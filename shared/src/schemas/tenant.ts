@@ -7,7 +7,7 @@ import { TenantRole } from '../constants/roles.js';
  */
 export const TenantSchema = z.object({
   /** Unique tenant identifier (UUID v4) */
-  id: z.string().uuid(),
+  id: z.uuid(),
   /** Tenant display name */
   name: z.string().min(1).max(100),
   /** URL-friendly slug for the tenant */
@@ -17,9 +17,9 @@ export const TenantSchema = z.object({
     .max(80)
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.string().datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 /** Inferred Tenant type */
@@ -67,9 +67,9 @@ export type UpdateTenant = z.infer<typeof UpdateTenantSchema>;
  */
 export const TenantMemberSchema = z.object({
   /** User ID of the member */
-  userId: z.string().uuid(),
+  userId: z.uuid(),
   /** Tenant ID */
-  tenantId: z.string().uuid(),
+  tenantId: z.uuid(),
   /** Role of the user within the tenant */
   role: z.enum(TenantRole),
 });

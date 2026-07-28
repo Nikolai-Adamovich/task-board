@@ -7,15 +7,15 @@ import { z } from 'zod';
  */
 export const UserSchema = z.object({
   /** Unique user identifier (UUID v4) */
-  id: z.string().uuid(),
+  id: z.uuid(),
   /** User's email address */
-  email: z.string().email(),
+  email: z.email(),
   /** User's display name */
   displayName: z.string().min(1).max(100),
   /** Account creation timestamp (ISO 8601) */
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.string().datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 /** Inferred User type */
@@ -26,7 +26,7 @@ export type User = z.infer<typeof UserSchema>;
  * Includes the plaintext password which will be hashed server-side.
  */
 export const CreateUserSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.email('Invalid email address'),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')

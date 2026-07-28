@@ -24,7 +24,7 @@ export const projectContracts = {
       page: z.coerce.number().int().positive().default(1),
       limit: z.coerce.number().int().min(1).max(100).default(20),
       search: z.string().optional(),
-      tenantId: z.string().uuid(),
+      tenantId: z.uuid(),
     }),
     response: z.object({
       data: z.array(ProjectSchema),
@@ -65,7 +65,7 @@ export const projectContracts = {
     method: 'POST' as const,
     path: '/projects/:id/members',
     body: z.object({
-      userId: z.string().uuid(),
+      userId: z.uuid(),
       role: z.enum(ProjectRole),
     }),
     response: ProjectMemberSchema,

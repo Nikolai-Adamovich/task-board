@@ -63,7 +63,7 @@ export const tenantContracts = {
     method: 'POST' as const,
     path: '/tenants/:id/members',
     body: z.object({
-      userId: z.string().uuid(),
+      userId: z.uuid(),
       role: z.enum(TenantRole),
     }),
     response: TenantMemberSchema,

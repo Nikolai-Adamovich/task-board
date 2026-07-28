@@ -7,27 +7,27 @@ import { SprintStatus } from '../constants/roles.js';
  */
 export const SprintSchema = z.object({
   /** Unique sprint identifier (UUID v4) */
-  id: z.string().uuid(),
+  id: z.uuid(),
   /** Owning tenant ID */
-  tenantId: z.string().uuid(),
+  tenantId: z.uuid(),
   /** Parent project ID */
-  projectId: z.string().uuid(),
+  projectId: z.uuid(),
   /** Sprint name (e.g., "Sprint 1") */
   name: z.string().min(1).max(100),
   /** Sprint start date (ISO 8601 date) */
-  startDate: z.string().datetime(),
+  startDate: z.iso.datetime(),
   /** Sprint end date (ISO 8601 date) */
-  endDate: z.string().datetime(),
+  endDate: z.iso.datetime(),
   /** Optional sprint goal description */
   goal: z.string().max(500).nullable().optional(),
   /** Sprint lifecycle status */
   status: z.enum(SprintStatus),
   /** IDs of tasks assigned to this sprint */
-  taskIds: z.array(z.string().uuid()),
+  taskIds: z.array(z.uuid()),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.string().datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 /** Inferred Sprint type */
@@ -38,8 +38,8 @@ export type Sprint = z.infer<typeof SprintSchema>;
  */
 export const CreateSprintSchema = z.object({
   name: z.string().min(1, 'Sprint name is required').max(100, 'Sprint name must be at most 100 characters'),
-  startDate: z.string().datetime('Invalid start date'),
-  endDate: z.string().datetime('Invalid end date'),
+  startDate: z.iso.datetime('Invalid start date'),
+  endDate: z.iso.datetime('Invalid end date'),
   goal: z.string().max(500).optional(),
 });
 
@@ -56,8 +56,8 @@ export const UpdateSprintSchema = z.object({
     .min(1, 'Sprint name cannot be empty')
     .max(100, 'Sprint name must be at most 100 characters')
     .optional(),
-  startDate: z.string().datetime('Invalid start date').optional(),
-  endDate: z.string().datetime('Invalid end date').optional(),
+  startDate: z.iso.datetime('Invalid start date').optional(),
+  endDate: z.iso.datetime('Invalid end date').optional(),
   goal: z.string().max(500).optional(),
   status: z.enum(SprintStatus).optional(),
 });

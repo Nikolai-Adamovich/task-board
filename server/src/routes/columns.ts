@@ -15,7 +15,7 @@ const UpdateColumnSchema = z.object({
   position: z.number().int().nonnegative().optional(),
 });
 const ReorderColumnsSchema = z.object({
-  columnIds: z.array(z.string().uuid()).min(1),
+  columnIds: z.array(z.uuid()).min(1),
 });
 
 // ─── Column Routes ───────────────────────────────────────────────────────────

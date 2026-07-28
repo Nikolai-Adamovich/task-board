@@ -7,9 +7,9 @@ import { ProjectRole } from '../constants/roles.js';
  */
 export const ProjectSchema = z.object({
   /** Unique project identifier (UUID v4) */
-  id: z.string().uuid(),
+  id: z.uuid(),
   /** Owning tenant ID */
-  tenantId: z.string().uuid(),
+  tenantId: z.uuid(),
   /** Project name */
   name: z.string().min(1).max(100),
   /** URL-friendly slug for the project */
@@ -21,9 +21,9 @@ export const ProjectSchema = z.object({
   /** Optional project description */
   description: z.string().max(500).nullable().optional(),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.string().datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 /** Inferred Project type */
@@ -73,11 +73,11 @@ export type UpdateProject = z.infer<typeof UpdateProjectSchema>;
  */
 export const ProjectMemberSchema = z.object({
   /** User ID of the member */
-  userId: z.string().uuid(),
+  userId: z.uuid(),
   /** Project ID */
-  projectId: z.string().uuid(),
+  projectId: z.uuid(),
   /** Tenant ID (denormalized for multi-tenant queries) */
-  tenantId: z.string().uuid(),
+  tenantId: z.uuid(),
   /** Role of the user within the project */
   role: z.enum(ProjectRole),
 });

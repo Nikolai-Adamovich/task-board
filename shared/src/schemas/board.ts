@@ -6,19 +6,19 @@ import { z } from 'zod';
  */
 export const BoardSchema = z.object({
   /** Unique board identifier (UUID v4) */
-  id: z.string().uuid(),
+  id: z.uuid(),
   /** Owning tenant ID */
-  tenantId: z.string().uuid(),
+  tenantId: z.uuid(),
   /** Parent project ID */
-  projectId: z.string().uuid(),
+  projectId: z.uuid(),
   /** Board name */
   name: z.string().min(1).max(100),
   /** Optional board description */
   description: z.string().max(500).nullable().optional(),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.string().datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 /** Inferred Board type */
@@ -60,11 +60,11 @@ export type UpdateBoard = z.infer<typeof UpdateBoardSchema>;
  */
 export const ColumnSchema = z.object({
   /** Unique column identifier (UUID v4) */
-  id: z.string().uuid(),
+  id: z.uuid(),
   /** Parent board ID */
-  boardId: z.string().uuid(),
+  boardId: z.uuid(),
   /** Owning tenant ID */
-  tenantId: z.string().uuid(),
+  tenantId: z.uuid(),
   /** Column display name */
   name: z.string().min(1).max(50),
   /** Position/order of the column within the board (0-based) */
@@ -72,7 +72,7 @@ export const ColumnSchema = z.object({
   /** Whether this is a default column (cannot be deleted) */
   isDefault: z.boolean(),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
 });
 
 /** Inferred Column type */

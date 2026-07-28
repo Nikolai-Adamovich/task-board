@@ -22,7 +22,7 @@ export const sprintContracts = {
     query: z.object({
       page: z.coerce.number().int().positive().default(1),
       limit: z.coerce.number().int().min(1).max(100).default(20),
-      projectId: z.string().uuid(),
+      projectId: z.uuid(),
       status: z.enum(['planned', 'active', 'completed']).optional(),
     }),
     response: z.object({

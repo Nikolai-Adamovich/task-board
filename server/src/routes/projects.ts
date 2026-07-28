@@ -13,7 +13,7 @@ import { z } from 'zod';
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const AddProjectMemberSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.uuid(),
   role: z.enum(ProjectRole),
 });
 const UpdateProjectMemberSchema = z.object({
