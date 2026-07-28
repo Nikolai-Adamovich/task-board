@@ -169,7 +169,6 @@ export default [
       'docs/',
       '**/*.mjs',
       '**/*.cjs',
-      'angular.json',
     ],
   },
   // Disables all @stylistic rules that conflict with Prettier.
