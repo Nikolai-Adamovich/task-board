@@ -2,7 +2,10 @@
 import baseConfig from '../eslint.config.js';
 import angular from 'angular-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const toFlatConfigArray = (config) => (Array.isArray(config) ? config : [config]);
 /**
  * Returns a copy of each config object with the given `files` pattern applied.
@@ -37,6 +40,17 @@ export default [
       ],
     },
     ignores: ['dist/**', '.angular/**'],
+  },
+  // Unit test spec files are in tsconfig.spec.json (excluded from tsconfig.app.json).
+  // Point them to the correct tsconfig so the ESLint project service resolves them.
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: path.resolve(__dirname, 'tsconfig.spec.json'),
+      },
+    },
   },
   // E2E tests (Playwright) are not part of any Angular project.
   // Disable project-service-dependent rules so TypeScript doesn't complain.
