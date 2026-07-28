@@ -1,0 +1,47 @@
+{
+  "name": "task-board",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "server",
+    "shared",
+    "ui"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "npm run build --workspace=shared && npm run build --workspace=server && npm run build --workspace=ui",
+    "build:shared": "npm run build --workspace=shared",
+    "build:server": "npm run build --workspace=server",
+    "build:ui": "npm run build --workspace=ui",
+    "test": "npm test --workspace=shared && npm test --workspace=server",
+    "test:shared": "npm test --workspace=shared",
+    "test:server": "npm test --workspace=server",
+    "test:e2e": "npm run e2e --workspace=ui",
+    "typecheck": "npm run typecheck --workspace=shared && npm run typecheck --workspace=server",
+    "deploy:server": "cd server && npx wrangler deploy",
+    "deploy:ui": "cd ui && npx wrangler pages deploy dist/ui/browser --project-name=task-board-ui",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "~6.0.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true
+  }
+}

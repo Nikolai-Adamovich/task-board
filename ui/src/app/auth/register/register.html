@@ -1,0 +1,53 @@
+<div class="flex min-h-screen items-center justify-center bg-surface-50">
+  <hlm-card class="w-full max-w-md">
+    <hlm-card-header>
+      <h3 hlmCardTitle>Create your account</h3>
+      <p hlmCardDescription>Fill in the details below to get started.</p>
+    </hlm-card-header>
+
+    <div hlmCardContent>
+      @if (error()) {
+      <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+        {{ error() }}
+      </div>
+      }
+
+      <form (submit)="onSubmit($event)">
+        <hlm-field-group>
+          <hlm-field>
+            <label hlmFieldLabel for="displayName">Display Name</label>
+            <input hlmInput id="displayName" type="text" [value]="displayName()" (input)="onDisplayNameInput($event)"
+              required autocomplete="name" placeholder="John Doe" />
+          </hlm-field>
+
+          <hlm-field>
+            <label hlmFieldLabel for="email">Email</label>
+            <input hlmInput id="email" type="email" [value]="email()" (input)="onEmailInput($event)" required
+              autocomplete="email" placeholder="you&#64;example.com" />
+          </hlm-field>
+
+          <hlm-field>
+            <label hlmFieldLabel for="password">Password</label>
+            <input hlmInput id="password" type="password" [value]="password()" (input)="onPasswordInput($event)"
+              required autocomplete="new-password" placeholder="••••••••" minlength="8" />
+            <p hlm-field-description>Must be at least 8 characters</p>
+          </hlm-field>
+        </hlm-field-group>
+      </form>
+    </div>
+
+    <hlm-card-footer class="flex-col gap-2">
+      <button hlmBtn type="submit" class="w-full" [disabled]="loading()" (click)="onSubmit($event)">
+        @if (loading()) {
+        <hlm-spinner /> Creating account...
+        } @else {
+        Create account
+        }
+      </button>
+      <p class="text-center text-sm text-muted-foreground">
+        Already have an account?
+        <a routerLink="/auth/login" class="font-medium text-primary hover:underline">Sign in</a>
+      </p>
+    </hlm-card-footer>
+  </hlm-card>
+</div>

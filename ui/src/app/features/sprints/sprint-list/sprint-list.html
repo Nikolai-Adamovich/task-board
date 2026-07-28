@@ -1,0 +1,93 @@
+<div class="mx-auto max-w-5xl">
+  <div class="mb-6 flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-foreground">Sprints</h2>
+    @if (canCreate()) {
+    <button hlmBtn (click)="showCreateModal.set(true)">
+      <ng-icon name="lucidePlus" class="mr-1" />
+      New Sprint
+    </button>
+    }
+  </div>
+
+  @if (loading()) {
+  <div class="flex items-center justify-center py-12">
+    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading sprints...</span>
+  </div>
+  } @else if (sprints().length === 0) {
+  <div class="rounded-lg border border-dashed border-border py-12 text-center">
+    <ng-icon name="lucideCalendar" class="mx-auto h-12 w-12 text-muted-foreground" />
+    <p class="mt-4 text-sm text-muted-foreground">No sprints yet.</p>
+    @if (canCreate()) {
+    <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">Create first sprint</button>
+    }
+  </div>
+  } @else {
+  <div class="space-y-3">
+    @for (sprint of sprints(); track sprint.id) {
+    <a [routerLink]="['/tenants', sprint.tenantId, 'projects', sprint.projectId, 'sprints', sprint.id]"
+      class="group flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30">
+      <div>
+        <div class="flex items-center gap-3">
+          <h3 class="text-base font-semibold text-foreground group-hover:text-primary">
+            {{ sprint.name }}
+          </h3>
+          <span hlmBadge [class]="getStatusColor(sprint.status)">
+            {{ sprint.status }}
+          </span>
+        </div>
+        @if (sprint.goal) {
+        <p class="mt-1 text-sm text-muted-foreground">{{ sprint.goal }}</p>
+        }
+        <p class="mt-1 text-xs text-muted-foreground">
+          {{ sprint.startDate | date:'mediumDate' }} — {{ sprint.endDate | date:'mediumDate' }}
+          &middot; {{ sprint.taskIds.length }} tasks
+        </p>
+      </div>
+      <ng-icon name="lucideChevronRight"
+        class="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+    </a>
+    }
+  </div>
+  }
+
+  <!-- Create Sprint Modal -->
+  <hlm-dialog [state]="showCreateModal() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>Create Sprint</h3>
+      </hlm-dialog-header>
+      <form (ngSubmit)="createSprint()" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="sprint-name">Name</label>
+          <input hlmInput id="sprint-name" type="text" [(ngModel)]="newSprint.name" name="name" required
+            placeholder="Sprint 1" />
+        </hlm-field>
+        <div class="grid grid-cols-2 gap-4">
+          <hlm-field>
+            <label hlmFieldLabel for="sprint-start">Start Date</label>
+            <input hlmInput id="sprint-start" type="date" [(ngModel)]="startDateStr" name="startDate" required />
+          </hlm-field>
+          <hlm-field>
+            <label hlmFieldLabel for="sprint-end">End Date</label>
+            <input hlmInput id="sprint-end" type="date" [(ngModel)]="endDateStr" name="endDate" required />
+          </hlm-field>
+        </div>
+        <hlm-field>
+          <label hlmFieldLabel for="sprint-goal">Goal</label>
+          <textarea hlmTextarea id="sprint-goal" [(ngModel)]="newSprint.goal" name="goal" rows="2"
+            placeholder="Optional sprint goal..."></textarea>
+        </hlm-field>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn (click)="createSprint()" [disabled]="creating()">
+          @if (creating()) {
+          <hlm-spinner /> Creating...
+          } @else {
+          Create Sprint
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</div>

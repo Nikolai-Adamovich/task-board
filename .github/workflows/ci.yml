@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=shared
+
+      - name: Lint all packages
+        run: npm run lint
+
+      - name: Run shared tests
+        run: npm test --workspace=shared
+
+      - name: Run server tests
+        run: npm test --workspace=server
+
+      - name: Type-check shared
+        run: npm run typecheck --workspace=shared
+
+      - name: Type-check server
+        run: npm run typecheck --workspace=server
+
+      - name: Build UI
+        run: npm run build --workspace=ui
+
+      # ─── Deployment steps (uncomment when secrets are configured) ────────
+      #
+      # - name: Deploy backend to Cloudflare Workers
+      #   uses: cloudflare/wrangler-action@v3
+      #   with:
+      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     workingDirectory: server
+      #     command: deploy
+      #
+      # - name: Deploy frontend to Cloudflare Pages
+      #   uses: cloudflare/wrangler-action@v3
+      #   with:
+      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     workingDirectory: ui
+      #     command: pages deploy dist/ui/browser --project-name=task-board-ui

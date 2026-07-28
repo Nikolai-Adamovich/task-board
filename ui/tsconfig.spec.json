@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec",
+    "types": ["vitest"],
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "useDefineForClassFields": false,
+    "lib": ["ES2022", "dom"],
+    "paths": {
+      "@task-board/shared": ["../../shared/src/index.ts"]
+    }
+  },
+  "files": [],
+  "include": ["src/**/*.spec.ts", "src/**/*.test.ts"]
+}

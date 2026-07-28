@@ -1,0 +1,11 @@
+name = "task-board-api"
+main = "src/index.ts"
+compatibility_date = "2025-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+MONGODB_URI = ""
+JWT_SECRET = ""
+
+# Comma-separated list of allowed origins for CORS. Use "*" for development.
+ALLOWED_ORIGINS = "*"

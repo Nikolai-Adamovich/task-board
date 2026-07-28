@@ -1,0 +1,68 @@
+@if (loading()) {
+<div class="flex items-center justify-center py-12">
+  <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading sprint...</span>
+</div>
+} @else if (sprint(); as s) {
+<div class="mx-auto max-w-5xl">
+  <!-- Sprint header -->
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <div class="flex items-center gap-3">
+        <h2 class="text-2xl font-bold text-foreground">{{ s.name }}</h2>
+        <span hlmBadge [class]="getStatusColor(s.status)">
+          {{ s.status }}
+        </span>
+      </div>
+      @if (s.goal) {
+      <p class="mt-1 text-sm text-muted-foreground">{{ s.goal }}</p>
+      }
+      <p class="mt-1 text-xs text-muted-foreground">
+        {{ s.startDate | date:'mediumDate' }} — {{ s.endDate | date:'mediumDate' }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Sprint tasks -->
+  <section>
+    <div class="mb-4 flex items-center justify-between">
+      <h3 class="text-lg font-semibold text-foreground">
+        Tasks <span class="text-sm font-normal text-muted-foreground">({{ sprintTasks().length }})</span>
+      </h3>
+      <button hlmBtn variant="outline" size="sm" [routerLink]="['/tenants', s.tenantId, 'projects', s.projectId]">
+        Back to Project
+      </button>
+    </div>
+
+    @if (sprintTasks().length === 0) {
+    <div class="rounded-lg border border-dashed border-border py-8 text-center">
+      <p class="text-sm text-muted-foreground">No tasks in this sprint.</p>
+    </div>
+    } @else {
+    <div class="space-y-2">
+      @for (task of sprintTasks(); track task.id) {
+      <div class="flex items-center justify-between rounded-lg border border-border bg-card p-3">
+        <div class="flex items-center gap-3">
+          <span class="h-2 w-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
+          <a [routerLink]="['/tenants', task.tenantId, 'projects', task.projectId, 'tasks', task.id]"
+            class="text-sm font-medium text-foreground hover:text-primary hover:underline">
+            {{ task.title }}
+          </a>
+        </div>
+        <div class="flex items-center gap-2">
+          <span hlmBadge variant="outline" class="text-[10px] uppercase" [class]="getPriorityBadge(task.priority)">
+            {{ task.priority }}
+          </span>
+          @if (canManage()) {
+          <button hlmBtn variant="ghost" size="icon-xs" (click)="removeTaskFromSprint(task.id)"
+            title="Remove from sprint">
+            <ng-icon name="lucideX" />
+          </button>
+          }
+        </div>
+      </div>
+      }
+    </div>
+    }
+  </section>
+</div>
+}
