@@ -61,6 +61,7 @@ describe('TenantRepository', () => {
       collection.findOne.mockResolvedValue(null);
 
       const result = await repo.findById('missing');
+
       expect(result).toBeNull();
     });
   });
@@ -73,7 +74,7 @@ describe('TenantRepository', () => {
 
       expect(collection.findOne).toHaveBeenCalledWith({ slug: 'test-tenant' });
       expect(result).not.toBeNull();
-      expect(result!.slug).toBe('test-tenant');
+      expect(result?.slug).toBe('test-tenant');
     });
   });
 
@@ -82,13 +83,14 @@ describe('TenantRepository', () => {
       const toArray = vi
         .fn()
         .mockResolvedValue([makeDoc(), makeDoc({ id: 'tenant-456', name: 'Other', slug: 'other' })]);
+
       collection.find.mockReturnValue({ toArray });
 
       const result = await repo.findAll();
 
       expect(result).toHaveLength(2);
-      expect(result[0]!.id).toBe('tenant-123');
-      expect(result[1]!.id).toBe('tenant-456');
+      expect(result[0]?.id).toBe('tenant-123');
+      expect(result[1]?.id).toBe('tenant-456');
     });
   });
 
@@ -99,7 +101,9 @@ describe('TenantRepository', () => {
       const result = await repo.create({ name: 'New Tenant', slug: 'new-tenant' });
 
       expect(collection.insertOne).toHaveBeenCalledTimes(1);
-      const insertedDoc = collection.insertOne.mock.calls[0]![0] as TenantDocument;
+
+      const insertedDoc = collection.insertOne.mock.calls[0]?.[0] as TenantDocument;
+
       expect(insertedDoc.name).toBe('New Tenant');
       expect(insertedDoc.slug).toBe('new-tenant');
       expect(insertedDoc.id).toBeDefined();
@@ -116,6 +120,7 @@ describe('TenantRepository', () => {
   describe('update', () => {
     it('returns the updated tenant', async () => {
       const updated = makeDoc({ name: 'Updated' });
+
       collection.findOneAndUpdate.mockResolvedValue(updated);
 
       const result = await repo.update('tenant-123', { name: 'Updated' });
@@ -125,13 +130,14 @@ describe('TenantRepository', () => {
         { $set: { name: 'Updated', updatedAt: expect.any(Date) } },
         { returnDocument: 'after' },
       );
-      expect(result!.name).toBe('Updated');
+      expect(result?.name).toBe('Updated');
     });
 
     it('returns null when tenant not found', async () => {
       collection.findOneAndUpdate.mockResolvedValue(null);
 
       const result = await repo.update('missing', { name: 'X' });
+
       expect(result).toBeNull();
     });
   });
@@ -149,6 +155,7 @@ describe('TenantRepository', () => {
       collection.deleteOne.mockResolvedValue({ deletedCount: 0 } as DeleteResult);
 
       const result = await repo.delete('missing');
+
       expect(result).toBe(false);
     });
   });

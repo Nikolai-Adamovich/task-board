@@ -34,7 +34,6 @@ function createMockTenantMemberRepo() {
 }
 
 const NOW = '2025-01-01T00:00:00.000Z';
-
 const TEST_SECRET = 'test-jwt-secret-for-auth-service';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -90,8 +89,10 @@ describe('AuthService', () => {
           displayName: 'New User',
         }),
       );
+
       // Password should be hashed (not plaintext)
-      const createCall = userRepo.create.mock.calls[0]![0];
+      const createCall = userRepo.create.mock.calls[0]?.[0];
+
       expect(createCall.passwordHash).not.toBe('securepass123');
       expect(createCall.passwordHash.length).toBeGreaterThan(10);
 
@@ -237,10 +238,9 @@ describe('AuthService', () => {
         password: 'securepass123',
         displayName: 'New User',
       });
-
       // Decode the JWT payload (base64url)
       const parts = result.token.split('.');
-      const payloadJson = atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/'));
+      const payloadJson = atob((parts[1] ?? '').replace(/-/g, '+').replace(/_/g, '/'));
       const payload = JSON.parse(payloadJson);
 
       expect(payload.sub).toBe('user-1');

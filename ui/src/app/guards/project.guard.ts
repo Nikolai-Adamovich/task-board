@@ -9,7 +9,6 @@ import { TenantClient } from '../services/tenant-client';
 export const projectGuard: CanActivateFn = (route) => {
   const tenantService = inject(TenantClient);
   const router = inject(Router);
-
   const tenantId = route.paramMap.get('tenantId');
   const projectId = route.paramMap.get('projectId');
 

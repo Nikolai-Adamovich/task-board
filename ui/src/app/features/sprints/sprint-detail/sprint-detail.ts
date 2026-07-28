@@ -19,7 +19,7 @@ const statusColorMap: Record<string, string> = {
 };
 
 @Component({
-  selector: 'app-sprint-detail',
+  selector: 'ui-sprint-detail',
   imports: [RouterLink, DatePipe, NgIcon, HlmButtonImports, HlmSpinnerImports, HlmBadgeImports],
   providers: [provideIcons({ lucideX })],
   templateUrl: './sprint-detail.html',
@@ -28,10 +28,8 @@ export class SprintDetail implements OnInit {
   private readonly sprintService = inject(SprintClient);
   private readonly taskService = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
-
   /** Bound via withComponentInputBinding() */
   readonly sprintId = input.required<string>();
-
   protected readonly sprint = signal<Sprint | null>(null);
   protected readonly sprintTasks = signal<Task[]>([]);
   protected readonly loading = signal(true);
@@ -51,6 +49,7 @@ export class SprintDetail implements OnInit {
       high: 'bg-orange-500',
       critical: 'bg-red-500',
     };
+
     return map[priority] ?? 'bg-gray-500';
   }
 
@@ -61,6 +60,7 @@ export class SprintDetail implements OnInit {
       high: 'bg-orange-100 text-orange-700',
       critical: 'bg-red-100 text-red-700',
     };
+
     return map[priority] ?? 'bg-gray-100 text-gray-700';
   }
 
@@ -89,6 +89,7 @@ export class SprintDetail implements OnInit {
 
   protected removeTaskFromSprint(taskId: string): void {
     const s = this.sprint();
+
     if (!s) return;
     this.sprintService.removeTask(s.id, taskId).subscribe({
       next: () => {

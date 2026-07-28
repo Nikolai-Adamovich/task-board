@@ -15,7 +15,6 @@ async function createTestToken(
   expired = false,
 ): Promise<string> {
   const encoder = new TextEncoder();
-
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const tokenPayload = {
@@ -23,14 +22,11 @@ async function createTestToken(
     iat: now,
     exp: expired ? now - 3600 : now + 3600,
   };
-
   const headerB64 = btoa(JSON.stringify(header)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const payloadB64 = btoa(JSON.stringify(tokenPayload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
   const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
     'sign',
   ]);
-
   const data = encoder.encode(`${headerB64}.${payloadB64}`);
   const signature = await crypto.subtle.sign('HMAC', key, data);
   const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
@@ -43,11 +39,13 @@ async function createTestToken(
 
 function createTestApp() {
   const app = new Hono<AppEnv>();
+
   app.onError(errorHandler);
   app.use('/protected/*', authMiddleware);
   app.get('/protected/me', (c) => {
     const userId = c.get('userId');
     const user = c.get('user');
+
     return c.json({ userId, user });
   });
   return app;
@@ -66,8 +64,11 @@ describe('authMiddleware', () => {
 
   it('returns 401 when Authorization header is missing', async () => {
     const res = await requestWithEnv(app, '/protected/me');
+
     expect(res.status).toBe(401);
+
     const body = (await res.json()) as Record<string, unknown>;
+
     expect(body.code).toBe('UNAUTHORIZED');
   });
 
@@ -75,6 +76,7 @@ describe('authMiddleware', () => {
     const res = await requestWithEnv(app, '/protected/me', {
       headers: { Authorization: 'Basic abc123' },
     });
+
     expect(res.status).toBe(401);
   });
 
@@ -82,6 +84,7 @@ describe('authMiddleware', () => {
     const res = await requestWithEnv(app, '/protected/me', {
       headers: { Authorization: 'Bearer invalid.token.here' },
     });
+
     expect(res.status).toBe(401);
   });
 
@@ -91,10 +94,10 @@ describe('authMiddleware', () => {
       TEST_SECRET,
       true,
     );
-
     const res = await requestWithEnv(app, '/protected/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
+
     expect(res.status).toBe(401);
   });
 
@@ -103,10 +106,10 @@ describe('authMiddleware', () => {
       { sub: 'user-1', email: 'test@example.com', tenantId: 't1', tenantRole: 'member' },
       'wrong-secret',
     );
-
     const res = await requestWithEnv(app, '/protected/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
+
     expect(res.status).toBe(401);
   });
 
@@ -118,13 +121,14 @@ describe('authMiddleware', () => {
       tenantId: 'tenant-1',
       tenantRole: 'member',
     });
-
     const res = await requestWithEnv(app, '/protected/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     expect(res.status).toBe(200);
+
     const body = (await res.json()) as { userId: string; user: { id: string; email: string; displayName: string } };
+
     expect(body.userId).toBe('user-123');
     expect(body.user.id).toBe('user-123');
     expect(body.user.email).toBe('test@example.com');

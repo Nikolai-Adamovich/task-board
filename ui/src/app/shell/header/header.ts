@@ -4,7 +4,7 @@ import { TenantSwitcher } from '../tenant-switcher/tenant-switcher';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 
 @Component({
-  selector: 'app-header',
+  selector: 'ui-header',
   imports: [TenantSwitcher, HlmButtonImports],
   templateUrl: './header.html',
 })

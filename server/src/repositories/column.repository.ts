@@ -36,11 +36,13 @@ export class ColumnRepository {
 
   async findById(tenantId: string, id: string): Promise<Column | null> {
     const doc = await this.collection.findOne({ id, tenantId });
+
     return doc ? toDomain(doc) : null;
   }
 
   async findByBoard(tenantId: string, boardId: string): Promise<Column[]> {
     const docs = await this.collection.find({ tenantId, boardId }).sort({ position: 1 }).toArray();
+
     return docs.map(toDomain);
   }
 
@@ -83,6 +85,7 @@ export class ColumnRepository {
 
   async delete(tenantId: string, id: string): Promise<boolean> {
     const result = await this.collection.deleteOne({ id, tenantId });
+
     return result.deletedCount > 0;
   }
 

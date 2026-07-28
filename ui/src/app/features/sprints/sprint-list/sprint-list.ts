@@ -24,7 +24,7 @@ const statusColorMap: Record<string, string> = {
 };
 
 @Component({
-  selector: 'app-sprint-list',
+  selector: 'ui-sprint-list',
   imports: [
     RouterLink,
     DatePipe,
@@ -44,10 +44,8 @@ const statusColorMap: Record<string, string> = {
 export class SprintList implements OnInit {
   private readonly sprintService = inject(SprintClient);
   private readonly authStore = inject(AuthStore);
-
   /** Bound via withComponentInputBinding() */
   readonly projectId = input.required<string>();
-
   protected readonly sprints = signal<Sprint[]>([]);
   protected readonly loading = signal(true);
   protected readonly creating = signal(false);
@@ -91,12 +89,14 @@ export class SprintList implements OnInit {
   protected createSprint(): void {
     if (!this.newSprint.name || !this.startDateStr || !this.endDateStr) return;
     this.creating.set(true);
+
     const data: CreateSprint = {
       name: this.newSprint.name,
       startDate: new Date(this.startDateStr).toISOString(),
       endDate: new Date(this.endDateStr).toISOString(),
       goal: this.newSprint.goal,
     };
+
     this.sprintService.create(this.projectId(), data).subscribe({
       next: (sprint) => {
         this.sprints.update((list) => [...list, sprint]);

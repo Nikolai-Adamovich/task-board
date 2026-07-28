@@ -30,16 +30,19 @@ export class ProjectMemberRepository {
 
   async findByProjectAndUser(projectId: string, userId: string): Promise<ProjectMember | null> {
     const doc = await this.collection.findOne({ userId, projectId });
+
     return doc ? toDomain(doc) : null;
   }
 
   async findByProject(projectId: string): Promise<ProjectMember[]> {
     const docs = await this.collection.find({ projectId }).toArray();
+
     return docs.map(toDomain);
   }
 
   async findByUser(userId: string, tenantId: string): Promise<ProjectMember[]> {
     const docs = await this.collection.find({ userId, tenantId }).toArray();
+
     return docs.map(toDomain);
   }
 
@@ -68,6 +71,7 @@ export class ProjectMemberRepository {
 
   async delete(projectId: string, userId: string): Promise<boolean> {
     const result = await this.collection.deleteOne({ userId, projectId });
+
     return result.deletedCount > 0;
   }
 }

@@ -7,20 +7,17 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import type { Task, Sprint } from '@task-board/shared';
 
 @Component({
-  selector: 'app-sprint-backlog',
+  selector: 'ui-sprint-backlog',
   imports: [HlmButtonImports, HlmSpinnerImports, HlmCardImports],
   templateUrl: './sprint-backlog.html',
 })
 export class SprintBacklog implements OnInit {
   private readonly taskService = inject(TaskClient);
   private readonly sprintService = inject(SprintClient);
-
   readonly projectId = input.required<string>();
   readonly boardId = input<string>('');
   readonly targetSprint = input<Sprint | null>(null);
-
   readonly taskAdded = output<string>();
-
   protected readonly backlogTasks = signal<Task[]>([]);
   protected readonly loading = signal(true);
 
@@ -31,6 +28,7 @@ export class SprintBacklog implements OnInit {
       high: 'bg-orange-500',
       critical: 'bg-red-500',
     };
+
     return map[priority] ?? 'bg-gray-500';
   }
 
@@ -52,6 +50,7 @@ export class SprintBacklog implements OnInit {
 
   protected addTaskToSprint(taskId: string): void {
     const sprint = this.targetSprint();
+
     if (!sprint) return;
     this.sprintService.addTask(sprint.id, taskId).subscribe({
       next: () => {

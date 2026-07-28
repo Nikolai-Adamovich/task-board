@@ -11,7 +11,7 @@ const priorityColorMap: Record<string, string> = {
 };
 
 @Component({
-  selector: 'app-task-card',
+  selector: 'ui-task-card',
   imports: [HlmBadgeImports, HlmAvatarImports],
   host: {
     class: 'block',

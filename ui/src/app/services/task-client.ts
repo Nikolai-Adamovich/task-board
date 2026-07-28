@@ -31,6 +31,7 @@ export class TaskClient {
   /** List tasks with optional filters */
   list(query: TaskQuery = {}): Observable<PaginatedResponse<Task>> {
     let params = new HttpParams();
+
     if (query.projectId) params = params.set('projectId', query.projectId);
     if (query.boardId) params = params.set('boardId', query.boardId);
     if (query.columnId) params = params.set('columnId', query.columnId);
@@ -58,7 +59,7 @@ export class TaskClient {
 
   /** Delete a task */
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/tasks/${id}`);
+    return this.http.delete<null>(`${this.baseUrl}/tasks/${id}`) as unknown as Observable<void>;
   }
 
   /** Move a task to a different column */

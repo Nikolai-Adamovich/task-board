@@ -15,6 +15,7 @@ test.describe('Board', () => {
 
       // Verify page loads (may redirect to login)
       const url = page.url();
+
       expect(url).toBeTruthy();
     });
   });
@@ -25,6 +26,7 @@ test.describe('Board', () => {
 
       // Look for board creation elements
       const heading = page.locator('h1, h2, h3');
+
       // Page should have some heading content
       await expect(heading.first()).toBeVisible();
     });

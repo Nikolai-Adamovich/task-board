@@ -1,0 +1,73 @@
+// UI-specific ESLint overrides
+import baseConfig from '../eslint.config.js';
+import angular from 'angular-eslint';
+import eslintConfigPrettier from 'eslint-config-prettier';
+
+const toFlatConfigArray = (config) => (Array.isArray(config) ? config : [config]);
+/**
+ * Returns a copy of each config object with the given `files` pattern applied.
+ * Needed because angular-eslint's shared template configs ship without a
+ * `files` filter, which would otherwise make the Angular template parser run
+ * on `.ts` files and crash.
+ */
+const withFiles = (configs, files) => toFlatConfigArray(configs).map((config) => ({ ...config, files }));
+
+export default [
+  ...baseConfig,
+  ...toFlatConfigArray(angular.configs.tsRecommended),
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+      },
+    },
+    processor: angular.processInlineTemplates,
+    rules: {
+      // UI-specific rules
+      '@angular-eslint/component-max-inline-declarations': ['error', { animations: 15, styles: 0, template: 0 }],
+      '@angular-eslint/component-selector': [
+        'error',
+        { type: ['attribute', 'element'], prefix: 'ui', style: 'kebab-case' },
+      ],
+      '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'ui', style: 'camelCase' }],
+      '@typescript-eslint/no-extraneous-class': [
+        'error',
+        { allowConstructorOnly: true, allowEmpty: true, allowWithDecorator: true },
+      ],
+    },
+    ignores: ['dist/**', '.angular/**'],
+  },
+  // E2E tests (Playwright) are not part of any Angular project.
+  // Disable project-service-dependent rules so TypeScript doesn't complain.
+  {
+    files: ['e2e/**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: null,
+      },
+    },
+    rules: {
+      '@angular-eslint/component-selector': 'off',
+      '@angular-eslint/directive-selector': 'off',
+      '@angular-eslint/component-max-inline-declarations': 'off',
+    },
+  },
+  // Spartan UI library (libs/) uses 'hlm-' selectors and different code conventions.
+  // Relax project-specific rules that don't apply to generated library code.
+  {
+    files: ['libs/**/*.ts'],
+    rules: {
+      '@angular-eslint/component-selector': 'off',
+      '@angular-eslint/directive-selector': 'off',
+      '@angular-eslint/component-max-inline-declarations': 'off',
+      '@stylistic/lines-between-class-members': 'off',
+      '@stylistic/padding-line-between-statements': 'off',
+    },
+  },
+  ...withFiles(angular.configs.templateRecommended, ['**/*.html']),
+  ...withFiles(angular.configs.templateAccessibility, ['**/*.html']),
+  // Must be last — disables @stylistic / @angular-eslint rules that conflict with Prettier.
+  eslintConfigPrettier,
+];

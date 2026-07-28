@@ -28,18 +28,14 @@ function base64UrlEncode(data: string): string {
  */
 async function signJwt(payload: JwtPayload, secret: string): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
-
   const headerB64 = base64UrlEncode(JSON.stringify(header));
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
-
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
     'sign',
   ]);
-
   const data = encoder.encode(`${headerB64}.${payloadB64}`);
   const signatureBuffer = await crypto.subtle.sign('HMAC', key, data);
-
   // Convert ArrayBuffer to base64url
   const signatureArray = new Uint8Array(signatureBuffer);
   const signatureB64 = btoa(String.fromCharCode(...signatureArray))
@@ -72,20 +68,19 @@ export class AuthService {
   async register(input: RegisterRequest): Promise<AuthResponse> {
     // Check if email is already taken
     const existingUser = await this.userRepo.findByEmail(input.email);
+
     if (existingUser) {
       throw new ConflictError('A user with this email already exists');
     }
 
     // Hash the password
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
-
     // Create the user
     const user = await this.userRepo.create({
       email: input.email,
       displayName: input.displayName,
       passwordHash,
     });
-
     // Auto-create a personal tenant using the user's display name
     const slug = this.generateSlug(input.displayName);
     const tenant = await this.tenantRepo.create({
@@ -111,11 +106,13 @@ export class AuthService {
    */
   async login(input: LoginRequest): Promise<AuthResponse> {
     const userDoc = await this.userRepo.findByEmail(input.email);
+
     if (!userDoc) {
       throw new UnauthorizedError('Invalid email or password');
     }
 
     const passwordValid = await bcrypt.compare(input.password, userDoc.passwordHash);
+
     if (!passwordValid) {
       throw new UnauthorizedError('Invalid email or password');
     }
@@ -123,7 +120,6 @@ export class AuthService {
     // Find the user's first tenant membership for the token
     const memberships = await this.tenantMemberRepo.findByUser(userDoc.id);
     const membership = memberships[0];
-
     const user: User = {
       id: userDoc.id,
       email: userDoc.email,
@@ -131,7 +127,6 @@ export class AuthService {
       createdAt: userDoc.createdAt.toISOString(),
       updatedAt: userDoc.updatedAt.toISOString(),
     };
-
     const token = await this.generateToken(user, membership?.tenantId ?? '', membership?.role ?? 'member');
 
     return { token, user };
@@ -142,6 +137,7 @@ export class AuthService {
    */
   async me(userId: string): Promise<User> {
     const user = await this.userRepo.findById(userId);
+
     if (!user) {
       throw new NotFoundError('User not found');
     }
@@ -171,6 +167,7 @@ export class AuthService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
     const suffix = randomUUID().slice(0, 8);
+
     return `${base}-${suffix}`;
   }
 }

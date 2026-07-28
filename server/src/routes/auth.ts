@@ -33,7 +33,6 @@ export function createAuthRoutes(): Hono<AppEnv> {
       password: string;
       displayName: string;
     };
-
     const service = createAuthService(c);
     const result = await service.register(body);
 
@@ -49,7 +48,6 @@ export function createAuthRoutes(): Hono<AppEnv> {
       email: string;
       password: string;
     };
-
     const service = createAuthService(c);
     const result = await service.login(body);
 

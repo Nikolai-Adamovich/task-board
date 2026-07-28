@@ -10,7 +10,7 @@ import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import type { Project } from '@task-board/shared';
 
 @Component({
-  selector: 'app-dashboard',
+  selector: 'ui-dashboard',
   imports: [RouterLink, DatePipe, HlmSpinnerImports, HlmCardImports, HlmAvatarImports],
   templateUrl: './dashboard.html',
 })
@@ -18,7 +18,6 @@ export class Dashboard implements OnInit {
   protected readonly authStore = inject(AuthStore);
   protected readonly tenantService = inject(TenantClient);
   private readonly projectService = inject(ProjectClient);
-
   protected readonly projects = signal<Project[]>([]);
   protected readonly loading = signal(true);
 

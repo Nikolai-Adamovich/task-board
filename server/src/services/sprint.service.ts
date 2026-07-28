@@ -42,6 +42,7 @@ export class SprintService {
    */
   async getSprint(tenantId: string, id: string): Promise<{ sprint: Sprint; tasks: Task[] }> {
     const sprint = await this.sprintRepo.findById(tenantId, id);
+
     if (!sprint) {
       throw new NotFoundError('Sprint not found');
     }
@@ -81,11 +82,13 @@ export class SprintService {
 
     // Clear sprintId on all tasks in this sprint
     const tasks = await this.taskRepo.findBySprint(tenantId, id);
+
     for (const task of tasks) {
       await this.taskRepo.update(tenantId, task.id, { sprintId: null });
     }
 
     const deleted = await this.sprintRepo.delete(tenantId, id);
+
     if (!deleted) {
       throw new NotFoundError('Sprint not found');
     }
@@ -141,6 +144,7 @@ export class SprintService {
 
   private async requireProject(tenantId: string, projectId: string) {
     const project = await this.projectRepo.findById(tenantId, projectId);
+
     if (!project) {
       throw new NotFoundError('Project not found');
     }
@@ -149,6 +153,7 @@ export class SprintService {
 
   private async requireSprint(tenantId: string, sprintId: string): Promise<Sprint> {
     const sprint = await this.sprintRepo.findById(tenantId, sprintId);
+
     if (!sprint) {
       throw new NotFoundError('Sprint not found');
     }
@@ -157,6 +162,7 @@ export class SprintService {
 
   private async requireTask(tenantId: string, taskId: string): Promise<Task> {
     const task = await this.taskRepo.findById(tenantId, taskId);
+
     if (!task) {
       throw new NotFoundError('Task not found');
     }

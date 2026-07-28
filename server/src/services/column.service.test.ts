@@ -153,7 +153,7 @@ describe('ColumnService', () => {
 
       expect(columnRepo.reorder).toHaveBeenCalledWith('tenant-1', 'board-1', ['col-3', 'col-1', 'col-2']);
       expect(result).toHaveLength(3);
-      expect(result[0]!.id).toBe('col-3');
+      expect(result[0]?.id).toBe('col-3');
     });
 
     it('throws ForbiddenError when user is not admin', async () => {

@@ -19,6 +19,7 @@ export class TenantService {
   async createTenant(userId: string, input: CreateTenant): Promise<Tenant> {
     // Check slug uniqueness
     const existing = await this.tenantRepo.findBySlug(input.slug);
+
     if (existing) {
       throw new ConflictError(`Tenant with slug "${input.slug}" already exists`);
     }
@@ -44,6 +45,7 @@ export class TenantService {
 
     for (const membership of memberships) {
       const tenant = await this.tenantRepo.findById(membership.tenantId);
+
       if (tenant) {
         tenants.push(tenant);
       }
@@ -57,6 +59,7 @@ export class TenantService {
    */
   async getTenant(id: string): Promise<Tenant> {
     const tenant = await this.tenantRepo.findById(id);
+
     if (!tenant) {
       throw new NotFoundError('Tenant not found');
     }
@@ -68,6 +71,7 @@ export class TenantService {
    */
   async updateTenant(userId: string, id: string, input: UpdateTenant): Promise<Tenant> {
     const membership = await this.requireMembership(userId, id);
+
     if (membership.role !== 'owner' && membership.role !== 'admin') {
       throw new ForbiddenError('Only owner or admin can update the tenant');
     }
@@ -75,12 +79,14 @@ export class TenantService {
     // Check slug uniqueness if slug is being changed
     if (input.slug) {
       const existing = await this.tenantRepo.findBySlug(input.slug);
+
       if (existing && existing.id !== id) {
         throw new ConflictError(`Tenant with slug "${input.slug}" already exists`);
       }
     }
 
     const tenant = await this.tenantRepo.update(id, input);
+
     if (!tenant) {
       throw new NotFoundError('Tenant not found');
     }
@@ -93,17 +99,20 @@ export class TenantService {
    */
   async deleteTenant(userId: string, id: string): Promise<void> {
     const membership = await this.requireMembership(userId, id);
+
     if (membership.role !== 'owner') {
       throw new ForbiddenError('Only the owner can delete the tenant');
     }
 
     const deleted = await this.tenantRepo.delete(id);
+
     if (!deleted) {
       throw new NotFoundError('Tenant not found');
     }
 
     // Clean up all memberships for this tenant
     const members = await this.tenantMemberRepo.findByTenant(id);
+
     for (const member of members) {
       await this.tenantMemberRepo.delete(id, member.userId);
     }
@@ -117,18 +126,21 @@ export class TenantService {
    */
   async inviteMember(requesterId: string, tenantId: string, email: string, role: string): Promise<TenantMember> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
+
     if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
       throw new ForbiddenError('Only owner or admin can invite members');
     }
 
     // Find the user by email
     const user = await this.userRepo.findByEmail(email);
+
     if (!user) {
       throw new NotFoundError(`User with email "${email}" not found`);
     }
 
     // Check if already a member
     const existing = await this.tenantMemberRepo.findByUserAndTenant(user.id, tenantId);
+
     if (existing) {
       throw new ConflictError('User is already a member of this tenant');
     }
@@ -145,17 +157,20 @@ export class TenantService {
    */
   async updateMemberRole(requesterId: string, tenantId: string, userId: string, role: string): Promise<TenantMember> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
+
     if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
       throw new ForbiddenError('Only owner or admin can update member roles');
     }
 
     // Cannot change the owner's role
     const targetMembership = await this.requireMembership(userId, tenantId);
+
     if (targetMembership.role === 'owner') {
       throw new ForbiddenError("Cannot change the owner's role");
     }
 
     const updated = await this.tenantMemberRepo.updateRole(tenantId, userId, role);
+
     if (!updated) {
       throw new NotFoundError('Member not found');
     }
@@ -169,12 +184,14 @@ export class TenantService {
    */
   async removeMember(requesterId: string, tenantId: string, userId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
+
     if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
       throw new ForbiddenError('Only owner or admin can remove members');
     }
 
     // Cannot remove the owner
     const targetMembership = await this.requireMembership(userId, tenantId);
+
     if (targetMembership.role === 'owner') {
       throw new ForbiddenError('Cannot remove the owner from the tenant');
     }
@@ -193,6 +210,7 @@ export class TenantService {
 
   private async requireMembership(userId: string, tenantId: string): Promise<TenantMember> {
     const membership = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
+
     if (!membership) {
       throw new ForbiddenError('You are not a member of this tenant');
     }

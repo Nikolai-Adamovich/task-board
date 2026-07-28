@@ -20,37 +20,44 @@ describe('TenantSchema', () => {
 
   it('should accept a valid tenant', () => {
     const result = TenantSchema.safeParse(validTenant);
+
     expect(result.success).toBe(true);
   });
 
   it('should reject empty name', () => {
     const result = TenantSchema.safeParse({ ...validTenant, name: '' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject invalid slug (starts with hyphen)', () => {
     const result = TenantSchema.safeParse({ ...validTenant, slug: '-bad-slug' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject slug with uppercase letters', () => {
     const result = TenantSchema.safeParse({ ...validTenant, slug: 'Bad-Slug' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject slug ending with hyphen', () => {
     const result = TenantSchema.safeParse({ ...validTenant, slug: 'bad-slug-' });
+
     expect(result.success).toBe(false);
   });
 
   it('should accept single-character slug name (boundary: 2 min)', () => {
     // Minimum slug length is 2
     const result = TenantSchema.safeParse({ ...validTenant, slug: 'ab' });
+
     expect(result.success).toBe(true);
   });
 
   it('should reject single-character slug', () => {
     const result = TenantSchema.safeParse({ ...validTenant, slug: 'a' });
+
     expect(result.success).toBe(false);
   });
 });
@@ -63,6 +70,7 @@ describe('CreateTenantSchema', () => {
       name: 'New Org',
       slug: 'new-org',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -71,6 +79,7 @@ describe('CreateTenantSchema', () => {
       name: '',
       slug: 'new-org',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -79,6 +88,7 @@ describe('CreateTenantSchema', () => {
       name: 'a'.repeat(101),
       slug: 'new-org',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -87,6 +97,7 @@ describe('CreateTenantSchema', () => {
       name: 'Org',
       slug: 'a'.repeat(81),
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -95,6 +106,7 @@ describe('CreateTenantSchema', () => {
       name: 'Org',
       slug: 'has spaces',
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -104,16 +116,19 @@ describe('CreateTenantSchema', () => {
 describe('UpdateTenantSchema', () => {
   it('should accept partial update with name only', () => {
     const result = UpdateTenantSchema.safeParse({ name: 'Updated Name' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept partial update with slug only', () => {
     const result = UpdateTenantSchema.safeParse({ slug: 'updated-slug' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept empty update (all optional)', () => {
     const result = UpdateTenantSchema.safeParse({});
+
     expect(result.success).toBe(true);
   });
 });
@@ -129,23 +144,27 @@ describe('TenantMemberSchema', () => {
 
   it('should accept a valid tenant member', () => {
     const result = TenantMemberSchema.safeParse(validMember);
+
     expect(result.success).toBe(true);
   });
 
   it('should accept all tenant roles', () => {
     for (const role of ['owner', 'admin', 'member'] as const) {
       const result = TenantMemberSchema.safeParse({ ...validMember, role });
+
       expect(result.success).toBe(true);
     }
   });
 
   it('should reject invalid role', () => {
     const result = TenantMemberSchema.safeParse({ ...validMember, role: 'superadmin' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject invalid userId UUID', () => {
     const result = TenantMemberSchema.safeParse({ ...validMember, userId: 'bad' });
+
     expect(result.success).toBe(false);
   });
 });

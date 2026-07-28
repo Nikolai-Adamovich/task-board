@@ -13,6 +13,7 @@ test.describe('Tasks', () => {
 
       // Verify page loads
       const url = page.url();
+
       expect(url).toBeTruthy();
     });
   });
@@ -25,6 +26,7 @@ test.describe('Tasks', () => {
 
       // Verify page loads (may redirect to login)
       const url = page.url();
+
       expect(url).toBeTruthy();
     });
   });

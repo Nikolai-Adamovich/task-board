@@ -33,6 +33,7 @@ export class UserRepository {
 
   async findById(id: string): Promise<User | null> {
     const doc = await this.collection.findOne({ id });
+
     return doc ? toDomain(doc) : null;
   }
 

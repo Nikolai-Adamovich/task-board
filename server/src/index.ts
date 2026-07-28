@@ -25,12 +25,14 @@ app.use('*', async (c, next) => {
     allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
     maxAge: 86400,
   });
+
   return corsMiddleware(c, next);
 });
 
 // Initialize MongoDB connection before any route handler
 app.use('/api/v1/*', async (c, next) => {
   const uri = c.env.MONGODB_URI;
+
   if (uri) {
     await connectMongo(uri);
   }

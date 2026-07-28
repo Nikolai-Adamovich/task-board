@@ -24,6 +24,7 @@ test.describe('Authentication', () => {
 
       // Attempt to submit empty form
       const submitButton = page.locator('button[type="submit"]');
+
       if (await submitButton.isVisible()) {
         await submitButton.click();
         // Form should not navigate away — validation prevents submission
@@ -46,6 +47,7 @@ test.describe('Authentication', () => {
 
       // Click the register link (if present)
       const registerLink = page.locator('a[href="/auth/register"]');
+
       if (await registerLink.isVisible()) {
         await registerLink.click();
         await expect(page).toHaveURL(/\/auth\/register/);

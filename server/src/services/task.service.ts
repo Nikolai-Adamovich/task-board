@@ -20,7 +20,6 @@ export class TaskService {
   ): Promise<{ data: Task[]; total: number; page: number; limit: number }> {
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
-
     const allTasks = await this.taskRepo.findByFilters(tenantId, {
       projectId: filters.projectId,
       boardId: filters.boardId,
@@ -28,7 +27,6 @@ export class TaskService {
       sprintId: filters.sprintId,
       assigneeId: filters.assigneeId,
     });
-
     const total = allTasks.length;
     const start = (page - 1) * limit;
     const data = allTasks.slice(start, start + limit);
@@ -43,6 +41,7 @@ export class TaskService {
   async createTask(tenantId: string, userId: string, input: CreateTask): Promise<Task> {
     // Validate column exists
     const column = await this.columnRepo.findById(tenantId, input.columnId);
+
     if (!column) {
       throw new NotFoundError('Column not found');
     }
@@ -69,6 +68,7 @@ export class TaskService {
    */
   async getTask(tenantId: string, id: string): Promise<Task> {
     const task = await this.taskRepo.findById(tenantId, id);
+
     if (!task) {
       throw new NotFoundError('Task not found');
     }
@@ -108,6 +108,7 @@ export class TaskService {
     this.requireAdmin(userRole);
 
     const deleted = await this.taskRepo.delete(tenantId, id);
+
     if (!deleted) {
       throw new NotFoundError('Task not found');
     }
@@ -120,9 +121,9 @@ export class TaskService {
    */
   async moveTask(tenantId: string, input: MoveTask): Promise<Task> {
     const task = await this.requireTask(tenantId, input.taskId);
-
     // Validate target column exists
     const targetColumn = await this.columnRepo.findById(tenantId, input.targetColumnId);
+
     if (!targetColumn) {
       throw new NotFoundError('Target column not found');
     }
@@ -134,7 +135,6 @@ export class TaskService {
 
     // Get max position in target column
     const maxPosition = await this.taskRepo.getMaxPosition(tenantId, task.boardId, input.targetColumnId);
-
     const updated = await this.taskRepo.update(tenantId, input.taskId, {
       columnId: input.targetColumnId,
       position: maxPosition + 1,
@@ -171,6 +171,7 @@ export class TaskService {
 
   private async requireTask(tenantId: string, taskId: string): Promise<Task> {
     const task = await this.taskRepo.findById(tenantId, taskId);
+
     if (!task) {
       throw new NotFoundError('Task not found');
     }

@@ -17,6 +17,7 @@ test.describe('Projects', () => {
       // Should redirect to login if not authenticated
       // or show dashboard/projects if authenticated
       const url = page.url();
+
       expect(url).toBeTruthy();
     });
   });
@@ -27,10 +28,12 @@ test.describe('Projects', () => {
       await page.goto('/');
 
       // Look for a create project button or form
-      // Look for create project button (prefixed with underscore to avoid unused var lint)
-      const _createButton = page.locator('button', { hasText: /create|new|add/i });
+      // Look for create project button
+      page.locator('button', { hasText: /create|new|add/i });
       // Either the button exists (authenticated) or we're redirected to login
+
       const currentUrl = page.url();
+
       expect(currentUrl).toBeTruthy();
     });
   });

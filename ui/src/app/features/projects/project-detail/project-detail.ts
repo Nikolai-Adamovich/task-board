@@ -18,7 +18,7 @@ import type { Project, Board, ProjectMember, CreateBoard } from '@task-board/sha
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 @Component({
-  selector: 'app-project-detail',
+  selector: 'ui-project-detail',
   imports: [
     RouterLink,
     FormsModule,
@@ -38,10 +38,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 export class ProjectDetail implements OnInit {
   private readonly projectService = inject(ProjectClient);
   private readonly boardService = inject(BoardClient);
-
   /** Bound via withComponentInputBinding() */
   readonly projectId = input.required<string>();
-
   protected readonly project = signal<Project | null>(null);
   protected readonly boards = signal<Board[]>([]);
   protected readonly members = signal<ProjectMember[]>([]);

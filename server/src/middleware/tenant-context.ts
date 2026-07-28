@@ -35,6 +35,7 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
   }
 
   const userId = c.get('userId');
+
   if (!userId) {
     throw new ForbiddenError('Authentication required for tenant context');
   }

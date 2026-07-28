@@ -32,16 +32,19 @@ export class TenantRepository {
 
   async findById(id: string): Promise<Tenant | null> {
     const doc = await this.collection.findOne({ id });
+
     return doc ? toDomain(doc) : null;
   }
 
   async findBySlug(slug: string): Promise<Tenant | null> {
     const doc = await this.collection.findOne({ slug });
+
     return doc ? toDomain(doc) : null;
   }
 
   async findAll(): Promise<Tenant[]> {
     const docs = await this.collection.find().toArray();
+
     return docs.map(toDomain);
   }
 
@@ -71,6 +74,7 @@ export class TenantRepository {
 
   async delete(id: string): Promise<boolean> {
     const result = await this.collection.deleteOne({ id });
+
     return result.deletedCount > 0;
   }
 }

@@ -26,11 +26,13 @@ describe('SprintSchema', () => {
 
   it('should accept a valid sprint', () => {
     const result = SprintSchema.safeParse(validSprint);
+
     expect(result.success).toBe(true);
   });
 
   it('should accept sprint with null goal', () => {
     const result = SprintSchema.safeParse({ ...validSprint, goal: null });
+
     expect(result.success).toBe(true);
   });
 
@@ -39,23 +41,27 @@ describe('SprintSchema', () => {
       ...validSprint,
       taskIds: ['550e8400-e29b-41d4-a716-446655440000'],
     });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept all sprint statuses', () => {
     for (const status of ['planned', 'active', 'completed'] as const) {
       const result = SprintSchema.safeParse({ ...validSprint, status });
+
       expect(result.success).toBe(true);
     }
   });
 
   it('should reject invalid status', () => {
     const result = SprintSchema.safeParse({ ...validSprint, status: 'cancelled' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject empty name', () => {
     const result = SprintSchema.safeParse({ ...validSprint, name: '' });
+
     expect(result.success).toBe(false);
   });
 
@@ -64,6 +70,7 @@ describe('SprintSchema', () => {
       ...validSprint,
       startDate: 'not-a-date',
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -79,6 +86,7 @@ describe('CreateSprintSchema', () => {
 
   it('should accept valid sprint creation data', () => {
     const result = CreateSprintSchema.safeParse(validCreate);
+
     expect(result.success).toBe(true);
   });
 
@@ -87,6 +95,7 @@ describe('CreateSprintSchema', () => {
       ...validCreate,
       goal: 'Complete feature X',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -95,6 +104,7 @@ describe('CreateSprintSchema', () => {
       startDate: '2026-01-01T00:00:00.000Z',
       endDate: '2026-01-15T00:00:00.000Z',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -103,6 +113,7 @@ describe('CreateSprintSchema', () => {
       name: 'Sprint',
       endDate: '2026-01-15T00:00:00.000Z',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -111,6 +122,7 @@ describe('CreateSprintSchema', () => {
       ...validCreate,
       name: 'a'.repeat(101),
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -120,21 +132,25 @@ describe('CreateSprintSchema', () => {
 describe('UpdateSprintSchema', () => {
   it('should accept partial update with name', () => {
     const result = UpdateSprintSchema.safeParse({ name: 'Updated Sprint' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept partial update with status', () => {
     const result = UpdateSprintSchema.safeParse({ status: 'active' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept empty update (all optional)', () => {
     const result = UpdateSprintSchema.safeParse({});
+
     expect(result.success).toBe(true);
   });
 
   it('should reject goal exceeding 500 characters', () => {
     const result = UpdateSprintSchema.safeParse({ goal: 'a'.repeat(501) });
+
     expect(result.success).toBe(false);
   });
 });

@@ -21,6 +21,7 @@ export const tenantInterceptor: HttpInterceptorFn = (req, next) => {
         'X-Tenant-Id': activeTenant.id,
       },
     });
+
     return next(cloned);
   }
 

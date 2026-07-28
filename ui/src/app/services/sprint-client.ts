@@ -20,6 +20,7 @@ export class SprintClient {
   /** List sprints for a project */
   list(projectId: string): Observable<PaginatedResponse<Sprint>> {
     const params = new HttpParams().set('projectId', projectId);
+
     return this.http.get<PaginatedResponse<Sprint>>(`${this.baseUrl}/sprints`, { params });
   }
 
@@ -40,7 +41,7 @@ export class SprintClient {
 
   /** Delete a sprint */
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/sprints/${id}`);
+    return this.http.delete<null>(`${this.baseUrl}/sprints/${id}`) as unknown as Observable<void>;
   }
 
   /** Add a task to a sprint */

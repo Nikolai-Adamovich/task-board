@@ -22,17 +22,20 @@ describe('ProjectSchema', () => {
 
   it('should accept a valid project', () => {
     const result = ProjectSchema.safeParse(validProject);
+
     expect(result.success).toBe(true);
   });
 
   it('should accept project with null description', () => {
     const result = ProjectSchema.safeParse({ ...validProject, description: null });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept project without description (optional)', () => {
-    const { description: _, ...noDesc } = validProject;
+    const noDesc = Object.fromEntries(Object.entries(validProject).filter(([key]) => key !== 'description'));
     const result = ProjectSchema.safeParse(noDesc);
+
     expect(result.success).toBe(true);
   });
 
@@ -41,6 +44,7 @@ describe('ProjectSchema', () => {
       ...validProject,
       description: 'a'.repeat(501),
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -53,6 +57,7 @@ describe('CreateProjectSchema', () => {
       name: 'New Project',
       slug: 'new-project',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -62,16 +67,19 @@ describe('CreateProjectSchema', () => {
       slug: 'new-project',
       description: 'Some description',
     });
+
     expect(result.success).toBe(true);
   });
 
   it('should reject missing name', () => {
     const result = CreateProjectSchema.safeParse({ slug: 'new-project' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject missing slug', () => {
     const result = CreateProjectSchema.safeParse({ name: 'New Project' });
+
     expect(result.success).toBe(false);
   });
 });
@@ -81,11 +89,13 @@ describe('CreateProjectSchema', () => {
 describe('UpdateProjectSchema', () => {
   it('should accept partial update', () => {
     const result = UpdateProjectSchema.safeParse({ name: 'Updated' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept empty update (all optional)', () => {
     const result = UpdateProjectSchema.safeParse({});
+
     expect(result.success).toBe(true);
   });
 });
@@ -102,18 +112,21 @@ describe('ProjectMemberSchema', () => {
 
   it('should accept a valid project member', () => {
     const result = ProjectMemberSchema.safeParse(validMember);
+
     expect(result.success).toBe(true);
   });
 
   it('should accept all project roles', () => {
     for (const role of ['admin', 'developer', 'viewer'] as const) {
       const result = ProjectMemberSchema.safeParse({ ...validMember, role });
+
       expect(result.success).toBe(true);
     }
   });
 
   it('should reject invalid project role', () => {
     const result = ProjectMemberSchema.safeParse({ ...validMember, role: 'owner' });
+
     expect(result.success).toBe(false);
   });
 });

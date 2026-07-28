@@ -38,7 +38,6 @@ const tenantPermissions: Record<string, TenantRoleType[]> = {
   crud_boards: ['owner', 'admin'],
   crud_columns: ['owner', 'admin'],
 };
-
 /**
  * Permission matrix for project-level actions.
  * Maps action → allowed project roles.
@@ -108,6 +107,7 @@ export class RbacService {
    */
   private checkTenantAction(tenantRole: string, action: string): boolean {
     const allowedRoles = tenantPermissions[action];
+
     if (!allowedRoles) {
       return false;
     }
@@ -120,6 +120,7 @@ export class RbacService {
    */
   private checkProjectAction(projectRole: string, action: string): boolean {
     const allowedRoles = projectPermissions[action];
+
     if (!allowedRoles) {
       return false;
     }

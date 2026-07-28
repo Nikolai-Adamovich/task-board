@@ -11,7 +11,7 @@ export interface ContextUser {
 }
 
 /** Hono environment type for the Task Board API */
-export type AppEnv = {
+export interface AppEnv {
   Bindings: {
     MONGODB_URI: string;
     JWT_SECRET: string;
@@ -23,4 +23,4 @@ export type AppEnv = {
     tenantId: string;
     userRole: string;
   };
-};
+}

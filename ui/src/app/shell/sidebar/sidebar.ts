@@ -3,7 +3,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TenantClient } from '../../services/tenant-client';
 
 @Component({
-  selector: 'app-sidebar',
+  selector: 'ui-sidebar',
   imports: [RouterLink, RouterLinkActive],
   templateUrl: './sidebar.html',
 })

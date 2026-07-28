@@ -18,7 +18,7 @@ import type { Project, CreateProject } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 @Component({
-  selector: 'app-project-list',
+  selector: 'ui-project-list',
   imports: [
     RouterLink,
     DatePipe,
@@ -38,13 +38,11 @@ export class ProjectList implements OnInit {
   private readonly projectService = inject(ProjectClient);
   private readonly tenantService = inject(TenantClient);
   private readonly authStore = inject(AuthStore);
-
   protected readonly projects = signal<Project[]>([]);
   protected readonly loading = signal(true);
   protected readonly creating = signal(false);
   protected readonly showCreateModal = signal(false);
   protected newProject: CreateProject = { name: '', slug: '', description: '' };
-
   protected tenantId = signal('');
 
   protected canCreate(): boolean {
@@ -59,6 +57,7 @@ export class ProjectList implements OnInit {
 
   ngOnInit(): void {
     const tenant = this.tenantService.activeTenant();
+
     if (tenant) {
       this.tenantId.set(tenant.id);
       this.loadProjects();

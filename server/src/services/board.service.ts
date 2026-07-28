@@ -34,7 +34,6 @@ export class BoardService {
       name: input.name,
       description: input.description,
     });
-
     // Create columns — use custom names if provided, otherwise use defaults
     const columnNames = input.columnNames ?? [...DefaultColumnNames];
     const columns: Column[] = [];
@@ -46,6 +45,7 @@ export class BoardService {
         position: i,
         isDefault: i < DefaultColumnNames.length && !input.columnNames,
       });
+
       columns.push(column);
     }
 
@@ -57,11 +57,13 @@ export class BoardService {
    */
   async getBoard(tenantId: string, id: string): Promise<{ board: Board; columns: Column[] }> {
     const board = await this.boardRepo.findById(tenantId, id);
+
     if (!board) {
       throw new NotFoundError('Board not found');
     }
 
     const columns = await this.columnRepo.findByBoard(tenantId, id);
+
     return { board, columns };
   }
 
@@ -72,6 +74,7 @@ export class BoardService {
     this.requireAdmin(userRole);
 
     const board = await this.boardRepo.update(tenantId, id, input);
+
     if (!board) {
       throw new NotFoundError('Board not found');
     }
@@ -87,11 +90,13 @@ export class BoardService {
 
     // Delete all columns first
     const columns = await this.columnRepo.findByBoard(tenantId, id);
+
     for (const column of columns) {
       await this.columnRepo.delete(tenantId, column.id);
     }
 
     const deleted = await this.boardRepo.delete(tenantId, id);
+
     if (!deleted) {
       throw new NotFoundError('Board not found');
     }

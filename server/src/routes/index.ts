@@ -41,6 +41,7 @@ export const routeRegistry = {
   /** Project routes — requires any tenant member role; handles admin checks internally */
   projects: (() => {
     const router = new Hono<AppEnv>();
+
     router.use('/*', requireRole('owner', 'admin', 'member'));
     router.route('/', createProjectRoutes());
     return router;
@@ -49,6 +50,7 @@ export const routeRegistry = {
   /** Board routes — requires any tenant member role; handles admin checks internally */
   boards: (() => {
     const router = new Hono<AppEnv>();
+
     router.use('/*', requireRole('owner', 'admin', 'member'));
 
     // Mount board CRUD routes
@@ -63,6 +65,7 @@ export const routeRegistry = {
   /** Task routes — requires any tenant member role; handles admin checks internally */
   tasks: (() => {
     const router = new Hono<AppEnv>();
+
     router.use('/*', requireRole('owner', 'admin', 'member'));
     router.route('/', createTaskRoutes());
     return router;
@@ -71,6 +74,7 @@ export const routeRegistry = {
   /** Sprint routes — requires any tenant member role; handles admin checks internally */
   sprints: (() => {
     const router = new Hono<AppEnv>();
+
     router.use('/*', requireRole('owner', 'admin', 'member'));
     router.route('/', createSprintRoutes());
     return router;

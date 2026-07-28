@@ -76,7 +76,6 @@ export function createSprintRoutes(): Hono<AppEnv> {
   router.get('/:sprintId', async (c) => {
     const tenantId = c.get('tenantId');
     const sprintId = c.req.param('sprintId');
-
     const service = createSprintService();
     const result = await service.getSprint(tenantId, sprintId);
 
@@ -97,7 +96,6 @@ export function createSprintRoutes(): Hono<AppEnv> {
       goal?: string;
       status?: string;
     };
-
     const service = createSprintService();
     const sprint = await service.updateSprint(
       tenantId,
@@ -122,8 +120,8 @@ export function createSprintRoutes(): Hono<AppEnv> {
     const tenantId = c.get('tenantId');
     const userRole = c.get('userRole');
     const sprintId = c.req.param('sprintId');
-
     const service = createSprintService();
+
     await service.deleteSprint(tenantId, sprintId, userRole);
 
     return c.json({ success: true as const });
@@ -155,7 +153,6 @@ export function createSprintRoutes(): Hono<AppEnv> {
     const tenantId = c.get('tenantId');
     const sprintId = c.req.param('sprintId');
     const taskId = c.req.param('taskId');
-
     const service = createSprintService();
     const sprint = await service.removeTaskFromSprint(tenantId, sprintId, taskId);
 

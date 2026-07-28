@@ -14,13 +14,13 @@ export const hlmDialogOverlayClass = hlm(
 })
 export class HlmDialogOverlay {
   private readonly _classSettable = injectCustomClassSettable({ optional: true, host: true });
-
   public readonly userClass = input<ClassValue>('', { alias: 'class' });
   protected readonly _computedClass = computed(() => hlm(hlmDialogOverlayClass, this.userClass()));
 
   constructor() {
     effect(() => {
       const newClass = this._computedClass();
+
       untracked(() => this._classSettable?.setClassToCustomElement(newClass));
     });
   }

@@ -17,6 +17,7 @@ describe('ErrorResponseSchema', () => {
       code: 'VALIDATION_ERROR',
       message: 'Invalid input data',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -26,16 +27,19 @@ describe('ErrorResponseSchema', () => {
       message: 'Invalid input data',
       details: { field: 'email', reason: 'invalid format' },
     });
+
     expect(result.success).toBe(true);
   });
 
   it('should reject missing code', () => {
     const result = ErrorResponseSchema.safeParse({ message: 'Error' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject missing message', () => {
     const result = ErrorResponseSchema.safeParse({ code: 'ERROR' });
+
     expect(result.success).toBe(false);
   });
 });
@@ -45,11 +49,13 @@ describe('ErrorResponseSchema', () => {
 describe('PaginationSchema', () => {
   it('should accept valid pagination parameters', () => {
     const result = PaginationSchema.safeParse({ page: 1, limit: 20 });
+
     expect(result.success).toBe(true);
   });
 
   it('should apply defaults when parsing with defaults', () => {
     const result = PaginationSchema.safeParse({ page: 1, limit: 20 });
+
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.page).toBe(1);
@@ -59,26 +65,31 @@ describe('PaginationSchema', () => {
 
   it('should reject page 0 (not positive)', () => {
     const result = PaginationSchema.safeParse({ page: 0, limit: 20 });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject negative page', () => {
     const result = PaginationSchema.safeParse({ page: -1, limit: 20 });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject limit of 0', () => {
     const result = PaginationSchema.safeParse({ page: 1, limit: 0 });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject limit exceeding 100', () => {
     const result = PaginationSchema.safeParse({ page: 1, limit: 101 });
+
     expect(result.success).toBe(false);
   });
 
   it('should accept boundary limit of 100', () => {
     const result = PaginationSchema.safeParse({ page: 1, limit: 100 });
+
     expect(result.success).toBe(true);
   });
 });
@@ -91,7 +102,6 @@ describe('createPaginatedResponseSchema', () => {
     id: z.string(),
     name: z.string(),
   });
-
   const PaginatedItemsSchema = createPaginatedResponseSchema(ItemSchema);
 
   it('should accept a valid paginated response', () => {
@@ -101,6 +111,7 @@ describe('createPaginatedResponseSchema', () => {
       page: 1,
       limit: 20,
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -111,6 +122,7 @@ describe('createPaginatedResponseSchema', () => {
       page: 1,
       limit: 20,
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -121,6 +133,7 @@ describe('createPaginatedResponseSchema', () => {
       page: 1,
       limit: 20,
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -131,6 +144,7 @@ describe('createPaginatedResponseSchema', () => {
       page: 1,
       limit: 20,
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -141,6 +155,7 @@ describe('createPaginatedResponseSchema', () => {
       page: 1,
       limit: 20,
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -150,6 +165,7 @@ describe('createPaginatedResponseSchema', () => {
 describe('ListQuerySchema', () => {
   it('should accept valid list query', () => {
     const result = ListQuerySchema.safeParse({ page: '1', limit: '20' });
+
     expect(result.success).toBe(true);
   });
 
@@ -159,11 +175,13 @@ describe('ListQuerySchema', () => {
       limit: '20',
       search: 'test',
     });
+
     expect(result.success).toBe(true);
   });
 
   it('should apply defaults for missing page/limit (via coerce defaults)', () => {
     const result = ListQuerySchema.safeParse({});
+
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.page).toBe(1);

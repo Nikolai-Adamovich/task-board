@@ -26,7 +26,6 @@ export function createTaskRoutes(): Hono<AppEnv> {
    */
   router.get('/', async (c) => {
     const tenantId = c.get('tenantId');
-
     const filters: TaskFilters & { page?: number; limit?: number } = {
       projectId: c.req.query('projectId'),
       boardId: c.req.query('boardId'),
@@ -34,9 +33,9 @@ export function createTaskRoutes(): Hono<AppEnv> {
       sprintId: c.req.query('sprintId'),
       assigneeId: c.req.query('assigneeId'),
     };
-
     const page = c.req.query('page');
     const limit = c.req.query('limit');
+
     if (page) filters.page = parseInt(page, 10);
     if (limit) filters.limit = parseInt(limit, 10);
 
@@ -62,7 +61,6 @@ export function createTaskRoutes(): Hono<AppEnv> {
       priority?: string;
       assigneeIds?: string[];
     };
-
     const service = createTaskService();
     const task = await service.createTask(tenantId, userId, body as never);
 
@@ -75,7 +73,6 @@ export function createTaskRoutes(): Hono<AppEnv> {
   router.get('/:taskId', async (c) => {
     const tenantId = c.get('tenantId');
     const taskId = c.req.param('taskId');
-
     const service = createTaskService();
     const task = await service.getTask(tenantId, taskId);
 
@@ -97,7 +94,6 @@ export function createTaskRoutes(): Hono<AppEnv> {
       priority?: string;
       assigneeIds?: string[];
     };
-
     const service = createTaskService();
     const task = await service.updateTask(tenantId, userId, taskId, body as never, userRole);
 
@@ -111,8 +107,8 @@ export function createTaskRoutes(): Hono<AppEnv> {
     const tenantId = c.get('tenantId');
     const userRole = c.get('userRole');
     const taskId = c.req.param('taskId');
-
     const service = createTaskService();
+
     await service.deleteTask(tenantId, taskId, userRole);
 
     return c.json({ success: true as const });

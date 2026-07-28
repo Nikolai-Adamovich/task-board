@@ -21,7 +21,7 @@
   <!-- Kanban columns -->
   <div class="flex flex-1 gap-4 overflow-x-auto pb-4">
     @for (col of columns(); track col.id) {
-    <app-column-view [column]="col" [tasks]="getTasksForColumn(col.id)" [showAddButton]="false"
+    <ui-column-view [column]="col" [tasks]="getTasksForColumn(col.id)" [showAddButton]="false"
       (taskDrop)="onTaskDrop($event)" (taskClick)="goToTask($event)" />
     }
   </div>

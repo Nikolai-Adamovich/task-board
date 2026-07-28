@@ -73,7 +73,6 @@ export function createBoardRoutes(): Hono<AppEnv> {
   router.get('/:boardId', async (c) => {
     const tenantId = c.get('tenantId');
     const boardId = c.req.param('boardId');
-
     const service = createBoardService();
     const result = await service.getBoard(tenantId, boardId);
 
@@ -91,7 +90,6 @@ export function createBoardRoutes(): Hono<AppEnv> {
       name?: string;
       description?: string;
     };
-
     const service = createBoardService();
     const board = await service.updateBoard(tenantId, boardId, body, userRole);
 
@@ -105,8 +103,8 @@ export function createBoardRoutes(): Hono<AppEnv> {
     const tenantId = c.get('tenantId');
     const userRole = c.get('userRole');
     const boardId = c.req.param('boardId');
-
     const service = createBoardService();
+
     await service.deleteBoard(tenantId, boardId, userRole);
 
     return c.json({ success: true as const });

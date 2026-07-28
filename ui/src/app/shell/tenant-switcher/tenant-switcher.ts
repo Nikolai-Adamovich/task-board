@@ -7,7 +7,7 @@ import { NgIcon } from '@ng-icons/core';
 import type { Tenant } from '@task-board/shared';
 
 @Component({
-  selector: 'app-tenant-switcher',
+  selector: 'ui-tenant-switcher',
   imports: [NgIcon, HlmButtonImports],
   providers: [provideIcons({ lucideChevronDown, lucideCheck })],
   templateUrl: './tenant-switcher.html',

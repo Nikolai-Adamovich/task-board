@@ -119,14 +119,15 @@ describe('TenantService', () => {
       const result = await service.listTenantsForUser('user-1');
 
       expect(result).toHaveLength(2);
-      expect(result[0]!.name).toBe('Tenant 1');
-      expect(result[1]!.name).toBe('Tenant 2');
+      expect(result[0]?.name).toBe('Tenant 1');
+      expect(result[1]?.name).toBe('Tenant 2');
     });
 
     it('returns empty array when user has no memberships', async () => {
       memberRepo.findByUser.mockResolvedValue([]);
 
       const result = await service.listTenantsForUser('user-1');
+
       expect(result).toEqual([]);
     });
   });
@@ -138,6 +139,7 @@ describe('TenantService', () => {
       tenantRepo.findById.mockResolvedValue(makeTenant());
 
       const result = await service.getTenant('tenant-1');
+
       expect(result.id).toBe('tenant-1');
     });
 
@@ -169,6 +171,7 @@ describe('TenantService', () => {
       const result = await service.updateTenant('user-2', 'tenant-1', {
         name: 'Updated',
       });
+
       expect(result.name).toBe('Updated');
     });
 
@@ -258,6 +261,7 @@ describe('TenantService', () => {
       memberRepo.updateRole.mockResolvedValue(makeMember({ userId: 'user-2', role: 'admin' }));
 
       const result = await service.updateMemberRole('user-1', 'tenant-1', 'user-2', 'admin');
+
       expect(result.role).toBe('admin');
     });
 
@@ -300,6 +304,7 @@ describe('TenantService', () => {
       memberRepo.findByTenant.mockResolvedValue([makeMember(), makeMember({ userId: 'user-2', role: 'member' })]);
 
       const result = await service.getTenantMembers('tenant-1');
+
       expect(result).toHaveLength(2);
     });
   });

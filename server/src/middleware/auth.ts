@@ -25,21 +25,21 @@ interface JwtPayload {
  */
 async function verifyJwt(token: string, secret: string): Promise<JwtPayload> {
   const parts = token.split('.');
+
   if (parts.length !== 3) {
     throw new Error('Invalid JWT format');
   }
 
-  const [headerB64, payloadB64, signatureB64] = parts;
-
+  const headerB64 = parts[0] ?? '';
+  const payloadB64 = parts[1] ?? '';
+  const signatureB64 = parts[2] ?? '';
   // Import the secret as an HMAC key
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
     'verify',
   ]);
-
   // Decode the signature from base64url
-  const signature = Uint8Array.from(atob(signatureB64!.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
-
+  const signature = Uint8Array.from(atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
   // Verify the signature
   const data = encoder.encode(`${headerB64}.${payloadB64}`);
   const isValid = await crypto.subtle.verify('HMAC', key, signature, data);
@@ -49,11 +49,11 @@ async function verifyJwt(token: string, secret: string): Promise<JwtPayload> {
   }
 
   // Decode the payload
-  const payloadJson = atob(payloadB64!.replace(/-/g, '+').replace(/_/g, '/'));
+  const payloadJson = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
   const payload = JSON.parse(payloadJson) as JwtPayload;
-
   // Check expiration
   const now = Math.floor(Date.now() / 1000);
+
   if (payload.exp && payload.exp < now) {
     throw new Error('JWT has expired');
   }
@@ -80,16 +80,19 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   const token = authHeader.slice(7);
+
   if (!token) {
     throw new UnauthorizedError('Missing access token');
   }
 
   const jwtSecret = c.env.JWT_SECRET;
+
   if (!jwtSecret) {
     throw new UnauthorizedError('JWT secret not configured');
   }
 
   let payload: JwtPayload;
+
   try {
     payload = await verifyJwt(token, jwtSecret);
   } catch {

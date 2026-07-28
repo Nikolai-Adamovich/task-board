@@ -50,11 +50,8 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>;
 })
 export class HlmButton {
   private readonly _config = injectBrnButtonConfig();
-
   private readonly _additionalClasses = signal<ClassValue>('');
-
   public readonly variant = input<ButtonVariants['variant']>(this._config.variant);
-
   public readonly size = input<ButtonVariants['size']>(this._config.size);
 
   constructor() {

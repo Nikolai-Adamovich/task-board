@@ -20,7 +20,6 @@ export class HlmSpinner {
    * Use provideIcons({ ... }) to register custom icons.
    */
   public readonly icon = input<string>('lucideLoader2');
-
   /** Aria label for the spinner for accessibility. */
   public readonly ariaLabel = input<string>('Loading', { alias: 'aria-label' });
 

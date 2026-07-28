@@ -9,7 +9,6 @@ import { TenantClient } from '../services/tenant-client';
 export const tenantGuard: CanActivateFn = (route) => {
   const tenantService = inject(TenantClient);
   const router = inject(Router);
-
   const tenantId = route.paramMap.get('tenantId');
 
   if (!tenantId) {

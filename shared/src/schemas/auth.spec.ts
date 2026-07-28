@@ -15,6 +15,7 @@ describe('LoginRequestSchema', () => {
       email: 'user@example.com',
       password: 'secret123',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -23,6 +24,7 @@ describe('LoginRequestSchema', () => {
       email: '',
       password: 'secret123',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -31,6 +33,7 @@ describe('LoginRequestSchema', () => {
       email: 'not-an-email',
       password: 'secret123',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -39,11 +42,13 @@ describe('LoginRequestSchema', () => {
       email: 'user@example.com',
       password: '',
     });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject missing fields', () => {
     const result = LoginRequestSchema.safeParse({});
+
     expect(result.success).toBe(false);
   });
 });
@@ -59,6 +64,7 @@ describe('RegisterRequestSchema', () => {
 
   it('should accept valid registration data', () => {
     const result = RegisterRequestSchema.safeParse(validRegister);
+
     expect(result.success).toBe(true);
   });
 
@@ -67,6 +73,7 @@ describe('RegisterRequestSchema', () => {
       ...validRegister,
       password: 'short',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -75,6 +82,7 @@ describe('RegisterRequestSchema', () => {
       ...validRegister,
       password: 'a'.repeat(129),
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -83,6 +91,7 @@ describe('RegisterRequestSchema', () => {
       ...validRegister,
       password: '12345678',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -91,6 +100,7 @@ describe('RegisterRequestSchema', () => {
       ...validRegister,
       displayName: '',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -99,6 +109,7 @@ describe('RegisterRequestSchema', () => {
       ...validRegister,
       displayName: 'a'.repeat(101),
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -107,6 +118,7 @@ describe('RegisterRequestSchema', () => {
       email: 'a@b.com',
       password: '12345678',
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -127,6 +139,7 @@ describe('AuthResponseSchema', () => {
       token: 'jwt-token-string',
       user: validUser,
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -134,6 +147,7 @@ describe('AuthResponseSchema', () => {
     const result = AuthResponseSchema.safeParse({
       user: validUser,
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -141,6 +155,7 @@ describe('AuthResponseSchema', () => {
     const result = AuthResponseSchema.safeParse({
       token: 'jwt-token-string',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -149,6 +164,7 @@ describe('AuthResponseSchema', () => {
       token: 'jwt-token-string',
       user: { ...validUser, id: 'not-a-uuid' },
     });
+
     expect(result.success).toBe(false);
   });
 });

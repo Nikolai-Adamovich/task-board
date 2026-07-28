@@ -13,7 +13,6 @@ const TOKEN_KEY = 'taskboard_token';
 export class AuthStore implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly apiBaseUrl = inject(API_BASE_URL);
-
   readonly currentUser = signal<User | null>(null);
   readonly token = signal<string | null>(null);
   readonly isAuthenticated = computed(() => !!this.currentUser());
@@ -21,6 +20,7 @@ export class AuthStore implements OnInit {
   constructor() {
     // Restore token from localStorage on init
     const stored = localStorage.getItem(TOKEN_KEY);
+
     if (stored) {
       this.token.set(stored);
     }

@@ -4,7 +4,7 @@ import { Header } from '../header/header';
 import { Sidebar } from '../sidebar/sidebar';
 
 @Component({
-  selector: 'app-shell',
+  selector: 'ui-shell',
   imports: [RouterOutlet, Header, Sidebar],
   templateUrl: './app-shell.html',
 })

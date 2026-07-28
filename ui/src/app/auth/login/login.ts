@@ -9,13 +9,12 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 
 @Component({
   imports: [RouterLink, HlmCardImports, HlmFieldImports, HlmInputImports, HlmButtonImports, HlmSpinnerImports],
-  selector: 'app-login',
+  selector: 'ui-login',
   templateUrl: './login.html',
 })
 export class Login {
   private readonly authService = inject(AuthClient);
   private readonly router = inject(Router);
-
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly error = signal('');

@@ -8,7 +8,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { NgIcon } from '@ng-icons/core';
 
 @Component({
-  selector: 'app-column-view',
+  selector: 'ui-column-view',
   imports: [TaskCard, NgIcon, HlmButtonImports, HlmBadgeImports],
   providers: [provideIcons({ lucidePlus })],
   host: {
@@ -20,37 +20,48 @@ export class ColumnView {
   readonly column = input.required<Column>();
   readonly tasks = input.required<Task[]>();
   readonly showAddButton = input(true);
-
   readonly addTask = output<Column>();
   readonly taskClick = output<Task>();
   readonly taskDrop = output<{ task: Task; targetColumnId: string }>();
 
   protected onDragOver(event: DragEvent): void {
     event.preventDefault();
-    event.dataTransfer!.dropEffect = 'move';
+
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+
     const target = event.currentTarget as HTMLElement;
+
     target.classList.add('bg-primary/5');
   }
 
   protected onDragLeave(event: DragEvent): void {
     const target = event.currentTarget as HTMLElement;
+
     target.classList.remove('bg-primary/5');
   }
 
   protected onDrop(event: DragEvent): void {
     event.preventDefault();
+
     const target = event.currentTarget as HTMLElement;
+
     target.classList.remove('bg-primary/5');
 
     const taskData = event.dataTransfer?.getData('application/json');
+
     if (taskData) {
       const task = JSON.parse(taskData) as Task;
+
       this.taskDrop.emit({ task, targetColumnId: this.column().id });
     }
   }
 
   protected onTaskDragStart(event: { task: Task; dragEvent: DragEvent }): void {
-    event.dragEvent.dataTransfer!.setData('application/json', JSON.stringify(event.task));
-    event.dragEvent.dataTransfer!.effectAllowed = 'move';
+    if (event.dragEvent.dataTransfer) {
+      event.dragEvent.dataTransfer.setData('application/json', JSON.stringify(event.task));
+      event.dragEvent.dataTransfer.effectAllowed = 'move';
+    }
   }
 }

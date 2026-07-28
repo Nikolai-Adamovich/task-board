@@ -14,7 +14,6 @@ const UpdateColumnSchema = z.object({
   name: z.string().min(1).max(50).optional(),
   position: z.number().int().nonnegative().optional(),
 });
-
 const ReorderColumnsSchema = z.object({
   columnIds: z.array(z.string().uuid()).min(1),
 });
@@ -35,8 +34,7 @@ export function createColumnRoutes(): Hono<AppEnv> {
    */
   router.get('/', async (c) => {
     const tenantId = c.get('tenantId');
-    const boardId = c.req.param('boardId')!;
-
+    const boardId = c.req.param('boardId') ?? '';
     const service = createColumnService();
     const columns = await service.listColumns(tenantId, boardId);
 
@@ -52,12 +50,11 @@ export function createColumnRoutes(): Hono<AppEnv> {
   router.post('/', validateBody(CreateColumnSchema), async (c) => {
     const tenantId = c.get('tenantId');
     const userRole = c.get('userRole');
-    const boardId = c.req.param('boardId')!;
+    const boardId = c.req.param('boardId') ?? '';
     const body = c.get('validatedBody' as never) as {
       name: string;
       position?: number;
     };
-
     const service = createColumnService();
     const column = await service.createColumn(tenantId, boardId, body, userRole);
 
@@ -71,9 +68,8 @@ export function createColumnRoutes(): Hono<AppEnv> {
   router.patch('/reorder', validateBody(ReorderColumnsSchema), async (c) => {
     const tenantId = c.get('tenantId');
     const userRole = c.get('userRole');
-    const boardId = c.req.param('boardId')!;
+    const boardId = c.req.param('boardId') ?? '';
     const body = c.get('validatedBody' as never) as { columnIds: string[] };
-
     const service = createColumnService();
     const columns = await service.reorderColumns(tenantId, boardId, body.columnIds, userRole);
 
@@ -91,7 +87,6 @@ export function createColumnRoutes(): Hono<AppEnv> {
       name?: string;
       position?: number;
     };
-
     const service = createColumnService();
     const column = await service.updateColumn(tenantId, columnId, body, userRole);
 
@@ -105,8 +100,8 @@ export function createColumnRoutes(): Hono<AppEnv> {
     const tenantId = c.get('tenantId');
     const userRole = c.get('userRole');
     const columnId = c.req.param('columnId');
-
     const service = createColumnService();
+
     await service.deleteColumn(tenantId, columnId, userRole);
 
     return c.json({ success: true as const });

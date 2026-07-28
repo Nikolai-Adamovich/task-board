@@ -44,11 +44,13 @@ export class SprintRepository {
 
   async findById(tenantId: string, id: string): Promise<Sprint | null> {
     const doc = await this.collection.findOne({ id, tenantId });
+
     return doc ? toDomain(doc) : null;
   }
 
   async findByProject(tenantId: string, projectId: string): Promise<Sprint[]> {
     const docs = await this.collection.find({ tenantId, projectId }).sort({ startDate: -1 }).toArray();
+
     return docs.map(toDomain);
   }
 
@@ -111,6 +113,7 @@ export class SprintRepository {
 
   async delete(tenantId: string, id: string): Promise<boolean> {
     const result = await this.collection.deleteOne({ id, tenantId });
+
     return result.deletedCount > 0;
   }
 

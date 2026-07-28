@@ -23,8 +23,10 @@ export class ColumnService {
 
     // Determine position: use provided or append at end
     let position = input.position;
+
     if (position === undefined) {
       const existing = await this.columnRepo.findByBoard(tenantId, boardId);
+
       position = existing.length;
     }
 
@@ -47,6 +49,7 @@ export class ColumnService {
     this.requireAdmin(userRole);
 
     const column = await this.columnRepo.update(tenantId, id, input);
+
     if (!column) {
       throw new NotFoundError('Column not found');
     }
@@ -61,6 +64,7 @@ export class ColumnService {
     this.requireAdmin(userRole);
 
     const column = await this.columnRepo.findById(tenantId, id);
+
     if (!column) {
       throw new NotFoundError('Column not found');
     }

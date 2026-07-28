@@ -13,6 +13,7 @@ test.describe('Sprints', () => {
 
       // Verify page loads (may redirect to login)
       const url = page.url();
+
       expect(url).toBeTruthy();
     });
   });
@@ -23,6 +24,7 @@ test.describe('Sprints', () => {
 
       // Verify page loads
       const url = page.url();
+
       expect(url).toBeTruthy();
     });
   });

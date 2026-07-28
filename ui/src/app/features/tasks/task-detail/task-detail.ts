@@ -23,7 +23,7 @@ const priorityColorMap: Record<string, string> = {
 };
 
 @Component({
-  selector: 'app-task-detail',
+  selector: 'ui-task-detail',
   imports: [
     DatePipe,
     FormsModule,
@@ -43,10 +43,8 @@ export class TaskDetail implements OnInit {
   private readonly taskService = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
-
   /** Bound via withComponentInputBinding() */
   readonly taskId = input.required<string>();
-
   protected readonly task = signal<Task | null>(null);
   protected readonly loading = signal(true);
   protected readonly isEditing = signal(false);
@@ -78,6 +76,7 @@ export class TaskDetail implements OnInit {
 
   protected startEdit(): void {
     const t = this.task();
+
     if (t) {
       this.editForm = {
         title: t.title,
@@ -95,6 +94,7 @@ export class TaskDetail implements OnInit {
 
   protected saveTask(): void {
     const t = this.task();
+
     if (!t) return;
     this.saving.set(true);
     this.taskService.update(t.id, this.editForm).subscribe({

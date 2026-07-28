@@ -48,7 +48,6 @@ export function createTenantRoutes(): Hono<AppEnv> {
   router.post('/', validateBody(CreateTenantSchema), async (c) => {
     const userId = c.get('userId');
     const body = c.get('validatedBody' as never) as { name: string; slug: string };
-
     const service = createTenantService();
     const tenant = await service.createTenant(userId, body);
 
@@ -73,7 +72,6 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     const body = c.get('validatedBody' as never) as { name?: string; slug?: string };
-
     const service = createTenantService();
     const tenant = await service.updateTenant(userId, tenantId, body);
 
@@ -86,8 +84,8 @@ export function createTenantRoutes(): Hono<AppEnv> {
   router.delete('/:tenantId', async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
-
     const service = createTenantService();
+
     await service.deleteTenant(userId, tenantId);
 
     return c.json({ success: true as const });
@@ -103,7 +101,6 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     const body = await c.req.json<{ email: string; role: string }>();
-
     const service = createTenantService();
     const member = await service.inviteMember(userId, tenantId, body.email, body.role);
 
@@ -119,7 +116,6 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const tenantId = c.req.param('tenantId');
     const memberUserId = c.req.param('memberUserId');
     const body = await c.req.json<{ role: string }>();
-
     const service = createTenantService();
     const member = await service.updateMemberRole(userId, tenantId, memberUserId, body.role);
 
@@ -134,8 +130,8 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     const memberUserId = c.req.param('memberUserId');
-
     const service = createTenantService();
+
     await service.removeMember(userId, tenantId, memberUserId);
 
     return c.json({ success: true as const });

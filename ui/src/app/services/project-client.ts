@@ -20,6 +20,7 @@ export class ProjectClient {
   /** List projects for the active tenant */
   list(page = 1, limit = 20): Observable<PaginatedResponse<Project>> {
     const params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
+
     return this.http.get<PaginatedResponse<Project>>(`${this.baseUrl}/projects`, { params });
   }
 
@@ -40,7 +41,7 @@ export class ProjectClient {
 
   /** Delete a project */
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/projects/${id}`);
+    return this.http.delete<null>(`${this.baseUrl}/projects/${id}`) as unknown as Observable<void>;
   }
 
   /** List members of a project */
@@ -60,6 +61,8 @@ export class ProjectClient {
 
   /** Remove a member from a project */
   removeMember(projectId: string, userId: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/projects/${projectId}/members/${userId}`);
+    return this.http.delete<null>(
+      `${this.baseUrl}/projects/${projectId}/members/${userId}`,
+    ) as unknown as Observable<void>;
   }
 }

@@ -28,16 +28,19 @@ export class TenantMemberRepository {
 
   async findByUserAndTenant(userId: string, tenantId: string): Promise<TenantMember | null> {
     const doc = await this.collection.findOne({ userId, tenantId });
+
     return doc ? toDomain(doc) : null;
   }
 
   async findByTenant(tenantId: string): Promise<TenantMember[]> {
     const docs = await this.collection.find({ tenantId }).toArray();
+
     return docs.map(toDomain);
   }
 
   async findByUser(userId: string): Promise<TenantMember[]> {
     const docs = await this.collection.find({ userId }).toArray();
+
     return docs.map(toDomain);
   }
 
@@ -65,6 +68,7 @@ export class TenantMemberRepository {
 
   async delete(tenantId: string, userId: string): Promise<boolean> {
     const result = await this.collection.deleteOne({ userId, tenantId });
+
     return result.deletedCount > 0;
   }
 }

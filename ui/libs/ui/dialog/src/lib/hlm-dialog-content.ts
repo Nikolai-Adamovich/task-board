@@ -10,11 +10,11 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { classes } from '@spartan-ng/helm/utils';
 import { HlmDialogClose } from './hlm-dialog-close';
 
-type HlmDialogContentContext = {
+interface HlmDialogContentContext {
   $component?: ComponentType<unknown>;
   $dynamicComponentClass?: string;
   $showCloseButton?: boolean;
-};
+}
 
 @Component({
   selector: 'hlm-dialog-content',
@@ -43,13 +43,10 @@ type HlmDialogContentContext = {
 export class HlmDialogContent {
   private readonly _dialogRef = inject(BrnDialogRef);
   private readonly _dialogContext = injectBrnDialogContext<HlmDialogContentContext | null>({ optional: true });
-
   public readonly showCloseButton = input<boolean, BooleanInput>(this._dialogContext?.$showCloseButton ?? true, {
     transform: booleanAttribute,
   });
-
   public readonly state = computed(() => this._dialogRef?.state() ?? 'closed');
-
   public readonly component = this._dialogContext?.$component;
   private readonly _dynamicComponentClass = this._dialogContext?.$dynamicComponentClass;
 

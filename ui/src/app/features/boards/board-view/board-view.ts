@@ -19,7 +19,7 @@ import type { TaskQuery } from '../../../services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 @Component({
-  selector: 'app-board-view',
+  selector: 'ui-board-view',
   imports: [
     ColumnView,
     FormsModule,
@@ -39,11 +39,9 @@ export class BoardView implements OnInit {
   private readonly boardService = inject(BoardClient);
   private readonly taskService = inject(TaskClient);
   private readonly router = inject(Router);
-
   /** Bound via withComponentInputBinding() */
   readonly boardId = input.required<string>();
   readonly projectId = input<string>('');
-
   protected readonly board = signal<Board | null>(null);
   protected readonly columns = signal<Column[]>([]);
   protected readonly tasks = signal<Task[]>([]);
@@ -89,6 +87,7 @@ export class BoardView implements OnInit {
     this.boardService.listColumns(this.boardId()).subscribe({
       next: (res) => {
         const sorted = res.data.sort((a, b) => a.position - b.position);
+
         this.columns.set(sorted);
         if (sorted.length > 0 && !this.newTask.columnId) {
           this.newTask.columnId = sorted[0].id;
@@ -99,6 +98,7 @@ export class BoardView implements OnInit {
 
   private loadTasks(): void {
     const query: TaskQuery = { boardId: this.boardId(), limit: 200 };
+
     this.taskService.list(query).subscribe({
       next: (res) => this.tasks.set(res.data),
     });

@@ -60,21 +60,25 @@ export class TaskRepository {
 
   async findById(tenantId: string, id: string): Promise<Task | null> {
     const doc = await this.collection.findOne({ id, tenantId });
+
     return doc ? toDomain(doc) : null;
   }
 
   async findByBoardAndColumn(tenantId: string, boardId: string, columnId: string): Promise<Task[]> {
     const docs = await this.collection.find({ tenantId, boardId, columnId }).sort({ position: 1 }).toArray();
+
     return docs.map(toDomain);
   }
 
   async findBySprint(tenantId: string, sprintId: string): Promise<Task[]> {
     const docs = await this.collection.find({ tenantId, sprintId }).sort({ position: 1 }).toArray();
+
     return docs.map(toDomain);
   }
 
   async findByProject(tenantId: string, projectId: string): Promise<Task[]> {
     const docs = await this.collection.find({ tenantId, projectId }).sort({ position: 1 }).toArray();
+
     return docs.map(toDomain);
   }
 
@@ -88,6 +92,7 @@ export class TaskRepository {
     if (filters.assigneeId) query.assigneeIds = filters.assigneeId;
 
     const docs = await this.collection.find(query).sort({ position: 1 }).toArray();
+
     return docs.map(toDomain);
   }
 
@@ -146,6 +151,7 @@ export class TaskRepository {
 
   async delete(tenantId: string, id: string): Promise<boolean> {
     const result = await this.collection.deleteOne({ id, tenantId });
+
     return result.deletedCount > 0;
   }
 

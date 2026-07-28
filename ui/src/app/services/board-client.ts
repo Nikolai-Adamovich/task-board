@@ -12,6 +12,7 @@ export class BoardClient {
   /** List boards for a project */
   list(projectId: string): Observable<{ data: Board[] }> {
     const params = new HttpParams().set('projectId', projectId);
+
     return this.http.get<{ data: Board[] }>(`${this.baseUrl}/boards`, { params });
   }
 
@@ -32,7 +33,7 @@ export class BoardClient {
 
   /** Delete a board */
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/boards/${id}`);
+    return this.http.delete<null>(`${this.baseUrl}/boards/${id}`) as unknown as Observable<void>;
   }
 
   /** List columns for a board */

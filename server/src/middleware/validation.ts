@@ -26,6 +26,7 @@ import type { ZodType } from 'zod';
 export function validateBody<T extends ZodType>(schema: T) {
   return createMiddleware<AppEnv>(async (c, next) => {
     let body: unknown;
+
     try {
       body = await c.req.json();
     } catch {
@@ -61,7 +62,6 @@ export function validateBody<T extends ZodType>(schema: T) {
 export function validateQuery<T extends ZodType>(schema: T) {
   return createMiddleware<AppEnv>(async (c, next) => {
     const query = c.req.query();
-
     const result = schema.safeParse(query);
 
     if (!result.success) {

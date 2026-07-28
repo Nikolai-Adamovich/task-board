@@ -67,56 +67,39 @@ export const HLM_NATIVE_SELECT_VALUE_ACCESSOR = {
 })
 export class HlmNativeSelect implements ControlValueAccessor {
   private readonly _fieldControl = inject(BrnFieldControl, { optional: true });
-
   private static _id = 0;
-
   public readonly selectId = input<string>(`hlm-native-select-${HlmNativeSelect._id++}`);
-
   public readonly selectClass = input<ClassValue>('');
-
   protected readonly _computedSelectClass = computed(() =>
     hlm(
       'border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 dark:hover:bg-input/50 focus-visible:border-ring focus-visible:ring-ring/50 data-[matches-spartan-invalid=true]:ring-destructive/20 dark:data-[matches-spartan-invalid=true]:ring-destructive/40 data-[matches-spartan-invalid=true]:border-destructive dark:data-[matches-spartan-invalid=true]:border-destructive/50 h-8 w-full min-w-0 appearance-none rounded-lg border bg-transparent py-1 ps-2.5 pe-8 text-sm transition-colors select-none focus-visible:ring-3 data-[matches-spartan-invalid=true]:ring-3 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-[size=sm]:py-0.5 outline-none disabled:pointer-events-none disabled:cursor-not-allowed',
       this.selectClass(),
     ),
   );
-
   public readonly selectIconClass = input<ClassValue>('');
-
   protected readonly _computedSelectIconClass = computed(() =>
     hlm(
       'text-muted-foreground end-2.5 top-1/2 -translate-y-1/2 text-[length:--spacing(4)] pointer-events-none absolute select-none',
       this.selectIconClass(),
     ),
   );
-
   public readonly size = input<'sm' | 'default'>('default');
-
   public readonly disabled = input<boolean, BooleanInput>(false, { transform: booleanAttribute });
-
   protected readonly _disabled = linkedSignal(this.disabled);
-
   /** Whether to force the input into an invalid state. */
   public readonly forceInvalid = input<boolean, BooleanInput>(false, { transform: booleanAttribute });
-
   /** Manual override for aria-invalid. When not set, auto-detects from the parent autocomplete error state. */
   public readonly ariaInvalidOverride = input<boolean | undefined, BooleanInput>(undefined, {
     transform: (v: BooleanInput) => (v === '' || v === undefined ? undefined : booleanAttribute(v)),
     alias: 'aria-invalid',
   });
-
   protected readonly _ariaInvalid = computed(() => this.ariaInvalidOverride() ?? this._invalid?.());
-
   public readonly valueInput = input<string | undefined | null>('', { alias: 'value' });
   public readonly value = linkedSignal(this.valueInput);
-
   public readonly valueChange = output<string | undefined | null>();
-
   protected _onChange?: ChangeFn<string | undefined | null>;
   protected _onTouched?: TouchFn;
-
   public readonly labelableId = this.selectId;
-
   protected readonly _invalid = this._fieldControl?.invalid;
   protected readonly _touched = this._fieldControl?.touched;
   protected readonly _dirty = this._fieldControl?.dirty;
@@ -128,6 +111,7 @@ export class HlmNativeSelect implements ControlValueAccessor {
 
   protected _valueChanged(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
+
     this.value.set(value);
     this.valueChange.emit(value);
     this._onChange?.(value);

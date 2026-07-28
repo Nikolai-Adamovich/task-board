@@ -79,6 +79,7 @@ describe('ProjectService', () => {
       projectRepo.findByTenant.mockResolvedValue([]);
 
       const result = await service.listProjects('tenant-1');
+
       expect(result).toEqual([]);
     });
   });
@@ -137,6 +138,7 @@ describe('ProjectService', () => {
       projectRepo.findById.mockResolvedValue(makeProject());
 
       const result = await service.getProject('tenant-1', 'proj-1');
+
       expect(result.id).toBe('proj-1');
     });
 

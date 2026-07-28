@@ -30,11 +30,13 @@ describe('TaskSchema', () => {
 
   it('should accept a valid task', () => {
     const result = TaskSchema.safeParse(validTask);
+
     expect(result.success).toBe(true);
   });
 
   it('should accept task with null sprintId (backlog)', () => {
     const result = TaskSchema.safeParse({ ...validTask, sprintId: null });
+
     expect(result.success).toBe(true);
   });
 
@@ -43,33 +45,39 @@ describe('TaskSchema', () => {
       ...validTask,
       sprintId: 'bb0e8400-e29b-41d4-a716-446655440006',
     });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept all priority levels', () => {
     for (const priority of ['low', 'medium', 'high', 'critical'] as const) {
       const result = TaskSchema.safeParse({ ...validTask, priority });
+
       expect(result.success).toBe(true);
     }
   });
 
   it('should reject invalid priority', () => {
     const result = TaskSchema.safeParse({ ...validTask, priority: 'urgent' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject empty title', () => {
     const result = TaskSchema.safeParse({ ...validTask, title: '' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject title exceeding 200 characters', () => {
     const result = TaskSchema.safeParse({ ...validTask, title: 'a'.repeat(201) });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject negative position', () => {
     const result = TaskSchema.safeParse({ ...validTask, position: -1 });
+
     expect(result.success).toBe(false);
   });
 });
@@ -86,6 +94,7 @@ describe('CreateTaskSchema', () => {
 
   it('should accept valid task creation data with defaults', () => {
     const result = CreateTaskSchema.safeParse(validCreate);
+
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.priority).toBe('medium');
@@ -101,6 +110,7 @@ describe('CreateTaskSchema', () => {
       priority: 'high',
       assigneeIds: ['990e8400-e29b-41d4-a716-446655440004'],
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -110,6 +120,7 @@ describe('CreateTaskSchema', () => {
       boardId: '660e8400-e29b-41d4-a716-446655440001',
       columnId: '770e8400-e29b-41d4-a716-446655440002',
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -118,6 +129,7 @@ describe('CreateTaskSchema', () => {
       ...validCreate,
       projectId: 'not-a-uuid',
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -127,16 +139,19 @@ describe('CreateTaskSchema', () => {
 describe('UpdateTaskSchema', () => {
   it('should accept partial update with title only', () => {
     const result = UpdateTaskSchema.safeParse({ title: 'Updated Title' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept partial update with priority', () => {
     const result = UpdateTaskSchema.safeParse({ priority: 'critical' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept empty update (all optional)', () => {
     const result = UpdateTaskSchema.safeParse({});
+
     expect(result.success).toBe(true);
   });
 });
@@ -149,6 +164,7 @@ describe('MoveTaskSchema', () => {
       taskId: '550e8400-e29b-41d4-a716-446655440000',
       targetColumnId: '660e8400-e29b-41d4-a716-446655440001',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -158,6 +174,7 @@ describe('MoveTaskSchema', () => {
       targetColumnId: '660e8400-e29b-41d4-a716-446655440001',
       targetSprintId: '770e8400-e29b-41d4-a716-446655440002',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -166,6 +183,7 @@ describe('MoveTaskSchema', () => {
       taskId: 'bad',
       targetColumnId: '660e8400-e29b-41d4-a716-446655440001',
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -178,6 +196,7 @@ describe('AssignTaskSchema', () => {
       taskId: '550e8400-e29b-41d4-a716-446655440000',
       assigneeIds: ['660e8400-e29b-41d4-a716-446655440001'],
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -186,6 +205,7 @@ describe('AssignTaskSchema', () => {
       taskId: '550e8400-e29b-41d4-a716-446655440000',
       assigneeIds: [],
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -194,6 +214,7 @@ describe('AssignTaskSchema', () => {
       taskId: '550e8400-e29b-41d4-a716-446655440000',
       assigneeIds: ['not-a-uuid'],
     });
+
     expect(result.success).toBe(false);
   });
 });

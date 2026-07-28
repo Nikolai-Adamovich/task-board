@@ -16,7 +16,6 @@ const AddProjectMemberSchema = z.object({
   userId: z.string().uuid(),
   role: z.enum(ProjectRole),
 });
-
 const UpdateProjectMemberSchema = z.object({
   role: z.enum(ProjectRole),
 });
@@ -61,7 +60,6 @@ export function createProjectRoutes(): Hono<AppEnv> {
       slug: string;
       description?: string;
     };
-
     const service = createProjectService();
     const project = await service.createProject(tenantId, userId, userRole, body);
 
@@ -74,7 +72,6 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.get('/:projectId', async (c) => {
     const tenantId = c.get('tenantId');
     const projectId = c.req.param('projectId');
-
     const service = createProjectService();
     const project = await service.getProject(tenantId, projectId);
 
@@ -93,7 +90,6 @@ export function createProjectRoutes(): Hono<AppEnv> {
       slug?: string;
       description?: string;
     };
-
     const service = createProjectService();
     const project = await service.updateProject(tenantId, projectId, userRole, body);
 
@@ -107,8 +103,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
     const tenantId = c.get('tenantId');
     const userRole = c.get('userRole');
     const projectId = c.req.param('projectId');
-
     const service = createProjectService();
+
     await service.deleteProject(tenantId, projectId, userRole);
 
     return c.json({ success: true as const });
@@ -122,7 +118,6 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.get('/:projectId/members', async (c) => {
     const tenantId = c.get('tenantId');
     const projectId = c.req.param('projectId');
-
     const service = createProjectService();
     const members = await service.getProjectMembers(tenantId, projectId);
 
@@ -143,7 +138,6 @@ export function createProjectRoutes(): Hono<AppEnv> {
       userId: string;
       role: string;
     };
-
     const service = createProjectService();
     const member = await service.addMember(tenantId, projectId, body.userId, body.role, userRole);
 
@@ -159,7 +153,6 @@ export function createProjectRoutes(): Hono<AppEnv> {
     const projectId = c.req.param('projectId');
     const memberUserId = c.req.param('memberUserId');
     const body = c.get('validatedBody' as never) as { role: string };
-
     const service = createProjectService();
     const member = await service.updateMemberRole(tenantId, projectId, memberUserId, body.role, userRole);
 
@@ -174,8 +167,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
     const userRole = c.get('userRole');
     const projectId = c.req.param('projectId');
     const memberUserId = c.req.param('memberUserId');
-
     const service = createProjectService();
+
     await service.removeMember(tenantId, projectId, memberUserId, userRole);
 
     return c.json({ success: true as const });

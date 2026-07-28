@@ -36,16 +36,19 @@ export class ProjectRepository {
 
   async findById(tenantId: string, id: string): Promise<Project | null> {
     const doc = await this.collection.findOne({ id, tenantId });
+
     return doc ? toDomain(doc) : null;
   }
 
   async findByTenant(tenantId: string): Promise<Project[]> {
     const docs = await this.collection.find({ tenantId }).toArray();
+
     return docs.map(toDomain);
   }
 
   async findBySlug(tenantId: string, slug: string): Promise<Project | null> {
     const doc = await this.collection.findOne({ tenantId, slug });
+
     return doc ? toDomain(doc) : null;
   }
 
@@ -81,6 +84,7 @@ export class ProjectRepository {
 
   async delete(tenantId: string, id: string): Promise<boolean> {
     const result = await this.collection.deleteOne({ id, tenantId });
+
     return result.deletedCount > 0;
   }
 }

@@ -23,21 +23,25 @@ describe('BoardSchema', () => {
 
   it('should accept a valid board', () => {
     const result = BoardSchema.safeParse(validBoard);
+
     expect(result.success).toBe(true);
   });
 
   it('should accept board with null description', () => {
     const result = BoardSchema.safeParse({ ...validBoard, description: null });
+
     expect(result.success).toBe(true);
   });
 
   it('should reject empty name', () => {
     const result = BoardSchema.safeParse({ ...validBoard, name: '' });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject name exceeding 100 characters', () => {
     const result = BoardSchema.safeParse({ ...validBoard, name: 'a'.repeat(101) });
+
     expect(result.success).toBe(false);
   });
 });
@@ -49,6 +53,7 @@ describe('CreateBoardSchema', () => {
     const result = CreateBoardSchema.safeParse({
       name: 'New Board',
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -57,6 +62,7 @@ describe('CreateBoardSchema', () => {
       name: 'Custom Board',
       columnNames: ['To Do', 'In Progress', 'Done'],
     });
+
     expect(result.success).toBe(true);
   });
 
@@ -65,6 +71,7 @@ describe('CreateBoardSchema', () => {
       name: 'Board',
       columnNames: ['To Do', ''],
     });
+
     expect(result.success).toBe(false);
   });
 
@@ -73,6 +80,7 @@ describe('CreateBoardSchema', () => {
       name: 'Board',
       columnNames: ['a'.repeat(51)],
     });
+
     expect(result.success).toBe(false);
   });
 });
@@ -82,11 +90,13 @@ describe('CreateBoardSchema', () => {
 describe('UpdateBoardSchema', () => {
   it('should accept partial update', () => {
     const result = UpdateBoardSchema.safeParse({ name: 'Updated Board' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept empty update', () => {
     const result = UpdateBoardSchema.safeParse({});
+
     expect(result.success).toBe(true);
   });
 });
@@ -106,26 +116,31 @@ describe('ColumnSchema', () => {
 
   it('should accept a valid column', () => {
     const result = ColumnSchema.safeParse(validColumn);
+
     expect(result.success).toBe(true);
   });
 
   it('should reject negative position', () => {
     const result = ColumnSchema.safeParse({ ...validColumn, position: -1 });
+
     expect(result.success).toBe(false);
   });
 
   it('should accept position 0', () => {
     const result = ColumnSchema.safeParse({ ...validColumn, position: 0 });
+
     expect(result.success).toBe(true);
   });
 
   it('should reject non-integer position', () => {
     const result = ColumnSchema.safeParse({ ...validColumn, position: 1.5 });
+
     expect(result.success).toBe(false);
   });
 
   it('should reject empty column name', () => {
     const result = ColumnSchema.safeParse({ ...validColumn, name: '' });
+
     expect(result.success).toBe(false);
   });
 });
@@ -135,16 +150,19 @@ describe('ColumnSchema', () => {
 describe('CreateColumnSchema', () => {
   it('should accept valid column creation', () => {
     const result = CreateColumnSchema.safeParse({ name: 'New Column' });
+
     expect(result.success).toBe(true);
   });
 
   it('should accept column with explicit position', () => {
     const result = CreateColumnSchema.safeParse({ name: 'Column', position: 2 });
+
     expect(result.success).toBe(true);
   });
 
   it('should reject position at optional boundary (negative)', () => {
     const result = CreateColumnSchema.safeParse({ name: 'Column', position: -1 });
+
     expect(result.success).toBe(false);
   });
 });

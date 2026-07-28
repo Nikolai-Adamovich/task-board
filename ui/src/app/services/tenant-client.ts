@@ -13,12 +13,12 @@ const TENANT_KEY = 'taskboard_tenant_id';
 export class TenantClient {
   private readonly http = inject(HttpClient);
   private readonly apiBaseUrl = inject(API_BASE_URL);
-
   readonly tenants = signal<Tenant[]>([]);
   readonly activeTenant = signal<Tenant | null>(null);
 
   constructor() {
     const storedId = localStorage.getItem(TENANT_KEY);
+
     if (storedId) {
       this.loadTenants();
     }
@@ -29,10 +29,13 @@ export class TenantClient {
     this.http.get<{ data: Tenant[] }>(`${this.apiBaseUrl}/tenants`).subscribe({
       next: (res) => {
         this.tenants.set(res.data);
+
         // Restore active tenant from localStorage
         const storedId = localStorage.getItem(TENANT_KEY);
+
         if (storedId) {
           const match = res.data.find((t) => t.id === storedId);
+
           if (match) {
             this.activeTenant.set(match);
           }
