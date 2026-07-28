@@ -55,6 +55,11 @@ describe('AuthStore', () => {
     const store = TestBed.inject(AuthStore);
 
     expect(store.token()).toBe('test-token');
+
+    // Constructor also calls fetchCurrentUser when token exists
+    const req = httpMock.expectOne('http://localhost/api/auth/me');
+
+    req.flush({ id: '1', email: 'user@test.com', displayName: 'User' } as User);
   });
 
   it('should set user and token on login', () => {
@@ -103,10 +108,8 @@ describe('AuthStore', () => {
     localStorage.setItem('taskboard_token', 'existing-token');
     createModule();
 
+    // Constructor automatically fetches current user when token exists
     const store = TestBed.inject(AuthStore);
-
-    store.ngOnInit();
-
     const req = httpMock.expectOne('http://localhost/api/auth/me');
 
     req.flush({ id: '1', email: 'user@test.com', displayName: 'User' } as User);

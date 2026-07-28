@@ -4,16 +4,22 @@
   </div>
   <nav class="flex-1 space-y-1 px-3 py-4">
     @if (tenantService.activeTenant(); as tenant) {
-    <a [routerLink]="['/tenants', tenant.id, 'projects']" routerLinkActive="bg-primary-50 text-primary-700 font-medium"
-      class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100">
-      <span class="i-lucide-folder h-4 w-4"></span>
-      Projects
-    </a>
-    <a [routerLink]="['/tenants', tenant.id, 'sprints']" routerLinkActive="bg-primary-50 text-primary-700 font-medium"
-      class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100">
-      <span class="i-lucide-calendar h-4 w-4"></span>
-      Sprints
-    </a>
+      <a
+        [routerLink]="['/tenants', tenant.id, 'projects']"
+        routerLinkActive="bg-primary-50 text-primary-700 font-medium"
+        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
+      >
+        <span class="i-lucide-folder h-4 w-4"></span>
+        Projects
+      </a>
+      <a
+        [routerLink]="['/tenants', tenant.id, 'sprints']"
+        routerLinkActive="bg-primary-50 text-primary-700 font-medium"
+        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
+      >
+        <span class="i-lucide-calendar h-4 w-4"></span>
+        Sprints
+      </a>
     }
   </nav>
 </aside>

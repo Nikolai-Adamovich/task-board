@@ -1,4 +1,4 @@
-import { Service, signal, computed, inject, OnInit } from '@angular/core';
+import { Service, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE_URL } from '../api-url.token';
 import type { User, AuthResponse } from '@task-board/shared';
@@ -10,7 +10,7 @@ const TOKEN_KEY = 'taskboard_token';
  * Manages the current user, JWT token, and authentication state.
  */
 @Service()
-export class AuthStore implements OnInit {
+export class AuthStore {
   private readonly http = inject(HttpClient);
   private readonly apiBaseUrl = inject(API_BASE_URL);
   readonly currentUser = signal<User | null>(null);
@@ -23,12 +23,6 @@ export class AuthStore implements OnInit {
 
     if (stored) {
       this.token.set(stored);
-    }
-  }
-
-  ngOnInit(): void {
-    // If we have a stored token, fetch the current user
-    if (this.token()) {
       this.fetchCurrentUser();
     }
   }

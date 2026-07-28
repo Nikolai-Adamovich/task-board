@@ -22,7 +22,7 @@ const priorityColorMap: Record<string, string> = {
 })
 export class TaskCard {
   readonly task = input.required<Task>();
-  readonly click = output<Task>();
+  readonly taskClick = output<Task>();
   readonly dragStart = output<{ task: Task; dragEvent: DragEvent }>();
 
   protected priorityColor(): string {

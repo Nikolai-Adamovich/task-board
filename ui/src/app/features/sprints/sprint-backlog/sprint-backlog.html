@@ -6,35 +6,33 @@
   </div>
 
   @if (loading()) {
-  <div class="flex items-center justify-center py-8">
-    <hlm-spinner class="text-sm" /> <span class="ml-2 text-xs text-muted-foreground">Loading backlog...</span>
-  </div>
-  } @else if (backlogTasks().length === 0) {
-  <div class="py-8 text-center">
-    <p class="text-sm text-muted-foreground">All tasks are assigned to sprints.</p>
-  </div>
-  } @else {
-  <div class="divide-y divide-border">
-    @for (task of backlogTasks(); track task.id) {
-    <div class="flex items-center justify-between px-4 py-3">
-      <div class="flex items-center gap-3">
-        <span class="h-2 w-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
-        <div>
-          <p class="text-sm font-medium text-foreground">{{ task.title }}</p>
-          @if (task.description) {
-          <p class="text-xs text-muted-foreground line-clamp-1">{{ task.description }}</p>
-          }
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        @if (targetSprint()) {
-        <button hlmBtn size="sm" variant="outline" (click)="addTaskToSprint(task.id)">
-          Add to Sprint
-        </button>
-        }
-      </div>
+    <div class="flex items-center justify-center py-8">
+      <hlm-spinner class="text-sm" /> <span class="ml-2 text-xs text-muted-foreground">Loading backlog...</span>
     </div>
-    }
-  </div>
+  } @else if (backlogTasks().length === 0) {
+    <div class="py-8 text-center">
+      <p class="text-sm text-muted-foreground">All tasks are assigned to sprints.</p>
+    </div>
+  } @else {
+    <div class="divide-y divide-border">
+      @for (task of backlogTasks(); track task.id) {
+        <div class="flex items-center justify-between px-4 py-3">
+          <div class="flex items-center gap-3">
+            <span class="h-2 w-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
+            <div>
+              <p class="text-sm font-medium text-foreground">{{ task.title }}</p>
+              @if (task.description) {
+                <p class="text-xs text-muted-foreground line-clamp-1">{{ task.description }}</p>
+              }
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            @if (targetSprint()) {
+              <button hlmBtn size="sm" variant="outline" (click)="addTaskToSprint(task.id)">Add to Sprint</button>
+            }
+          </div>
+        </div>
+      }
+    </div>
   }
 </hlm-card>

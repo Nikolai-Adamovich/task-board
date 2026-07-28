@@ -1,122 +1,131 @@
 @if (loading()) {
-<div class="flex items-center justify-center py-12">
-  <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading task...</span>
-</div>
-} @else if (task(); as t) {
-<div class="mx-auto max-w-3xl">
-  <!-- Header -->
-  <div class="mb-6 flex items-center justify-between">
-    <div>
-      <div class="flex items-center gap-3">
-        <h2 class="text-xl font-bold text-foreground">{{ t.title }}</h2>
-        <span hlmBadge variant="outline" class="text-xs font-semibold uppercase" [class]="getPriorityColor(t.priority)">
-          {{ t.priority }}
-        </span>
-      </div>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Created {{ t.createdAt | date:'medium' }}
-        &middot; Updated {{ t.updatedAt | date:'medium' }}
-      </p>
-    </div>
-    @if (isEditing()) {
-    <div class="flex gap-2">
-      <button hlmBtn variant="outline" size="sm" (click)="cancelEdit()">Cancel</button>
-      <button hlmBtn size="sm" (click)="saveTask()" [disabled]="saving()">
-        @if (saving()) {
-        <hlm-spinner /> Saving...
-        } @else {
-        Save
-        }
-      </button>
-    </div>
-    } @else {
-    <button hlmBtn variant="outline" size="sm" (click)="startEdit()">Edit</button>
-    }
+  <div class="flex items-center justify-center py-12">
+    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading task...</span>
   </div>
-
-  <!-- Content -->
-  <div class="grid gap-6 lg:grid-cols-3">
-    <div class="lg:col-span-2 space-y-6">
-      <!-- Title & Description -->
-      <hlm-card>
-        <div hlmCardContent>
-          @if (isEditing()) {
-          <div class="space-y-4">
-            <hlm-field>
-              <label hlmFieldLabel>Title</label>
-              <input hlmInput type="text" [(ngModel)]="editForm.title" />
-            </hlm-field>
-            <hlm-field>
-              <label hlmFieldLabel>Description</label>
-              <textarea hlmTextarea [(ngModel)]="editForm.description" rows="6"
-                placeholder="Task description (supports markdown)"></textarea>
-            </hlm-field>
-          </div>
-          } @else {
-          <h3 class="text-sm font-medium text-foreground">Description</h3>
-          @if (t.description) {
-          <p class="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{{ t.description }}</p>
-          } @else {
-          <p class="mt-2 text-sm italic text-muted-foreground">No description</p>
-          }
-          }
+} @else if (task(); as t) {
+  <div class="mx-auto max-w-3xl">
+    <!-- Header -->
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-bold text-foreground">{{ t.title }}</h2>
+          <span
+            hlmBadge
+            variant="outline"
+            class="text-xs font-semibold uppercase"
+            [class]="getPriorityColor(t.priority)"
+          >
+            {{ t.priority }}
+          </span>
         </div>
-      </hlm-card>
-    </div>
-
-    <!-- Sidebar -->
-    <div class="space-y-4">
-      <!-- Priority -->
-      <hlm-card>
-        <div hlmCardContent>
-          <h4 class="text-xs font-medium uppercase text-muted-foreground">Priority</h4>
-          @if (isEditing()) {
-          <select hlmNativeSelect [(ngModel)]="editForm.priority" class="mt-2">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-          } @else {
-          <p class="mt-1 text-sm font-medium text-foreground">{{ t.priority }}</p>
-          }
-        </div>
-      </hlm-card>
-
-      <!-- Assignees -->
-      <hlm-card>
-        <div hlmCardContent>
-          <h4 class="text-xs font-medium uppercase text-muted-foreground">Assignees</h4>
-          <div class="mt-2 space-y-1">
-            @if (t.assigneeIds.length === 0) {
-            <p class="text-xs text-muted-foreground">Unassigned</p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Created {{ t.createdAt | date: 'medium' }} &middot; Updated {{ t.updatedAt | date: 'medium' }}
+        </p>
+      </div>
+      @if (isEditing()) {
+        <div class="flex gap-2">
+          <button hlmBtn variant="outline" size="sm" (click)="cancelEdit()">Cancel</button>
+          <button hlmBtn size="sm" (click)="saveTask()" [disabled]="saving()">
+            @if (saving()) {
+              <hlm-spinner /> Saving...
+            } @else {
+              Save
             }
-            @for (assigneeId of t.assigneeIds; track assigneeId) {
-            <div class="flex items-center gap-2">
-              <hlm-avatar class="h-6 w-6">
-                <div hlmAvatarFallback class="text-[10px] font-medium">
-                  {{ assigneeId.substring(0, 2).toUpperCase() }}
-                </div>
-              </hlm-avatar>
-              <span class="text-xs text-foreground">{{ assigneeId }}</span>
-            </div>
-            }
-          </div>
-        </div>
-      </hlm-card>
-
-      <!-- Actions -->
-      @if (canDelete()) {
-      <hlm-card>
-        <div hlmCardContent>
-          <h4 class="text-xs font-medium uppercase text-muted-foreground">Actions</h4>
-          <button hlmBtn variant="destructive" size="sm" class="mt-2 w-full" (click)="deleteTask(t)">
-            Delete Task
           </button>
         </div>
-      </hlm-card>
+      } @else {
+        <button hlmBtn variant="outline" size="sm" (click)="startEdit()">Edit</button>
       }
     </div>
+
+    <!-- Content -->
+    <div class="grid gap-6 lg:grid-cols-3">
+      <div class="lg:col-span-2 space-y-6">
+        <!-- Title & Description -->
+        <hlm-card>
+          <div hlmCardContent>
+            @if (isEditing()) {
+              <div class="space-y-4">
+                <hlm-field>
+                  <label hlmFieldLabel for="edit-title">Title</label>
+                  <input hlmInput id="edit-title" type="text" [(ngModel)]="editForm.title" />
+                </hlm-field>
+                <hlm-field>
+                  <label hlmFieldLabel for="edit-description">Description</label>
+                  <textarea
+                    hlmTextarea
+                    id="edit-description"
+                    [(ngModel)]="editForm.description"
+                    rows="6"
+                    placeholder="Task description (supports markdown)"
+                  ></textarea>
+                </hlm-field>
+              </div>
+            } @else {
+              <h3 class="text-sm font-medium text-foreground">Description</h3>
+              @if (t.description) {
+                <p class="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{{ t.description }}</p>
+              } @else {
+                <p class="mt-2 text-sm italic text-muted-foreground">No description</p>
+              }
+            }
+          </div>
+        </hlm-card>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="space-y-4">
+        <!-- Priority -->
+        <hlm-card>
+          <div hlmCardContent>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">Priority</h4>
+            @if (isEditing()) {
+              <select hlmNativeSelect [(ngModel)]="editForm.priority" class="mt-2">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            } @else {
+              <p class="mt-1 text-sm font-medium text-foreground">{{ t.priority }}</p>
+            }
+          </div>
+        </hlm-card>
+
+        <!-- Assignees -->
+        <hlm-card>
+          <div hlmCardContent>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">Assignees</h4>
+            <div class="mt-2 space-y-1">
+              @if (t.assigneeIds.length === 0) {
+                <p class="text-xs text-muted-foreground">Unassigned</p>
+              }
+              @for (assigneeId of t.assigneeIds; track assigneeId) {
+                <div class="flex items-center gap-2">
+                  <hlm-avatar class="h-6 w-6">
+                    <div hlmAvatarFallback class="text-[10px] font-medium">
+                      {{ assigneeId.substring(0, 2).toUpperCase() }}
+                    </div>
+                  </hlm-avatar>
+                  <span class="text-xs text-foreground">{{ assigneeId }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        </hlm-card>
+
+        <!-- Actions -->
+        @if (canDelete()) {
+          <hlm-card>
+            <div hlmCardContent>
+              <h4 class="text-xs font-medium uppercase text-muted-foreground">Actions</h4>
+              <button hlmBtn variant="destructive" size="sm" class="mt-2 w-full" (click)="deleteTask(t)">
+                Delete Task
+              </button>
+            </div>
+          </hlm-card>
+        }
+      </div>
+    </div>
   </div>
-</div>
 }

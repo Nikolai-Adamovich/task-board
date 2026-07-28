@@ -1,112 +1,123 @@
 @if (loading()) {
-<div class="flex items-center justify-center py-12">
-  <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading project...</span>
-</div>
+  <div class="flex items-center justify-center py-12">
+    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading project...</span>
+  </div>
 } @else if (project(); as p) {
-<div class="mx-auto max-w-5xl">
-  <!-- Project header -->
-  <div class="mb-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-foreground">{{ p.name }}</h2>
-        @if (p.description) {
-        <p class="mt-1 text-sm text-muted-foreground">{{ p.description }}</p>
-        }
-      </div>
-      <div class="flex items-center gap-2">
-        <button hlmBtn variant="outline" size="sm" [routerLink]="['sprints']">
-          Sprints
-        </button>
-        <button hlmBtn size="sm" (click)="showCreateBoard.set(true)">
-          <ng-icon name="lucidePlus" class="mr-1" />
-          New Board
-        </button>
+  <div class="mx-auto max-w-5xl">
+    <!-- Project header -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-foreground">{{ p.name }}</h2>
+          @if (p.description) {
+            <p class="mt-1 text-sm text-muted-foreground">{{ p.description }}</p>
+          }
+        </div>
+        <div class="flex items-center gap-2">
+          <button hlmBtn variant="outline" size="sm" [routerLink]="['sprints']">Sprints</button>
+          <button hlmBtn size="sm" (click)="showCreateBoard.set(true)">
+            <ng-icon name="lucidePlus" class="mr-1" />
+            New Board
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- Boards section -->
+    <section class="mb-8">
+      <h3 class="mb-4 text-lg font-semibold text-foreground">Boards</h3>
+      @if (boards().length === 0) {
+        <div class="rounded-lg border border-dashed border-border py-8 text-center">
+          <p class="text-sm text-muted-foreground">No boards yet.</p>
+          <button hlmBtn class="mt-3" size="sm" (click)="showCreateBoard.set(true)">Create a board</button>
+        </div>
+      } @else {
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          @for (board of boards(); track board.id) {
+            <a
+              [routerLink]="['boards', board.id]"
+              class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+            >
+              <h4 class="font-medium text-foreground group-hover:text-primary">
+                {{ board.name }}
+              </h4>
+              @if (board.description) {
+                <p class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ board.description }}</p>
+              }
+            </a>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Members section -->
+    <section>
+      <h3 class="mb-4 text-lg font-semibold text-foreground">Members</h3>
+      @if (members().length === 0) {
+        <p class="text-sm text-muted-foreground">No members loaded.</p>
+      } @else {
+        <div class="rounded-lg border border-border">
+          @for (member of members(); track member.userId) {
+            <div class="flex items-center justify-between border-b border-border px-4 py-3 last:border-b-0">
+              <div class="flex items-center gap-3">
+                <hlm-avatar class="h-8 w-8">
+                  <div hlmAvatarFallback class="text-xs font-medium">
+                    {{ member.userId.substring(0, 2).toUpperCase() }}
+                  </div>
+                </hlm-avatar>
+                <span class="text-sm text-foreground">{{ member.userId }}</span>
+              </div>
+              <span hlmBadge variant="secondary">
+                {{ member.role }}
+              </span>
+            </div>
+          }
+        </div>
+      }
+    </section>
   </div>
 
-  <!-- Boards section -->
-  <section class="mb-8">
-    <h3 class="mb-4 text-lg font-semibold text-foreground">Boards</h3>
-    @if (boards().length === 0) {
-    <div class="rounded-lg border border-dashed border-border py-8 text-center">
-      <p class="text-sm text-muted-foreground">No boards yet.</p>
-      <button hlmBtn class="mt-3" size="sm" (click)="showCreateBoard.set(true)">
-        Create a board
-      </button>
-    </div>
-    } @else {
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      @for (board of boards(); track board.id) {
-      <a [routerLink]="['boards', board.id]"
-        class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30">
-        <h4 class="font-medium text-foreground group-hover:text-primary">
-          {{ board.name }}
-        </h4>
-        @if (board.description) {
-        <p class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ board.description }}</p>
-        }
-      </a>
-      }
-    </div>
-    }
-  </section>
-
-  <!-- Members section -->
-  <section>
-    <h3 class="mb-4 text-lg font-semibold text-foreground">Members</h3>
-    @if (members().length === 0) {
-    <p class="text-sm text-muted-foreground">No members loaded.</p>
-    } @else {
-    <div class="rounded-lg border border-border">
-      @for (member of members(); track member.userId) {
-      <div class="flex items-center justify-between border-b border-border px-4 py-3 last:border-b-0">
-        <div class="flex items-center gap-3">
-          <hlm-avatar class="h-8 w-8">
-            <div hlmAvatarFallback class="text-xs font-medium">
-              {{ member.userId.substring(0, 2).toUpperCase() }}
-            </div>
-          </hlm-avatar>
-          <span class="text-sm text-foreground">{{ member.userId }}</span>
-        </div>
-        <span hlmBadge variant="secondary">
-          {{ member.role }}
-        </span>
-      </div>
-      }
-    </div>
-    }
-  </section>
-</div>
-
-<!-- Create Board Modal -->
-<hlm-dialog [state]="showCreateBoard() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
-  <hlm-dialog-content *hlmDialogPortal>
-    <hlm-dialog-header>
-      <h3 hlmDialogTitle>Create Board</h3>
-    </hlm-dialog-header>
-    <form (ngSubmit)="createBoard()" class="space-y-4">
-      <hlm-field>
-        <label hlmFieldLabel for="board-name">Name</label>
-        <input hlmInput id="board-name" type="text" [(ngModel)]="newBoard.name" name="name" required
-          placeholder="Sprint Board" />
-      </hlm-field>
-      <hlm-field>
-        <label hlmFieldLabel for="board-desc">Description</label>
-        <textarea hlmTextarea id="board-desc" [(ngModel)]="newBoard.description" name="description" rows="3"
-          placeholder="Optional description..."></textarea>
-      </hlm-field>
-    </form>
-    <hlm-dialog-footer>
-      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-      <button hlmBtn (click)="createBoard()" [disabled]="creatingBoard()">
-        @if (creatingBoard()) {
-        <hlm-spinner /> Creating...
-        } @else {
-        Create Board
-        }
-      </button>
-    </hlm-dialog-footer>
-  </hlm-dialog-content>
-</hlm-dialog>
+  <!-- Create Board Modal -->
+  <hlm-dialog [state]="showCreateBoard() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>Create Board</h3>
+      </hlm-dialog-header>
+      <form (ngSubmit)="createBoard()" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="board-name">Name</label>
+          <input
+            hlmInput
+            id="board-name"
+            type="text"
+            [(ngModel)]="newBoard.name"
+            name="name"
+            required
+            placeholder="Sprint Board"
+          />
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="board-desc">Description</label>
+          <textarea
+            hlmTextarea
+            id="board-desc"
+            [(ngModel)]="newBoard.description"
+            name="description"
+            rows="3"
+            placeholder="Optional description..."
+          ></textarea>
+        </hlm-field>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn (click)="createBoard()" [disabled]="creatingBoard()">
+          @if (creatingBoard()) {
+            <hlm-spinner /> Creating...
+          } @else {
+            Create Board
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
 }

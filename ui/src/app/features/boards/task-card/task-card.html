@@ -1,6 +1,9 @@
 <div
   class="cursor-pointer rounded-md border border-border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
-  role="button" tabindex="0" (keydown.enter)="click.emit(task())">
+  role="button"
+  tabindex="0"
+  (keydown.enter)="taskClick.emit(task())"
+>
   <div class="flex items-start justify-between gap-2">
     <h4 class="text-sm font-medium text-foreground line-clamp-2">{{ task().title }}</h4>
     <span hlmBadge variant="outline" class="shrink-0 text-[10px] uppercase" [class]="priorityColor()">
@@ -9,27 +12,25 @@
   </div>
 
   @if (task().description) {
-  <p class="mt-1 text-xs text-muted-foreground line-clamp-2">
-    {{ task().description }}
-  </p>
+    <p class="mt-1 text-xs text-muted-foreground line-clamp-2">
+      {{ task().description }}
+    </p>
   }
 
   <div class="mt-2 flex items-center justify-between">
     <!-- Assignee avatars -->
     <div class="flex -space-x-1">
       @for (assigneeId of task().assigneeIds.slice(0, 3); track assigneeId) {
-      <hlm-avatar class="h-5 w-5 border border-card" [title]="assigneeId">
-        <div hlmAvatarFallback class="text-[9px] font-medium">
-          {{ assigneeId.substring(0, 2).toUpperCase() }}
-        </div>
-      </hlm-avatar>
+        <hlm-avatar class="h-5 w-5 border border-card" [title]="assigneeId">
+          <div hlmAvatarFallback class="text-[9px] font-medium">
+            {{ assigneeId.substring(0, 2).toUpperCase() }}
+          </div>
+        </hlm-avatar>
       }
       @if (task().assigneeIds.length > 3) {
-      <hlm-avatar class="h-5 w-5 border border-card">
-        <div hlmAvatarFallback class="text-[9px] text-muted-foreground">
-          +{{ task().assigneeIds.length - 3 }}
-        </div>
-      </hlm-avatar>
+        <hlm-avatar class="h-5 w-5 border border-card">
+          <div hlmAvatarFallback class="text-[9px] text-muted-foreground">+{{ task().assigneeIds.length - 3 }}</div>
+        </hlm-avatar>
       }
     </div>
   </div>

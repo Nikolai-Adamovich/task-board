@@ -1,7 +1,9 @@
 // UI-specific ESLint overrides
 import baseConfig from '../eslint.config.js';
 import angular from 'angular-eslint';
+import eslintPluginPrettier from 'eslint-plugin-prettier';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import * as angularTemplateParser from '@angular-eslint/template-parser';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,7 +46,7 @@ export default [
   // Unit test spec files are in tsconfig.spec.json (excluded from tsconfig.app.json).
   // Point them to the correct tsconfig so the ESLint project service resolves them.
   {
-    files: ['**/*.spec.ts', '**/*.test.ts'],
+    files: ['**/*.spec.ts', '**/*.test.ts', 'ui/**/*.spec.ts', 'ui/**/*.test.ts'],
     languageOptions: {
       parserOptions: {
         projectService: false,
@@ -55,7 +57,7 @@ export default [
   // E2E tests (Playwright) are not part of any Angular project.
   // Disable project-service-dependent rules so TypeScript doesn't complain.
   {
-    files: ['e2e/**/*.ts'],
+    files: ['**/e2e/**/*.ts'],
     languageOptions: {
       parserOptions: {
         projectService: false,
@@ -71,17 +73,42 @@ export default [
   // Spartan UI library (libs/) uses 'hlm-' selectors and different code conventions.
   // Relax project-specific rules that don't apply to generated library code.
   {
-    files: ['libs/**/*.ts'],
+    files: ['**/libs/**/*.ts'],
     rules: {
       '@angular-eslint/component-selector': 'off',
       '@angular-eslint/directive-selector': 'off',
+      '@angular-eslint/no-input-rename': 'off',
       '@angular-eslint/component-max-inline-declarations': 'off',
       '@stylistic/lines-between-class-members': 'off',
       '@stylistic/padding-line-between-statements': 'off',
+    },
+  },
+  // Config files (playwright, vitest, etc.) are not part of any Angular project.
+  {
+    files: ['**/playwright.config.ts', '**/vitest.config.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: null,
+      },
     },
   },
   ...withFiles(angular.configs.templateRecommended, ['**/*.html']),
   ...withFiles(angular.configs.templateAccessibility, ['**/*.html']),
   // Must be last — disables @stylistic / @angular-eslint rules that conflict with Prettier.
   eslintConfigPrettier,
+  // Check Prettier formatting for Angular HTML templates.
+  // Must come AFTER eslintConfigPrettier since that disables prettier/prettier.
+  {
+    files: ['**/*.html'],
+    languageOptions: {
+      parser: angularTemplateParser,
+    },
+    plugins: {
+      prettier: eslintPluginPrettier,
+    },
+    rules: {
+      'prettier/prettier': ['warn', { parser: 'angular' }],
+    },
+  },
 ];

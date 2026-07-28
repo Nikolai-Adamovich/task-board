@@ -2,44 +2,44 @@
   <div class="mb-6 flex items-center justify-between">
     <h2 class="text-2xl font-bold text-foreground">Projects</h2>
     @if (canCreate()) {
-    <button hlmBtn (click)="showCreateModal.set(true)">
-      <ng-icon name="lucidePlus" class="mr-1" />
-      New Project
-    </button>
+      <button hlmBtn (click)="showCreateModal.set(true)">
+        <ng-icon name="lucidePlus" class="mr-1" />
+        New Project
+      </button>
     }
   </div>
 
   @if (loading()) {
-  <div class="flex items-center justify-center py-12">
-    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading projects...</span>
-  </div>
+    <div class="flex items-center justify-center py-12">
+      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading projects...</span>
+    </div>
   } @else if (projects().length === 0) {
-  <div class="rounded-lg border border-dashed border-border py-12 text-center">
-    <ng-icon name="lucideFolderOpen" class="mx-auto h-12 w-12 text-muted-foreground" />
-    <p class="mt-4 text-sm text-muted-foreground">No projects yet.</p>
-    @if (canCreate()) {
-    <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">Create your first project</button>
-    }
-  </div>
-  } @else {
-  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    @for (project of projects(); track project.id) {
-    <a [routerLink]="['/tenants', tenantId(), 'projects', project.id]"
-      class="group rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/30">
-      <h3 class="text-base font-semibold text-foreground group-hover:text-primary">
-        {{ project.name }}
-      </h3>
-      @if (project.description) {
-      <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">
-        {{ project.description }}
-      </p>
+    <div class="rounded-lg border border-dashed border-border py-12 text-center">
+      <ng-icon name="lucideFolderOpen" class="mx-auto h-12 w-12 text-muted-foreground" />
+      <p class="mt-4 text-sm text-muted-foreground">No projects yet.</p>
+      @if (canCreate()) {
+        <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">Create your first project</button>
       }
-      <p class="mt-3 text-xs text-muted-foreground">
-        Created {{ project.createdAt | date:'mediumDate' }}
-      </p>
-    </a>
-    }
-  </div>
+    </div>
+  } @else {
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      @for (project of projects(); track project.id) {
+        <a
+          [routerLink]="['/tenants', tenantId(), 'projects', project.id]"
+          class="group rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+        >
+          <h3 class="text-base font-semibold text-foreground group-hover:text-primary">
+            {{ project.name }}
+          </h3>
+          @if (project.description) {
+            <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">
+              {{ project.description }}
+            </p>
+          }
+          <p class="mt-3 text-xs text-muted-foreground">Created {{ project.createdAt | date: 'mediumDate' }}</p>
+        </a>
+      }
+    </div>
   }
 
   <!-- Create Project Modal -->
@@ -51,27 +51,47 @@
       <form (ngSubmit)="createProject()" class="space-y-4">
         <hlm-field>
           <label hlmFieldLabel for="project-name">Name</label>
-          <input hlmInput id="project-name" type="text" [(ngModel)]="newProject.name" name="name" required
-            placeholder="My Project" />
+          <input
+            hlmInput
+            id="project-name"
+            type="text"
+            [(ngModel)]="newProject.name"
+            name="name"
+            required
+            placeholder="My Project"
+          />
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="project-slug">Slug</label>
-          <input hlmInput id="project-slug" type="text" [(ngModel)]="newProject.slug" name="slug" required
-            placeholder="my-project" />
+          <input
+            hlmInput
+            id="project-slug"
+            type="text"
+            [(ngModel)]="newProject.slug"
+            name="slug"
+            required
+            placeholder="my-project"
+          />
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="project-desc">Description</label>
-          <textarea hlmTextarea id="project-desc" [(ngModel)]="newProject.description" name="description" rows="3"
-            placeholder="Optional description..."></textarea>
+          <textarea
+            hlmTextarea
+            id="project-desc"
+            [(ngModel)]="newProject.description"
+            name="description"
+            rows="3"
+            placeholder="Optional description..."
+          ></textarea>
         </hlm-field>
       </form>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
         <button hlmBtn (click)="createProject()" [disabled]="creating()">
           @if (creating()) {
-          <hlm-spinner /> Creating...
+            <hlm-spinner /> Creating...
           } @else {
-          Create Project
+            Create Project
           }
         </button>
       </hlm-dialog-footer>

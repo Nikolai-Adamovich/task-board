@@ -7,23 +7,39 @@
 
     <div hlmCardContent>
       @if (error()) {
-      <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-        {{ error() }}
-      </div>
+        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() }}
+        </div>
       }
 
       <form (submit)="onSubmit($event)">
         <hlm-field-group>
           <hlm-field>
             <label hlmFieldLabel for="email">Email</label>
-            <input hlmInput id="email" type="email" [value]="email()" (input)="onEmailInput($event)" required
-              autocomplete="email" placeholder="you&#64;example.com" />
+            <input
+              hlmInput
+              id="email"
+              type="email"
+              [value]="email()"
+              (input)="onEmailInput($event)"
+              required
+              autocomplete="email"
+              placeholder="you&#64;example.com"
+            />
           </hlm-field>
 
           <hlm-field>
             <label hlmFieldLabel for="password">Password</label>
-            <input hlmInput id="password" type="password" [value]="password()" (input)="onPasswordInput($event)"
-              required autocomplete="current-password" placeholder="••••••••" />
+            <input
+              hlmInput
+              id="password"
+              type="password"
+              [value]="password()"
+              (input)="onPasswordInput($event)"
+              required
+              autocomplete="current-password"
+              placeholder="••••••••"
+            />
           </hlm-field>
         </hlm-field-group>
       </form>
@@ -32,9 +48,9 @@
     <hlm-card-footer class="flex-col gap-2">
       <button hlmBtn type="submit" class="w-full" [disabled]="loading()" (click)="onSubmit($event)">
         @if (loading()) {
-        <hlm-spinner /> Signing in...
+          <hlm-spinner /> Signing in...
         } @else {
-        Sign in
+          Sign in
         }
       </button>
       <p class="text-center text-sm text-muted-foreground">

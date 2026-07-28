@@ -1,79 +1,97 @@
 @if (loading()) {
-<div class="flex items-center justify-center py-12">
-  <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading board...</span>
-</div>
+  <div class="flex items-center justify-center py-12">
+    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading board...</span>
+  </div>
 } @else if (board(); as b) {
-<div class="flex h-full flex-col">
-  <!-- Board header -->
-  <div class="mb-4 flex items-center justify-between">
-    <div>
-      <h2 class="text-xl font-bold text-foreground">{{ b.name }}</h2>
-      @if (b.description) {
-      <p class="text-sm text-muted-foreground">{{ b.description }}</p>
+  <div class="flex h-full flex-col">
+    <!-- Board header -->
+    <div class="mb-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-bold text-foreground">{{ b.name }}</h2>
+        @if (b.description) {
+          <p class="text-sm text-muted-foreground">{{ b.description }}</p>
+        }
+      </div>
+      <button hlmBtn size="sm" (click)="showCreateTask.set(true)">
+        <ng-icon name="lucidePlus" class="mr-1" />
+        New Task
+      </button>
+    </div>
+
+    <!-- Kanban columns -->
+    <div class="flex flex-1 gap-4 overflow-x-auto pb-4">
+      @for (col of columns(); track col.id) {
+        <ui-column-view
+          [column]="col"
+          [tasks]="getTasksForColumn(col.id)"
+          [showAddButton]="false"
+          (taskDrop)="onTaskDrop($event)"
+          (taskClick)="goToTask($event)"
+        />
       }
     </div>
-    <button hlmBtn size="sm" (click)="showCreateTask.set(true)">
-      <ng-icon name="lucidePlus" class="mr-1" />
-      New Task
-    </button>
   </div>
 
-  <!-- Kanban columns -->
-  <div class="flex flex-1 gap-4 overflow-x-auto pb-4">
-    @for (col of columns(); track col.id) {
-    <ui-column-view [column]="col" [tasks]="getTasksForColumn(col.id)" [showAddButton]="false"
-      (taskDrop)="onTaskDrop($event)" (taskClick)="goToTask($event)" />
-    }
-  </div>
-</div>
-
-<!-- Create Task Modal -->
-<hlm-dialog [state]="showCreateTask() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
-  <hlm-dialog-content *hlmDialogPortal>
-    <hlm-dialog-header>
-      <h3 hlmDialogTitle>Create Task</h3>
-    </hlm-dialog-header>
-    <form (ngSubmit)="createTask()" class="space-y-4">
-      <hlm-field>
-        <label hlmFieldLabel for="task-title">Title</label>
-        <input hlmInput id="task-title" type="text" [(ngModel)]="newTask.title" name="title" required
-          placeholder="Task title" />
-      </hlm-field>
-      <hlm-field>
-        <label hlmFieldLabel for="task-desc">Description</label>
-        <textarea hlmTextarea id="task-desc" [(ngModel)]="newTask.description" name="description" rows="3"
-          placeholder="Optional description..."></textarea>
-      </hlm-field>
-      <hlm-field>
-        <label hlmFieldLabel for="task-priority">Priority</label>
-        <select hlmNativeSelect id="task-priority" [(ngModel)]="newTask.priority" name="priority">
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="critical">Critical</option>
-        </select>
-      </hlm-field>
-      @if (columns().length > 0) {
-      <hlm-field>
-        <label hlmFieldLabel for="task-column">Column</label>
-        <select hlmNativeSelect id="task-column" [(ngModel)]="newTask.columnId" name="columnId">
-          @for (col of columns(); track col.id) {
-          <option [value]="col.id">{{ col.name }}</option>
-          }
-        </select>
-      </hlm-field>
-      }
-    </form>
-    <hlm-dialog-footer>
-      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-      <button hlmBtn (click)="createTask()" [disabled]="creatingTask()">
-        @if (creatingTask()) {
-        <hlm-spinner /> Creating...
-        } @else {
-        Create Task
+  <!-- Create Task Modal -->
+  <hlm-dialog [state]="showCreateTask() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>Create Task</h3>
+      </hlm-dialog-header>
+      <form (ngSubmit)="createTask()" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="task-title">Title</label>
+          <input
+            hlmInput
+            id="task-title"
+            type="text"
+            [(ngModel)]="newTask.title"
+            name="title"
+            required
+            placeholder="Task title"
+          />
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="task-desc">Description</label>
+          <textarea
+            hlmTextarea
+            id="task-desc"
+            [(ngModel)]="newTask.description"
+            name="description"
+            rows="3"
+            placeholder="Optional description..."
+          ></textarea>
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="task-priority">Priority</label>
+          <select hlmNativeSelect id="task-priority" [(ngModel)]="newTask.priority" name="priority">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </hlm-field>
+        @if (columns().length > 0) {
+          <hlm-field>
+            <label hlmFieldLabel for="task-column">Column</label>
+            <select hlmNativeSelect id="task-column" [(ngModel)]="newTask.columnId" name="columnId">
+              @for (col of columns(); track col.id) {
+                <option [value]="col.id">{{ col.name }}</option>
+              }
+            </select>
+          </hlm-field>
         }
-      </button>
-    </hlm-dialog-footer>
-  </hlm-dialog-content>
-</hlm-dialog>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn (click)="createTask()" [disabled]="creatingTask()">
+          @if (creatingTask()) {
+            <hlm-spinner /> Creating...
+          } @else {
+            Create Task
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
 }

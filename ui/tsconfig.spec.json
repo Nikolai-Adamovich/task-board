@@ -2,6 +2,7 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
+    "rootDir": "./src",
     "types": ["vitest/globals"],
     "target": "ES2022",
     "module": "ESNext",
@@ -11,6 +12,9 @@
     "paths": {
       "@task-board/shared": ["../../shared/src/index.ts"]
     }
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true
   },
   "files": [],
   "include": ["src/**/*.spec.ts", "src/**/*.test.ts"]

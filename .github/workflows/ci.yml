@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [24]
 
     steps:
       - name: Checkout code
@@ -37,6 +37,9 @@ jobs:
 
       - name: Run server tests
         run: npm test --workspace=server
+
+      - name: Run UI tests
+        run: npm test --workspace=ui
 
       - name: Type-check shared
         run: npm run typecheck --workspace=shared

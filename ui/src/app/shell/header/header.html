@@ -4,10 +4,8 @@
   </div>
   <div class="flex items-center gap-4">
     @if (authStore.currentUser(); as user) {
-    <span class="text-sm text-surface-600">{{ user.displayName }}</span>
-    <button hlmBtn variant="outline" size="sm" (click)="logout()">
-      Logout
-    </button>
+      <span class="text-sm text-surface-600">{{ user.displayName }}</span>
+      <button hlmBtn variant="outline" size="sm" (click)="logout()">Logout</button>
     }
   </div>
 </header>
