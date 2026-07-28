@@ -3,8 +3,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRouteSnapshot, provideRouter, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { tenantGuard } from './tenant.guard';
-import { TenantClient } from '../services/tenant-client';
-import { API_BASE_URL } from '../api-url.token';
+import { TenantClient } from '@services/tenant-client';
+import { API_BASE_URL } from '@app/api-url.token';
 import type { Tenant } from '@task-board/shared';
 
 describe('tenantGuard', () => {

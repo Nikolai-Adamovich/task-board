@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { authInterceptor } from './auth.interceptor';
-import { AuthStore } from '../stores/auth-store';
-import { API_BASE_URL } from '../api-url.token';
+import { AuthStore } from '@stores/auth-store';
+import { API_BASE_URL } from '@app/api-url.token';
 
 describe('authInterceptor', () => {
   let httpMock: HttpTestingController;

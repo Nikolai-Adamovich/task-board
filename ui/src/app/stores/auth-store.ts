@@ -1,6 +1,6 @@
 import { Service, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { API_BASE_URL } from '../api-url.token';
+import { API_BASE_URL } from '@app/api-url.token';
 import type { User, AuthResponse } from '@task-board/shared';
 
 const TOKEN_KEY = 'taskboard_token';

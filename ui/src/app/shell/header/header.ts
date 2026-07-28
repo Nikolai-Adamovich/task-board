@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { AuthStore } from '../../stores/auth-store';
+import { AuthStore } from '@stores/auth-store';
 import { TenantSwitcher } from '../tenant-switcher/tenant-switcher';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 

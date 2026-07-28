@@ -1,9 +1,9 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
-import { AuthStore } from '../../stores/auth-store';
-import { TenantClient } from '../../services/tenant-client';
-import { ProjectClient } from '../../services/project-client';
+import { AuthStore } from '@stores/auth-store';
+import { TenantClient } from '@services/tenant-client';
+import { ProjectClient } from '@services/project-client';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';

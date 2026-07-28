@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
-import { TenantClient } from '../services/tenant-client';
+import { TenantClient } from '@services/tenant-client';
 
 /**
  * Functional route guard that ensures a valid project context.

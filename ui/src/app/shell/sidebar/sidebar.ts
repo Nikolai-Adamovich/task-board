@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { TenantClient } from '../../services/tenant-client';
+import { TenantClient } from '@services/tenant-client';
 
 @Component({
   selector: 'ui-sidebar',

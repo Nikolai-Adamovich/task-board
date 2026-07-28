@@ -3,8 +3,8 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
-import { BoardClient } from '../../../services/board-client';
-import { TaskClient } from '../../../services/task-client';
+import { BoardClient } from '@services/board-client';
+import { TaskClient } from '@services/task-client';
 import { ColumnView } from '../column-view/column-view';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -15,7 +15,7 @@ import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { NgIcon } from '@ng-icons/core';
 import type { Board, Column, Task, CreateTask } from '@task-board/shared';
-import type { TaskQuery } from '../../../services/task-client';
+import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 @Component({

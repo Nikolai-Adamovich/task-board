@@ -2,8 +2,8 @@ import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
-import { API_BASE_URL } from '../api-url.token';
-import { AuthStore } from '../stores/auth-store';
+import { API_BASE_URL } from '@app/api-url.token';
+import { AuthStore } from '@stores/auth-store';
 import type { AuthResponse, LoginRequest, RegisterRequest } from '@task-board/shared';
 
 /**

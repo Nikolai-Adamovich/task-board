@@ -10,6 +10,13 @@
     "lib": ["ES2022", "dom"],
     "paths": {
       "@task-board/shared": ["../../shared/src/index.ts"],
+      "@services/*": ["./src/app/services/*"],
+      "@stores/*": ["./src/app/stores/*"],
+      "@guards/*": ["./src/app/guards/*"],
+      "@interceptors/*": ["./src/app/interceptors/*"],
+      "@features/*": ["./src/app/features/*"],
+      "@shell/*": ["./src/app/shell/*"],
+      "@app/*": ["./src/app/*"],
       "@spartan-ng/helm/button": ["./libs/ui/button/src/index.ts"],
       "@spartan-ng/helm/utils": ["./libs/ui/utils/src/index.ts"],
       "@spartan-ng/helm/input": ["./libs/ui/input/src/index.ts"],

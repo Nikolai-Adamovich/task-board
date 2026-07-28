@@ -1,6 +1,6 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { TenantClient } from '../services/tenant-client';
+import { TenantClient } from '@services/tenant-client';
 
 /**
  * Functional HTTP interceptor that attaches the X-Tenant-Id header

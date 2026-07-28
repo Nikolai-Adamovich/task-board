@@ -1,6 +1,6 @@
 import { Service, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { API_BASE_URL } from '../api-url.token';
+import { API_BASE_URL } from '@app/api-url.token';
 import type { Tenant } from '@task-board/shared';
 
 const TENANT_KEY = 'taskboard_tenant_id';

@@ -3,7 +3,7 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 import { errorInterceptor } from './error.interceptor';
-import { API_BASE_URL } from '../api-url.token';
+import { API_BASE_URL } from '@app/api-url.token';
 
 describe('errorInterceptor', () => {
   let httpMock: HttpTestingController;

@@ -1,6 +1,6 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { AuthStore } from '../stores/auth-store';
+import { AuthStore } from '@stores/auth-store';
 
 /**
  * Functional HTTP interceptor that attaches the JWT Bearer token

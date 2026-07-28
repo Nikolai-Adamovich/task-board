@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideCheck } from '@ng-icons/lucide';
-import { TenantClient } from '../../services/tenant-client';
+import { TenantClient } from '@services/tenant-client';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NgIcon } from '@ng-icons/core';
 import type { Tenant } from '@task-board/shared';

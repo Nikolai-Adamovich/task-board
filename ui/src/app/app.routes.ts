@@ -7,11 +7,11 @@ export const routes: Routes = [
   // Auth routes (unauthenticated)
   {
     path: 'auth/login',
-    loadComponent: () => import('./auth/login/login').then((m) => m.Login),
+    loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
   },
   {
     path: 'auth/register',
-    loadComponent: () => import('./auth/register/register').then((m) => m.Register),
+    loadComponent: () => import('./features/auth/register/register').then((m) => m.Register),
   },
 
   // Root redirect to dashboard

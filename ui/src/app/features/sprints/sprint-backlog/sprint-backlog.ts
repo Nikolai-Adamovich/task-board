@@ -1,6 +1,6 @@
 import { Component, inject, input, signal, OnInit, output } from '@angular/core';
-import { SprintClient } from '../../../services/sprint-client';
-import { TaskClient } from '../../../services/task-client';
+import { SprintClient } from '@services/sprint-client';
+import { TaskClient } from '@services/task-client';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmCardImports } from '@spartan-ng/helm/card';

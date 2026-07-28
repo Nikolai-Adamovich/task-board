@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { AuthStore } from './auth-store';
-import { API_BASE_URL } from '../api-url.token';
+import { API_BASE_URL } from '@app/api-url.token';
 import type { User } from '@task-board/shared';
 
 describe('AuthStore', () => {

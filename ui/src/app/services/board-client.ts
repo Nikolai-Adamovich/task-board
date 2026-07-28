@@ -1,7 +1,7 @@
 import { Service, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { API_BASE_URL } from '../api-url.token';
+import { API_BASE_URL } from '@app/api-url.token';
 import type { Board, CreateBoard, UpdateBoard, Column, CreateColumn } from '@task-board/shared';
 
 @Service()

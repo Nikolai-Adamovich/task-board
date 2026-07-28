@@ -3,8 +3,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRouteSnapshot, provideRouter, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { authGuard } from './auth.guard';
-import { AuthStore } from '../stores/auth-store';
-import { API_BASE_URL } from '../api-url.token';
+import { AuthStore } from '@stores/auth-store';
+import { API_BASE_URL } from '@app/api-url.token';
 import type { User } from '@task-board/shared';
 
 describe('authGuard', () => {
