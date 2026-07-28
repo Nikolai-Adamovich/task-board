@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import {
   errorHandler,
@@ -126,14 +126,21 @@ describe('errorHandler', () => {
   });
 
   it('returns 500 for unknown errors without leaking stack', async () => {
-    const res = await app.request('/unknown');
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    expect(res.status).toBe(500);
+    try {
+      const res = await app.request('/unknown');
 
-    const body = (await res.json()) as Record<string, unknown>;
+      expect(res.status).toBe(500);
 
-    expect(body.code).toBe('INTERNAL_SERVER_ERROR');
-    expect(body.message).toBe('An unexpected error occurred');
-    expect(body).not.toHaveProperty('stack');
+      const body = (await res.json()) as Record<string, unknown>;
+
+      expect(body.code).toBe('INTERNAL_SERVER_ERROR');
+      expect(body.message).toBe('An unexpected error occurred');
+      expect(body).not.toHaveProperty('stack');
+      expect(consoleSpy).toHaveBeenCalledOnce();
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 });
