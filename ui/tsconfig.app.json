@@ -36,6 +36,6 @@
     "strictTemplates": true
   },
   "files": [],
-  "include": ["src/**/*.ts", "libs/ui/**/src/**/*.ts"],
+  "include": ["src/**/*.ts", "libs/ui/**/src/**/*.ts", "../../shared/src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts"]
 }
