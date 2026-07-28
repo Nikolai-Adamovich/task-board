@@ -2,7 +2,7 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
-    "types": ["vitest"],
+    "types": ["vitest/globals"],
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
