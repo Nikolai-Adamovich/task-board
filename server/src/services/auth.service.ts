@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import bcrypt from 'bcrypt';
 import type { User, AuthResponse, RegisterRequest, LoginRequest } from '@task-board/shared';
 import { ConflictError, NotFoundError, UnauthorizedError } from '../middleware/error-handler.js';
 import { UserRepository } from '../repositories/user.repository.js';
@@ -73,7 +72,8 @@ export class AuthService {
       throw new ConflictError('A user with this email already exists');
     }
 
-    // Hash the password
+    // Dynamic import — bcrypt may use crypto at module load time
+    const bcrypt = await import('bcrypt');
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
     // Create the user
     const user = await this.userRepo.create({
@@ -111,6 +111,7 @@ export class AuthService {
       throw new UnauthorizedError('Invalid email or password');
     }
 
+    const bcrypt = await import('bcrypt');
     const passwordValid = await bcrypt.compare(input.password, userDoc.passwordHash);
 
     if (!passwordValid) {

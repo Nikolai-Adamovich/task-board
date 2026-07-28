@@ -1,6 +1,6 @@
-import { MongoClient, type Collection, type Db } from 'mongodb';
+import type { Collection, Db, MongoClient } from 'mongodb';
 
-let client: MongoClient | null = null;
+let client: import('mongodb').MongoClient | null = null;
 let db: Db | null = null;
 
 /**
@@ -14,6 +14,10 @@ export async function connectMongo(uri: string): Promise<MongoClient> {
   if (client) {
     return client;
   }
+
+  // Dynamic import required — MongoDB's BSON module calls crypto.randomBytes()
+  // at module load time, which Cloudflare Workers forbids at global scope.
+  const { MongoClient } = await import('mongodb');
 
   client = new MongoClient(uri);
   await client.connect();
