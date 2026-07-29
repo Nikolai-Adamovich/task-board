@@ -41,6 +41,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/projects/project-list/project-list').then((m) => m.ProjectList),
       },
       {
+        path: 'sprints',
+        loadComponent: () => import('./features/sprints/sprint-list/sprint-list').then((m) => m.SprintList),
+      },
+      {
         path: 'projects/:projectId',
         canActivate: [projectGuard],
         children: [

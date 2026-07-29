@@ -23,19 +23,15 @@ export function createSprintRoutes(): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
   /**
-   * GET / — List sprints for a project.
-   * Requires `projectId` query parameter.
+   * GET / — List sprints.
+   * If `projectId` query parameter is provided, lists sprints for that project.
+   * Otherwise, lists all sprints for the tenant.
    */
   router.get('/', async (c) => {
     const tenantId = c.get('tenantId');
     const projectId = c.req.query('projectId');
-
-    if (!projectId) {
-      return c.json({ code: 'VALIDATION_ERROR', message: 'projectId query parameter is required' }, 422);
-    }
-
     const service = createSprintService();
-    const sprints = await service.listSprints(tenantId, projectId);
+    const sprints = projectId ? await service.listSprints(tenantId, projectId) : await service.listAllSprints(tenantId);
 
     return c.json({
       data: sprints,

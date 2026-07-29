@@ -24,6 +24,11 @@ export class SprintClient {
     return this.http.get<PaginatedResponse<Sprint>>(`${this.baseUrl}/sprints`, { params });
   }
 
+  /** List all sprints for the active tenant */
+  listByTenant(): Observable<PaginatedResponse<Sprint>> {
+    return this.http.get<PaginatedResponse<Sprint>>(`${this.baseUrl}/sprints`);
+  }
+
   /** Get a single sprint by ID */
   getById(id: string): Observable<Sprint> {
     return this.http.get<Sprint>(`${this.baseUrl}/sprints/${id}`);
@@ -31,7 +36,9 @@ export class SprintClient {
 
   /** Create a new sprint */
   create(projectId: string, data: CreateSprint): Observable<Sprint> {
-    return this.http.post<Sprint>(`${this.baseUrl}/sprints`, { ...data, projectId });
+    const params = new HttpParams().set('projectId', projectId);
+
+    return this.http.post<Sprint>(`${this.baseUrl}/sprints`, data, { params });
   }
 
   /** Update an existing sprint */

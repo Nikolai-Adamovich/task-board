@@ -22,6 +22,13 @@ export class SprintService {
   }
 
   /**
+   * List all sprints for a tenant (across all projects).
+   */
+  async listAllSprints(tenantId: string): Promise<Sprint[]> {
+    return this.sprintRepo.findByTenant(tenantId);
+  }
+
+  /**
    * Create a new sprint. Admin+ only.
    */
   async createSprint(tenantId: string, projectId: string, input: CreateSprint, userRole: string): Promise<Sprint> {

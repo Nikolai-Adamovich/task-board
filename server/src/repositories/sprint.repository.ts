@@ -54,6 +54,12 @@ export class SprintRepository {
     return docs.map(toDomain);
   }
 
+  async findByTenant(tenantId: string): Promise<Sprint[]> {
+    const docs = await this.collection.find({ tenantId }).sort({ startDate: -1 }).toArray();
+
+    return docs.map(toDomain);
+  }
+
   async create(
     tenantId: string,
     input: {

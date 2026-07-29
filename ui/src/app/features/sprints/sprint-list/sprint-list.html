@@ -21,7 +21,8 @@
         <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">Create first sprint</button>
       }
     </div>
-  } @else {
+  } @else if (projectId()) {
+    <!-- Flat list for project-level view -->
     <div class="space-y-3">
       @for (sprint of sprints(); track sprint.id) {
         <a
@@ -50,6 +51,56 @@
             class="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1"
           />
         </a>
+      }
+    </div>
+  } @else {
+    <!-- Grouped by project with collapsible sections for tenant-level view -->
+    <div class="space-y-6">
+      @for (group of projectGroups(); track group.projectId) {
+        <hlm-collapsible [expanded]="isGroupExpanded(group.projectId)" (expandedChange)="toggleGroup(group.projectId)">
+          <div class="flex items-center justify-between rounded-t-lg border border-border bg-surface-50 px-4 py-3">
+            <div class="flex items-center gap-3">
+              <h3 class="text-lg font-semibold text-foreground">{{ group.projectName }}</h3>
+              <span hlmBadge variant="secondary">{{ group.sprints.length }} sprints</span>
+            </div>
+            <button hlmCollapsibleTrigger hlmBtn variant="ghost" size="icon" class="size-8">
+              <ng-icon name="lucideChevronsUpDown" />
+              <span class="sr-only">Toggle</span>
+            </button>
+          </div>
+          <hlm-collapsible-content>
+            <div class="space-y-2 rounded-b-lg border border-t-0 border-border bg-card p-3">
+              @for (sprint of group.sprints; track sprint.id) {
+                <a
+                  [routerLink]="['/tenants', sprint.tenantId, 'projects', sprint.projectId, 'sprints', sprint.id]"
+                  class="group flex items-center justify-between rounded-md border border-border bg-background p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                >
+                  <div>
+                    <div class="flex items-center gap-3">
+                      <h3 class="text-base font-semibold text-foreground group-hover:text-primary">
+                        {{ sprint.name }}
+                      </h3>
+                      <span hlmBadge [class]="getStatusColor(sprint.status)">
+                        {{ sprint.status }}
+                      </span>
+                    </div>
+                    @if (sprint.goal) {
+                      <p class="mt-1 text-sm text-muted-foreground">{{ sprint.goal }}</p>
+                    }
+                    <p class="mt-1 text-xs text-muted-foreground">
+                      {{ sprint.startDate | date: 'mediumDate' }} — {{ sprint.endDate | date: 'mediumDate' }} &middot;
+                      {{ sprint.taskIds.length }} tasks
+                    </p>
+                  </div>
+                  <ng-icon
+                    name="lucideChevronRight"
+                    class="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1"
+                  />
+                </a>
+              }
+            </div>
+          </hlm-collapsible-content>
+        </hlm-collapsible>
       }
     </div>
   }
