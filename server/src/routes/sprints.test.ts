@@ -33,6 +33,7 @@ const mockSprint = {
 vi.mock('../services/sprint.service.js', () => ({
   SprintService: vi.fn().mockImplementation(() => ({
     listSprints: vi.fn().mockResolvedValue([mockSprint]),
+    listAllSprints: vi.fn().mockResolvedValue([mockSprint]),
     createSprint: vi.fn().mockResolvedValue(mockSprint),
     getSprint: vi.fn().mockResolvedValue({ sprint: mockSprint, tasks: [] }),
     updateSprint: vi.fn().mockResolvedValue(mockSprint),
@@ -114,14 +115,14 @@ describe('GET /api/v1/sprints', () => {
     expect(body).toHaveProperty('total');
   });
 
-  it('should return 422 when projectId is missing', async () => {
+  it('should return all tenant sprints when projectId is omitted', async () => {
     const res = await getJson(app, '/api/v1/sprints');
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(200);
 
     const body = (await res.json()) as Record<string, unknown>;
 
-    expect(body.code).toBe('VALIDATION_ERROR');
+    expect(body.data).toBeDefined();
   });
 });
 
