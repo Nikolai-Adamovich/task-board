@@ -19,14 +19,6 @@ export class TenantClient {
   readonly tenants = signal<Tenant[]>([]);
   readonly activeTenant = signal<Tenant | null>(null);
 
-  constructor() {
-    const storedId = localStorage.getItem(TENANT_KEY);
-
-    if (storedId) {
-      this.loadTenants().subscribe();
-    }
-  }
-
   /** Load all tenants for the current user. Returns an Observable for chaining. */
   loadTenants(): Observable<{ data: Tenant[] }> {
     return this.http.get<{ data: Tenant[] }>(`${this.apiBaseUrl}/tenants`).pipe(

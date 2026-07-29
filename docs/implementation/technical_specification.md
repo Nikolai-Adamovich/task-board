@@ -751,11 +751,22 @@ export const appConfig = {
 
 ```typescript
 // Functional guard example
-export const authGuard: CanActivateFn = () => {
-  const auth = inject(AuthService);
+// Auth is determined by the presence of `currentUser` (already loaded)
+// or `token` (restored from localStorage — guard awaits fetchCurrentUser
+// to validate the token before allowing navigation).
+export const authGuard: CanActivateFn = async () => {
+  const auth = inject(AuthStore);
   const router = inject(Router);
-  if (!auth.isAuthenticated()) return router.createUrlTree(['/auth/login']);
-  return true;
+  if (auth.currentUser()) return true;
+  if (auth.token()) {
+    try {
+      await firstValueFrom(auth.fetchCurrentUser());
+      return true;
+    } catch {
+      return router.parseUrl('/auth/login');
+    }
+  }
+  return router.parseUrl('/auth/login');
 };
 ```
 
@@ -764,13 +775,13 @@ export const authGuard: CanActivateFn = () => {
 All state is signal-based. Stores are plain Angular services using `signal()`, `computed()`, `linkedSignal()`, and
 `resource()` — no external state management library.
 
-| Concern         | Mechanism                              | Key APIs                                                                                                                 |
-| --------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Auth state      | `inject(AuthService)` — signal store   | `currentUser = signal<User \| null>(null)`, `isAuthenticated = computed(() => !!this.currentUser())`                     |
-| Tenant context  | `inject(TenantService)` — signal store | `activeTenant = linkedSignal(() => this.tenants()[0])`, `tenants = resource({ loader: () => this.fetchTenants() })`      |
-| Project data    | `inject(ProjectStore)` — signal store  | `projects = resource({ loader: () => this.fetchProjects() })`, `currentProject = linkedSignal(() => this.projects()[0])` |
-| Board/Task data | `inject(BoardStore)` — signal store    | `board = resource({ params: () => ({ id: this.boardId() }), loader: ({ params }) => this.fetchBoard(params.id) })`       |
-| UI state        | Component-level signals                | `showSidebar = signal(true)`, `selectedFilter = linkedSignal(() => FILTER_OPTIONS[0])`                                   |
+| Concern         | Mechanism                              | Key APIs                                                                                                                                                                 |
+| --------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Auth state      | `inject(AuthStore)` — signal store     | `currentUser = signal<User \| null>(null)`, `token = signal<string \| null>(null)` — guard checks `currentUser()` first, then validates `token` via `fetchCurrentUser()` |
+| Tenant context  | `inject(TenantService)` — signal store | `activeTenant = linkedSignal(() => this.tenants()[0])`, `tenants = resource({ loader: () => this.fetchTenants() })`                                                      |
+| Project data    | `inject(ProjectStore)` — signal store  | `projects = resource({ loader: () => this.fetchProjects() })`, `currentProject = linkedSignal(() => this.projects()[0])`                                                 |
+| Board/Task data | `inject(BoardStore)` — signal store    | `board = resource({ params: () => ({ id: this.boardId() }), loader: ({ params }) => this.fetchBoard(params.id) })`                                                       |
+| UI state        | Component-level signals                | `showSidebar = signal(true)`, `selectedFilter = linkedSignal(() => FILTER_OPTIONS[0])`                                                                                   |
 
 **`resource()` pattern** — replaces manual `HttpClient` subscription for data fetching:
 

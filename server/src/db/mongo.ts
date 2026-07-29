@@ -1,39 +1,35 @@
 import type { Collection, Db, MongoClient } from 'mongodb';
 
-let client: import('mongodb').MongoClient | null = null;
 let db: Db | null = null;
 
 /**
- * Initialize and return the MongoDB client singleton.
- * Reuses the existing connection if already established.
+ * Initialize and return the MongoDB client.
  *
- * Configured for Cloudflare Workers compatibility:
- * - `maxPoolSize: 1` avoids connection-pool stalls in the Workers runtime
- * - Timeouts ensure requests never hang indefinitely
+ * In Cloudflare Workers the TCP socket does not survive between requests,
+ * so a cached MongoClient becomes stale immediately.  This function creates
+ * a **fresh connection on every request** which, for a local MongoDB, takes
+ * only a few milliseconds — far less than the 10-second socket-timeout that
+ * was previously hit when the driver tried to reuse a dead socket.
+ *
+ * A `db` module-level variable is kept so that `getDb()` / `getCollection()`
+ * can still be called by downstream code without passing the client through.
  *
  * @param uri - MongoDB connection string from environment variables
  * @returns The connected MongoClient instance
  */
 export async function connectMongo(uri: string): Promise<MongoClient> {
-  if (client) {
-    return client;
-  }
-
   // Dynamic import required — MongoDB's BSON module calls crypto.randomBytes()
   // at module load time, which Cloudflare Workers forbids at global scope.
   const { MongoClient } = await import('mongodb');
-
-  client = new MongoClient(uri, {
-    maxPoolSize: 10,
+  const client = new MongoClient(uri, {
+    maxPoolSize: 1,
     minPoolSize: 0,
-    maxIdleTimeMS: 10_000,
-    connectTimeoutMS: 3_000,
-    socketTimeoutMS: 10_000,
-    serverSelectionTimeoutMS: 3_000,
+    connectTimeoutMS: 5_000,
+    serverSelectionTimeoutMS: 5_000,
   });
+
   await client.connect();
   db = client.db();
-
   return client;
 }
 
@@ -66,13 +62,10 @@ export function getCollection<T extends import('mongodb').Document>(name: string
 }
 
 /**
- * Close the MongoDB connection.
- * Useful for graceful shutdown or testing.
+ * Reset the cached database reference.
+ * Useful for testing — the client is now created per-request so there
+ * is no long-lived connection to close.
  */
-export async function closeMongo(): Promise<void> {
-  if (client) {
-    await client.close();
-    client = null;
-    db = null;
-  }
+export function closeMongo(): void {
+  db = null;
 }

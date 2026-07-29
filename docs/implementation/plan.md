@@ -925,18 +925,20 @@
 
 ### T-061: Implement AuthStore (signal-based)
 
-- **Goal:** Create `ui/src/app/stores/auth.store.ts` as a plain Angular service (no NgRx) using `signal()` and
-  `computed()` with `currentUser`, `isAuthenticated`, and `token` state, plus `login()` and `logout()` methods. Uses
-  `inject()` for DI.
+- **Goal:** Create `ui/src/app/stores/auth-store.ts` as a plain Angular service (no NgRx) using `signal()` with
+  `currentUser` and `token` state, plus `login()`, `logout()` and `fetchCurrentUser()` methods. Uses `inject()` for DI.
 - **Files to create:**
-  - `ui/src/app/stores/auth.store.ts`
+  - `ui/src/app/stores/auth-store.ts`
 - **Dependencies:** T-057
 - **Acceptance criteria:**
-  - AuthStore is a plain `@Injectable({ providedIn: 'root' })` service — no NgRx `signalStore`
+  - AuthStore is a plain `@Service()` service — no NgRx `signalStore`
   - `currentUser = signal<User | null>(null)` holds the current user or null
-  - `isAuthenticated = computed(() => !!this.currentUser())` reflects auth state
-  - `login(user, token)` updates all signals
-  - `logout()` resets all signals and clears the stored JWT
+  - `token = signal<string | null>(null)` holds the JWT (restored from localStorage in constructor)
+  - Auth state is determined by `currentUser()` (loaded) or `token()` (awaiting validation) — no `isAuthenticated`
+    computed signal
+  - `fetchCurrentUser()` returns `Observable<User>` — the `authGuard` awaits this to validate the token before allowing
+    navigation
+  - `login()` and `logout()` manage state and localStorage
   - Uses `inject(HttpClient)` for dependency injection
 
 ### T-062: Implement TenantService (signal-based, tenant switching)

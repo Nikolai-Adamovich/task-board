@@ -22,9 +22,8 @@ export class Dashboard implements OnInit {
   protected readonly loading = signal(true);
 
   ngOnInit(): void {
-    if (this.authStore.token() && !this.authStore.currentUser()) {
-      this.authStore.fetchCurrentUser();
-    }
+    // fetchCurrentUser is now handled by the authGuard before the
+    // Dashboard loads. No need to call it here.
 
     // Load tenants first, then load projects once tenant is available
     this.tenantService.loadTenants().subscribe({

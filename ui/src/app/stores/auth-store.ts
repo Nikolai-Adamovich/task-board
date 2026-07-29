@@ -1,6 +1,8 @@
-import { Service, signal, computed, inject } from '@angular/core';
+import { Service, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE_URL } from '@app/api-url.token';
+import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
 import type { User, AuthResponse } from '@task-board/shared';
 
 const TOKEN_KEY = 'taskboard_token';
@@ -16,16 +18,17 @@ export class AuthStore {
   readonly currentUser = signal<User | null>(null);
   readonly token = signal<string | null>(null);
   readonly tenantRole = signal<string | null>(null);
-  readonly isAuthenticated = computed(() => !!this.currentUser());
 
   constructor() {
-    // Restore token from localStorage on init
+    // Restore token from localStorage on init.
+    // fetchCurrentUser() is NOT called here — the authGuard handles
+    // it explicitly and waits for the result to avoid a race condition
+    // where logout() clears the token before the guard finishes.
     const stored = localStorage.getItem(TOKEN_KEY);
 
     if (stored) {
       this.token.set(stored);
       this.decodeTenantRole(stored);
-      this.fetchCurrentUser();
     }
   }
 
@@ -97,11 +100,20 @@ export class AuthStore {
     }
   }
 
-  /** Fetch the current user using the stored token */
-  fetchCurrentUser(): void {
-    this.http.get<User>(`${this.apiBaseUrl}/auth/me`).subscribe({
-      next: (user) => this.currentUser.set(user),
-      error: () => this.logout(),
-    });
+  /** Fetch the current user using the stored token. Returns an Observable. */
+  fetchCurrentUser(): Observable<User> {
+    return this.http.get<User>(`${this.apiBaseUrl}/auth/me`).pipe(
+      tap({
+        next: (user) => this.currentUser.set(user),
+        error: (err) => {
+          // Only clear session on 401 (invalid/expired token).
+          // For other errors (network, 500, etc.) keep the token so the
+          // user stays logged in.
+          if (err.status === 401) {
+            this.logout();
+          }
+        },
+      }),
+    );
   }
 }

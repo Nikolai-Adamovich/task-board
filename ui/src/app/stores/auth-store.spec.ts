@@ -45,7 +45,6 @@ describe('AuthStore', () => {
     const store = TestBed.inject(AuthStore);
 
     expect(store.currentUser()).toBeNull();
-    expect(store.isAuthenticated()).toBe(false);
   });
 
   it('should restore token from localStorage', () => {
@@ -55,11 +54,8 @@ describe('AuthStore', () => {
     const store = TestBed.inject(AuthStore);
 
     expect(store.token()).toBe('test-token');
-
-    // Constructor also calls fetchCurrentUser when token exists
-    const req = httpMock.expectOne('http://localhost/api/auth/me');
-
-    req.flush({ id: '1', email: 'user@test.com', displayName: 'User' } as User);
+    // Constructor no longer calls fetchCurrentUser (handled by authGuard)
+    expect(store.currentUser()).toBeNull();
   });
 
   it('should decode tenantRole from JWT on login', () => {
@@ -156,7 +152,7 @@ describe('AuthStore', () => {
 
     expect(store.token()).toBe('jwt-token');
     expect(store.currentUser()?.email).toBe('test@example.com');
-    expect(store.isAuthenticated()).toBe(true);
+    expect(store.token()).toBe('jwt-token');
     expect(localStorage.getItem('taskboard_token')).toBe('jwt-token');
   });
 
@@ -178,16 +174,16 @@ describe('AuthStore', () => {
 
     expect(store.currentUser()).toBeNull();
     expect(store.token()).toBeNull();
-    expect(store.isAuthenticated()).toBe(false);
     expect(localStorage.getItem('taskboard_token')).toBeNull();
   });
 
-  it('should fetch current user on init when token exists', () => {
-    localStorage.setItem('taskboard_token', 'existing-token');
+  it('should fetch current user via fetchCurrentUser()', () => {
     createModule();
 
-    // Constructor automatically fetches current user when token exists
     const store = TestBed.inject(AuthStore);
+
+    store.fetchCurrentUser().subscribe();
+
     const req = httpMock.expectOne('http://localhost/api/auth/me');
 
     req.flush({ id: '1', email: 'user@test.com', displayName: 'User' } as User);

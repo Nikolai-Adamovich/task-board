@@ -52,7 +52,7 @@ describe('authInterceptor', () => {
     req.flush({});
   });
 
-  it('should skip Authorization header for /auth/ requests', () => {
+  it('should skip Authorization header for /auth/login requests', () => {
     store.token.set('test-jwt');
 
     http.post('/api/auth/login', {}).subscribe();
@@ -60,6 +60,30 @@ describe('authInterceptor', () => {
     const req = httpMock.expectOne('/api/auth/login');
 
     expect(req.request.headers.has('Authorization')).toBe(false);
+
+    req.flush({});
+  });
+
+  it('should skip Authorization header for /auth/register requests', () => {
+    store.token.set('test-jwt');
+
+    http.post('/api/auth/register', {}).subscribe();
+
+    const req = httpMock.expectOne('/api/auth/register');
+
+    expect(req.request.headers.has('Authorization')).toBe(false);
+
+    req.flush({});
+  });
+
+  it('should add Authorization header for /auth/me requests', () => {
+    store.token.set('test-jwt');
+
+    http.get('/api/auth/me').subscribe();
+
+    const req = httpMock.expectOne('/api/auth/me');
+
+    expect(req.request.headers.get('Authorization')).toBe('Bearer test-jwt');
 
     req.flush({});
   });
