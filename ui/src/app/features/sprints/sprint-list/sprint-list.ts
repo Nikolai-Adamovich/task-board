@@ -23,6 +23,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 interface ProjectSprintGroup {
   projectId: string;
   projectName: string;
+  tenantId: string;
   sprints: Sprint[];
 }
 
@@ -90,6 +91,7 @@ export class SprintList implements OnInit {
     return Array.from(groupMap.entries()).map(([pid, groupSprints]) => ({
       projectId: pid,
       projectName: projects.find((p) => p.id === pid)?.name ?? pid,
+      tenantId: groupSprints[0].tenantId,
       sprints: groupSprints,
     }));
   });

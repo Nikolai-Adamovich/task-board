@@ -60,7 +60,11 @@
         <hlm-collapsible [expanded]="isGroupExpanded(group.projectId)" (expandedChange)="toggleGroup(group.projectId)">
           <div class="flex items-center justify-between rounded-t-lg border border-border bg-surface-50 px-4 py-3">
             <div class="flex items-center gap-3">
-              <h3 class="text-lg font-semibold text-foreground">{{ group.projectName }}</h3>
+              <a
+                [routerLink]="['/tenants', group.tenantId, 'projects', group.projectId]"
+                class="text-lg font-semibold text-primary hover:underline"
+                >{{ group.projectName }}</a
+              >
               <span hlmBadge variant="secondary">{{ group.sprints.length }} sprints</span>
             </div>
             <button hlmCollapsibleTrigger hlmBtn variant="ghost" size="icon" class="size-8">
