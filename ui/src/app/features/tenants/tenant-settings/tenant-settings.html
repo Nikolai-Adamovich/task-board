@@ -27,7 +27,7 @@
               name="name"
               required
               placeholder="Tenant Name"
-              [disabled]="!canEdit"
+              [disabled]="!canEdit()"
             />
           </hlm-field>
           <hlm-field>
@@ -40,7 +40,7 @@
               name="slug"
               required
               placeholder="tenant-slug"
-              [disabled]="!canEdit"
+              [disabled]="!canEdit()"
             />
           </hlm-field>
         </form>
@@ -52,7 +52,7 @@
           <p class="mt-3 text-sm text-destructive">{{ errorMessage() }}</p>
         }
       </div>
-      @if (canEdit) {
+      @if (canEdit()) {
         <hlm-card-footer>
           <button hlmBtn (click)="save()" [disabled]="saving()">
             @if (saving()) {
@@ -67,7 +67,7 @@
     </hlm-card>
 
     <!-- Danger Zone -->
-    @if (canEdit) {
+    @if (canEdit()) {
       <hlm-card class="border-destructive/50">
         <hlm-card-header>
           <h3 hlmCardTitle class="text-destructive">Danger Zone</h3>

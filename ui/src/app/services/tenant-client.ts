@@ -23,14 +23,14 @@ export class TenantClient {
     const storedId = localStorage.getItem(TENANT_KEY);
 
     if (storedId) {
-      this.loadTenants();
+      this.loadTenants().subscribe();
     }
   }
 
-  /** Load all tenants for the current user */
-  loadTenants(): void {
-    this.http.get<{ data: Tenant[] }>(`${this.apiBaseUrl}/tenants`).subscribe({
-      next: (res) => {
+  /** Load all tenants for the current user. Returns an Observable for chaining. */
+  loadTenants(): Observable<{ data: Tenant[] }> {
+    return this.http.get<{ data: Tenant[] }>(`${this.apiBaseUrl}/tenants`).pipe(
+      tap((res) => {
         this.tenants.set(res.data);
 
         // Restore active tenant from localStorage
@@ -47,8 +47,8 @@ export class TenantClient {
         if (!this.activeTenant() && res.data.length > 0) {
           this.setActiveTenant(res.data[0]);
         }
-      },
-    });
+      }),
+    );
   }
 
   /** Set the active tenant */

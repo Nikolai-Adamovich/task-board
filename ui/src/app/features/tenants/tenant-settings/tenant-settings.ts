@@ -43,16 +43,12 @@ export class TenantSettings implements OnInit {
   protected slug = '';
   /** Current tenant name, used for delete confirmation comparison */
   protected readonly currentTenantName = computed(() => this.tenantService.activeTenant()?.name ?? '');
-
-  protected get tenantId(): string | null {
-    return this.tenantService.activeTenant()?.id ?? null;
-  }
-
-  protected get canEdit(): boolean {
+  protected readonly tenantId = computed(() => this.tenantService.activeTenant()?.id ?? null);
+  protected readonly canEdit = computed(() => {
     const role = this.authStore.tenantRole();
 
     return role === 'owner' || role === 'admin';
-  }
+  });
 
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
@@ -74,7 +70,7 @@ export class TenantSettings implements OnInit {
   }
 
   protected save(): void {
-    const id = this.tenantId;
+    const id = this.tenantId();
 
     if (!id || !this.name || !this.slug) return;
 

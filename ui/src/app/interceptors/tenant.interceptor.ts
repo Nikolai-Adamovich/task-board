@@ -1,10 +1,13 @@
 import { HttpInterceptorFn } from '@angular/common/http';
-import { inject } from '@angular/core';
-import { TenantClient } from '@services/tenant-client';
+
+const TENANT_KEY = 'taskboard_tenant_id';
 
 /**
  * Functional HTTP interceptor that attaches the X-Tenant-Id header
  * to all requests except /auth/* endpoints.
+ *
+ * Reads tenant ID from localStorage to avoid circular dependency with TenantClient.
+ * TenantClient.setActiveTenant() writes to localStorage, so this stays in sync.
  */
 export const tenantInterceptor: HttpInterceptorFn = (req, next) => {
   // Skip tenant header for auth-related requests
@@ -12,13 +15,12 @@ export const tenantInterceptor: HttpInterceptorFn = (req, next) => {
     return next(req);
   }
 
-  const tenantService = inject(TenantClient);
-  const activeTenant = tenantService.activeTenant();
+  const tenantId = localStorage.getItem(TENANT_KEY);
 
-  if (activeTenant) {
+  if (tenantId) {
     const cloned = req.clone({
       setHeaders: {
-        'X-Tenant-Id': activeTenant.id,
+        'X-Tenant-Id': tenantId,
       },
     });
 

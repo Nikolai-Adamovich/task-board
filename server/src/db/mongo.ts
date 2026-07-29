@@ -24,12 +24,12 @@ export async function connectMongo(uri: string): Promise<MongoClient> {
   const { MongoClient } = await import('mongodb');
 
   client = new MongoClient(uri, {
-    maxPoolSize: 1,
+    maxPoolSize: 10,
     minPoolSize: 0,
     maxIdleTimeMS: 10_000,
-    connectTimeoutMS: 10_000,
+    connectTimeoutMS: 3_000,
     socketTimeoutMS: 10_000,
-    serverSelectionTimeoutMS: 10_000,
+    serverSelectionTimeoutMS: 3_000,
   });
   await client.connect();
   db = client.db();

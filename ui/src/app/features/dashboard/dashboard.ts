@@ -22,13 +22,18 @@ export class Dashboard implements OnInit {
   protected readonly loading = signal(true);
 
   ngOnInit(): void {
-    this.tenantService.loadTenants();
-
     if (this.authStore.token() && !this.authStore.currentUser()) {
       this.authStore.fetchCurrentUser();
     }
 
-    this.loadProjects();
+    // Load tenants first, then load projects once tenant is available
+    this.tenantService.loadTenants().subscribe({
+      next: () => {
+        if (this.tenantService.activeTenant()) {
+          this.loadProjects();
+        }
+      },
+    });
   }
 
   private loadProjects(): void {

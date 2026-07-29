@@ -1,4 +1,4 @@
-import { Component, inject, input, signal, OnInit } from '@angular/core';
+import { Component, inject, input, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideUserPlus, lucideTrash2, lucideShield } from '@ng-icons/lucide';
@@ -54,12 +54,11 @@ export class TenantMemberList implements OnInit {
   protected inviteEmail = '';
   protected inviteRole = 'member';
   protected readonly removingUserId = signal<string | null>(null);
-
-  protected get canManage(): boolean {
+  protected readonly canManage = computed(() => {
     const role = this.authStore.tenantRole();
 
     return role === 'owner' || role === 'admin';
-  }
+  });
 
   protected getRoleColor(role: string): string {
     return roleColorMap[role] ?? 'bg-gray-100 text-gray-600';

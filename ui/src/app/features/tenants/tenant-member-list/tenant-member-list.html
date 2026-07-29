@@ -5,7 +5,7 @@
       <ng-icon name="lucideShield" class="h-6 w-6 text-foreground" />
       <h2 class="text-2xl font-bold text-foreground">Members</h2>
     </div>
-    @if (canManage) {
+    @if (canManage()) {
       <button hlmBtn (click)="showInviteDialog.set(true)">
         <ng-icon name="lucideUserPlus" class="mr-1" />
         Invite Member
@@ -38,7 +38,7 @@
                   {{ member.role }}
                 </span>
               </div>
-              @if (canManage) {
+              @if (canManage()) {
                 <div class="flex items-center gap-2">
                   @if (!isOwner(member)) {
                     <hlm-native-select [value]="member.role" (valueChange)="changeRole(member, $event)" class="w-32">
