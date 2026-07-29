@@ -12,20 +12,21 @@
         </div>
       }
 
-      <form (submit)="onSubmit($event)">
+      <form id="register-form" (submit)="onSubmit(); $event.preventDefault()">
         <hlm-field-group>
           <hlm-field>
-            <label hlmFieldLabel for="displayName">Display Name</label>
+            <label hlmFieldLabel for="displayName">Name</label>
             <input
               hlmInput
               id="displayName"
               type="text"
-              [value]="displayName()"
-              (input)="onDisplayNameInput($event)"
-              required
+              [formField]="registerForm.displayName"
               autocomplete="name"
               placeholder="John Doe"
             />
+            @if (registerForm.displayName().touched() && registerForm.displayName().errors().length) {
+              <p hlm-field-error>{{ registerForm.displayName().errors()[0].message }}</p>
+            }
           </hlm-field>
 
           <hlm-field>
@@ -34,12 +35,13 @@
               hlmInput
               id="email"
               type="email"
-              [value]="email()"
-              (input)="onEmailInput($event)"
-              required
+              [formField]="registerForm.email"
               autocomplete="email"
               placeholder="you&#64;example.com"
             />
+            @if (registerForm.email().touched() && registerForm.email().errors().length) {
+              <p hlm-field-error>{{ registerForm.email().errors()[0].message }}</p>
+            }
           </hlm-field>
 
           <hlm-field>
@@ -48,22 +50,27 @@
               hlmInput
               id="password"
               type="password"
-              [value]="password()"
-              (input)="onPasswordInput($event)"
-              required
+              [formField]="registerForm.password"
               autocomplete="new-password"
               placeholder="••••••••"
-              minlength="8"
             />
-            <p hlm-field-description>Must be at least 8 characters</p>
+            @if (registerForm.password().touched() && registerForm.password().errors().length) {
+              <p hlm-field-error>{{ registerForm.password().errors()[0].message }}</p>
+            }
           </hlm-field>
         </hlm-field-group>
       </form>
     </div>
 
     <hlm-card-footer class="flex-col gap-2">
-      <button hlmBtn type="submit" class="w-full" [disabled]="loading()" (click)="onSubmit($event)">
-        @if (loading()) {
+      <button
+        hlmBtn
+        type="submit"
+        form="register-form"
+        class="w-full"
+        [disabled]="registerForm().invalid() || registerForm().submitting()"
+      >
+        @if (registerForm().submitting()) {
           <hlm-spinner /> Creating account...
         } @else {
           Create account

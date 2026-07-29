@@ -72,8 +72,8 @@ export class AuthService {
       throw new ConflictError('A user with this email already exists');
     }
 
-    // Dynamic import — bcrypt may use crypto at module load time
-    const bcrypt = await import('bcrypt');
+    // bcryptjs is a pure-JS implementation — no native bindings, Workers-compatible
+    const bcrypt = await import('bcryptjs');
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
     // Create the user
     const user = await this.userRepo.create({
@@ -111,7 +111,7 @@ export class AuthService {
       throw new UnauthorizedError('Invalid email or password');
     }
 
-    const bcrypt = await import('bcrypt');
+    const bcrypt = await import('bcryptjs');
     const passwordValid = await bcrypt.compare(input.password, userDoc.passwordHash);
 
     if (!passwordValid) {

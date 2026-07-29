@@ -10,44 +10,62 @@ import { LoginRequestSchema, RegisterRequestSchema, AuthResponseSchema } from '.
 // ─── LoginRequestSchema ──────────────────────────────────────────────────────
 
 describe('LoginRequestSchema', () => {
-  it('should accept valid login credentials', () => {
-    const result = LoginRequestSchema.safeParse({
-      email: 'user@example.com',
-      password: 'secret123',
-    });
+  // ── Valid emails ─────────────────────────────────────────────────────────
+
+  it.each([
+    'user@example.com',
+    'test@test',
+    'a@b.c',
+    'user+tag@example.com',
+    'user.name@domain.co.uk',
+    'user_name@example.org',
+  ])('should accept valid email: %s', (email) => {
+    const result = LoginRequestSchema.safeParse({ email, password: 'secret123' });
 
     expect(result.success).toBe(true);
   });
 
-  it('should reject empty email', () => {
-    const result = LoginRequestSchema.safeParse({
-      email: '',
-      password: 'secret123',
-    });
+  // ── Invalid emails ──────────────────────────────────────────────────────
+
+  it.each([
+    { email: '', desc: 'empty string' },
+    { email: 'not-an-email', desc: 'missing @ sign' },
+    { email: '@example.com', desc: 'missing local part' },
+    { email: 'user@', desc: 'missing domain' },
+  ])('should reject email: $desc ($email)', ({ email }) => {
+    const result = LoginRequestSchema.safeParse({ email, password: 'secret123' });
 
     expect(result.success).toBe(false);
   });
 
-  it('should reject invalid email format', () => {
-    const result = LoginRequestSchema.safeParse({
-      email: 'not-an-email',
-      password: 'secret123',
-    });
+  // ── Password ────────────────────────────────────────────────────────────
 
-    expect(result.success).toBe(false);
+  it('should accept any non-empty password', () => {
+    const result = LoginRequestSchema.safeParse({ email: 'user@example.com', password: 'a' });
+
+    expect(result.success).toBe(true);
   });
 
   it('should reject empty password', () => {
-    const result = LoginRequestSchema.safeParse({
-      email: 'user@example.com',
-      password: '',
-    });
+    const result = LoginRequestSchema.safeParse({ email: 'user@example.com', password: '' });
 
     expect(result.success).toBe(false);
   });
 
   it('should reject missing fields', () => {
     const result = LoginRequestSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing password', () => {
+    const result = LoginRequestSchema.safeParse({ email: 'user@example.com' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing email', () => {
+    const result = LoginRequestSchema.safeParse({ password: 'secret123' });
 
     expect(result.success).toBe(false);
   });
@@ -68,56 +86,101 @@ describe('RegisterRequestSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  // ── Email ────────────────────────────────────────────────────────────────
+
+  it.each(['test@test', 'user@example.com', 'a@b.co', 'user+tag@example.com'])(
+    'should accept valid email: %s',
+    (email) => {
+      const result = RegisterRequestSchema.safeParse({ ...validRegister, email });
+
+      expect(result.success).toBe(true);
+    },
+  );
+
+  it('should reject invalid email', () => {
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, email: 'not-an-email' });
+
+    expect(result.success).toBe(false);
+  });
+
+  // ── Password ────────────────────────────────────────────────────────────
+
+  it('should accept password at minimum boundary (8 chars)', () => {
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, password: '12345678' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept password at maximum boundary (128 chars)', () => {
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, password: 'a'.repeat(128) });
+
+    expect(result.success).toBe(true);
+  });
+
   it('should reject password shorter than 8 characters', () => {
-    const result = RegisterRequestSchema.safeParse({
-      ...validRegister,
-      password: 'short',
-    });
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, password: 'short' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject password of 7 characters', () => {
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, password: '1234567' });
 
     expect(result.success).toBe(false);
   });
 
   it('should reject password longer than 128 characters', () => {
-    const result = RegisterRequestSchema.safeParse({
-      ...validRegister,
-      password: 'a'.repeat(129),
-    });
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, password: 'a'.repeat(129) });
 
     expect(result.success).toBe(false);
   });
 
-  it('should accept password at boundary (8 chars)', () => {
-    const result = RegisterRequestSchema.safeParse({
-      ...validRegister,
-      password: '12345678',
-    });
+  it('should reject empty password', () => {
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, password: '' });
+
+    expect(result.success).toBe(false);
+  });
+
+  // ── Display Name ────────────────────────────────────────────────────────
+
+  it('should accept single-character display name', () => {
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, displayName: 'A' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept display name at maximum boundary (100 chars)', () => {
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, displayName: 'a'.repeat(100) });
 
     expect(result.success).toBe(true);
   });
 
   it('should reject empty display name', () => {
-    const result = RegisterRequestSchema.safeParse({
-      ...validRegister,
-      displayName: '',
-    });
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, displayName: '' });
 
     expect(result.success).toBe(false);
   });
 
   it('should reject display name exceeding 100 characters', () => {
-    const result = RegisterRequestSchema.safeParse({
-      ...validRegister,
-      displayName: 'a'.repeat(101),
-    });
+    const result = RegisterRequestSchema.safeParse({ ...validRegister, displayName: 'a'.repeat(101) });
 
     expect(result.success).toBe(false);
   });
 
   it('should reject missing displayName', () => {
-    const result = RegisterRequestSchema.safeParse({
-      email: 'a@b.com',
-      password: '12345678',
-    });
+    const result = RegisterRequestSchema.safeParse({ email: 'a@b.com', password: '12345678' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing email', () => {
+    const result = RegisterRequestSchema.safeParse({ password: '12345678', displayName: 'User' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing password', () => {
+    const result = RegisterRequestSchema.safeParse({ email: 'a@b.com', displayName: 'User' });
 
     expect(result.success).toBe(false);
   });
@@ -144,17 +207,13 @@ describe('AuthResponseSchema', () => {
   });
 
   it('should reject missing token', () => {
-    const result = AuthResponseSchema.safeParse({
-      user: validUser,
-    });
+    const result = AuthResponseSchema.safeParse({ user: validUser });
 
     expect(result.success).toBe(false);
   });
 
   it('should reject missing user', () => {
-    const result = AuthResponseSchema.safeParse({
-      token: 'jwt-token-string',
-    });
+    const result = AuthResponseSchema.safeParse({ token: 'jwt-token-string' });
 
     expect(result.success).toBe(false);
   });

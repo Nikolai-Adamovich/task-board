@@ -7,6 +7,10 @@ let db: Db | null = null;
  * Initialize and return the MongoDB client singleton.
  * Reuses the existing connection if already established.
  *
+ * Configured for Cloudflare Workers compatibility:
+ * - `maxPoolSize: 1` avoids connection-pool stalls in the Workers runtime
+ * - Timeouts ensure requests never hang indefinitely
+ *
  * @param uri - MongoDB connection string from environment variables
  * @returns The connected MongoClient instance
  */
@@ -19,7 +23,14 @@ export async function connectMongo(uri: string): Promise<MongoClient> {
   // at module load time, which Cloudflare Workers forbids at global scope.
   const { MongoClient } = await import('mongodb');
 
-  client = new MongoClient(uri);
+  client = new MongoClient(uri, {
+    maxPoolSize: 1,
+    minPoolSize: 0,
+    maxIdleTimeMS: 10_000,
+    connectTimeoutMS: 10_000,
+    socketTimeoutMS: 10_000,
+    serverSelectionTimeoutMS: 10_000,
+  });
   await client.connect();
   db = client.db();
 

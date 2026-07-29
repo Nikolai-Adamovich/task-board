@@ -126,8 +126,8 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('returns token and user for valid credentials', async () => {
-      // bcrypt hash of 'securepass123' with 10 rounds
-      const bcrypt = await import('bcrypt');
+      // bcryptjs hash of 'securepass123' with 10 rounds
+      const bcrypt = await import('bcryptjs');
       const hash = await bcrypt.hash('securepass123', 10);
 
       userRepo.findByEmail.mockResolvedValue({
@@ -165,7 +165,7 @@ describe('AuthService', () => {
     });
 
     it('throws UnauthorizedError for wrong password', async () => {
-      const bcrypt = await import('bcrypt');
+      const bcrypt = await import('bcryptjs');
       const hash = await bcrypt.hash('correctpass', 10);
 
       userRepo.findByEmail.mockResolvedValue({

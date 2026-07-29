@@ -12,7 +12,7 @@
         </div>
       }
 
-      <form (submit)="onSubmit($event)">
+      <form id="login-form" (submit)="onSubmit(); $event.preventDefault()">
         <hlm-field-group>
           <hlm-field>
             <label hlmFieldLabel for="email">Email</label>
@@ -20,12 +20,13 @@
               hlmInput
               id="email"
               type="email"
-              [value]="email()"
-              (input)="onEmailInput($event)"
-              required
+              [formField]="loginForm.email"
               autocomplete="email"
               placeholder="you&#64;example.com"
             />
+            @if (loginForm.email().touched() && loginForm.email().errors().length) {
+              <p hlm-field-error>{{ loginForm.email().errors()[0].message }}</p>
+            }
           </hlm-field>
 
           <hlm-field>
@@ -34,20 +35,27 @@
               hlmInput
               id="password"
               type="password"
-              [value]="password()"
-              (input)="onPasswordInput($event)"
-              required
+              [formField]="loginForm.password"
               autocomplete="current-password"
               placeholder="••••••••"
             />
+            @if (loginForm.password().touched() && loginForm.password().errors().length) {
+              <p hlm-field-error>{{ loginForm.password().errors()[0].message }}</p>
+            }
           </hlm-field>
         </hlm-field-group>
       </form>
     </div>
 
     <hlm-card-footer class="flex-col gap-2">
-      <button hlmBtn type="submit" class="w-full" [disabled]="loading()" (click)="onSubmit($event)">
-        @if (loading()) {
+      <button
+        hlmBtn
+        type="submit"
+        form="login-form"
+        class="w-full"
+        [disabled]="loginForm().invalid() || loginForm().submitting()"
+      >
+        @if (loginForm().submitting()) {
           <hlm-spinner /> Signing in...
         } @else {
           Sign in

@@ -9,7 +9,7 @@ export const UserSchema = z.object({
   /** Unique user identifier (UUID v4) */
   id: z.uuid(),
   /** User's email address */
-  email: z.email(),
+  email: z.email({ pattern: z.regexes.html5Email }),
   /** User's display name */
   displayName: z.string().min(1).max(100),
   /** Account creation timestamp (ISO 8601) */
@@ -26,7 +26,7 @@ export type User = z.infer<typeof UserSchema>;
  * Includes the plaintext password which will be hashed server-side.
  */
 export const CreateUserSchema = z.object({
-  email: z.email('Invalid email address'),
+  email: z.email({ message: 'Invalid email address', pattern: z.regexes.html5Email }),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')

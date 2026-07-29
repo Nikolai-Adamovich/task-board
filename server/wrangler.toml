@@ -9,3 +9,9 @@ JWT_SECRET = ""
 
 # Comma-separated list of allowed origins for CORS. Use "*" for development.
 ALLOWED_ORIGINS = "*"
+
+# Suppress esbuild [import-is-undefined] warning caused by unenv's whatwg-url shim
+# lacking a default export (used by mongodb → mongodb-connection-string-url).
+# See: server/src/shims/whatwg-url.mjs
+[alias]
+"whatwg-url" = "./src/shims/whatwg-url.mjs"
