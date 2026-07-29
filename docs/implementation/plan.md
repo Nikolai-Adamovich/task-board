@@ -827,7 +827,7 @@
 - **Acceptance criteria:**
   - `npm run build --workspace=ui` succeeds (empty app)
   - Angular 22.0.8 standalone components are configured (no NgModules)
-  - `provideZonelessChangeDetection()` is used (no `zone.js` dependency)
+  - Zoneless change detection is active by default (no `zone.js` dependency)
   - Tailwind CSS v4.1.0 is configured via CSS-first approach (`@import "tailwindcss"` + `@theme { ... }` in
     `styles.css`; no `tailwind.config.js`)
   - Tailwind v4 auto-detects source files (no `content` config needed)
@@ -877,7 +877,7 @@
   - `ui/src/app/app.config.ts`
 - **Dependencies:** T-056
 - **Acceptance criteria:**
-  - `provideZonelessChangeDetection()` is configured (no `zone.js`)
+  - Zoneless change detection is active by default (no `zone.js`)
   - `provideRouter(routes, withComponentInputBinding())` is configured
   - `provideHttpClient(withInterceptors([authInterceptor, tenantInterceptor, errorInterceptor]))` is configured
   - No `provideSignalStore()` — state stores are plain Angular services using signals

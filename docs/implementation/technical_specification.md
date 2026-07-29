@@ -701,13 +701,11 @@ and resolvers. The root component bootstraps the app with providers for auth, te
 // ui/src/app/app.config.ts
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideZonelessChangeDetection } from '@angular/core';
 import { routes } from './app.routes';
 import { authInterceptor, tenantInterceptor, errorInterceptor } from './core/interceptors';
 
 export const appConfig = {
   providers: [
-    provideZonelessChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor, tenantInterceptor, errorInterceptor])),
   ],

@@ -145,7 +145,7 @@ None.
 | 2026-07-28 | Task comments/activity logs out of MVP       | Not in scope for vertical slice; can be added post-MVP                          |
 | 2026-07-28 | Password reset/email verification out of MVP | Basic email/password auth only; post-MVP enhancement                            |
 | 2026-07-28 | Zod v4 with `z.interface()`                  | Better performance than `z.object()`; `zod/mini` for frontend tree-shaking      |
-| 2026-07-28 | Angular 22 zoneless by default               | No `zone.js`; all reactivity via signals; `provideZonelessChangeDetection()`    |
+| 2026-07-28 | Angular 22 zoneless by default               | No `zone.js`; all reactivity via signals; zoneless is default in Angular 21+    |
 | 2026-07-28 | Tailwind CSS v4 CSS-first config             | No `tailwind.config.js`; `@theme` directive in CSS; auto content detection      |
 | 2026-07-28 | MongoDB Driver v7 (async-only)               | Drops legacy callbacks; all operations return promises                          |
 | 2026-07-28 | CORS via ALLOWED_ORIGINS env var             | Configurable per-environment; '*' in dev, explicit origins in production        |

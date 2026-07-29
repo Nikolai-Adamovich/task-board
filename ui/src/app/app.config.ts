@@ -1,4 +1,4 @@
-import { type ApplicationConfig, provideZonelessChangeDetection } from '@angular/core';
+import { type ApplicationConfig } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideSpartanHlm } from '@spartan-ng/helm/utils';
@@ -11,7 +11,6 @@ import { API_BASE_URL } from './api-url.token';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZonelessChangeDetection(),
     provideSpartanHlm(),
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor, tenantInterceptor, errorInterceptor])),
