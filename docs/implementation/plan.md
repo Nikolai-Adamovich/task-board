@@ -8,8 +8,8 @@
 
 ## Summary
 
-- **Total tasks:** 80
-- **Phases:** 9 (Phase 0–Phase 8)
+- **Total tasks:** 94
+- **Phases:** 10 (Phase 0–Phase 9)
 - **First deployable vertical slice:** Tasks T-001 through T-053, T-054 through T-065, T-066 through T-071, T-074 (see
   [Vertical Slice Mapping](#vertical-slice-mapping))
 
@@ -1304,6 +1304,261 @@
 
 ---
 
+## Phase 9: Missing UI Features
+
+> **Reference:** [Technical Specification §12](technical_specification.md:1120) ·
+> [Architecture §11](architecture.md:1300)
+
+This phase implements three UI feature areas that have working backend endpoints but no Angular frontend: tenant
+settings, tenant member management, and project member management.
+
+### T-081: Add GET /tenants/:tenantId/members route to server
+
+- **Goal:** Add the missing `GET /:tenantId/members` endpoint to the tenant routes file. The service method
+  `TenantService.getTenantMembers()` and the shared contract `tenantContracts.listMembers` already exist.
+- **Files to modify:**
+  - [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:94)
+- **Dependencies:** None
+- **Acceptance criteria:**
+  - `GET /api/v1/tenants/:tenantId/members` returns `{ data: TenantMember[], total: number }`
+  - Any authenticated tenant member can view the list (no owner/admin restriction)
+  - Route is registered **before** `POST /:tenantId/members` to avoid path parameter collision
+  - Manual `curl` test confirms 200 with member data
+
+### T-082: Add tenantRole computed signal to AuthStore
+
+- **Goal:** Add a `tenantRole` computed signal to [`AuthStore`](ui/src/app/stores/auth-store.ts:13) that decodes the JWT
+  payload to extract the current user's tenant role.
+- **Files to modify:**
+  - [`ui/src/app/stores/auth-store.ts`](ui/src/app/stores/auth-store.ts:13)
+- **Dependencies:** None
+- **Acceptance criteria:**
+  - `readonly tenantRole = computed(() => ...)` returns `TenantRole | null`
+  - Signal decodes JWT payload via `atob(token.split('.')[1])` and extracts `tenantRole`
+  - Signal returns `null` when no token is stored
+  - Signal updates reactively when token changes (e.g., after login/logout)
+  - `TenantRole` type is imported from `@task-board/shared`
+
+### T-083: Extend TenantClient with tenant update/delete methods
+
+- **Goal:** Add [`updateTenant()`](ui/src/app/services/tenant-client.ts:13) and
+  [`deleteTenant()`](ui/src/app/services/tenant-client.ts:13) methods to
+  [`TenantClient`](ui/src/app/services/tenant-client.ts:13), plus post-mutation signal updates.
+- **Files to modify:**
+  - [`ui/src/app/services/tenant-client.ts`](ui/src/app/services/tenant-client.ts:13)
+- **Dependencies:** None
+- **Acceptance criteria:**
+  - `updateTenant(tenantId: string, data: UpdateTenant): Observable<Tenant>` calls `PATCH /tenants/:tenantId`
+  - `deleteTenant(tenantId: string): Observable<void>` calls `DELETE /tenants/:tenantId`
+  - `UpdateTenant` and `Tenant` types imported from `@task-board/shared`
+  - After `updateTenant` succeeds, `tenants` and `activeTenant` signals are updated to reflect new name/slug
+  - After `deleteTenant` succeeds, tenant is removed from `tenants` signal; `activeTenant` is cleared if it was the
+    deleted tenant
+
+### T-084: Extend TenantClient with tenant member methods
+
+- **Goal:** Add [`listMembers()`](ui/src/app/services/tenant-client.ts:13),
+  [`inviteMember()`](ui/src/app/services/tenant-client.ts:13),
+  [`updateMemberRole()`](ui/src/app/services/tenant-client.ts:13), and
+  [`removeMember()`](ui/src/app/services/tenant-client.ts:13) methods to
+  [`TenantClient`](ui/src/app/services/tenant-client.ts:13).
+- **Files to modify:**
+  - [`ui/src/app/services/tenant-client.ts`](ui/src/app/services/tenant-client.ts:13)
+- **Dependencies:** None
+- **Acceptance criteria:**
+  - `listMembers(tenantId): Observable<{ data: TenantMember[] }>` calls `GET /tenants/:tenantId/members`
+  - `inviteMember(tenantId, email, role): Observable<TenantMember>` calls `POST /tenants/:tenantId/members` with
+    `{ email, role }`
+  - `updateMemberRole(tenantId, userId, role): Observable<TenantMember>` calls
+    `PATCH /tenants/:tenantId/members/:userId` with `{ role }`
+  - `removeMember(tenantId, userId): Observable<void>` calls `DELETE /tenants/:tenantId/members/:userId`
+  - `TenantMember` and `TenantRole` types imported from `@task-board/shared`
+
+### T-085: Create TenantSettingsComponent
+
+- **Goal:** Create the tenant settings page with editable name/slug form (owner/admin) and danger zone delete section
+  (owner only), following the design in [§12.2.4](technical_specification.md:1362).
+- **Files to create:**
+  - `ui/src/app/features/tenants/tenant-settings/tenant-settings.ts`
+  - `ui/src/app/features/tenants/tenant-settings/tenant-settings.html`
+- **Dependencies:** T-082, T-083
+- **Acceptance criteria:**
+  - Selector: `ui-tenant-settings`; standalone component
+  - Page displays editable name and slug fields pre-populated from `TenantClient.activeTenant()`
+  - "Save" button calls `TenantClient.updateTenant()` — visible only for owner/admin
+  - "Danger Zone" section with "Delete Tenant" button — visible only for owner
+  - Delete confirmation dialog requires typing the tenant name to confirm
+  - After successful delete, redirects to `/dashboard`
+  - Members see read-only view (inputs disabled, no save/delete buttons)
+  - RBAC via `computed()` signals reading `AuthStore.tenantRole()`
+  - Uses Spartan UI: `HlmButtonImports`, `HlmDialogImports`, `HlmFieldImports`, `HlmInputImports`, `HlmSpinnerImports`
+  - Error states displayed inline (422 slug conflict)
+  - Angular 22 patterns: signals, `@if`/`@for`, `inject()`, `FormsModule` with `ngModel`
+
+### T-086: Create TenantMemberListComponent
+
+- **Goal:** Create the tenant member list page with invite dialog, inline role editing, and remove confirmation,
+  following the design in [§12.1.4](technical_specification.md:1186).
+- **Files to create:**
+  - `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts`
+  - `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.html`
+- **Dependencies:** T-082, T-084
+- **Acceptance criteria:**
+  - Selector: `ui-tenant-member-list`; standalone component
+  - Member list displays avatar fallback, userId, and role for each member
+  - "Invite Member" button (owner/admin) opens dialog with email input and role `NativeSelect`
+  - Invite submits `POST /tenants/:tenantId/members` via `TenantClient.inviteMember()`; list refreshes on success
+  - Inline role change via `NativeSelect` dropdown — owner/admin only, disabled for the owner row
+  - "Remove" button with confirmation dialog — owner/admin only, disabled for the owner row
+  - Members see read-only view (role badge, no action buttons)
+  - Error states displayed inline (422 validation, 409 duplicate)
+  - Uses Spartan UI: `HlmButtonImports`, `HlmDialogImports`, `HlmFieldImports`, `HlmInputImports`,
+    `HlmNativeSelectImports`, `HlmBadgeImports`, `HlmAvatarImports`, `HlmSpinnerImports`
+  - Angular 22 patterns: signals, `@if`/`@for`, `computed()`, `inject()`, `FormsModule` with `ngModel`
+
+### T-087: Add tenant settings routes and sidebar Settings link
+
+- **Goal:** Wire tenant settings and member list routes into [`app.routes.ts`](ui/src/app/app.routes.ts:26), and add a
+  "Settings" navigation link to [`sidebar.html`](ui/src/app/shell/sidebar/sidebar.html:1).
+- **Files to modify:**
+  - [`ui/src/app/app.routes.ts`](ui/src/app/app.routes.ts:26)
+  - [`ui/src/app/shell/sidebar/sidebar.html`](ui/src/app/shell/sidebar/sidebar.html:1)
+- **Dependencies:** T-085, T-086
+- **Acceptance criteria:**
+  - `/tenants/:tenantId/settings` lazy-loads `TenantSettings` component
+  - `/tenants/:tenantId/settings/members` lazy-loads `TenantMemberList` component
+  - Both routes are children of the existing `tenants/:tenantId` route in `app.routes.ts`
+  - Sidebar shows "Settings" link with `i-lucide-settings` icon inside the `@if (tenantService.activeTenant())` block
+  - Link navigates to `/tenants/:tenantId/settings` using `routerLink`
+  - Link uses `routerLinkActive` for active state styling consistent with Projects/Sprints links
+  - No additional guards needed — RBAC enforced inside components via computed signals
+
+### T-088: Extend ProjectDetailComponent with member management controls
+
+- **Goal:** Add "Add Member" dialog, inline role editing, and remove button to the members section of
+  [`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38), following the design in
+  [§12.3.3](technical_specification.md:1507).
+- **Files to modify:**
+  - [`ui/src/app/features/projects/project-detail/project-detail.ts`](ui/src/app/features/projects/project-detail/project-detail.ts:38)
+  - [`ui/src/app/features/projects/project-detail/project-detail.html`](ui/src/app/features/projects/project-detail/project-detail.html:54)
+- **Dependencies:** T-081, T-082, T-084
+- **Acceptance criteria:**
+  - "Add Member" button visible only for project admins (`canManageProjectMembers` computed signal)
+  - Add-member dialog shows tenant member list (from `TenantClient.listMembers()`) as user picker dropdown + role
+    `NativeSelect`
+  - Submitting calls `ProjectClient.addMember(projectId, userId, role)`; member list refreshes on success
+  - Inline role change via `NativeSelect` dropdown — project admin only
+  - "Remove" button with confirmation dialog — project admin only
+  - Non-admin users see read-only member list (existing behavior preserved)
+  - New signals: `showAddMember`, `addingMember`, `selectedUserId`, `selectedRole`
+  - New computed: `canManageProjectMembers`, `currentUserProjectRole`
+  - `HlmNativeSelectImports` added to component imports
+  - Error states displayed inline (409 duplicate, 403 last admin)
+
+### T-089: Unit tests for TenantClient and AuthStore extensions
+
+- **Goal:** Add unit tests for the six new [`TenantClient`](ui/src/app/services/tenant-client.ts:13) methods and the
+  [`AuthStore.tenantRole`](ui/src/app/stores/auth-store.ts:13) computed signal.
+- **Files to create:**
+  - `ui/src/app/services/tenant-client.spec.ts`
+- **Files to modify:**
+  - [`ui/src/app/stores/auth-store.spec.ts`](ui/src/app/stores/auth-store.spec.ts)
+- **Dependencies:** T-082, T-083, T-084
+- **Acceptance criteria:**
+  - Tests cover all 6 new TenantClient methods: `listMembers`, `inviteMember`, `updateMemberRole`, `removeMember`,
+    `updateTenant`, `deleteTenant`
+  - Each test verifies correct HTTP method, URL, and request body
+  - Tests verify signal updates (`tenants`, `activeTenant`) after successful mutations
+  - Tests verify `deleteTenant` clears `activeTenant` when the deleted tenant was active
+  - AuthStore tests cover `tenantRole`: valid token → extracts role, null token → returns null, invalid token → returns
+    null
+  - Coverage ≥ 80% on new code
+
+### T-090: Unit tests for TenantSettingsComponent
+
+- **Goal:** Add unit tests for
+  [`TenantSettingsComponent`](ui/src/app/features/tenants/tenant-settings/tenant-settings.ts) covering RBAC visibility,
+  form submission, and delete flow.
+- **Files to create:**
+  - `ui/src/app/features/tenants/tenant-settings/tenant-settings.spec.ts`
+- **Dependencies:** T-085
+- **Acceptance criteria:**
+  - Tests verify form fields are pre-populated from `activeTenant()`
+  - Tests verify "Save" button calls `updateTenant()` for owner and admin roles
+  - Tests verify "Save" button is hidden/disabled for tenant members
+  - Tests verify "Delete Tenant" button is visible only for owner
+  - Tests verify delete confirmation requires typing exact tenant name
+  - Tests verify read-only mode for tenant members (inputs disabled)
+  - Coverage ≥ 80%
+
+### T-091: Unit tests for TenantMemberListComponent
+
+- **Goal:** Add unit tests for
+  [`TenantMemberListComponent`](ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts) covering the
+  invite, role change, and remove flows.
+- **Files to create:**
+  - `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.spec.ts`
+- **Dependencies:** T-086
+- **Acceptance criteria:**
+  - Tests verify member list renders correctly with avatar, userId, and role
+  - Tests verify "Invite Member" button is visible for owner/admin, hidden for members
+  - Tests verify invite dialog submits with email and role
+  - Tests verify inline role change calls `updateMemberRole()`
+  - Tests verify "Remove" button calls `removeMember()` after confirmation
+  - Tests verify owner row has no edit/remove controls
+  - Tests verify read-only view for tenant members
+  - Coverage ≥ 80%
+
+### T-092: Unit tests for ProjectDetailComponent member management
+
+- **Goal:** Add unit tests for the new member management controls in
+  [`ProjectDetailComponent`](ui/src/app/features/projects/project-detail/project-detail.ts:38).
+- **Files to create:**
+  - `ui/src/app/features/projects/project-detail/project-detail.spec.ts`
+- **Dependencies:** T-088
+- **Acceptance criteria:**
+  - Tests verify "Add Member" button visibility based on project role
+  - Tests verify add-member dialog shows tenant members as user picker options
+  - Tests verify add-member submits with selected userId and role
+  - Tests verify inline role change calls `updateMemberRole()`
+  - Tests verify "Remove" calls `removeMember()` after confirmation
+  - Tests verify non-admin users see read-only member list
+  - Coverage ≥ 80%
+
+### T-093: E2E tests for tenant settings, tenant members, and project members
+
+- **Goal:** Add Playwright 1.55.0 E2E tests covering the three new UI feature areas.
+- **Files to create:**
+  - `ui/e2e/tenant-settings.spec.ts`
+  - `ui/e2e/tenant-members.spec.ts`
+  - `ui/e2e/project-members.spec.ts`
+- **Dependencies:** T-087, T-088
+- **Acceptance criteria:**
+  - E2E: tenant owner can navigate to settings, edit name/slug, and save
+  - E2E: tenant owner can invite a member by email, change their role, and remove them
+  - E2E: tenant delete flow works with name confirmation and redirects to dashboard
+  - E2E: project admin can add a tenant member to the project, change role, and remove
+  - E2E: non-admin users see read-only views on settings and member pages
+  - `npx playwright test` passes for all three spec files
+
+### T-094: Full integration verification of new UI features
+
+- **Goal:** Run the complete quality gate suite across the entire monorepo and verify all new features work end-to-end.
+  Fix any issues found.
+- **Files to modify:**
+  - Various (fix any issues found during verification)
+- **Dependencies:** T-089, T-090, T-091, T-092, T-093
+- **Acceptance criteria:**
+  - `npm run build` succeeds for all workspaces (shared, server, ui)
+  - `npm test` passes for all workspaces (≥ 80% coverage on new code)
+  - `npm run lint` passes with zero errors
+  - `tsc --noEmit` passes across the entire monorepo (zero TypeScript errors)
+  - Full user journey works end-to-end: register → create tenant → open settings → edit name → invite member → create
+    project → add project member → change project member role → remove project member → remove tenant member → delete
+    tenant
+
+---
+
 ## Vertical Slice Mapping
 
 The first deployable vertical slice delivers the **core Kanban flow** end-to-end: auth → tenant → project → board →
@@ -1320,6 +1575,7 @@ tasks → sprints, with RBAC enforced throughout.
 | 5    | **Task CRUD + Move**               | T-047, T-048, T-049                           |
 | 6    | **Sprint CRUD + Backlog → Sprint** | T-050, T-051, T-052                           |
 | 7    | **RBAC enforcement**               | T-053 (RBAC service), T-022 (RBAC middleware) |
+| 8    | **Tenant member list endpoint**    | T-081                                         |
 
 ### Frontend vertical slice tasks
 
@@ -1332,6 +1588,8 @@ tasks → sprints, with RBAC enforced throughout.
 | 5    | **Task CRUD + Move**               | T-070                                                                         |
 | 6    | **Sprint CRUD + Backlog → Sprint** | T-071                                                                         |
 | 7    | **RBAC in UI**                     | T-063 (guards), T-073 (shared UI), T-066 (services with RBAC-aware rendering) |
+| 8    | **Tenant settings & members**      | T-082, T-083, T-084, T-085, T-086, T-087                                      |
+| 9    | **Project member management**      | T-088                                                                         |
 
 ### Foundation tasks (required before the slice)
 
@@ -1342,11 +1600,12 @@ tasks → sprints, with RBAC enforced throughout.
 | Backend foundation  | T-017 through T-025 |
 | Frontend foundation | T-054 through T-060 |
 
-### Integration task
+### Integration tasks
 
-| Task  | Description                                                     |
-| ----- | --------------------------------------------------------------- |
-| T-074 | Connect frontend to backend and verify the full end-to-end flow |
+| Task  | Description                                                           |
+| ----- | --------------------------------------------------------------------- |
+| T-074 | Connect frontend to backend and verify the full end-to-end flow       |
+| T-094 | Verify all Phase 9 features work end-to-end (settings, members, RBAC) |
 
 ---
 
@@ -1366,3 +1625,5 @@ The tasks are ordered for execution as follows:
 8. **Phase 7** (T-066–T-073): Build frontend features (services, project/board/task/sprint UI, dashboard, shared
    components)
 9. **Phase 8** (T-074–T-080): Integration, testing, CI/CD, deployment, and hardening
+10. **Phase 9** (T-081–T-094): Missing UI features (backend fix, service layer, tenant settings, tenant members, project
+    members, testing)

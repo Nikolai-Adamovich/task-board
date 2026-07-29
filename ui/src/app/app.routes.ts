@@ -28,6 +28,15 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/app-shell/app-shell').then((m) => m.AppShell),
     children: [
       {
+        path: 'settings',
+        loadComponent: () => import('./features/tenants/tenant-settings/tenant-settings').then((m) => m.TenantSettings),
+      },
+      {
+        path: 'settings/members',
+        loadComponent: () =>
+          import('./features/tenants/tenant-member-list/tenant-member-list').then((m) => m.TenantMemberList),
+      },
+      {
         path: 'projects',
         loadComponent: () => import('./features/projects/project-list/project-list').then((m) => m.ProjectList),
       },

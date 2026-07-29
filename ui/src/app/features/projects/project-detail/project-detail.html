@@ -52,7 +52,15 @@
 
     <!-- Members section -->
     <section>
-      <h3 class="mb-4 text-lg font-semibold text-foreground">Members</h3>
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-foreground">Members</h3>
+        @if (isAdmin()) {
+          <button hlmBtn size="sm" (click)="showAddMember.set(true)">
+            <ng-icon name="lucideUserPlus" class="mr-1" />
+            Add Member
+          </button>
+        }
+      </div>
       @if (members().length === 0) {
         <p class="text-sm text-muted-foreground">No members loaded.</p>
       } @else {
@@ -67,9 +75,34 @@
                 </hlm-avatar>
                 <span class="text-sm text-foreground">{{ member.userId }}</span>
               </div>
-              <span hlmBadge variant="secondary">
-                {{ member.role }}
-              </span>
+              <div class="flex items-center gap-2">
+                @if (isAdmin()) {
+                  <hlm-native-select
+                    [ngModel]="member.role"
+                    (ngModelChange)="onRoleChange(member, $event)"
+                    class="h-8 w-28 text-xs"
+                    aria-label="Change role"
+                  >
+                    @for (role of projectRoles; track role) {
+                      <option [value]="role">{{ role }}</option>
+                    }
+                  </hlm-native-select>
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8 text-destructive hover:text-destructive"
+                    (click)="confirmRemoveMember(member)"
+                    aria-label="Remove member"
+                  >
+                    <ng-icon name="lucideTrash2" />
+                  </button>
+                } @else {
+                  <span hlmBadge variant="secondary">
+                    {{ member.role }}
+                  </span>
+                }
+              </div>
             </div>
           }
         </div>
@@ -115,6 +148,70 @@
             <hlm-spinner /> Creating...
           } @else {
             Create Board
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- Add Member Modal -->
+  <hlm-dialog [state]="showAddMember() ? 'open' : 'closed'" (stateChanged)="onAddMemberDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>Add Member</h3>
+      </hlm-dialog-header>
+      <form (ngSubmit)="addMember()" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="member-userid">User ID</label>
+          <input
+            hlmInput
+            id="member-userid"
+            type="text"
+            [(ngModel)]="newMemberUserId"
+            name="userId"
+            required
+            placeholder="Enter user ID"
+          />
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="member-role">Role</label>
+          <hlm-native-select id="member-role" [(ngModel)]="newMemberRole" name="role">
+            @for (role of projectRoles; track role) {
+              <option [value]="role">{{ role }}</option>
+            }
+          </hlm-native-select>
+        </hlm-field>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn (click)="addMember()" [disabled]="addingMember()">
+          @if (addingMember()) {
+            <hlm-spinner /> Adding...
+          } @else {
+            Add Member
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- Remove Member Confirmation Modal -->
+  <hlm-dialog [state]="showRemoveConfirm() ? 'open' : 'closed'" (stateChanged)="onRemoveDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>Remove Member</h3>
+      </hlm-dialog-header>
+      <p class="text-sm text-muted-foreground">
+        Are you sure you want to remove <strong>{{ memberToRemove?.userId }}</strong> from this project? This action
+        cannot be undone.
+      </p>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn variant="destructive" (click)="removeMember()" [disabled]="removingMember()">
+          @if (removingMember()) {
+            <hlm-spinner /> Removing...
+          } @else {
+            Remove
           }
         </button>
       </hlm-dialog-footer>

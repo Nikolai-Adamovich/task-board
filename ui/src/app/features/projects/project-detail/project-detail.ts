@@ -1,10 +1,11 @@
-import { Component, inject, input, signal, OnInit } from '@angular/core';
+import { Component, inject, input, signal, computed, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { provideIcons } from '@ng-icons/core';
-import { lucidePlus } from '@ng-icons/lucide';
+import { provideIcons, NgIcon } from '@ng-icons/core';
+import { lucidePlus, lucideUserPlus, lucideTrash2 } from '@ng-icons/lucide';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
+import { AuthStore } from '@stores/auth-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -13,7 +14,8 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
-import { NgIcon } from '@ng-icons/core';
+import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
+import { ProjectRole } from '@task-board/shared';
 import type { Project, Board, ProjectMember, CreateBoard } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
@@ -31,13 +33,15 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmTextareaImports,
     HlmBadgeImports,
     HlmAvatarImports,
+    HlmNativeSelectImports,
   ],
-  providers: [provideIcons({ lucidePlus })],
+  providers: [provideIcons({ lucidePlus, lucideUserPlus, lucideTrash2 })],
   templateUrl: './project-detail.html',
 })
 export class ProjectDetail implements OnInit {
   private readonly projectService = inject(ProjectClient);
   private readonly boardService = inject(BoardClient);
+  private readonly authStore = inject(AuthStore);
   /** Bound via withComponentInputBinding() */
   readonly projectId = input.required<string>();
   protected readonly project = signal<Project | null>(null);
@@ -47,10 +51,38 @@ export class ProjectDetail implements OnInit {
   protected readonly showCreateBoard = signal(false);
   protected readonly creatingBoard = signal(false);
   protected newBoard: CreateBoard = { name: '', description: '' };
+  // ── Member management state ──────────────────────────────────────────────────
+  protected readonly showAddMember = signal(false);
+  protected readonly addingMember = signal(false);
+  protected readonly showRemoveConfirm = signal(false);
+  protected readonly removingMember = signal(false);
+  protected newMemberUserId = '';
+  protected newMemberRole = 'developer';
+  protected memberToRemove: ProjectMember | null = null;
+  protected readonly projectRoles = [...ProjectRole];
+  /** Whether the current user has admin/owner privileges */
+  protected readonly isAdmin = computed(() => {
+    const role = this.authStore.tenantRole();
+
+    return role === 'owner' || role === 'admin';
+  });
 
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showCreateBoard.set(false);
+    }
+  }
+
+  protected onAddMemberDialogStateChange(state: BrnDialogState): void {
+    if (state === 'closed') {
+      this.showAddMember.set(false);
+    }
+  }
+
+  protected onRemoveDialogStateChange(state: BrnDialogState): void {
+    if (state === 'closed') {
+      this.showRemoveConfirm.set(false);
+      this.memberToRemove = null;
     }
   }
 
@@ -94,6 +126,49 @@ export class ProjectDetail implements OnInit {
         this.creatingBoard.set(false);
       },
       error: () => this.creatingBoard.set(false),
+    });
+  }
+
+  // ── Member management methods ────────────────────────────────────────────────
+
+  protected addMember(): void {
+    if (!this.newMemberUserId) return;
+    this.addingMember.set(true);
+    this.projectService.addMember(this.projectId(), this.newMemberUserId, this.newMemberRole).subscribe({
+      next: () => {
+        this.loadMembers();
+        this.showAddMember.set(false);
+        this.newMemberUserId = '';
+        this.newMemberRole = 'developer';
+        this.addingMember.set(false);
+      },
+      error: () => this.addingMember.set(false),
+    });
+  }
+
+  protected onRoleChange(member: ProjectMember, newRole: string): void {
+    if (newRole === member.role) return;
+    this.projectService.updateMemberRole(this.projectId(), member.userId, newRole).subscribe({
+      next: () => this.loadMembers(),
+    });
+  }
+
+  protected confirmRemoveMember(member: ProjectMember): void {
+    this.memberToRemove = member;
+    this.showRemoveConfirm.set(true);
+  }
+
+  protected removeMember(): void {
+    if (!this.memberToRemove) return;
+    this.removingMember.set(true);
+    this.projectService.removeMember(this.projectId(), this.memberToRemove.userId).subscribe({
+      next: () => {
+        this.loadMembers();
+        this.showRemoveConfirm.set(false);
+        this.memberToRemove = null;
+        this.removingMember.set(false);
+      },
+      error: () => this.removingMember.set(false),
     });
   }
 }

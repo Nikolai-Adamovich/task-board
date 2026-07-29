@@ -1,0 +1,115 @@
+<div class="mx-auto max-w-3xl">
+  <!-- Page header -->
+  <div class="mb-6 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <ng-icon name="lucideShield" class="h-6 w-6 text-foreground" />
+      <h2 class="text-2xl font-bold text-foreground">Members</h2>
+    </div>
+    @if (canManage) {
+      <button hlmBtn (click)="showInviteDialog.set(true)">
+        <ng-icon name="lucideUserPlus" class="mr-1" />
+        Invite Member
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="flex items-center justify-center py-12">
+      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading members...</span>
+    </div>
+  } @else if (members().length === 0) {
+    <div class="rounded-lg border border-dashed border-border py-12 text-center">
+      <p class="text-sm text-muted-foreground">No members found.</p>
+    </div>
+  } @else {
+    <hlm-card>
+      <div hlmCardContent class="p-0">
+        <div class="divide-y divide-border">
+          @for (member of members(); track member.userId) {
+            <div class="flex items-center justify-between px-4 py-3">
+              <div class="flex items-center gap-3">
+                <hlm-avatar class="h-8 w-8">
+                  <div hlmAvatarFallback class="text-xs font-medium">
+                    {{ getInitials(member.userId) }}
+                  </div>
+                </hlm-avatar>
+                <span class="text-sm text-foreground">{{ member.userId }}</span>
+                <span hlmBadge [class]="getRoleColor(member.role)">
+                  {{ member.role }}
+                </span>
+              </div>
+              @if (canManage) {
+                <div class="flex items-center gap-2">
+                  @if (!isOwner(member)) {
+                    <hlm-native-select [value]="member.role" (valueChange)="changeRole(member, $event)" class="w-32">
+                      @for (role of roles; track role) {
+                        <option hlmNativeSelectOption [value]="role">{{ role }}</option>
+                      }
+                    </hlm-native-select>
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="sm"
+                      (click)="removeMember(member)"
+                      [disabled]="removingUserId() === member.userId"
+                    >
+                      @if (removingUserId() === member.userId) {
+                        <hlm-spinner class="h-4 w-4" />
+                      } @else {
+                        <ng-icon name="lucideTrash2" class="h-4 w-4 text-destructive" />
+                      }
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </hlm-card>
+  }
+
+  <!-- Invite Member Dialog -->
+  <hlm-dialog [state]="showInviteDialog() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>Invite Member</h3>
+      </hlm-dialog-header>
+      <form (ngSubmit)="inviteMember()" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="invite-email">Email</label>
+          <input
+            hlmInput
+            id="invite-email"
+            type="email"
+            [(ngModel)]="inviteEmail"
+            name="email"
+            required
+            placeholder="user@example.com"
+          />
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="invite-role">Role</label>
+          <hlm-native-select id="invite-role" [(ngModel)]="inviteRole" name="role">
+            @for (role of roles; track role) {
+              @if (role !== 'owner') {
+                <option hlmNativeSelectOption [value]="role">{{ role }}</option>
+              }
+            }
+          </hlm-native-select>
+        </hlm-field>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn (click)="inviteMember()" [disabled]="inviting() || !inviteEmail">
+          @if (inviting()) {
+            <hlm-spinner /> Inviting...
+          } @else {
+            <ng-icon name="lucideUserPlus" class="mr-1" />
+            Invite
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</div>

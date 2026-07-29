@@ -1297,6 +1297,463 @@ leakage.
 
 ---
 
+## 11. UI Architecture — Member Management & Tenant Settings
+
+> **Reference:** [Technical Specification §12](technical_specification.md:1120) — Missing UI Features
+
+This section defines the architectural decisions for three UI feature areas that have working backend endpoints but no
+Angular frontend implementation: tenant member management, tenant settings, and project member management.
+
+### 11.1 Blocking backend fix — missing `GET /tenants/:tenantId/members`
+
+The route file [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:94) is missing the `GET /:tenantId/members`
+endpoint. The service method [`TenantService.getTenantMembers()`](server/src/services/tenant.service.ts:205) and the
+shared contract [`tenantContracts.listMembers`](shared/src/contracts/tenant.contracts.ts:74) already exist.
+
+**Required change:** Add the following route to [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:94):
+
+```typescript
+/**
+ * GET /:tenantId/members — List all members of a tenant.
+ * Any tenant member can view the list.
+ */
+router.get('/:tenantId/members', async (c) => {
+  const tenantId = c.req.param('tenantId');
+  const service = createTenantService();
+  const members = await service.getTenantMembers(tenantId);
+
+  return c.json({
+    data: members,
+    total: members.length,
+  });
+});
+```
+
+This route must be registered **before** the `POST /:tenantId/members` route to avoid path parameter collision
+(`members` being parsed as a `:tenantId` value).
+
+---
+
+### 11.2 Route tree updates
+
+Two new routes are added as children of the existing `tenants/:tenantId` route in
+[`app.routes.ts`](ui/src/app/app.routes.ts:26). Both render inside the
+[`AppShell`](ui/src/app/shell/app-shell/app-shell.ts) outlet.
+
+```
+/tenants/:tenantId
+  /projects                          ← ProjectList (existing)
+  /projects/:projectId               ← ProjectDetail (existing, enhanced)
+    /boards/:boardId                 ← BoardView (existing)
+    /tasks/:taskId                   ← TaskDetail (existing)
+    /sprints                         ← SprintList (existing)
+    /sprints/:sprintId               ← SprintDetail (existing)
+  /settings                          ← TenantSettings (NEW)
+    /members                         ← TenantMemberList (NEW)
+```
+
+**Route definitions to add** (inside the `children` array of the `tenants/:tenantId` route):
+
+```typescript
+{
+  path: 'settings',
+  loadComponent: () =>
+    import('./features/tenants/tenant-settings/tenant-settings')
+      .then((m) => m.TenantSettings),
+},
+{
+  path: 'settings/members',
+  loadComponent: () =>
+    import('./features/tenants/tenant-member-list/tenant-member-list')
+      .then((m) => m.TenantMemberList),
+},
+```
+
+Both routes are protected by the existing [`authGuard`](ui/src/app/guards/auth.guard.ts) and
+[`tenantGuard`](ui/src/app/guards/tenant.guard.ts) applied to the parent route. No additional guards are needed — RBAC
+enforcement is handled inside the components via computed signals that read the user's tenant role from
+[`AuthStore`](ui/src/app/stores/auth-store.ts).
+
+---
+
+### 11.3 Component hierarchy
+
+```
+AppShell (existing)
+├── Header (existing, unchanged)
+│   └── TenantSwitcher (existing, unchanged)
+├── Sidebar (existing, enhanced — adds "Settings" link)
+│   └── routerLink to /tenants/:tenantId/settings
+└── <router-outlet>
+    ├── TenantSettings (NEW)
+    │   ├── Edit form: name + slug inputs
+    │   ├── Save button (owner/admin only)
+    │   ├── Danger Zone section (owner only)
+    │   │   └── Delete Tenant → confirmation dialog
+    │   └── Link to "Manage Members" → /settings/members
+    │
+    ├── TenantMemberList (NEW)
+    │   ├── Member table rows (avatar + userId + role)
+    │   ├── Invite Member button (owner/admin) → Invite dialog
+    │   │   └── Invite Dialog (email input + role select)
+    │   ├── Inline role change (NativeSelect, owner/admin)
+    │   ├── Remove button (owner/admin) → confirmation dialog
+    │   └── Read-only view for tenant members
+    │
+    └── ProjectDetail (existing, enhanced)
+        ├── Project info section (existing, unchanged)
+        ├── Boards section (existing, unchanged)
+        └── Members section (enhanced)
+            ├── Member rows with inline role editor (project admin)
+            ├── Add Member button (project admin) → Add dialog
+            │   └── Add Dialog (user picker from tenant members + role select)
+            └── Remove button (project admin) → confirmation dialog
+```
+
+#### Component file locations
+
+| Component                  | Selector                | File path                                                                                                                                      |
+| -------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TenantSettings`           | `ui-tenant-settings`    | [`ui/src/app/features/tenants/tenant-settings/tenant-settings.ts`](ui/src/app/features/tenants/tenant-settings/tenant-settings.ts)             |
+| `TenantMemberList`         | `ui-tenant-member-list` | [`ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts`](ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts) |
+| `ProjectDetail` (modified) | `ui-project-detail`     | [`ui/src/app/features/projects/project-detail/project-detail.ts`](ui/src/app/features/projects/project-detail/project-detail.ts:38)            |
+| `Sidebar` (modified)       | `ui-sidebar`            | [`ui/src/app/shell/sidebar/sidebar.ts`](ui/src/app/shell/sidebar/sidebar.ts:10)                                                                |
+
+---
+
+### 11.4 Service layer extensions
+
+#### 11.4.1 `TenantClient` — new methods
+
+Extend [`TenantClient`](ui/src/app/services/tenant-client.ts:13) with the following methods. All types (`TenantMember`,
+`TenantRole`, `UpdateTenant`, `Tenant`) are already defined in the shared package.
+
+```typescript
+// Add to TenantClient:
+
+/** List members of a tenant */
+listMembers(tenantId: string): Observable<{ data: TenantMember[] }> {
+  return this.http.get<{ data: TenantMember[] }>(
+    `${this.apiBaseUrl}/tenants/${tenantId}/members`,
+  );
+}
+
+/** Invite a member by email with a role */
+inviteMember(tenantId: string, email: string, role: TenantRole): Observable<TenantMember> {
+  return this.http.post<TenantMember>(
+    `${this.apiBaseUrl}/tenants/${tenantId}/members`,
+    { email, role },
+  );
+}
+
+/** Update a member's role */
+updateMemberRole(tenantId: string, userId: string, role: TenantRole): Observable<TenantMember> {
+  return this.http.patch<TenantMember>(
+    `${this.apiBaseUrl}/tenants/${tenantId}/members/${userId}`,
+    { role },
+  );
+}
+
+/** Remove a member from the tenant */
+removeMember(tenantId: string, userId: string): Observable<void> {
+  return this.http.delete<null>(
+    `${this.apiBaseUrl}/tenants/${tenantId}/members/${userId}`,
+  ) as unknown as Observable<void>;
+}
+
+/** Update tenant name/slug */
+updateTenant(tenantId: string, data: UpdateTenant): Observable<Tenant> {
+  return this.http.patch<Tenant>(
+    `${this.apiBaseUrl}/tenants/${tenantId}`,
+    data,
+  );
+}
+
+/** Delete a tenant */
+deleteTenant(tenantId: string): Observable<void> {
+  return this.http.delete<null>(
+    `${this.apiBaseUrl}/tenants/${tenantId}`,
+  ) as unknown as Observable<void>;
+}
+```
+
+After `updateTenant` succeeds, the component must call `this.tenants.update(...)` and `this.activeTenant.update(...)` to
+reflect the changes in the signal store.
+
+After `deleteTenant` succeeds, the component must remove the tenant from `this.tenants` signal, clear `activeTenant` if
+it was the deleted tenant, and navigate to `/dashboard`.
+
+#### 11.4.2 `ProjectClient` — no changes needed
+
+All project member methods already exist on [`ProjectClient`](ui/src/app/services/project-client.ts:48):
+[`listMembers()`](ui/src/app/services/project-client.ts:48), [`addMember()`](ui/src/app/services/project-client.ts:53),
+[`updateMemberRole()`](ui/src/app/services/project-client.ts:58),
+[`removeMember()`](ui/src/app/services/project-client.ts:63).
+
+The `ProjectDetail` component enhancement only needs to call these existing methods.
+
+---
+
+### 11.5 RBAC — UI visibility model
+
+#### 11.5.1 Tenant role source
+
+The [`AuthStore`](ui/src/app/stores/auth-store.ts:13) stores the current `User` object. The user's **tenant role** is
+determined by looking up their `TenantMember` record from the tenant context. Two approaches:
+
+1. **Preferred:** Decode `tenantRole` from the JWT payload (the JWT already includes `tenantRole` per
+   [§7.1](#71-authentication-mvp--mocksimple)). Add a `tenantRole` computed signal to `AuthStore`:
+
+   ```typescript
+   readonly tenantRole = computed(() => {
+     const token = this.token();
+     if (!token) return null;
+     const payload = JSON.parse(atob(token.split('.')[1]));
+     return payload.tenantRole as TenantRole | null;
+   });
+   ```
+
+2. **Alternative:** Fetch the user's `TenantMember` records via `TenantClient.listMembers()` and find the record
+   matching the current user's ID.
+
+Option 1 is preferred because it avoids an extra HTTP call and the JWT already contains the role.
+
+#### 11.5.2 Project role source
+
+The [`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38) component already loads members
+via [`ProjectClient.listMembers()`](ui/src/app/services/project-client.ts:48). The current user's project role is
+derived by matching `member.userId === authStore.currentUser()?.id`:
+
+```typescript
+readonly currentUserProjectRole = computed(() => {
+  const userId = this.authStore.currentUser()?.id;
+  return this.members().find((m) => m.userId === userId)?.role ?? null;
+});
+```
+
+#### 11.5.3 Visibility matrix
+
+| UI Element                 | Condition                                                |
+| -------------------------- | -------------------------------------------------------- |
+| Tenant settings: edit form | `tenantRole() === 'owner' \|\| tenantRole() === 'admin'` |
+| Tenant settings: save btn  | Same as edit form                                        |
+| Tenant delete button       | `tenantRole() === 'owner'`                               |
+| Tenant member invite btn   | `tenantRole() === 'owner' \|\| tenantRole() === 'admin'` |
+| Tenant member role change  | Same as invite btn + `!isOwner(member)`                  |
+| Tenant member remove btn   | Same as invite btn + `!isOwner(member)`                  |
+| Project member add btn     | `projectRole() === 'admin'`                              |
+| Project member role change | `projectRole() === 'admin'`                              |
+| Project member remove btn  | `projectRole() === 'admin'`                              |
+
+**Implementation pattern — `computed()` signals:**
+
+```typescript
+// TenantMemberList / TenantSettings:
+protected readonly canManage = computed(() => {
+  const role = this.authStore.tenantRole();
+  return role === 'owner' || role === 'admin';
+});
+protected readonly isOwner = computed(() => this.authStore.tenantRole() === 'owner');
+
+// ProjectDetail:
+protected readonly canManageProjectMembers = computed(() => {
+  return this.currentUserProjectRole() === 'admin';
+});
+```
+
+---
+
+### 11.6 Spartan UI component mapping
+
+All new UI uses Spartan UI (`@spartan-ng/helm`) components. The following table maps each UI element to its Spartan
+component import.
+
+#### 11.6.1 `TenantSettings`
+
+| UI Element                 | Spartan Component     | Import                       |
+| -------------------------- | --------------------- | ---------------------------- |
+| Page layout card           | `HlmCardImports`      | `@spartan-ng/helm/card`      |
+| Name / slug input fields   | `HlmInputImports`     | `@spartan-ng/helm/input`     |
+| Field wrappers with labels | `HlmFieldImports`     | `@spartan-ng/helm/field`     |
+| Save Changes button        | `HlmButtonImports`    | `@spartan-ng/helm/button`    |
+| Delete Tenant button       | `HlmButtonImports`    | `@spartan-ng/helm/button`    |
+| Delete confirmation dialog | `HlmDialogImports`    | `@spartan-ng/helm/dialog`    |
+| Confirm name input         | `HlmInputImports`     | `@spartan-ng/helm/input`     |
+| Loading / saving spinner   | `HlmSpinnerImports`   | `@spartan-ng/helm/spinner`   |
+| Section separator          | `HlmSeparatorImports` | `@spartan-ng/helm/separator` |
+
+#### 11.6.2 `TenantMemberList`
+
+| UI Element                      | Spartan Component        | Import                           |
+| ------------------------------- | ------------------------ | -------------------------------- |
+| "Invite Member" button          | `HlmButtonImports`       | `@spartan-ng/helm/button`        |
+| Invite dialog                   | `HlmDialogImports`       | `@spartan-ng/helm/dialog`        |
+| Email input in dialog           | `HlmInputImports`        | `@spartan-ng/helm/input`         |
+| Role dropdown (invite + inline) | `HlmNativeSelectImports` | `@spartan-ng/helm/native-select` |
+| Field wrappers in dialog        | `HlmFieldImports`        | `@spartan-ng/helm/field`         |
+| Role badge (read-only rows)     | `HlmBadgeImports`        | `@spartan-ng/helm/badge`         |
+| User avatar fallback            | `HlmAvatarImports`       | `@spartan-ng/helm/avatar`        |
+| Remove button                   | `HlmButtonImports`       | `@spartan-ng/helm/button`        |
+| Remove confirmation dialog      | `HlmDialogImports`       | `@spartan-ng/helm/dialog`        |
+| Loading spinner                 | `HlmSpinnerImports`      | `@spartan-ng/helm/spinner`       |
+
+#### 11.6.3 `ProjectDetail` (enhanced members section)
+
+| UI Element                      | Spartan Component        | Import                           |
+| ------------------------------- | ------------------------ | -------------------------------- |
+| "Add Member" button             | `HlmButtonImports`       | `@spartan-ng/helm/button`        |
+| Add member dialog               | `HlmDialogImports`       | `@spartan-ng/helm/dialog`        |
+| User picker dropdown            | `HlmNativeSelectImports` | `@spartan-ng/helm/native-select` |
+| Role dropdown (dialog + inline) | `HlmNativeSelectImports` | `@spartan-ng/helm/native-select` |
+| Field wrappers                  | `HlmFieldImports`        | `@spartan-ng/helm/field`         |
+| Remove button                   | `HlmButtonImports`       | `@spartan-ng/helm/button`        |
+| Remove confirmation dialog      | `HlmDialogImports`       | `@spartan-ng/helm/dialog`        |
+
+#### 11.6.4 `Sidebar` (modified)
+
+No new Spartan imports needed. The Settings link uses the existing `RouterLink` + `RouterLinkActive` pattern with Lucide
+icons (consistent with the existing Projects and Sprints links).
+
+---
+
+### 11.7 Data flow — member invite sequence
+
+```
+TenantSettings / TenantMemberList
+  │
+  ├─ 1. User clicks "Invite Member" → showInviteDialog.set(true)
+  │
+  ├─ 2. Dialog renders: email input + role NativeSelect
+  │
+  ├─ 3. User fills form, clicks "Invite"
+  │     └─ TenantClient.inviteMember(tenantId, email, role)
+  │          └─ POST /api/v1/tenants/:tenantId/members { email, role }
+  │               └─ TenantService.inviteMember()
+  │                    └─ TenantMemberRepository.create()
+  │
+  ├─ 4. On success: TenantClient.listMembers(tenantId) → refresh list
+  │     └─ showInviteDialog.set(false)
+  │
+  └─ 5. On error: display inline error message (422 validation, 409 conflict)
+```
+
+### 11.8 Data flow — tenant settings update sequence
+
+```
+TenantSettings
+  │
+  ├─ 1. Component reads activeTenant() from TenantClient for initial form values
+  │
+  ├─ 2. User edits name/slug fields (ngModel bindings)
+  │
+  ├─ 3. User clicks "Save Changes"
+  │     └─ TenantClient.updateTenant(tenantId, { name, slug })
+  │          └─ PATCH /api/v1/tenants/:tenantId { name, slug }
+  │               └─ TenantService.updateTenant()
+  │                    └─ TenantRepository.update()
+  │
+  ├─ 4. On success: update TenantClient.tenants() and activeTenant() signals
+  │     └─ saving.set(false)
+  │
+  └─ 5. On error (422 slug conflict): display inline error below slug field
+```
+
+### 11.9 Data flow — tenant delete sequence
+
+```
+TenantSettings (Danger Zone)
+  │
+  ├─ 1. User clicks "Delete Tenant" → showDeleteDialog.set(true)
+  │
+  ├─ 2. Dialog requires typing the tenant name to confirm
+  │
+  ├─ 3. User confirms → TenantClient.deleteTenant(tenantId)
+  │     └─ DELETE /api/v1/tenants/:tenantId
+  │          └─ TenantService.deleteTenant()
+  │               └─ TenantRepository.delete()
+  │
+  ├─ 4. On success:
+  │     ├─ Remove tenant from TenantClient.tenants() signal
+  │     ├─ Clear activeTenant if it was the deleted tenant
+  │     ├─ TenantClient.loadTenants() to refresh
+  │     └─ Router.navigate(['/dashboard'])
+  │
+  └─ 5. On error: display error message in dialog
+```
+
+---
+
+### 11.10 Sidebar navigation update
+
+The [`SidebarComponent`](ui/src/app/shell/sidebar/sidebar.html:1) must add a "Settings" link visible to all tenant
+members:
+
+```html
+<!-- Add after the Sprints link, inside the @if (tenantService.activeTenant()) block -->
+<a
+  [routerLink]="['/tenants', tenant.id, 'settings']"
+  routerLinkActive="bg-primary-50 text-primary-700 font-medium"
+  class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
+>
+  <span class="i-lucide-settings h-4 w-4"></span>
+  Settings
+</a>
+```
+
+The link uses the `i-lucide-settings` icon (Lucide). No new component dependencies are needed — the sidebar already
+imports `RouterLink` and `RouterLinkActive`.
+
+---
+
+### 11.11 Error handling integration
+
+All new components integrate with the existing [`error.interceptor.ts`](ui/src/app/interceptors/error.interceptor.ts)
+which globally handles:
+
+| HTTP Status | UI Behavior                                                    |
+| ----------- | -------------------------------------------------------------- |
+| 401         | Redirect to `/auth/login` (handled by interceptor)             |
+| 403         | Display "Permission denied" message; disable triggering action |
+| 422         | Display validation errors inline below the relevant form field |
+| 409         | Display "Already exists" message (e.g., duplicate membership)  |
+| 500         | Display generic error toast                                    |
+
+Components handle errors locally via the `error` callback in `subscribe()`:
+
+```typescript
+this.tenantClient.inviteMember(tenantId, email, role).subscribe({
+  next: (member) => {
+    this.members.update((list) => [...list, member]);
+    this.inviteError.set(null);
+  },
+  error: (err) => {
+    this.inviteError.set(err.error?.message ?? 'Failed to invite member');
+  },
+});
+```
+
+---
+
+### 11.12 Summary — files to create or modify
+
+| Action     | File                                                                                                                                    | Description                                     |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **Create** | `ui/src/app/features/tenants/tenant-settings/tenant-settings.ts`                                                                        | Tenant settings page component                  |
+| **Create** | `ui/src/app/features/tenants/tenant-settings/tenant-settings.html`                                                                      | Tenant settings template                        |
+| **Create** | `ui/src/app/features/tenants/tenant-settings/tenant-settings.spec.ts`                                                                   | Tenant settings unit tests                      |
+| **Create** | `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts`                                                                  | Tenant member list component                    |
+| **Create** | `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.html`                                                                | Tenant member list template                     |
+| **Create** | `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.spec.ts`                                                             | Tenant member list unit tests                   |
+| **Modify** | [`ui/src/app/services/tenant-client.ts`](ui/src/app/services/tenant-client.ts:13)                                                       | Add 6 new methods (§11.4.1)                     |
+| **Modify** | [`ui/src/app/stores/auth-store.ts`](ui/src/app/stores/auth-store.ts:13)                                                                 | Add `tenantRole` computed signal (§11.5.1)      |
+| **Modify** | [`ui/src/app/app.routes.ts`](ui/src/app/app.routes.ts:26)                                                                               | Add settings + settings/members routes (§11.2)  |
+| **Modify** | [`ui/src/app/shell/sidebar/sidebar.html`](ui/src/app/shell/sidebar/sidebar.html:1)                                                      | Add Settings nav link (§11.10)                  |
+| **Modify** | [`ui/src/app/features/projects/project-detail/project-detail.ts`](ui/src/app/features/projects/project-detail/project-detail.ts:38)     | Add member management signals + methods (§11.3) |
+| **Modify** | [`ui/src/app/features/projects/project-detail/project-detail.html`](ui/src/app/features/projects/project-detail/project-detail.html:54) | Add member management UI (§11.3)                |
+| **Modify** | [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:94)                                                                       | Add `GET /:tenantId/members` route (§11.1)      |
+
+---
+
 ## Summary
 
 | Item                              | Detail                                                                                                                                                                                                                                                            |

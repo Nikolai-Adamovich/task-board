@@ -20,6 +20,22 @@
         <span class="i-lucide-calendar h-4 w-4"></span>
         Sprints
       </a>
+      <a
+        [routerLink]="['/tenants', tenant.id, 'settings']"
+        routerLinkActive="bg-primary-50 text-primary-700 font-medium"
+        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
+      >
+        <span class="i-lucide-settings h-4 w-4"></span>
+        Settings
+      </a>
+      <a
+        [routerLink]="['/tenants', tenant.id, 'settings', 'members']"
+        routerLinkActive="bg-primary-50 text-primary-700 font-medium"
+        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
+      >
+        <span class="i-lucide-users h-4 w-4"></span>
+        Members
+      </a>
     }
   </nav>
 </aside>

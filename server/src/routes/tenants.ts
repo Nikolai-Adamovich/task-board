@@ -94,6 +94,18 @@ export function createTenantRoutes(): Hono<AppEnv> {
   // ─── Member Management ─────────────────────────────────────────────────────
 
   /**
+   * GET /:tenantId/members — List all members of a tenant.
+   * Accessible to any authenticated tenant member.
+   */
+  router.get('/:tenantId/members', async (c) => {
+    const tenantId = c.req.param('tenantId');
+    const service = createTenantService();
+    const members = await service.getTenantMembers(tenantId);
+
+    return c.json({ data: members, total: members.length });
+  });
+
+  /**
    * POST /:tenantId/members — Invite a member to the tenant.
    * Owner/admin only. Body: { email, role }.
    */

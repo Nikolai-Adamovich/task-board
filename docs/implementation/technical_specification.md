@@ -1117,12 +1117,596 @@ The following blocking questions from the initial draft have been resolved with 
 
 ---
 
+## 12. Missing UI Features
+
+> **Status:** To be implemented. Backend APIs are fully deployed; frontend UI is missing. **Date added:** 2026-07-29
+
+This section covers UI features that have working backend endpoints but no corresponding Angular frontend
+implementation. Each subsection defines the scope, user stories, acceptance criteria, component design, route structure,
+and API integration details.
+
+### 12.1 Tenant Member Management
+
+**Current state:** The backend exposes `POST /tenants/:tenantId/members`, `PATCH /tenants/:tenantId/members/:userId`,
+and `DELETE /tenants/:tenantId/members/:userId`. The [`TenantClient`](ui/src/app/services/tenant-client.ts:13) service
+only has [`loadTenants()`](ui/src/app/services/tenant-client.ts:28) and
+[`setActiveTenant()`](ui/src/app/services/tenant-client.ts:52) — no member management methods exist.
+
+#### 12.1.1 User stories
+
+| #    | As a…         | I want to…                                              | So that…                                            |
+| ---- | ------------- | ------------------------------------------------------- | --------------------------------------------------- |
+| TM-1 | Tenant owner  | Invite a user by email with a role                      | New team members can join my organization           |
+| TM-2 | Tenant owner  | View a list of all tenant members with their roles      | I know who has access                               |
+| TM-3 | Tenant owner  | Change a member's role (admin ↔ member)                 | I can adjust permissions as responsibilities change |
+| TM-4 | Tenant owner  | Remove a member from the tenant                         | I can revoke access for departed users              |
+| TM-5 | Tenant admin  | Invite members and manage member roles (but not owners) | Admins can help manage the team                     |
+| TM-6 | Tenant member | View the member list (read-only)                        | I can see who is in my organization                 |
+
+#### 12.1.2 Acceptance criteria
+
+| #        | Criterion                                                                                              | Verification                                                                    |
+| -------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| AC-TM-1  | A tenant owner/admin sees an "Invite Member" button on the tenant settings or a dedicated members page | Button is visible; clicking opens an invite dialog                              |
+| AC-TM-2  | The invite dialog accepts an email and a role (`owner` / `admin` / `member`) dropdown                  | Form submits `POST /tenants/:tenantId/members` with `{ email, role }`           |
+| AC-TM-3  | After a successful invite, the member list refreshes and shows the new member                          | New member appears in the list with correct role badge                          |
+| AC-TM-4  | A member list displays each member with avatar fallback, user ID (or email if resolved), and role      | Visual layout matches the project member list pattern                           |
+| AC-TM-5  | An owner/admin can change a member's role via a `NativeSelect` dropdown inline in the member row       | Selecting a new role calls `PATCH /tenants/:tenantId/members/:userId`           |
+| AC-TM-6  | An owner/admin can remove a member via a delete button with a confirmation dialog                      | Confirming calls `DELETE /tenants/:tenantId/members/:userId`; member removed    |
+| AC-TM-7  | The owner cannot be removed or have their role changed                                                 | Remove/edit controls are disabled or hidden for the owner row                   |
+| AC-TM-8  | An admin cannot promote someone to `owner` or remove the owner                                         | API returns 403; UI disables `owner` option in the role selector for non-owners |
+| AC-TM-9  | A tenant member (non-admin) sees the member list but no invite/edit/remove controls                    | Read-only view; no action buttons rendered                                      |
+| AC-TM-10 | Error states (invalid email, user not found, duplicate membership) are displayed inline                | Error message shown below the invite form or as a toast                         |
+
+#### 12.1.3 `TenantClient` extension
+
+The [`TenantClient`](ui/src/app/services/tenant-client.ts:13) service must be extended with the following methods. Types
+[`TenantMember`](shared/src/types/tenant.ts:14) and [`TenantRole`](shared/src/constants/roles.ts:2) are already defined
+in the shared package.
+
+```typescript
+// Methods to add to TenantClient:
+
+/** List members of a tenant */
+listMembers(tenantId: string): Observable<{ data: TenantMember[] }>
+
+/** Invite a member by email with a role */
+inviteMember(tenantId: string, email: string, role: TenantRole): Observable<TenantMember>
+
+/** Update a member's role */
+updateMemberRole(tenantId: string, userId: string, role: TenantRole): Observable<TenantMember>
+
+/** Remove a member from the tenant */
+removeMember(tenantId: string, userId: string): Observable<void>
+```
+
+> **Note:** The backend invite endpoint (`POST /tenants/:tenantId/members`) accepts `{ email, role }` in the body (not
+> `userId`). This is different from the project member add endpoint which accepts `{ userId, role }`.
+
+#### 12.1.4 UI component design
+
+**New component: `TenantMemberListComponent`**
+
+| Aspect           | Detail                                                                            |
+| ---------------- | --------------------------------------------------------------------------------- |
+| **Selector**     | `ui-tenant-member-list`                                                           |
+| **Location**     | `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts`            |
+| **Standalone**   | Yes                                                                               |
+| **Dependencies** | `TenantClient`, `AuthStore` (to check current user's tenant role for RBAC gating) |
+
+**Spartan UI components used:**
+
+| Component                | Usage                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `HlmButtonImports`       | "Invite Member" button; "Remove" action button; dialog confirm/cancel buttons |
+| `HlmDialogImports`       | Invite member dialog; remove confirmation dialog                              |
+| `HlmFieldImports`        | Form field wrappers for email input and role select                           |
+| `HlmInputImports`        | Email input field in invite dialog                                            |
+| `HlmNativeSelectImports` | Role dropdown (`owner`/`admin`/`member`) in invite dialog and inline in rows  |
+| `HlmBadgeImports`        | Role badge next to each member                                                |
+| `HlmAvatarImports`       | Avatar fallback with user initials                                            |
+| `HlmSpinnerImports`      | Loading state while fetching members                                          |
+
+**Template structure:**
+
+```
+<div>
+  <!-- Header with invite button (visible only for owner/admin) -->
+  <div class="flex items-center justify-between">
+    <h3>Members</h3>
+    @if (canManageMembers()) {
+      <button hlmBtn (click)="showInviteDialog.set(true)">Invite Member</button>
+    }
+  </div>
+
+  <!-- Member list -->
+  @if (loading()) {
+    <hlm-spinner />
+  } @else {
+    <div class="rounded-lg border">
+      @for (member of members(); track member.userId) {
+        <div class="flex items-center justify-between px-4 py-3">
+          <!-- Avatar + user info -->
+          <div class="flex items-center gap-3">
+            <hlm-avatar><div hlmAvatarFallback>{{ initials(member) }}</div></hlm-avatar>
+            <span>{{ member.userId }}</span>
+          </div>
+          <!-- Role control -->
+          @if (canManageMembers() && !isOwner(member)) {
+            <hlm-native-select [value]="member.role" (valueChange)="changeRole(member, $event)">
+              @for (role of availableRoles(); track role) {
+                <option [value]="role">{{ role }}</option>
+              }
+            </hlm-native-select>
+            <button hlmBtn variant="destructive" size="sm" (click)="confirmRemove(member)">Remove</button>
+          } @else {
+            <span hlmBadge variant="secondary">{{ member.role }}</span>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<!-- Invite Dialog -->
+<hlm-dialog ...>
+  <hlm-dialog-content *hlmDialogPortal>
+    <hlm-dialog-header><h3 hlmDialogTitle>Invite Member</h3></hlm-dialog-header>
+    <form>
+      <hlm-field>
+        <label hlmFieldLabel>Email</label>
+        <input hlmInput type="email" [(ngModel)]="inviteEmail" />
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel>Role</label>
+        <hlm-native-select [(ngModel)]="inviteRole">
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+        </hlm-native-select>
+      </hlm-field>
+    </form>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+      <button hlmBtn (click)="inviteMember()" [disabled]="inviting()">
+        @if (inviting()) { <hlm-spinner /> Inviting... } @else { Invite }
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
+
+<!-- Remove Confirmation Dialog -->
+<hlm-dialog ...>
+  <hlm-dialog-content *hlmDialogPortal>
+    <hlm-dialog-header><h3 hlmDialogTitle>Remove Member</h3></hlm-dialog-header>
+    <p>Are you sure you want to remove this member?</p>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+      <button hlmBtn variant="destructive" (click)="removeMember()">Remove</button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
+```
+
+#### 12.1.5 Route structure
+
+| Option              | Route                                 | Description                              |
+| ------------------- | ------------------------------------- | ---------------------------------------- |
+| **A (recommended)** | `/tenants/:tenantId/settings/members` | Nested under tenant settings (see §12.2) |
+| B                   | `/tenants/:tenantId/members`          | Standalone route at tenant level         |
+
+Option A is recommended because tenant member management is a tenant-level administrative action and belongs alongside
+tenant settings (name, slug, delete). This avoids adding a top-level navigation item.
+
+#### 12.1.6 Angular 22 patterns
+
+- **Signals:** `members = signal<TenantMember[]>([])`, `loading = signal(false)`, `showInviteDialog = signal(false)`
+- **`computed()`:**
+  `canManageMembers = computed(() => { const role = this.currentUserTenantRole(); return role === 'owner' || role === 'admin'; })`
+- **`@if` / `@for` control flow** for conditional rendering and list iteration
+- **`inject()`** for dependency injection of `TenantClient` and `AuthStore`
+- **Standalone component** — no NgModule
+- **`FormsModule`** with `ngModel` for form bindings in the invite dialog
+
+#### 12.1.7 Blocking question
+
+> **BQ-TM-1:** The server [`tenants.ts`](server/src/routes/tenants.ts:94) route file does not include a
+> `GET /:tenantId/members` endpoint (to list tenant members), although the shared contract
+> [`tenant.contracts.ts`](shared/src/contracts/tenant.contracts.ts:74) defines it as `listMembers`. This endpoint must
+> be verified as deployed or added to the backend before the member list UI can function. **This is a blocking
+> dependency.**
+
+---
+
+### 12.2 Tenant Settings Page
+
+**Current state:** The backend exposes `PATCH /tenants/:tenantId` (update name/slug) and `DELETE /tenants/:tenantId`
+(delete tenant). No settings UI exists anywhere in the frontend.
+
+#### 12.2.1 User stories
+
+| #    | As a…         | I want to…                             | So that…                                        |
+| ---- | ------------- | -------------------------------------- | ----------------------------------------------- |
+| TS-1 | Tenant owner  | View and edit the tenant name and slug | I can correct typos or rebrand the organization |
+| TS-2 | Tenant owner  | Delete the tenant with confirmation    | I can permanently remove an unused organization |
+| TS-3 | Tenant admin  | View and edit the tenant name and slug | Admins can manage basic tenant info             |
+| TS-4 | Tenant member | View the tenant settings (read-only)   | I can see the organization details              |
+
+#### 12.2.2 Acceptance criteria
+
+| #       | Criterion                                                                                    | Verification                                                                        |
+| ------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| AC-TS-1 | A tenant settings page is accessible at `/tenants/:tenantId/settings`                        | Route loads; page renders with current tenant name and slug                         |
+| AC-TS-2 | The page displays the tenant name and slug in editable input fields                          | Fields are pre-populated with current values from `TenantClient.activeTenant()`     |
+| AC-TS-3 | An owner/admin can edit the name and slug and save changes                                   | "Save" button calls `PATCH /tenants/:tenantId` with updated fields                  |
+| AC-TS-4 | After a successful update, the tenant list and active tenant in `TenantClient` are refreshed | `activeTenant()` signal reflects the new name/slug                                  |
+| AC-TS-5 | A "Delete Tenant" button is visible only to the owner                                        | Button is hidden for admin and member roles                                         |
+| AC-TS-6 | Clicking "Delete Tenant" opens a confirmation dialog requiring the tenant name to be typed   | Prevents accidental deletion; confirmation input must match tenant name             |
+| AC-TS-7 | Confirming deletion calls `DELETE /tenants/:tenantId` and redirects to the dashboard         | User lands on `/dashboard`; deleted tenant is removed from `TenantClient.tenants()` |
+| AC-TS-8 | Validation errors (e.g., slug already taken) are displayed inline                            | Error message appears below the slug field                                          |
+| AC-TS-9 | Members see the settings page in read-only mode (inputs disabled, no delete button)          | Fields are disabled; save/delete buttons are hidden                                 |
+
+#### 12.2.3 `TenantClient` extension
+
+```typescript
+// Methods to add to TenantClient:
+
+/** Update tenant name/slug */
+updateTenant(tenantId: string, data: UpdateTenant): Observable<Tenant>
+
+/** Delete a tenant */
+deleteTenant(tenantId: string): Observable<void>
+```
+
+Type [`UpdateTenant`](shared/src/types/tenant.ts:11) is already defined in the shared package.
+
+#### 12.2.4 UI component design
+
+**New component: `TenantSettingsComponent`**
+
+| Aspect           | Detail                                                           |
+| ---------------- | ---------------------------------------------------------------- |
+| **Selector**     | `ui-tenant-settings`                                             |
+| **Location**     | `ui/src/app/features/tenants/tenant-settings/tenant-settings.ts` |
+| **Standalone**   | Yes                                                              |
+| **Dependencies** | `TenantClient`, `AuthStore`, `Router`                            |
+
+**Spartan UI components used:**
+
+| Component           | Usage                                                 |
+| ------------------- | ----------------------------------------------------- |
+| `HlmButtonImports`  | "Save" button; "Delete Tenant" button; dialog buttons |
+| `HlmDialogImports`  | Delete confirmation dialog                            |
+| `HlmFieldImports`   | Field wrappers for name and slug inputs               |
+| `HlmInputImports`   | Text inputs for tenant name and slug                  |
+| `HlmSpinnerImports` | Loading state; saving state                           |
+
+**Template structure:**
+
+```
+<div class="mx-auto max-w-2xl">
+  <h2>Tenant Settings</h2>
+
+  @if (loading()) {
+    <hlm-spinner />
+  } @else {
+    <!-- Edit form -->
+    <form (ngSubmit)="save()" class="space-y-4">
+      <hlm-field>
+        <label hlmFieldLabel>Name</label>
+        <input hlmInput [(ngModel)]="form.name" name="name" [disabled]="!canEdit()" />
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel>Slug</label>
+        <input hlmInput [(ngModel)]="form.slug" name="slug" [disabled]="!canEdit()" />
+      </hlm-field>
+      @if (error()) {
+        <p class="text-sm text-destructive">{{ error() }}</p>
+      }
+      @if (canEdit()) {
+        <button hlmBtn (click)="save()" [disabled]="saving()">
+          @if (saving()) { <hlm-spinner /> Saving... } @else { Save Changes }
+        </button>
+      }
+    </form>
+
+    <!-- Danger zone -->
+    @if (isOwner()) {
+      <div class="mt-8 rounded-lg border border-destructive/30 p-4">
+        <h3 class="text-destructive font-semibold">Danger Zone</h3>
+        <p class="text-sm text-muted-foreground mt-1">
+          Deleting a tenant is permanent and cannot be undone.
+        </p>
+        <button hlmBtn variant="destructive" class="mt-3" (click)="showDeleteDialog.set(true)">
+          Delete Tenant
+        </button>
+      </div>
+    }
+  }
+</div>
+
+<!-- Delete Confirmation Dialog -->
+<hlm-dialog ...>
+  <hlm-dialog-content *hlmDialogPortal>
+    <hlm-dialog-header><h3 hlmDialogTitle>Delete Tenant</h3></hlm-dialog-header>
+    <p>Type the tenant name <strong>{{ tenantName() }}</strong> to confirm:</p>
+    <input hlmInput [(ngModel)]="confirmName" placeholder="Type tenant name..." />
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+      <button hlmBtn variant="destructive" [disabled]="confirmName !== tenantName()" (click)="deleteTenant()">
+        @if (deleting()) { <hlm-spinner /> Deleting... } @else { Delete Permanently }
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
+```
+
+#### 12.2.5 Route structure
+
+```
+/tenants/:tenantId
+  /settings                  ← TenantSettingsComponent (new)
+    /members                 ← TenantMemberListComponent (new, see §12.1)
+```
+
+Both routes are children of the existing `tenants/:tenantId` route in [`app.routes.ts`](ui/src/app/app.routes.ts:27) and
+rendered inside the [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts) outlet.
+
+```typescript
+// Addition to app.routes.ts children array:
+{
+  path: 'settings',
+  loadComponent: () => import('./features/tenants/tenant-settings/tenant-settings').then(m => m.TenantSettings),
+},
+{
+  path: 'settings/members',
+  loadComponent: () => import('./features/tenants/tenant-member-list/tenant-member-list').then(m => m.TenantMemberList),
+},
+```
+
+#### 12.2.6 Sidebar navigation
+
+The [`SidebarComponent`](ui/src/app/shell/sidebar/sidebar.html) should include a "Settings" link that navigates to
+`/tenants/:tenantId/settings`. This link should be visible to all tenant members but the settings content enforces its
+own RBAC (read-only for members, editable for admin/owner, deletable for owner only).
+
+---
+
+### 12.3 Project Member Management
+
+**Current state:** [`ProjectClient`](ui/src/app/services/project-client.ts:16) already has
+[`listMembers()`](ui/src/app/services/project-client.ts:48), [`addMember()`](ui/src/app/services/project-client.ts:53),
+[`updateMemberRole()`](ui/src/app/services/project-client.ts:58), and
+[`removeMember()`](ui/src/app/services/project-client.ts:63). The
+[`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38) component loads and displays members
+with avatar + role badge in [`project-detail.html`](ui/src/app/features/projects/project-detail/project-detail.html:54),
+but **no UI exists for adding, removing, or changing roles**.
+
+#### 12.3.1 User stories
+
+| #    | As a…             | I want to…                                              | So that…                                          |
+| ---- | ----------------- | ------------------------------------------------------- | ------------------------------------------------- |
+| PM-1 | Project admin     | Add a tenant member to the project with a specific role | I can grant project access to specific people     |
+| PM-2 | Project admin     | Change a project member's role                          | I can adjust their permissions within the project |
+| PM-3 | Project admin     | Remove a member from the project                        | I can revoke project-level access                 |
+| PM-4 | Project developer | View the member list (read-only)                        | I can see who is on the project                   |
+| PM-5 | Project viewer    | View the member list (read-only)                        | I can see who is on the project                   |
+
+#### 12.3.2 Acceptance criteria
+
+| #       | Criterion                                                                                        | Verification                                                            |
+| ------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| AC-PM-1 | The project detail page shows an "Add Member" button for project admins                          | Button visible only when current user has `project:admin` role          |
+| AC-PM-2 | Clicking "Add Member" opens a dialog with a user picker and role selector                        | Dialog renders with tenant members as selectable options                |
+| AC-PM-3 | Submitting the add-member form calls `POST /projects/:projectId/members` with `{ userId, role }` | New member appears in the list after refresh                            |
+| AC-PM-4 | A project admin can change a member's role inline via a `NativeSelect` dropdown                  | Selecting a new role calls `PATCH /projects/:projectId/members/:userId` |
+| AC-PM-5 | A project admin can remove a member with a confirmation step                                     | Confirming calls `DELETE /projects/:projectId/members/:userId`          |
+| AC-PM-6 | Non-admin users see the member list but no add/edit/remove controls                              | Read-only view; action buttons hidden                                   |
+| AC-PM-7 | The project admin cannot remove themselves if they are the last admin                            | API returns 403; UI disables remove for the last admin                  |
+| AC-PM-8 | Error states are displayed inline (e.g., user already a member)                                  | Error message shown in the dialog or as a toast                         |
+
+#### 12.3.3 UI component design
+
+**Approach:** Extend the existing [`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38)
+component rather than creating a separate component. The member section already exists in
+[`project-detail.html`](ui/src/app/features/projects/project-detail/project-detail.html:54) — it needs to be augmented
+with action controls.
+
+**Changes to [`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38):**
+
+| Aspect            | Change                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **New signals**   | `showAddMember = signal(false)`, `addingMember = signal(false)`, `selectedUserId = signal('')`, `selectedRole = signal<ProjectRole>('developer')` |
+| **New inputs**    | Tenant member list fetched via `TenantClient.listMembers()` for the user picker                                                                   |
+| **New imports**   | `HlmNativeSelectImports` for role dropdown; extend existing `HlmDialogImports`                                                                    |
+| **RBAC computed** | `canManageMembers = computed(() => currentUserProjectRole() === 'admin')`                                                                         |
+
+**Spartan UI components used (additional to existing):**
+
+| Component                | Usage                                                            |
+| ------------------------ | ---------------------------------------------------------------- |
+| `HlmNativeSelectImports` | Role dropdown in add-member dialog and inline role selector      |
+| `HlmDialogImports`       | Add-member dialog; remove confirmation dialog (already imported) |
+| `HlmButtonImports`       | "Add Member" button; remove action button (already imported)     |
+
+**Template changes to the members section:**
+
+```
+<!-- Members section (enhanced) -->
+<section>
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-lg font-semibold text-foreground">Members</h3>
+    @if (canManageMembers()) {
+      <button hlmBtn size="sm" (click)="showAddMember.set(true)">
+        <ng-icon name="lucidePlus" class="mr-1" /> Add Member
+      </button>
+    }
+  </div>
+
+  @if (members().length === 0) {
+    <p class="text-sm text-muted-foreground">No members yet.</p>
+  } @else {
+    <div class="rounded-lg border border-border">
+      @for (member of members(); track member.userId) {
+        <div class="flex items-center justify-between border-b border-border px-4 py-3 last:border-b-0">
+          <div class="flex items-center gap-3">
+            <hlm-avatar class="h-8 w-8">
+              <div hlmAvatarFallback class="text-xs font-medium">
+                {{ member.userId.substring(0, 2).toUpperCase() }}
+              </div>
+            </hlm-avatar>
+            <span class="text-sm text-foreground">{{ member.userId }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            @if (canManageMembers()) {
+              <hlm-native-select [value]="member.role" (valueChange)="changeProjectRole(member, $event)">
+                @for (role of projectRoles; track role) {
+                  <option [value]="role">{{ role }}</option>
+                }
+              </hlm-native-select>
+              <button hlmBtn variant="destructive" size="sm" (click)="confirmRemoveProjectMember(member)">
+                Remove
+              </button>
+            } @else {
+              <span hlmBadge variant="secondary">{{ member.role }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>
+
+<!-- Add Member Dialog -->
+<hlm-dialog [state]="showAddMember() ? 'open' : 'closed'" (stateChanged)="onAddMemberDialogStateChange($event)">
+  <hlm-dialog-content *hlmDialogPortal>
+    <hlm-dialog-header><h3 hlmDialogTitle>Add Member</h3></hlm-dialog-header>
+    <form class="space-y-4">
+      <hlm-field>
+        <label hlmFieldLabel>User</label>
+        <hlm-native-select [(ngModel)]="selectedUserId" name="userId">
+          <option value="" disabled>Select a user...</option>
+          @for (user of tenantMembers(); track user.userId) {
+            <option [value]="user.userId">{{ user.userId }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel>Role</label>
+        <hlm-native-select [(ngModel)]="selectedRole" name="role">
+          <option value="admin">Admin</option>
+          <option value="developer">Developer</option>
+          <option value="viewer">Viewer</option>
+        </hlm-native-select>
+      </hlm-field>
+    </form>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+      <button hlmBtn (click)="addProjectMember()" [disabled]="addingMember()">
+        @if (addingMember()) { <hlm-spinner /> Adding... } @else { Add Member }
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
+```
+
+#### 12.3.4 API integration
+
+All methods already exist on [`ProjectClient`](ui/src/app/services/project-client.ts:16):
+
+| Action        | Method                                                                                  | API call                                      |
+| ------------- | --------------------------------------------------------------------------------------- | --------------------------------------------- |
+| List members  | [`listMembers(projectId)`](ui/src/app/services/project-client.ts:48)                    | `GET /projects/:projectId/members`            |
+| Add member    | [`addMember(projectId, userId, role)`](ui/src/app/services/project-client.ts:53)        | `POST /projects/:projectId/members`           |
+| Update role   | [`updateMemberRole(projectId, userId, role)`](ui/src/app/services/project-client.ts:58) | `PATCH /projects/:projectId/members/:userId`  |
+| Remove member | [`removeMember(projectId, userId)`](ui/src/app/services/project-client.ts:63)           | `DELETE /projects/:projectId/members/:userId` |
+
+The tenant member list (for the user picker in the add-member dialog) must be fetched from `TenantClient.listMembers()`
+(new method, see §12.1.3).
+
+#### 12.3.5 Route structure
+
+No new routes. This feature is an enhancement to the existing
+[`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38) component at
+`/tenants/:tenantId/projects/:projectId`.
+
+---
+
+### 12.4 Cross-cutting requirements
+
+#### 12.4.1 Angular 22 patterns (applies to all features above)
+
+| Pattern                             | Requirement                                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------------------- |
+| **Signals**                         | All state managed via `signal()`, `computed()`, `linkedSignal()`                        |
+| **`resource()` / `httpResource()`** | Use for data fetching where appropriate; fall back to direct `HttpClient` for mutations |
+| **`@if` / `@for` / `@switch`**      | Built-in control flow only; no `*ngIf`, `*ngFor`, `ngSwitch`                            |
+| **`inject()`**                      | Function-based DI; no constructor injection                                             |
+| **Standalone components**           | All new components are standalone; no NgModules                                         |
+| **`FormsModule`**                   | Signal forms or `ngModel` for form bindings                                             |
+| **`@defer`**                        | Lazy-load heavy dialogs or secondary content where beneficial                           |
+
+#### 12.4.2 Spartan UI components (maximal usage required)
+
+All new UI must use Spartan UI (`@spartan-ng/helm`) components. The following are available in the project:
+
+| Component     | Import                   | Usage in this spec                                 |
+| ------------- | ------------------------ | -------------------------------------------------- |
+| Button        | `HlmButtonImports`       | All action buttons, dialog triggers                |
+| Dialog        | `HlmDialogImports`       | Invite/add member, delete confirmation, all modals |
+| Field + Label | `HlmFieldImports`        | Form field wrappers with labels and error messages |
+| Input         | `HlmInputImports`        | Text inputs (email, name, slug)                    |
+| Textarea      | `HlmTextareaImports`     | Description fields                                 |
+| NativeSelect  | `HlmNativeSelectImports` | Role dropdowns in member lists and invite dialogs  |
+| Badge         | `HlmBadgeImports`        | Role badges in member lists                        |
+| Avatar        | `HlmAvatarImports`       | User avatar fallbacks in member lists              |
+| Spinner       | `HlmSpinnerImports`      | Loading and submitting states                      |
+| Separator     | `HlmSeparatorImports`    | Visual separation between sections                 |
+
+#### 12.4.3 RBAC visibility rules
+
+| UI Element                  | Tenant: owner | Tenant: admin | Tenant: member | Project: admin | Project: developer | Project: viewer |
+| --------------------------- | :-----------: | :-----------: | :------------: | :------------: | :----------------: | :-------------: |
+| Tenant settings page (edit) |      ✅       |      ✅       |       👁️       |       —        |         —          |        —        |
+| Tenant delete button        |      ✅       |      ❌       |       ❌       |       —        |         —          |        —        |
+| Tenant member invite        |      ✅       |      ✅       |       ❌       |       —        |         —          |        —        |
+| Tenant member role change   |      ✅       |     ✅\*      |       ❌       |       —        |         —          |        —        |
+| Tenant member remove        |      ✅       |     ✅\*      |       ❌       |       —        |         —          |        —        |
+| Project member add          |       —       |       —       |       —        |       ✅       |         ❌         |       ❌        |
+| Project member role change  |       —       |       —       |       —        |       ✅       |         ❌         |       ❌        |
+| Project member remove       |       —       |       —       |       —        |       ✅       |         ❌         |       ❌        |
+
+\* Admin cannot change the owner's role or remove the owner.
+
+#### 12.4.4 Error handling
+
+All new components must integrate with the existing
+[`error.interceptor.ts`](ui/src/app/interceptors/error.interceptor.ts) pattern:
+
+- **401** → redirect to `/auth/login`
+- **403** → display "Permission denied" message; disable the action that triggered it
+- **422** → display validation errors inline (below the relevant form field)
+- **409 (conflict)** → display "Already exists" or similar message (e.g., user is already a member)
+- **500** → display generic error toast
+
+#### 12.4.5 Testing requirements
+
+| Layer           | Requirement                                                                            |
+| --------------- | -------------------------------------------------------------------------------------- |
+| **Unit**        | Each new component must have a `.spec.ts` with ≥ 80% coverage                          |
+| **Unit**        | `TenantClient` member methods must have tests                                          |
+| **Integration** | Member invite/remove flows tested with mocked HTTP                                     |
+| **E2E**         | Playwright tests for: tenant member invite → project member add → role change → remove |
+
+---
+
 ## Summary
 
 ```json
 {
   "tz_file": "docs/implementation/technical_specification.md",
-  "blocking_questions": [],
+  "blocking_questions": [
+    "BQ-TM-1: The server tenants.ts route file does not include a GET /:tenantId/members endpoint (to list tenant members), although the shared contract tenant.contracts.ts defines it as listMembers. This endpoint must be verified as deployed or added to the backend before the tenant member list UI can function."
+  ],
   "assumptions": [
     "JWT is the sole authentication mechanism; no OAuth, no SSO.",
     "MongoDB Atlas is the only data store; no relational database.",
@@ -1136,7 +1720,10 @@ The following blocking questions from the initial draft have been resolved with 
     "Zod v4 is used throughout; `z.interface()` preferred for object schemas, `zod/mini` for frontend tree-shaking.",
     "Angular 22 zoneless mode is the default; no `zone.js` dependency.",
     "Tailwind CSS v4 CSS-first configuration; no `tailwind.config.js`.",
-    "Hono RPC client is available for type-safe frontend→backend calls but the explicit shared-package contract approach is used as the primary pattern (simpler for educational purposes)."
+    "Hono RPC client is available for type-safe frontend→backend calls but the explicit shared-package contract approach is used as the primary pattern (simpler for educational purposes).",
+    "The tenant member invite endpoint (POST /tenants/:tenantId/members) accepts { email, role } in the body, not { userId, role } — consistent with the server route implementation.",
+    "TenantClient needs to be extended with member management and tenant update/delete methods; ProjectClient already has all required project member methods.",
+    "The existing error interceptor (error.interceptor.ts) handles 401/403/422 globally; new components integrate with this pattern rather than implementing custom error handling."
   ]
 }
 ```

@@ -7,7 +7,7 @@ const TOKEN_KEY = 'taskboard_token';
 
 /**
  * Signal-based auth store.
- * Manages the current user, JWT token, and authentication state.
+ * Manages the current user, JWT token, tenant role, and authentication state.
  */
 @Service()
 export class AuthStore {
@@ -15,6 +15,7 @@ export class AuthStore {
   private readonly apiBaseUrl = inject(API_BASE_URL);
   readonly currentUser = signal<User | null>(null);
   readonly token = signal<string | null>(null);
+  readonly tenantRole = signal<string | null>(null);
   readonly isAuthenticated = computed(() => !!this.currentUser());
 
   constructor() {
@@ -23,6 +24,7 @@ export class AuthStore {
 
     if (stored) {
       this.token.set(stored);
+      this.decodeTenantRole(stored);
       this.fetchCurrentUser();
     }
   }
@@ -57,14 +59,42 @@ export class AuthStore {
   logout(): void {
     this.currentUser.set(null);
     this.token.set(null);
+    this.tenantRole.set(null);
     localStorage.removeItem(TOKEN_KEY);
+  }
+
+  /** Manually set the tenant role (e.g. when tenant context changes) */
+  setTenantRole(role: string): void {
+    this.tenantRole.set(role);
   }
 
   /** Store token + user from an auth response */
   private setSession(response: AuthResponse): void {
     this.token.set(response.token);
     this.currentUser.set(response.user);
+    this.decodeTenantRole(response.token);
     localStorage.setItem(TOKEN_KEY, response.token);
+  }
+
+  /** Decode the tenantRole from the JWT payload */
+  private decodeTenantRole(jwt: string): void {
+    try {
+      const parts = jwt.split('.');
+
+      if (parts.length !== 3 || !parts[1]) {
+        this.tenantRole.set(null);
+        return;
+      }
+
+      // base64url → base64
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = atob(base64);
+      const payload = JSON.parse(jsonPayload) as { tenantRole?: string };
+
+      this.tenantRole.set(payload.tenantRole ?? null);
+    } catch {
+      this.tenantRole.set(null);
+    }
   }
 
   /** Fetch the current user using the stored token */
