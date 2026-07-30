@@ -1,0 +1,120 @@
+/**
+ * Tests for the InvitationView component.
+ *
+ * Covers:
+ * - acceptInvitation
+ * - declineInvitation
+ * - loading state signals
+ */
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
+import { of, throwError } from 'rxjs';
+import { InvitationView } from './invitation-view';
+import { TenantClient } from '@services/tenant-client';
+import { API_BASE_URL } from '@app/api-url.token';
+import type { MyInvitation } from '@task-board/shared';
+
+const NOW = '2025-01-01T00:00:00Z';
+const mockInvitations: MyInvitation[] = [
+  { id: 'inv1', tenantId: 't1', tenantName: 'Acme', role: 'member', invitedEmail: 'a@b.com', invitedAt: NOW },
+  { id: 'inv2', tenantId: 't2', tenantName: 'Globex', role: 'admin', invitedEmail: 'c@d.com', invitedAt: NOW },
+];
+
+describe('InvitationView', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let component: any;
+  let tenantClientMock: {
+    acceptInvitationById: ReturnType<typeof vi.fn>;
+    declineInvitation: ReturnType<typeof vi.fn>;
+  };
+
+  function setup() {
+    tenantClientMock = {
+      acceptInvitationById: vi.fn().mockReturnValue(of({ success: true })),
+      declineInvitation: vi.fn().mockReturnValue(of({ success: true })),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        { provide: TenantClient, useValue: tenantClientMock },
+      ],
+    });
+
+    const fixture = TestBed.createComponent(InvitationView);
+
+    fixture.componentRef.setInput('invitations', mockInvitations);
+
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  }
+
+  describe('acceptInvitation', () => {
+    beforeEach(() => setup());
+
+    it('should call tenantClient.acceptInvitationById', () => {
+      component.acceptInvitation(mockInvitations[0]);
+
+      expect(tenantClientMock.acceptInvitationById).toHaveBeenCalledWith('inv1');
+    });
+
+    it('should clear acceptingId after success', () => {
+      component.acceptInvitation(mockInvitations[0]);
+
+      expect(component.acceptingId()).toBeNull();
+    });
+
+    it('should emit invitationHandled after success', () => {
+      const emitted = vi.fn();
+
+      component.invitationHandled.subscribe(emitted);
+      component.acceptInvitation(mockInvitations[0]);
+
+      expect(emitted).toHaveBeenCalled();
+    });
+
+    it('should clear acceptingId on error', () => {
+      tenantClientMock.acceptInvitationById.mockReturnValueOnce(throwError(() => new Error('fail')));
+      component.acceptInvitation(mockInvitations[0]);
+
+      expect(component.acceptingId()).toBeNull();
+    });
+  });
+
+  describe('declineInvitation', () => {
+    beforeEach(() => setup());
+
+    it('should call tenantClient.declineInvitation', () => {
+      component.declineInvitation(mockInvitations[1]);
+
+      expect(tenantClientMock.declineInvitation).toHaveBeenCalledWith('inv2');
+    });
+
+    it('should clear decliningId after success', () => {
+      component.declineInvitation(mockInvitations[1]);
+
+      expect(component.decliningId()).toBeNull();
+    });
+
+    it('should emit invitationHandled after success', () => {
+      const emitted = vi.fn();
+
+      component.invitationHandled.subscribe(emitted);
+      component.declineInvitation(mockInvitations[1]);
+
+      expect(emitted).toHaveBeenCalled();
+    });
+
+    it('should clear decliningId on error', () => {
+      tenantClientMock.declineInvitation.mockReturnValueOnce(throwError(() => new Error('fail')));
+      component.declineInvitation(mockInvitations[1]);
+
+      expect(component.decliningId()).toBeNull();
+    });
+  });
+});
