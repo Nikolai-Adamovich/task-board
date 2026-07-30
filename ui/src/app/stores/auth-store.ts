@@ -3,13 +3,14 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthClient } from '@services/auth-client';
 import type { User, AuthResponse, LoginRequest, RegisterRequest } from '@task-board/shared';
+import { type TenantRole } from '@task-board/shared';
 
 const TOKEN_KEY = 'taskboard_token';
 
 /** Shape of the decoded JWT payload relevant to the auth store */
 interface JwtPayload {
   tenantId?: string | null;
-  tenantRole?: string | null;
+  tenantRole?: TenantRole | null;
 }
 
 /**
@@ -24,7 +25,7 @@ export class AuthStore {
   readonly currentUser = signal<User | null>(null);
   readonly token = signal<string | null>(null);
   readonly tenantId = signal<string | null>(null);
-  readonly tenantRole = signal<string | null>(null);
+  readonly tenantRole = signal<TenantRole | null>(null);
   /** Whether the current user belongs to at least one tenant */
   readonly hasTenant = computed(() => this.tenantId() !== null);
   /** Whether the user is authenticated but has no workspace (tenant) yet */
@@ -78,13 +79,13 @@ export class AuthStore {
   }
 
   /** Manually set the tenant context (e.g. when switching tenants) */
-  setTenantContext(tenantId: string | null, role: string | null): void {
+  setTenantContext(tenantId: string | null, role: TenantRole | null): void {
     this.tenantId.set(tenantId);
     this.tenantRole.set(role);
   }
 
   /** Manually set the tenant role (e.g. when tenant context changes) */
-  setTenantRole(role: string): void {
+  setTenantRole(role: TenantRole): void {
     this.tenantRole.set(role);
   }
 

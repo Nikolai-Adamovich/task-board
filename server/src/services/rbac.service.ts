@@ -1,4 +1,4 @@
-import { TenantRole, ProjectRole } from '@task-board/shared';
+import { type TenantRole, ProjectRole } from '@task-board/shared';
 
 // ─── Permission Actions ──────────────────────────────────────────────────────
 
@@ -20,7 +20,6 @@ export type PermissionAction =
 
 // ─── Role Hierarchies ────────────────────────────────────────────────────────
 
-type TenantRoleType = (typeof TenantRole)[number];
 type ProjectRoleType = (typeof ProjectRole)[number];
 
 // ─── Permission Matrix ───────────────────────────────────────────────────────
@@ -29,7 +28,7 @@ type ProjectRoleType = (typeof ProjectRole)[number];
  * Permission matrix for tenant-only actions.
  * Maps action → allowed tenant roles.
  */
-const tenantPermissions: Record<string, TenantRoleType[]> = {
+const tenantPermissions: Record<string, TenantRole[]> = {
   manage_tenant: ['owner'],
   create_project: ['owner', 'admin'],
   delete_project: ['owner', 'admin'],
@@ -73,7 +72,7 @@ export class RbacService {
    * @returns true if the action is permitted, false otherwise
    */
   can(
-    tenantRole: TenantRoleType | string,
+    tenantRole: TenantRole | string,
     projectRole: ProjectRoleType | string | null | undefined,
     action: PermissionAction,
   ): boolean {
@@ -112,7 +111,7 @@ export class RbacService {
       return false;
     }
 
-    return allowedRoles.includes(tenantRole as TenantRoleType);
+    return allowedRoles.includes(tenantRole as TenantRole);
   }
 
   /**

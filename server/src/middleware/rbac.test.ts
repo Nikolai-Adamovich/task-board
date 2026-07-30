@@ -3,11 +3,9 @@ import { Hono } from 'hono';
 import { requireRole } from './rbac.js';
 import { errorHandler } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';
-import { TenantRole } from '@task-board/shared';
+import type { TenantRole } from '@task-board/shared';
 
-type TenantRoleType = (typeof TenantRole)[number];
-
-function createTestAppWithRoles(roles: TenantRoleType[]) {
+function createTestAppWithRoles(roles: TenantRole[]) {
   const app = new Hono<AppEnv>();
 
   app.onError(errorHandler);
@@ -20,7 +18,7 @@ function createTestAppWithRoles(roles: TenantRoleType[]) {
     await next();
   });
 
-  app.get('/test/resource', requireRole(...(roles as [TenantRoleType, ...TenantRoleType[]])), (c) => {
+  app.get('/test/resource', requireRole(...(roles as [TenantRole, ...TenantRole[]])), (c) => {
     return c.json({ message: 'access granted' });
   });
 

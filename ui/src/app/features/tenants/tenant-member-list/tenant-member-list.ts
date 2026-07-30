@@ -56,7 +56,7 @@ export class TenantMemberList implements OnInit {
   protected readonly loading = signal(true);
   protected readonly inviting = signal(false);
   protected readonly showInviteDialog = signal(false);
-  protected readonly roles = TenantRole;
+  protected readonly roles = Object.values(TenantRole);
   protected inviteEmail = '';
   protected inviteRole = 'member';
   protected readonly removingUserId = signal<string | null>(null);
@@ -64,7 +64,7 @@ export class TenantMemberList implements OnInit {
   protected readonly canManage = computed(() => {
     const role = this.authStore.tenantRole();
 
-    return role === 'owner' || role === 'admin';
+    return role === TenantRole.Owner || role === TenantRole.Admin;
   });
 
   protected getRoleColor(role: string): string {
@@ -177,7 +177,7 @@ export class TenantMemberList implements OnInit {
   }
 
   protected isOwner(member: TenantMember): boolean {
-    return member.role === 'owner';
+    return member.role === TenantRole.Owner;
   }
 
   protected getInitials(userId: string | null): string {

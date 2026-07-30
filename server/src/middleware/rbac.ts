@@ -1,9 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { ForbiddenError } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';
-import { TenantRole } from '@task-board/shared';
-
-type TenantRoleType = (typeof TenantRole)[number];
+import type { TenantRole } from '@task-board/shared';
 
 // ─── RBAC Middleware Factory ──────────────────────────────────────────────────
 
@@ -24,9 +22,9 @@ type TenantRoleType = (typeof TenantRole)[number];
  * app.get('/projects', requireRole('owner', 'admin', 'member'), handler);
  * ```
  */
-export function requireRole(...roles: TenantRoleType[]) {
+export function requireRole(...roles: TenantRole[]) {
   return createMiddleware<AppEnv>(async (c, next) => {
-    const userRole = c.get('userRole') as TenantRoleType | undefined;
+    const userRole = c.get('userRole') as TenantRole | undefined;
 
     if (!userRole) {
       throw new ForbiddenError('No role assigned in this tenant');

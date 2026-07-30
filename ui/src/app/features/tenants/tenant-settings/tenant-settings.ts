@@ -5,6 +5,7 @@ import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideSettings, lucideTrash2, lucideSave } from '@ng-icons/lucide';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
+import { TenantRole } from '@task-board/shared';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -47,7 +48,7 @@ export class TenantSettings implements OnInit {
   protected readonly canEdit = computed(() => {
     const role = this.authStore.tenantRole();
 
-    return role === 'owner' || role === 'admin';
+    return role === TenantRole.Owner || role === TenantRole.Admin;
   });
 
   protected onDialogStateChange(state: BrnDialogState): void {

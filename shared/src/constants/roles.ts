@@ -1,5 +1,12 @@
 /** Tenant-level roles within an organization */
-export const TenantRole = ['owner', 'admin', 'member'] as const;
+export const TenantRole = {
+  Owner: 'owner',
+  Admin: 'admin',
+  Member: 'member',
+} as const;
+
+/** Union type of tenant role values */
+export type TenantRole = (typeof TenantRole)[keyof typeof TenantRole];
 
 /** Project-level roles for project members */
 export const ProjectRole = ['admin', 'developer', 'viewer'] as const;
