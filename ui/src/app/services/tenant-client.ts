@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { API_BASE_URL } from '@app/api-url.token';
 import type {
   Tenant,
+  TenantWithRole,
   CreateTenant,
   TenantMember,
   InvitationDetails,
@@ -24,9 +25,9 @@ export class TenantClient {
 
   // ─── Tenant CRUD ──────────────────────────────────────────────────────────
 
-  /** List all tenants for the current user. */
-  listTenants(): Observable<{ data: Tenant[] }> {
-    return this.http.get<{ data: Tenant[] }>(`${this.apiBaseUrl}/tenants`);
+  /** List all tenants for the current user (includes the caller's role per tenant). */
+  listTenants(): Observable<{ data: TenantWithRole[] }> {
+    return this.http.get<{ data: TenantWithRole[] }>(`${this.apiBaseUrl}/tenants`);
   }
 
   /** Create a new tenant. */
@@ -34,8 +35,11 @@ export class TenantClient {
     return this.http.post<Tenant>(`${this.apiBaseUrl}/tenants`, data);
   }
 
-  /** Update tenant name/slug. */
-  updateTenant(tenantId: string, data: { name?: string; slug?: string; subscription?: string }): Observable<Tenant> {
+  /** Update tenant name/slug/description. */
+  updateTenant(
+    tenantId: string,
+    data: { name?: string; slug?: string; description?: string; subscription?: string },
+  ): Observable<Tenant> {
     return this.http.patch<Tenant>(`${this.apiBaseUrl}/tenants/${tenantId}`, data);
   }
 

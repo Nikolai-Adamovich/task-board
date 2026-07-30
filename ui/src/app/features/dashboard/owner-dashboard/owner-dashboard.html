@@ -45,7 +45,11 @@
                 <ng-icon name="lucideBuilding2" class="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 class="text-sm font-semibold text-foreground">{{ tenant.name }}</h3>
+                <a
+                  [routerLink]="['/tenants', tenant.id]"
+                  class="text-sm font-semibold text-foreground hover:underline"
+                  >{{ tenant.name }}</a
+                >
                 <span hlmBadge class="mt-0.5 bg-purple-100 text-purple-700">{{ tenant.role }}</span>
               </div>
             </div>

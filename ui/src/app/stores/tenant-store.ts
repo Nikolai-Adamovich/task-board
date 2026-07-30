@@ -1,7 +1,7 @@
 import { Service, signal, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { TenantClient } from '@services/tenant-client';
-import type { Tenant, CreateTenant } from '@task-board/shared';
+import type { TenantWithRole, CreateTenant } from '@task-board/shared';
 
 const TENANT_KEY = 'taskboard_tenant_id';
 
@@ -13,11 +13,11 @@ const TENANT_KEY = 'taskboard_tenant_id';
 @Service()
 export class TenantStore {
   private readonly tenantClient = inject(TenantClient);
-  readonly tenants = signal<Tenant[]>([]);
-  readonly activeTenant = signal<Tenant | null>(null);
+  readonly tenants = signal<TenantWithRole[]>([]);
+  readonly activeTenant = signal<TenantWithRole | null>(null);
 
   /** Load all tenants for the current user and restore active tenant from localStorage. */
-  async loadTenants(): Promise<Tenant[]> {
+  async loadTenants(): Promise<TenantWithRole[]> {
     const res = await firstValueFrom(this.tenantClient.listTenants());
 
     this.tenants.set(res.data);
@@ -41,24 +41,31 @@ export class TenantStore {
   }
 
   /** Create a new tenant, add it to the list, and set as active. */
-  async createTenant(data: CreateTenant): Promise<Tenant> {
+  async createTenant(data: CreateTenant): Promise<TenantWithRole> {
     const tenant = await firstValueFrom(this.tenantClient.createTenant(data));
+    // Creator is always the owner
+    const tenantWithRole: TenantWithRole = { ...tenant, role: 'owner' };
 
-    this.tenants.update((list) => [...list, tenant]);
-    this.setActiveTenant(tenant);
-    return tenant;
+    this.tenants.update((list) => [...list, tenantWithRole]);
+    this.setActiveTenant(tenantWithRole);
+    return tenantWithRole;
   }
 
-  /** Update tenant name/slug/subscription and keep the store in sync. */
-  async updateTenant(tenantId: string, data: { name?: string; slug?: string; subscription?: string }): Promise<Tenant> {
+  /** Update tenant name/slug/description/subscription and keep the store in sync. */
+  async updateTenant(
+    tenantId: string,
+    data: { name?: string; slug?: string; description?: string; subscription?: string },
+  ): Promise<TenantWithRole> {
     const updated = await firstValueFrom(this.tenantClient.updateTenant(tenantId, data));
+    const existing = this.tenants().find((t) => t.id === tenantId);
+    const updatedWithRole: TenantWithRole = { ...updated, role: existing?.role ?? 'member' };
 
     if (this.activeTenant()?.id === tenantId) {
-      this.activeTenant.set(updated);
+      this.activeTenant.set(updatedWithRole);
     }
-    this.tenants.update((list) => list.map((t) => (t.id === tenantId ? updated : t)));
+    this.tenants.update((list) => list.map((t) => (t.id === tenantId ? updatedWithRole : t)));
 
-    return updated;
+    return updatedWithRole;
   }
 
   /** Delete a tenant and update the store. */
@@ -79,7 +86,7 @@ export class TenantStore {
   }
 
   /** Set the active tenant and persist to localStorage. */
-  setActiveTenant(tenant: Tenant): void {
+  setActiveTenant(tenant: TenantWithRole): void {
     this.activeTenant.set(tenant);
     localStorage.setItem(TENANT_KEY, tenant.id);
   }

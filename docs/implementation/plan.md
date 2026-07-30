@@ -8,8 +8,8 @@
 
 ## Summary
 
-- **Total tasks:** 148
-- **Phases:** 12 (Phase 0–Phase 11)
+- **Total tasks:** 156
+- **Phases:** 13 (Phase 0–Phase 12)
 - **First deployable vertical slice:** Tasks T-001 through T-053, T-054 through T-065, T-066 through T-071, T-074 (see
   [Vertical Slice Mapping](#vertical-slice-mapping))
 
@@ -2693,6 +2693,222 @@ settings, tenant member management, and project member management.
 
 ---
 
+## Phase 12: Workspace Detail Page
+
+> **Reference:** [Technical Specification §16](../implementation/technical_specification.md) ·
+> [Architecture §13](../implementation/architecture.md) — Workspace Detail Page
+
+### T-149: Add `description` field to shared tenant schemas
+
+- **Goal:** Add an optional `description` field (`string`, max 500, nullable) to
+  [`TenantSchema`](shared/src/schemas/tenant.ts:8), [`CreateTenantSchema`](shared/src/schemas/tenant.ts:33), and
+  [`UpdateTenantSchema`](shared/src/schemas/tenant.ts:50) in the shared package. The `nullable().optional()` combination
+  on `TenantSchema` handles three cases: existing MongoDB documents without `description` (→ `undefined`), explicit
+  `null` from the database, and string values from user input.
+- **Files to modify:**
+  - [`shared/src/schemas/tenant.ts`](shared/src/schemas/tenant.ts:8) — add
+    `description: z.string().max(500).nullable().optional()` to `TenantSchema`; add
+    `description: z.string().max(500).optional()` to `CreateTenantSchema` and `UpdateTenantSchema`
+- **Dependencies:** T-007
+- **Acceptance criteria:**
+  - `TenantSchema` parses `{ id, name, slug, subscription, description: null, createdAt, updatedAt }` without errors
+  - `TenantSchema` parses without `description` field (backward compat for existing documents)
+  - `CreateTenantSchema` parses `{ name, slug, description: "text" }` and `{ name, slug }` (description optional)
+  - `UpdateTenantSchema` parses `{ description: "new desc" }` (all fields optional)
+  - `tsc --noEmit` passes in the shared package
+  - `TenantWithRoleSchema` (extends `TenantSchema`) inherits `description` automatically — no change needed
+  - `Tenant` type (derived via `z.infer<>`) includes `description` automatically
+
+### T-150: Update shared tenant schema tests for `description`
+
+- **Goal:** Add test cases to [`tenant.spec.ts`](shared/src/schemas/tenant.spec.ts:1) verifying the new `description`
+  field behavior across all three tenant schemas.
+- **Files to modify:**
+  - [`shared/src/schemas/tenant.spec.ts`](shared/src/schemas/tenant.spec.ts:1) — add test cases for:
+    - `TenantSchema` with `description: null` (nullable)
+    - `TenantSchema` with `description: "text"` (string value)
+    - `TenantSchema` without `description` field (backward compat — optional)
+    - `TenantSchema` with `description` exceeding 500 chars (rejected)
+    - `CreateTenantSchema` with and without `description`
+    - `UpdateTenantSchema` with only `description` (partial update)
+- **Dependencies:** T-149
+- **Acceptance criteria:**
+  - All new tests pass: `npx vitest run shared/src/schemas/tenant.spec.ts`
+  - Backward compatibility test: schema parses a tenant object without `description` (existing MongoDB documents)
+  - Validation test: description > 500 chars is rejected with Zod error
+  - Coverage ≥ 80% on new test code
+
+### T-151: Add `description` to TenantDocument and TenantRepository
+
+- **Goal:** Add `description: string | null` to the [`TenantDocument`](server/src/repositories/tenant.repository.ts:11)
+  interface and update the [`TenantRepository`](server/src/repositories/tenant.repository.ts:36) methods to handle
+  `description` through the full persistence lifecycle. Update
+  [`toDomain()`](server/src/repositories/tenant.repository.ts:23) to map `null` → `undefined` for schema compatibility,
+  [`create()`](server/src/repositories/tenant.repository.ts:57) to store `description` (defaulting to `null`), and
+  [`update()`](server/src/repositories/tenant.repository.ts:72) to accept `description` in the `Pick` type. The
+  [`TenantService`](server/src/services/tenant.service.ts) does **not** need changes — `createTenant()` and
+  `updateTenant()` pass input through via spread/delegation.
+- **Files to modify:**
+  - [`server/src/repositories/tenant.repository.ts`](server/src/repositories/tenant.repository.ts:11) — modify:
+    - `TenantDocument` interface: add `description: string | null`
+    - `toDomain()` mapper: add `description: doc.description ?? undefined`
+    - `create()` method: add `description: input.description ?? null` to document construction
+    - `update()` method: add `'description'` to the `Pick<TenantDocument, ...>` type
+- **Dependencies:** T-149
+- **Acceptance criteria:**
+  - `tsc --noEmit` passes in the server package
+  - `TenantDocument` includes `description: string | null`
+  - `toDomain()` maps `null` description to `undefined` (schema compat)
+  - `toDomain()` handles missing `description` field gracefully (existing MongoDB documents return `undefined`)
+  - `create()` stores `description` in MongoDB; defaults to `null` when not provided
+  - `update()` accepts `description` in the `Pick` type without breaking existing update logic
+
+### T-152: Update TenantClient and TenantStore for `description`
+
+- **Goal:** Add `description` to the `data` parameter of
+  [`TenantClient.updateTenant()`](ui/src/app/services/tenant-client.ts:38) and
+  [`TenantStore.updateTenant()`](ui/src/app/stores/tenant-store.ts:53) so that the frontend can send `description`
+  updates. The [`TenantSettings`](ui/src/app/features/tenants/tenant-settings/tenant-settings.ts) component can then
+  edit the description field via the existing save flow. The `Tenant` type flowing through the store automatically
+  includes `description` after the schema change in T-149 — no store type changes needed.
+- **Files to modify:**
+  - [`ui/src/app/services/tenant-client.ts`](ui/src/app/services/tenant-client.ts:38) — add `description?: string` to
+    the `data` parameter of `updateTenant()`
+  - [`ui/src/app/stores/tenant-store.ts`](ui/src/app/stores/tenant-store.ts:53) — add `description?: string` to the
+    `data` parameter of `updateTenant()`
+- **Dependencies:** T-149
+- **Acceptance criteria:**
+  - `tsc --noEmit` passes in the UI package
+  - `TenantClient.updateTenant()` accepts `description` in the data parameter
+  - `TenantStore.updateTenant()` accepts `description` in the data parameter
+  - Existing callers (e.g., [`TenantSettings`](ui/src/app/features/tenants/tenant-settings/tenant-settings.ts)) continue
+    to compile without changes (new field is optional)
+
+### T-153: Create WorkspaceDetail component and register route
+
+- **Goal:** Create the [`WorkspaceDetail`](ui/src/app/features/tenants/workspace-detail/workspace-detail.ts) component
+  and register an empty-path (`''`) child route as the **first** child of `tenants/:tenantId` in
+  [`app.routes.ts`](ui/src/app/app.routes.ts:37). The component displays workspace name as `<h1>`, user's role badge
+  (using [`HlmBadge`](ui/libs/ui/badge/src/lib/hlm-badge.ts)), description text (or "No description provided."
+  placeholder), RBAC-gated action buttons (Settings, Members, Upgrade — visible only for owner/admin), and a collapsible
+  project list using [`HlmCollapsible`](ui/libs/ui/collapsible/src/lib/hlm-collapsible.ts). Upgrade button is only
+  visible for owner on `free` plan. Project data is loaded via
+  [`ProjectClient.list()`](ui/src/app/services/project-client.ts:21). Standalone component, signals-only (no RxJS in
+  component), Angular 22 patterns.
+- **Files to create:**
+  - `ui/src/app/features/tenants/workspace-detail/workspace-detail.ts` — standalone component with:
+    - Dependencies injected: [`TenantStore`](ui/src/app/stores/tenant-store.ts:14),
+      [`AuthStore`](ui/src/app/stores/auth-store.ts:21), [`ProjectClient`](ui/src/app/services/project-client.ts:16)
+    - Signals: `tenant` (computed from `tenantStore.activeTenant()`), `role` (computed from `authStore.tenantRole()`),
+      `description` (computed), `projects` (signal), `loadingProjects` (signal), `projectsExpanded` (signal, default
+      `true`)
+    - RBAC computed signals: `isOwnerOrAdmin`, `isOwner`, `showUpgrade` (owner + free plan)
+    - `ngOnInit()`: load projects via `ProjectClient.list(1, 100)` — non-blocking failure (empty state)
+    - Spartan UI: `HlmBadgeImports`, `HlmButtonImports`, `HlmCardImports`, `HlmCollapsibleImports`, `NgIcon`
+    - Icons: `lucideSettings`, `lucideUsers`, `lucideCreditCard`, `lucideChevronDown`, `lucideFolder`
+  - `ui/src/app/features/tenants/workspace-detail/workspace-detail.html` — template with:
+    - `<h1>` with workspace name
+    - Role badge (`<span hlmBadge>`)
+    - Description (with `@if`/`@else` for placeholder)
+    - Action buttons block (`@if (isOwnerOrAdmin())`) with `routerLink` to settings, members, upgrade
+    - `hlm-collapsible` project list with `@defer` on content, loading state, empty state, and `@for` project cards
+- **Files to modify:**
+  - [`ui/src/app/app.routes.ts`](ui/src/app/app.routes.ts:37) — add empty-path child route as **first** child:
+    ```
+    { path: '', loadComponent: () => import('./features/tenants/workspace-detail/workspace-detail').then((m) => m.WorkspaceDetail) }
+    ```
+- **Dependencies:** T-152
+- **Acceptance criteria:**
+  - Navigating to `/tenants/:tenantId` renders the WorkspaceDetail component inside AppShell (not an empty outlet)
+  - Workspace name displayed as `<h1>`
+  - Role badge displays correct role text (owner/admin/member)
+  - Description text renders when present; "No description provided." placeholder renders when null/empty
+  - Settings, Members, Upgrade buttons visible for owner on free plan
+  - Settings, Members buttons visible for admin; Upgrade hidden
+  - All action buttons hidden for member
+  - Upgrade button hidden for owner on premium plan
+  - Collapsible project list defaults to expanded; clicking trigger toggles visibility
+  - Project list shows project names with folder icon; empty state when no projects
+  - All new components are standalone (no NgModules)
+  - All new components use signals (no RxJS subscriptions in components)
+
+### T-154: Update dashboard workspace card links
+
+- **Goal:** On the owner and member dashboards, make workspace card titles link to the workspace detail page at
+  `/tenants/:tenantId` instead of showing plain text (owner) or linking directly to projects (member). This provides a
+  consistent entry point to the new Workspace Detail page.
+- **Files to modify:**
+  - [`ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html`](ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html:48)
+    — wrap the workspace card title (`tenant.name`) in an `<a>` with `[routerLink]="['/tenants', tenant.id]"` (keep
+    existing action buttons as secondary navigation)
+  - [`ui/src/app/features/dashboard/member-dashboard/member-dashboard.html`](ui/src/app/features/dashboard/member-dashboard/member-dashboard.html:34)
+    — change the workspace card link target from `/tenants/:tenantId/projects` to `/tenants/:tenantId`
+- **Dependencies:** T-153
+- **Acceptance criteria:**
+  - Owner dashboard: workspace card `tenant.name` is an `<a>` link to `/tenants/:tenantId`
+  - Member dashboard: workspace card links to `/tenants/:tenantId` (not `/tenants/:tenantId/projects`)
+  - Existing action buttons on owner dashboard (Projects, Settings, Members, Upgrade) remain unchanged
+  - Clicking the workspace card title navigates to the WorkspaceDetail page
+
+### T-155: Workspace Detail Page unit tests
+
+- **Goal:** Add unit tests for the [`WorkspaceDetail`](ui/src/app/features/tenants/workspace-detail/workspace-detail.ts)
+  component, covering all RBAC visibility scenarios, description rendering, collapsible project list, and data loading
+  behavior. Also update [`tenant.repository.test.ts`](server/src/repositories/tenant.repository.test.ts:1) to verify
+  `description` persistence.
+- **Files to create:**
+  - `ui/src/app/features/tenants/workspace-detail/workspace-detail.spec.ts` — test:
+    - Renders workspace name as `<h1>` with correct tenant name
+    - Role badge displays correct role text for each role (owner, admin, member)
+    - Description text renders when present; placeholder renders when null/empty
+    - Settings, Members, Upgrade buttons visible for owner on free plan
+    - Settings, Members buttons visible for admin; Upgrade hidden
+    - All action buttons hidden for member
+    - Upgrade button hidden for owner on premium plan
+    - Collapsible project list renders project items from mock data
+    - Project list shows empty state when no projects
+    - Project loading state shows loading indicator
+    - `@defer` renders project list content after trigger
+- **Files to modify:**
+  - [`server/src/repositories/tenant.repository.test.ts`](server/src/repositories/tenant.repository.test.ts:1) — add
+    tests for:
+    - `create()` stores `description` in MongoDB and returns it via `toDomain()`
+    - `create()` defaults `description` to `null` when not provided
+    - `update()` persists `description` changes
+    - `toDomain()` maps `null` description to `undefined`
+    - `toDomain()` handles missing `description` field (backward compat)
+- **Dependencies:** T-153, T-151
+- **Acceptance criteria:**
+  - All WorkspaceDetail component tests pass
+  - All TenantRepository description tests pass
+  - RBAC visibility is verified for all role/subscription combinations
+  - Coverage ≥ 80% on new code
+
+### T-156: Workspace Detail Page E2E tests and integration verification
+
+- **Goal:** Add Playwright E2E tests covering the full workspace detail page flow and run the complete quality gate
+  suite to verify all Phase 12 changes work end-to-end without regressions.
+- **Files to create:**
+  - `ui/e2e/workspace-detail.spec.ts` — test scenarios:
+    - Owner navigates to `/tenants/:tenantId` — sees workspace name, role badge "owner", description, action buttons
+      (Settings, Members, Upgrade), and collapsible project list
+    - Admin navigates to `/tenants/:tenantId` — sees Settings and Members buttons; Upgrade is NOT visible
+    - Member navigates to `/tenants/:tenantId` — action buttons are NOT visible; project list is visible
+    - Description placeholder: tenant with no description shows "No description provided."
+    - Collapsible project list: click trigger to collapse and expand
+    - Dashboard → workspace detail: owner dashboard workspace card title links to workspace detail page
+    - Dashboard → workspace detail: member dashboard workspace card links to workspace detail page
+- **Dependencies:** T-154, T-155
+- **Acceptance criteria:**
+  - All E2E scenarios pass: `npx playwright test ui/e2e/workspace-detail.spec.ts`
+  - `npm run build` succeeds for all workspaces (shared, server, ui)
+  - `npm test` passes for all workspaces
+  - `npm run lint` passes with zero errors
+  - `tsc --noEmit` passes across the entire monorepo (zero TypeScript errors)
+  - Existing tests continue to pass (no regressions from `description` schema change)
+
+---
+
 ## Vertical Slice Mapping
 
 The first deployable vertical slice delivers the **core Kanban flow** end-to-end: auth → tenant → project → board →
@@ -2759,14 +2975,26 @@ tasks → sprints, with RBAC enforced throughout.
 | 7    | **Frontend: sub-view components**                | T-137, T-138, T-139, T-140, T-141, T-142 |
 | 8    | **Tests + verification**                         | T-143, T-144, T-145, T-146, T-147, T-148 |
 
+### Workspace Detail tasks (Phase 12)
+
+| Step | Feature                                         | Tasks        |
+| ---- | ----------------------------------------------- | ------------ |
+| 1    | **Shared: tenant schema `description` field**   | T-149, T-150 |
+| 2    | **Backend: TenantDocument + TenantRepository**  | T-151        |
+| 3    | **Frontend: TenantClient + TenantStore**        | T-152        |
+| 4    | **Frontend: WorkspaceDetail component + route** | T-153        |
+| 5    | **Frontend: dashboard link updates**            | T-154        |
+| 6    | **Tests + verification**                        | T-155, T-156 |
+
 ### Integration tasks
 
-| Task  | Description                                                                       |
-| ----- | --------------------------------------------------------------------------------- |
-| T-074 | Connect frontend to backend and verify the full end-to-end flow                   |
-| T-094 | Verify all Phase 9 features work end-to-end (settings, members, RBAC)             |
-| T-122 | Verify user workflow rework end-to-end (no auto-tenant, subscriptions, invites)   |
-| T-148 | Verify dashboard feature end-to-end (all 5 states, invitation flow, cross-tenant) |
+| Task  | Description                                                                          |
+| ----- | ------------------------------------------------------------------------------------ |
+| T-074 | Connect frontend to backend and verify the full end-to-end flow                      |
+| T-094 | Verify all Phase 9 features work end-to-end (settings, members, RBAC)                |
+| T-122 | Verify user workflow rework end-to-end (no auto-tenant, subscriptions, invites)      |
+| T-148 | Verify dashboard feature end-to-end (all 5 states, invitation flow, cross-tenant)    |
+| T-156 | Verify Workspace Detail Page end-to-end (RBAC visibility, description, project list) |
 
 ---
 
@@ -2794,3 +3022,6 @@ The tasks are ordered for execution as follows:
     invitations view, member dashboard (my workspaces + my tasks), owner dashboard (sent invitations + management),
     cross-tenant endpoints (`GET /invitations/my`, `GET /tasks/my`), `access_revoked` member status, tenant-member
     management actions (resend, revoke, hard-delete)
+13. **Phase 12** (T-149–T-156): Workspace Detail Page — `description` field on tenant schema/repository/client/store,
+    `WorkspaceDetail` component with RBAC-gated action buttons and collapsible project list, empty-path child route,
+    dashboard workspace card link updates

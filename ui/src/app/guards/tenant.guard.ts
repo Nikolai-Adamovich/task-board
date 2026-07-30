@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
 import { TenantStore } from '@stores/tenant-store';
+import { AuthStore } from '@stores/auth-store';
 
 /**
  * Functional route guard that ensures an active tenant is selected.
@@ -14,6 +15,7 @@ import { TenantStore } from '@stores/tenant-store';
  */
 export const tenantGuard: CanActivateFn = async (route) => {
   const tenantStore = inject(TenantStore);
+  const authStore = inject(AuthStore);
   const router = inject(Router);
   const tenantId = route.paramMap.get('tenantId');
 
@@ -39,11 +41,14 @@ export const tenantGuard: CanActivateFn = async (route) => {
 
     if (match) {
       tenantStore.setActiveTenant(match);
+      authStore.setTenantRole(match.role);
       return true;
     }
 
     return router.parseUrl('/');
   }
 
+  // Active tenant matches — ensure AuthStore has the role
+  authStore.setTenantRole(activeTenant.role);
   return true;
 };

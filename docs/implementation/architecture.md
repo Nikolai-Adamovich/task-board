@@ -2178,6 +2178,585 @@ getMyTasks(page?: number, limit?: number): Observable<MyTasksResponse>
 
 ---
 
+## 13. Workspace Detail Page Architecture (Phase 12)
+
+> **Reference:** [Technical Specification §16](technical_specification.md:2743) — Workspace Detail Page
+
+This section defines the architectural decisions for the Workspace Detail page — a frontend-only feature with a minor
+shared schema change. No new backend endpoints are required; existing
+[`GET /tenants/:tenantId`](server/src/routes/tenants.ts) and [`GET /projects`](server/src/routes/projects.ts) are
+sufficient.
+
+### 13.1 Overview
+
+The Workspace Detail page adds a default landing view at [`/tenants/:tenantId`](ui/src/app/app.routes.ts:34) (empty
+child path) inside the [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts). It displays the workspace name, the user's
+role badge, an optional description, RBAC-gated action buttons, and a collapsible project list using
+[`HlmCollapsible`](ui/libs/ui/collapsible/src/lib/hlm-collapsible.ts).
+
+**Key constraint:** This is a **frontend-only feature**. The only backend changes are schema/repository plumbing to
+support the new `description` field on the `Tenant` entity. No new API endpoints, services, or routes are needed on the
+server.
+
+### 13.2 Shared layer changes — `description` field
+
+Three Zod schemas in [`shared/src/schemas/tenant.ts`](shared/src/schemas/tenant.ts:8) require a `description` field:
+
+#### 13.2.1 `TenantSchema` (line 8)
+
+Add `description` after `subscription`:
+
+```typescript
+// shared/src/schemas/tenant.ts — TenantSchema (modified)
+export const TenantSchema = z.object({
+  id: z.uuid(),
+  name: z.string().min(1).max(100),
+  slug: z
+    .string()
+    .min(2)
+    .max(80)
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
+  subscription: z.enum(SubscriptionTier),
+  description: z.string().max(500).nullable().optional(), // NEW
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+```
+
+The `nullable().optional()` combination handles three cases:
+
+- **Existing MongoDB documents** without a `description` field → `undefined` (optional)
+- **Explicit null** from the database → `null` (nullable)
+- **String value** from user input → validated up to 500 characters
+
+#### 13.2.2 `CreateTenantSchema` (line 33)
+
+Add optional `description`:
+
+```typescript
+export const CreateTenantSchema = z.object({
+  name: z.string().min(1, 'Tenant name is required').max(100),
+  slug: z
+    .string()
+    .min(2)
+    .max(80)
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
+  subscription: z.enum(SubscriptionTier).default('free'),
+  description: z.string().max(500).optional(), // NEW
+});
+```
+
+#### 13.2.3 `UpdateTenantSchema` (line 50)
+
+Add optional `description`:
+
+```typescript
+export const UpdateTenantSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  slug: z
+    .string()
+    .min(2)
+    .max(80)
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/)
+    .optional(),
+  description: z.string().max(500).optional(), // NEW
+});
+```
+
+**Type flow:** The [`Tenant`](shared/src/types/tenant.ts) type is derived from `TenantSchema` via `z.infer<>`, so it
+automatically includes `description` after the schema change. No manual type update needed.
+
+#### 13.2.4 `TenantWithRoleSchema` (line 107)
+
+[`TenantWithRoleSchema`](shared/src/schemas/tenant.ts:107) extends `TenantSchema` via `.extend()` — it inherits the
+`description` field automatically. No change needed.
+
+---
+
+### 13.3 Server layer changes
+
+#### 13.3.1 `TenantDocument` — [`server/src/repositories/tenant.repository.ts`](server/src/repositories/tenant.repository.ts:11)
+
+Add `description` to the MongoDB document interface:
+
+```typescript
+export interface TenantDocument {
+  _id?: import('mongodb').ObjectId;
+  id: string;
+  name: string;
+  slug: string;
+  subscription: string;
+  description: string | null; // NEW
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+#### 13.3.2 `toDomain()` mapper (line 23)
+
+Map `description` from the document to the domain model:
+
+```typescript
+function toDomain(doc: TenantDocument): Tenant {
+  return {
+    id: doc.id,
+    name: doc.name,
+    slug: doc.slug,
+    subscription: doc.subscription as Tenant['subscription'],
+    description: doc.description ?? undefined, // NEW — null → undefined for schema compat
+    createdAt: doc.createdAt.toISOString(),
+    updatedAt: doc.updatedAt.toISOString(),
+  };
+}
+```
+
+**Note:** MongoDB documents created before this change will not have a `description` field. Accessing a missing field
+returns `undefined`, which is valid for the `nullable().optional()` schema. No data migration is needed.
+
+#### 13.3.3 `TenantRepository.create()` (line 57)
+
+Update the input type to accept `description`:
+
+```typescript
+async create(input: { name: string; slug: string; subscription?: string; description?: string }): Promise<Tenant> {
+  const now = new Date();
+  const doc: TenantDocument = {
+    id: randomUUID(),
+    name: input.name,
+    slug: input.slug,
+    subscription: input.subscription ?? 'free',
+    description: input.description ?? null, // NEW
+    createdAt: now,
+    updatedAt: now,
+  };
+  await this.collection.insertOne(doc);
+  return toDomain(doc);
+}
+```
+
+#### 13.3.4 `TenantRepository.update()` (line 72)
+
+Update the `Pick` type to include `'description'`:
+
+```typescript
+async update(id: string, input: Partial<Pick<TenantDocument, 'name' | 'slug' | 'description'>>): Promise<Tenant | null> {
+  // Body unchanged — $set already handles arbitrary fields
+}
+```
+
+#### 13.3.5 `TenantService` — [`server/src/services/tenant.service.ts`](server/src/services/tenant.service.ts)
+
+**`createTenant()` (line 32):** The spread `{ ...input, subscription }` already passes `description` through if present
+in the `CreateTenant` input type. After the schema change, `input.description` flows automatically. **No code change
+needed** — verify that the spread is used (it is, at line 48).
+
+**`updateTenant()` (line 96):** The `input` parameter is typed as `UpdateTenant` and passed directly to
+`this.tenantRepo.update(id, input)` at line 112. After the schema change, `input.description` flows automatically. **No
+code change needed** — verify the direct pass-through (confirmed).
+
+---
+
+### 13.4 UI layer changes
+
+#### 13.4.1 Route — [`app.routes.ts`](ui/src/app/app.routes.ts:37)
+
+Add an empty-path child route as the **first** child of `tenants/:tenantId`:
+
+```typescript
+// In the children array of 'tenants/:tenantId' (line 37)
+children: [
+  {
+    path: '', // NEW — must be first child
+    loadComponent: () => import('./features/tenants/workspace-detail/workspace-detail').then((m) => m.WorkspaceDetail),
+  },
+  {
+    path: 'settings',
+    // ... existing
+  },
+  // ... rest of existing children
+];
+```
+
+> **Why first?** Angular matches child routes in declaration order. An empty-path route placed after other children
+> would never match because those more-specific paths would consume the request first. Placing it first ensures
+> `/tenants/:tenantId` resolves to `WorkspaceDetail` rather than showing an empty `<router-outlet>`.
+
+**Guards:** No additional guards needed. The parent route already applies
+[`authGuard`](ui/src/app/guards/auth.guard.ts:24) and [`tenantGuard`](ui/src/app/guards/tenant.guard.ts:24). RBAC
+enforcement is handled inside the component via computed signals.
+
+#### 13.4.2 New component — `WorkspaceDetail`
+
+**Location:** `ui/src/app/features/tenants/workspace-detail/`
+
+**Files:**
+
+| File                    | Purpose         |
+| ----------------------- | --------------- |
+| `workspace-detail.ts`   | Component class |
+| `workspace-detail.html` | Template        |
+
+#### 13.4.3 Component design — [`workspace-detail.ts`](ui/src/app/features/tenants/workspace-detail/workspace-detail.ts)
+
+| Aspect           | Detail                                                                                                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Selector**     | `ui-workspace-detail`                                                                                                                                                 |
+| **Standalone**   | Yes                                                                                                                                                                   |
+| **Dependencies** | [`TenantStore`](ui/src/app/stores/tenant-store.ts:14), [`AuthStore`](ui/src/app/stores/auth-store.ts:21), [`ProjectClient`](ui/src/app/services/project-client.ts:16) |
+| **Data loading** | Tenant from [`TenantStore.activeTenant()`](ui/src/app/stores/tenant-store.ts:17); projects via [`ProjectClient.list()`](ui/src/app/services/project-client.ts:21)     |
+| **RBAC source**  | [`AuthStore.tenantRole`](ui/src/app/stores/auth-store.ts:27) signal (decoded from JWT)                                                                                |
+
+**Signals:**
+
+```typescript
+// Component-level signals
+protected readonly tenant = computed(() => this.tenantStore.activeTenant());
+protected readonly role = computed(() => this.authStore.tenantRole() as TenantRole | null);
+protected readonly description = computed(() => this.tenant()?.description ?? '');
+protected readonly projects = signal<Project[]>([]);
+protected readonly loadingProjects = signal(true);
+protected readonly projectsExpanded = signal(true); // default: expanded
+
+// RBAC computed signals
+protected readonly isOwnerOrAdmin = computed(() => {
+  const r = this.role();
+  return r === 'owner' || r === 'admin';
+});
+
+protected readonly isOwner = computed(() => this.role() === 'owner');
+
+protected readonly showUpgrade = computed(() => {
+  return this.isOwner() && this.tenant()?.subscription === 'free';
+});
+```
+
+**Data loading strategy:**
+
+```typescript
+async ngOnInit(): Promise<void> {
+  try {
+    const res = await firstValueFrom(this.projectClient.list(1, 100));
+    this.projects.set(res.data);
+  } catch {
+    // Non-blocking — project section shows empty state
+  } finally {
+    this.loadingProjects.set(false);
+  }
+}
+```
+
+> **Member project filtering (BQ-16.1):** For `member` role,
+> [`ProjectClient.list()`](ui/src/app/services/project-client.ts:21) returns all tenant projects (the backend
+> `GET /projects` does not filter by project membership). As an interim solution, the component will display all
+> projects for all roles. When a server-side filter endpoint becomes available, the component can pass a filter
+> parameter. This is acceptable because the project list is read-only on this page — navigation to a project the member
+> doesn't belong to will be caught by [`projectGuard`](ui/src/app/guards/project.guard.ts).
+
+#### 13.4.4 Template — [`workspace-detail.html`](ui/src/app/features/tenants/workspace-detail/workspace-detail.html)
+
+```
+┌──────────────────────────────────────────────┐
+│  <h1> Workspace Name                         │
+│  [owner] badge                               │
+│                                              │
+│  Description text (or placeholder)           │
+│                                              │
+│  [Settings] [Members] [Upgrade]  ← owner/admin only
+│                                              │
+│  ▼ Projects (3)                    ← collapsible
+│    ┌──────────────────────────────┐ │
+│    │ 📁 Project A                 │ │
+│    │ 📁 Project B                 │ │
+│    │ 📁 Project C                 │ │
+│    └──────────────────────────────┘ │
+└──────────────────────────────────────────────┘
+```
+
+**Spartan UI components:**
+
+| UI Element                     | Spartan Component       | Import                         |
+| ------------------------------ | ----------------------- | ------------------------------ |
+| Role badge                     | `HlmBadgeImports`       | `@spartan-ng/helm/badge`       |
+| Action buttons (Settings etc.) | `HlmButtonImports`      | `@spartan-ng/helm/button`      |
+| Collapsible project list       | `HlmCollapsibleImports` | `@spartan-ng/helm/collapsible` |
+| Project list cards             | `HlmCardImports`        | `@spartan-ng/helm/card`        |
+
+Icons: `lucideSettings`, `lucideUsers`, `lucideCreditCard`, `lucideChevronDown`, `lucideFolder` via `@ng-icons/core` +
+`@ng-icons/lucide`.
+
+**Template structure:**
+
+```html
+<div class="mx-auto max-w-3xl py-8">
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-foreground">{{ tenant()?.name }}</h1>
+    <div class="mt-2 flex items-center gap-3">
+      <span hlmBadge class="bg-purple-100 text-purple-700">{{ role() }}</span>
+    </div>
+  </div>
+
+  <!-- Description -->
+  <div class="mb-6">
+    @if (description()) {
+    <p class="text-sm text-muted-foreground">{{ description() }}</p>
+    } @else {
+    <p class="text-sm text-muted-foreground italic">No description provided.</p>
+    }
+  </div>
+
+  <!-- Action Buttons (owner/admin only) -->
+  @if (isOwnerOrAdmin()) {
+  <div class="mb-6 flex flex-wrap gap-2">
+    <a hlmBtn variant="outline" size="md" [routerLink]="['/tenants', tenant()?.id, 'settings']">
+      <ng-icon name="lucideSettings" class="mr-1.5 h-4 w-4" /> Settings
+    </a>
+    <a hlmBtn variant="outline" size="md" [routerLink]="['/tenants', tenant()?.id, 'settings/members']">
+      <ng-icon name="lucideUsers" class="mr-1.5 h-4 w-4" /> Members
+    </a>
+    @if (showUpgrade()) {
+    <a hlmBtn variant="outline" size="md" [routerLink]="['/tenants', tenant()?.id, 'upgrade']">
+      <ng-icon name="lucideCreditCard" class="mr-1.5 h-4 w-4" /> Upgrade
+    </a>
+    }
+  </div>
+  }
+
+  <!-- Collapsible Project List -->
+  <hlm-collapsible [open]="projectsExpanded()" (openChange)="projectsExpanded.set($event)">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-foreground">Projects ({{ projects().length }})</h2>
+      <button hlmCollapsibleTrigger size="sm" variant="ghost">
+        <ng-icon
+          name="lucideChevronDown"
+          class="h-4 w-4 transition-transform"
+          [class.rotate-180]="projectsExpanded()"
+        />
+      </button>
+    </div>
+
+    <div hlmCollapsibleContent>
+      @if (loadingProjects()) {
+      <div class="py-4 text-center text-sm text-muted-foreground">Loading projects…</div>
+      } @else if (projects().length === 0) {
+      <div class="rounded-lg border border-dashed border-border py-8 text-center">
+        <p class="text-sm text-muted-foreground">No projects yet.</p>
+      </div>
+      } @else {
+      <div class="mt-4 space-y-2">
+        @for (project of projects(); track project.id) {
+        <a
+          [routerLink]="['/tenants', tenant()?.id, 'projects', project.id]"
+          class="flex items-center gap-3 rounded-lg border border-border bg-card p-3
+                      shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+        >
+          <ng-icon name="lucideFolder" class="h-4 w-4 text-muted-foreground" />
+          <div>
+            <p class="text-sm font-medium text-foreground">{{ project.name }}</p>
+            @if (project.description) {
+            <p class="text-xs text-muted-foreground">{{ project.description }}</p>
+            }
+          </div>
+        </a>
+        }
+      </div>
+      }
+    </div>
+  </hlm-collapsible>
+</div>
+```
+
+---
+
+### 13.5 RBAC visibility matrix
+
+| UI Element                  | Owner (free) | Owner (premium) | Admin | Member |
+| --------------------------- | :----------: | :-------------: | :---: | :----: |
+| Workspace name (`<h1>`)     |      ✅      |       ✅        |  ✅   |   ✅   |
+| Role badge                  |      ✅      |       ✅        |  ✅   |   ✅   |
+| Description text            |      ✅      |       ✅        |  ✅   |   ✅   |
+| Settings button             |      ✅      |       ✅        |  ✅   |   ❌   |
+| Members button              |      ✅      |       ✅        |  ✅   |   ❌   |
+| Upgrade button              |      ✅      |       ❌        |  ❌   |   ❌   |
+| Project list (all projects) |      ✅      |       ✅        |  ✅   |  ✅*   |
+
+\* For `member` role, all projects are shown (server does not filter by project membership). Navigation to unauthorized
+projects is blocked by [`projectGuard`](ui/src/app/guards/project.guard.ts).
+
+**Implementation:** All visibility is driven by [`computed()`](ui/src/app/stores/auth-store.ts:27) signals reading
+[`AuthStore.tenantRole`](ui/src/app/stores/auth-store.ts:27) — no role-based conditionals in the template beyond
+`@if (isOwnerOrAdmin())` and `@if (showUpgrade())`.
+
+---
+
+### 13.6 Data flow — workspace detail load sequence
+
+```
+1. User navigates to /tenants/:tenantId
+   │
+   ├─ authGuard verifies authentication (existing)
+   ├─ tenantGuard verifies active tenant membership (existing)
+   │
+   ├─ AppShell renders (sidebar + header + <router-outlet>)
+   ├─ Router resolves '' child → WorkspaceDetail component
+   │
+   ├─ Component reads tenantStore.activeTenant() → tenant signal
+   │   └─ Already loaded by TenantStore.loadTenants() on app init
+   │
+   ├─ Component reads authStore.tenantRole() → role signal
+   │   └─ Already decoded from JWT by AuthStore constructor
+   │
+   ├─ Component calls ProjectClient.list(1, 100) in ngOnInit()
+   │   └─ GET /api/v1/projects (X-Tenant-Id header attached by interceptor)
+   │   └─ Sets projects signal; loadingProjects → false
+   │
+   └─ Template renders:
+       ├─ <h1> with tenant name
+       ├─ Role badge
+       ├─ Description (or placeholder)
+       ├─ Action buttons (if isOwnerOrAdmin)
+       └─ Collapsible project list (HlmCollapsible)
+```
+
+**No new HTTP calls beyond existing endpoints.** Tenant data is already loaded by
+[`TenantStore`](ui/src/app/stores/tenant-store.ts:14). Project data uses the existing
+[`ProjectClient.list()`](ui/src/app/services/project-client.ts:21).
+
+---
+
+### 13.7 TenantClient and TenantStore updates
+
+#### 13.7.1 [`TenantClient.updateTenant()`](ui/src/app/services/tenant-client.ts:38)
+
+Add `description` to the data parameter:
+
+```typescript
+updateTenant(
+  tenantId: string,
+  data: { name?: string; slug?: string; description?: string; subscription?: string }
+): Observable<Tenant> {
+  return this.http.patch<Tenant>(`${this.apiBaseUrl}/tenants/${tenantId}`, data);
+}
+```
+
+#### 13.7.2 [`TenantStore.updateTenant()`](ui/src/app/stores/tenant-store.ts:53)
+
+Add `description` to the data parameter:
+
+```typescript
+async updateTenant(
+  tenantId: string,
+  data: { name?: string; slug?: string; description?: string; subscription?: string }
+): Promise<Tenant> {
+  // Body unchanged — data is passed through to tenantClient.updateTenant()
+}
+```
+
+After these changes, the [`TenantSettings`](ui/src/app/features/tenants/tenant-settings/tenant-settings.ts) component
+can edit the description field via the existing save flow. The
+[`WorkspaceDetail`](ui/src/app/features/tenants/workspace-detail/workspace-detail.ts) component reads `description` from
+[`TenantStore.activeTenant()`](ui/src/app/stores/tenant-store.ts:17) which is automatically updated after a successful
+save.
+
+---
+
+### 13.8 Dashboard link updates
+
+#### 13.8.1 [`owner-dashboard.html`](ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html:48) — workspace name link
+
+Make the workspace card title a link to the workspace detail page:
+
+```html
+<!-- Current (line 48): plain text -->
+<h3 class="text-sm font-semibold text-foreground">{{ tenant.name }}</h3>
+
+<!-- New: link to workspace detail -->
+<a [routerLink]="['/tenants', tenant.id]" class="text-sm font-semibold text-foreground hover:text-primary">
+  {{ tenant.name }}
+</a>
+```
+
+The existing action buttons (Projects, Settings, Members, Upgrade) remain unchanged as secondary navigation shortcuts.
+
+#### 13.8.2 [`member-dashboard.html`](ui/src/app/features/dashboard/member-dashboard/member-dashboard.html:36) — link target change
+
+Change the workspace card link target from projects to workspace detail:
+
+```html
+<!-- Current (line 36): links to projects -->
+<a [routerLink]="['/tenants', tenant.id, 'projects']" ...>
+  <!-- New: links to workspace detail -->
+  <a [routerLink]="['/tenants', tenant.id]" ...></a
+></a>
+```
+
+---
+
+### 13.9 Angular 22 patterns
+
+| Pattern              | Usage in WorkspaceDetail                                                                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `signal()`           | `projects`, `loadingProjects`, `projectsExpanded`                                                                                                                           |
+| `computed()`         | `tenant`, `role`, `description`, `isOwnerOrAdmin`, `isOwner`, `showUpgrade`                                                                                                 |
+| `@if` / `@for`       | Conditional rendering of description, action buttons, project list items                                                                                                    |
+| `inject()`           | DI of [`TenantStore`](ui/src/app/stores/tenant-store.ts:14), [`AuthStore`](ui/src/app/stores/auth-store.ts:21), [`ProjectClient`](ui/src/app/services/project-client.ts:16) |
+| Standalone component | No NgModule; declares own imports                                                                                                                                           |
+| `RouterLink`         | Navigation to settings, members, upgrade, and individual projects                                                                                                           |
+| `HlmCollapsible`     | Collapsible project list container                                                                                                                                          |
+| `@defer`             | Not used — project list is lightweight; `@defer` can be added later if performance requires                                                                                 |
+
+---
+
+### 13.10 Error handling
+
+| Scenario                                    | Behavior                                                        |
+| ------------------------------------------- | --------------------------------------------------------------- |
+| `GET /projects` fails                       | Non-blocking; project list shows "No projects yet." placeholder |
+| `activeTenant()` is `null`                  | Component shows nothing (route guard should prevent this state) |
+| `tenantRole()` is `null`                    | Action buttons hidden (default: not owner/admin)                |
+| Description is `null`/`undefined`           | Placeholder text "No description provided." in muted italic     |
+| Existing tenant without `description` field | MongoDB returns `undefined` → maps to `null` → placeholder      |
+
+---
+
+### 13.11 Summary — files to create or modify
+
+| Action     | File                                                                                                                                              | Description                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Modify** | [`shared/src/schemas/tenant.ts`](shared/src/schemas/tenant.ts:8)                                                                                  | Add `description` to `TenantSchema`, `CreateTenantSchema`, `UpdateTenantSchema` |
+| **Modify** | [`server/src/repositories/tenant.repository.ts`](server/src/repositories/tenant.repository.ts:11)                                                 | Add `description` to `TenantDocument`, `toDomain()`, `create()`, `update()`     |
+| **Modify** | [`ui/src/app/app.routes.ts`](ui/src/app/app.routes.ts:37)                                                                                         | Add empty-path child route for WorkspaceDetail                                  |
+| **Create** | `ui/src/app/features/tenants/workspace-detail/workspace-detail.ts`                                                                                | WorkspaceDetail component class                                                 |
+| **Create** | `ui/src/app/features/tenants/workspace-detail/workspace-detail.html`                                                                              | WorkspaceDetail template                                                        |
+| **Modify** | [`ui/src/app/services/tenant-client.ts`](ui/src/app/services/tenant-client.ts:38)                                                                 | Add `description` to `updateTenant()` data parameter                            |
+| **Modify** | [`ui/src/app/stores/tenant-store.ts`](ui/src/app/stores/tenant-store.ts:53)                                                                       | Add `description` to `updateTenant()` data parameter                            |
+| **Modify** | [`ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html`](ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html:48)     | Make workspace card title a link to `/tenants/:tenantId`                        |
+| **Modify** | [`ui/src/app/features/dashboard/member-dashboard/member-dashboard.html`](ui/src/app/features/dashboard/member-dashboard/member-dashboard.html:36) | Change workspace card link target to `/tenants/:tenantId`                       |
+
+**No changes needed:**
+
+| File                                                                             | Reason                                                                                |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [`server/src/services/tenant.service.ts`](server/src/services/tenant.service.ts) | `createTenant()` and `updateTenant()` pass input through via spread/direct delegation |
+| [`ui/src/app/stores/auth-store.ts`](ui/src/app/stores/auth-store.ts:27)          | `tenantRole` signal already exists                                                    |
+| [`shared/src/types/tenant.ts`](shared/src/types/tenant.ts)                       | Type is derived from `TenantSchema` via `z.infer<>` — auto-updated                    |
+
+---
+
+### 13.12 Risks and assumptions
+
+| #   | Risk / Assumption                                                                                                                                                                                          | Impact                                                               | Mitigation                                                                                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| A1  | MongoDB documents without a `description` field return `undefined` when accessed, which maps to `null` via `?? undefined` in `toDomain()`                                                                  | No migration needed for existing tenants                             | Verified: MongoDB handles missing fields gracefully                                                             |
+| A2  | [`HlmCollapsible`](ui/libs/ui/collapsible/src/lib/hlm-collapsible.ts) is already installed and available (confirmed used in [`sprint-list.ts`](ui/src/app/features/sprints/sprint-list/sprint-list.ts:17)) | No dependency installation needed                                    | Verified in codebase search                                                                                     |
+| A3  | [`ProjectClient.list()`](ui/src/app/services/project-client.ts:21) uses the active tenant context via `X-Tenant-Id` header interceptor                                                                     | Project list is automatically tenant-scoped                          | Verified: interceptor attaches header from [`TenantStore.activeTenant()`](ui/src/app/stores/tenant-store.ts:17) |
+| A4  | For `member` role, `GET /projects` returns all tenant projects (no server-side membership filter)                                                                                                          | Members see all projects; unauthorized nav blocked by `projectGuard` | Interim solution; server-side filter is a future enhancement (BQ-16.1)                                          |
+| A5  | The empty-path child route does not conflict with wildcard redirects since Angular resolves child routes before the parent's wildcard                                                                      | No routing conflicts                                                 | Verified: Angular router matching order is depth-first, children before siblings                                |
+| A6  | [`TenantService.updateTenant()`](server/src/services/tenant.service.ts:96) passes `input` directly to `this.tenantRepo.update(id, input)`                                                                  | `description` flows automatically after schema change                | Verified at line 112: direct pass-through, no field destructuring                                               |
+| R1  | Backward compatibility — existing tenants without `description` field must render gracefully                                                                                                               | Placeholder text shown                                               | `nullable().optional()` schema + null coalescing in `toDomain()` handles this                                   |
+
+---
+
 ## Summary
 
 | Item                              | Detail                                                                                                                                                                                                                                                                        |

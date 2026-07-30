@@ -36,6 +36,11 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/app-shell/app-shell').then((m) => m.AppShell),
     children: [
       {
+        path: '',
+        loadComponent: () =>
+          import('./features/tenants/workspace-detail/workspace-detail').then((m) => m.WorkspaceDetail),
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/tenants/tenant-settings/tenant-settings').then((m) => m.TenantSettings),
       },

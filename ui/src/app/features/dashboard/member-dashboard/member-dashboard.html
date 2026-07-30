@@ -33,7 +33,7 @@
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       @for (tenant of tenants(); track tenant.id) {
         <a
-          [routerLink]="['/tenants', tenant.id, 'projects']"
+          [routerLink]="['/tenants', tenant.id]"
           class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
         >
           <div class="flex items-center gap-3">

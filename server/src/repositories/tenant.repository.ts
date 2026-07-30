@@ -13,6 +13,7 @@ export interface TenantDocument {
   id: string;
   name: string;
   slug: string;
+  description: string | null;
   subscription: string;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +26,7 @@ function toDomain(doc: TenantDocument): Tenant {
     id: doc.id,
     name: doc.name,
     slug: doc.slug,
+    description: doc.description ?? undefined,
     subscription: doc.subscription as Tenant['subscription'],
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
@@ -54,12 +56,13 @@ export class TenantRepository {
     return docs.map(toDomain);
   }
 
-  async create(input: { name: string; slug: string; subscription?: string }): Promise<Tenant> {
+  async create(input: { name: string; slug: string; description?: string; subscription?: string }): Promise<Tenant> {
     const now = new Date();
     const doc: TenantDocument = {
       id: randomUUID(),
       name: input.name,
       slug: input.slug,
+      description: input.description ?? null,
       subscription: input.subscription ?? 'free',
       createdAt: now,
       updatedAt: now,
@@ -69,7 +72,10 @@ export class TenantRepository {
     return toDomain(doc);
   }
 
-  async update(id: string, input: Partial<Pick<TenantDocument, 'name' | 'slug'>>): Promise<Tenant | null> {
+  async update(
+    id: string,
+    input: Partial<Pick<TenantDocument, 'name' | 'slug' | 'description'>>,
+  ): Promise<Tenant | null> {
     const result = await this.collection.findOneAndUpdate(
       { id },
       { $set: { ...input, updatedAt: new Date() } },

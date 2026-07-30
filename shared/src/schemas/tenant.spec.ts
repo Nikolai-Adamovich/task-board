@@ -67,6 +67,30 @@ describe('TenantSchema', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('should accept tenant with description as null', () => {
+    const result = TenantSchema.safeParse({ ...validTenant, description: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept tenant with description as string', () => {
+    const result = TenantSchema.safeParse({ ...validTenant, description: 'A brief description' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept tenant without description (backward compat)', () => {
+    const result = TenantSchema.safeParse(validTenant);
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject description exceeding 500 characters', () => {
+    const result = TenantSchema.safeParse({ ...validTenant, description: 'a'.repeat(501) });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 // ─── CreateTenantSchema ──────────────────────────────────────────────────────
@@ -116,6 +140,25 @@ describe('CreateTenantSchema', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('should accept create-tenant data with description', () => {
+    const result = CreateTenantSchema.safeParse({
+      name: 'New Org',
+      slug: 'new-org',
+      description: 'A new organization',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept create-tenant data without description', () => {
+    const result = CreateTenantSchema.safeParse({
+      name: 'New Org',
+      slug: 'new-org',
+    });
+
+    expect(result.success).toBe(true);
+  });
 });
 
 // ─── UpdateTenantSchema ──────────────────────────────────────────────────────
@@ -135,6 +178,12 @@ describe('UpdateTenantSchema', () => {
 
   it('should accept empty update (all optional)', () => {
     const result = UpdateTenantSchema.safeParse({});
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept partial update with description only', () => {
+    const result = UpdateTenantSchema.safeParse({ description: 'Updated description' });
 
     expect(result.success).toBe(true);
   });

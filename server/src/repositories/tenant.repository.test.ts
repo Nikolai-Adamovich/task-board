@@ -26,6 +26,7 @@ function makeDoc(overrides: Partial<TenantDocument> = {}): TenantDocument {
     id: 'tenant-123',
     name: 'Test Tenant',
     slug: 'test-tenant',
+    description: null,
     subscription: 'free',
     createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),

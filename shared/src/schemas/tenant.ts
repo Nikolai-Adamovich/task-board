@@ -16,6 +16,8 @@ export const TenantSchema = z.object({
     .min(2)
     .max(80)
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
+  /** Optional description of the tenant */
+  description: z.string().max(500).nullable().optional(),
   /** Subscription tier */
   subscription: z.enum(SubscriptionTier),
   /** Creation timestamp (ISO 8601) */
@@ -37,6 +39,7 @@ export const CreateTenantSchema = z.object({
     .min(2, 'Slug must be at least 2 characters')
     .max(80, 'Slug must be at most 80 characters')
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
+  description: z.string().max(500).optional(),
   subscription: z.enum(SubscriptionTier).default('free'),
 });
 
@@ -59,6 +62,7 @@ export const UpdateTenantSchema = z.object({
     .max(80, 'Slug must be at most 80 characters')
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must contain only lowercase letters, numbers, and hyphens')
     .optional(),
+  description: z.string().max(500).optional(),
 });
 
 /** Inferred UpdateTenant type */
