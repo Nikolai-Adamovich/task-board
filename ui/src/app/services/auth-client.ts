@@ -13,17 +13,17 @@ export class AuthClient {
   private readonly http = inject(HttpClient);
   private readonly apiBaseUrl = inject(API_BASE_URL);
 
-  /** POST /auth/login */
+  /** Authenticate a user with email and password */
   login(credentials: LoginRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.apiBaseUrl}/auth/login`, credentials);
   }
 
-  /** POST /auth/register */
+  /** Register a new user account */
   register(data: RegisterRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.apiBaseUrl}/auth/register`, data);
   }
 
-  /** GET /auth/me */
+  /** Get the currently authenticated user's profile */
   getCurrentUser(): Observable<User> {
     return this.http.get<User>(`${this.apiBaseUrl}/auth/me`);
   }
