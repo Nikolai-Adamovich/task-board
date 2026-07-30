@@ -4,11 +4,23 @@
 // ─── Constants ───────────────────────────────────────────────────────────────
 export {
   TenantRole,
+  TenantRoleSchema,
+  TenantRoleValues,
   ProjectRole,
+  ProjectRoleSchema,
+  ProjectRoleValues,
   TaskPriority,
+  TaskPrioritySchema,
+  TaskPriorityValues,
   SprintStatus,
+  SprintStatusSchema,
+  SprintStatusValues,
   MemberStatus,
+  MemberStatusSchema,
+  MemberStatusValues,
   SubscriptionTier,
+  SubscriptionTierSchema,
+  SubscriptionTierValues,
 } from './constants/roles.js';
 export { DefaultColumnNames } from './constants/columns.js';
 export { HttpMethod } from './constants/http.js';

@@ -1,5 +1,13 @@
 import { z } from 'zod';
 import { ProjectRole } from '../constants/roles.js';
+import {
+  uuid,
+  slug,
+  nonEmptyString,
+  optionalString,
+  nullableOptionalString,
+  isoDateTime,
+} from '../validators/common.js';
 
 /**
  * Project entity schema.
@@ -7,23 +15,19 @@ import { ProjectRole } from '../constants/roles.js';
  */
 export const ProjectSchema = z.object({
   /** Unique project identifier (UUID v4) */
-  id: z.uuid(),
+  id: uuid(),
   /** Owning tenant ID */
-  tenantId: z.uuid(),
+  tenantId: uuid(),
   /** Project name */
-  name: z.string().min(1).max(100),
+  name: nonEmptyString(100, 'Project name'),
   /** URL-friendly slug for the project */
-  slug: z
-    .string()
-    .min(2)
-    .max(80)
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
+  slug: slug(),
   /** Optional project description */
-  description: z.string().max(500).nullable().optional(),
+  description: nullableOptionalString(500),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.iso.datetime(),
+  createdAt: isoDateTime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.iso.datetime(),
+  updatedAt: isoDateTime(),
 });
 
 /** Inferred Project type */
@@ -33,13 +37,9 @@ export type Project = z.infer<typeof ProjectSchema>;
  * Schema for creating a new project.
  */
 export const CreateProjectSchema = z.object({
-  name: z.string().min(1, 'Project name is required').max(100, 'Project name must be at most 100 characters'),
-  slug: z
-    .string()
-    .min(2, 'Slug must be at least 2 characters')
-    .max(80, 'Slug must be at most 80 characters')
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
-  description: z.string().max(500).optional(),
+  name: nonEmptyString(100, 'Project name'),
+  slug: slug(),
+  description: optionalString(500),
 });
 
 /** Inferred CreateProject type */
@@ -50,18 +50,9 @@ export type CreateProject = z.infer<typeof CreateProjectSchema>;
  * All fields are optional (partial update).
  */
 export const UpdateProjectSchema = z.object({
-  name: z
-    .string()
-    .min(1, 'Project name cannot be empty')
-    .max(100, 'Project name must be at most 100 characters')
-    .optional(),
-  slug: z
-    .string()
-    .min(2, 'Slug must be at least 2 characters')
-    .max(80, 'Slug must be at most 80 characters')
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must contain only lowercase letters, numbers, and hyphens')
-    .optional(),
-  description: z.string().max(500).optional(),
+  name: nonEmptyString(100, 'Project name').optional(),
+  slug: slug().optional(),
+  description: optionalString(500),
 });
 
 /** Inferred UpdateProject type */
@@ -73,11 +64,11 @@ export type UpdateProject = z.infer<typeof UpdateProjectSchema>;
  */
 export const ProjectMemberSchema = z.object({
   /** User ID of the member */
-  userId: z.uuid(),
+  userId: uuid(),
   /** Project ID */
-  projectId: z.uuid(),
+  projectId: uuid(),
   /** Tenant ID (denormalized for multi-tenant queries) */
-  tenantId: z.uuid(),
+  tenantId: uuid(),
   /** Role of the user within the project */
   role: z.enum(ProjectRole),
 });

@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  uuid,
+  nonEmptyString,
+  optionalString,
+  nullableOptionalString,
+  isoDateTime,
+  nonNegativeInt,
+} from '../validators/common.js';
 
 /**
  * Board entity schema.
@@ -6,19 +14,19 @@ import { z } from 'zod';
  */
 export const BoardSchema = z.object({
   /** Unique board identifier (UUID v4) */
-  id: z.uuid(),
+  id: uuid(),
   /** Owning tenant ID */
-  tenantId: z.uuid(),
+  tenantId: uuid(),
   /** Parent project ID */
-  projectId: z.uuid(),
+  projectId: uuid(),
   /** Board name */
-  name: z.string().min(1).max(100),
+  name: nonEmptyString(100, 'Board name'),
   /** Optional board description */
-  description: z.string().max(500).nullable().optional(),
+  description: nullableOptionalString(500),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.iso.datetime(),
+  createdAt: isoDateTime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.iso.datetime(),
+  updatedAt: isoDateTime(),
 });
 
 /** Inferred Board type */
@@ -29,10 +37,10 @@ export type Board = z.infer<typeof BoardSchema>;
  * Includes optional column names; defaults will be used if not provided.
  */
 export const CreateBoardSchema = z.object({
-  name: z.string().min(1, 'Board name is required').max(100, 'Board name must be at most 100 characters'),
-  description: z.string().max(500).optional(),
+  name: nonEmptyString(100, 'Board name'),
+  description: optionalString(500),
   /** Custom column names for the board (optional — defaults are used otherwise) */
-  columnNames: z.array(z.string().min(1).max(50)).optional(),
+  columnNames: z.array(nonEmptyString(50, 'Column name')).optional(),
 });
 
 /** Inferred CreateBoard type */
@@ -43,12 +51,8 @@ export type CreateBoard = z.infer<typeof CreateBoardSchema>;
  * All fields are optional (partial update).
  */
 export const UpdateBoardSchema = z.object({
-  name: z
-    .string()
-    .min(1, 'Board name cannot be empty')
-    .max(100, 'Board name must be at most 100 characters')
-    .optional(),
-  description: z.string().max(500).optional(),
+  name: nonEmptyString(100, 'Board name').optional(),
+  description: optionalString(500),
 });
 
 /** Inferred UpdateBoard type */
@@ -60,19 +64,19 @@ export type UpdateBoard = z.infer<typeof UpdateBoardSchema>;
  */
 export const ColumnSchema = z.object({
   /** Unique column identifier (UUID v4) */
-  id: z.uuid(),
+  id: uuid(),
   /** Parent board ID */
-  boardId: z.uuid(),
+  boardId: uuid(),
   /** Owning tenant ID */
-  tenantId: z.uuid(),
+  tenantId: uuid(),
   /** Column display name */
-  name: z.string().min(1).max(50),
+  name: nonEmptyString(50, 'Column name'),
   /** Position/order of the column within the board (0-based) */
-  position: z.number().int().nonnegative(),
+  position: nonNegativeInt(),
   /** Whether this is a default column (cannot be deleted) */
   isDefault: z.boolean(),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.iso.datetime(),
+  createdAt: isoDateTime(),
 });
 
 /** Inferred Column type */
@@ -82,9 +86,9 @@ export type Column = z.infer<typeof ColumnSchema>;
  * Schema for creating a new column in a board.
  */
 export const CreateColumnSchema = z.object({
-  name: z.string().min(1, 'Column name is required').max(50, 'Column name must be at most 50 characters'),
+  name: nonEmptyString(50, 'Column name'),
   /** Position/order within the board. If omitted, column is appended at the end. */
-  position: z.number().int().nonnegative().optional(),
+  position: nonNegativeInt().optional(),
 });
 
 /** Inferred CreateColumn type */

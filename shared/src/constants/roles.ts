@@ -1,24 +1,33 @@
-/** Tenant-level roles within an organization */
+import { z } from 'zod';
+
+/**
+ * Type-safe enum-like constants with Zod schema support.
+ * Each constant provides both the value object and a Zod enum schema.
+ */
+
+// ─── TenantRole ──────────────────────────────────────────────────────────────
 export const TenantRole = {
   Owner: 'owner',
   Admin: 'admin',
   Member: 'member',
 } as const;
 
-/** Union type of tenant role values */
 export type TenantRole = (typeof TenantRole)[keyof typeof TenantRole];
+export const TenantRoleSchema = z.enum(TenantRole);
+export const TenantRoleValues = Object.values(TenantRole) as [TenantRole, ...TenantRole[]];
 
-/** Project-level roles for project members */
+// ─── ProjectRole ─────────────────────────────────────────────────────────────
 export const ProjectRole = {
   Admin: 'admin',
   Developer: 'developer',
   Viewer: 'viewer',
 } as const;
 
-/** Union type of project role values */
 export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole];
+export const ProjectRoleSchema = z.enum(ProjectRole);
+export const ProjectRoleValues = Object.values(ProjectRole) as [ProjectRole, ...ProjectRole[]];
 
-/** Task priority levels */
+// ─── TaskPriority ────────────────────────────────────────────────────────────
 export const TaskPriority = {
   Low: 'low',
   Medium: 'medium',
@@ -26,20 +35,22 @@ export const TaskPriority = {
   Critical: 'critical',
 } as const;
 
-/** Union type of task priority values */
 export type TaskPriority = (typeof TaskPriority)[keyof typeof TaskPriority];
+export const TaskPrioritySchema = z.enum(TaskPriority);
+export const TaskPriorityValues = Object.values(TaskPriority) as [TaskPriority, ...TaskPriority[]];
 
-/** Sprint lifecycle statuses */
+// ─── SprintStatus ────────────────────────────────────────────────────────────
 export const SprintStatus = {
   Planned: 'planned',
   Active: 'active',
   Completed: 'completed',
 } as const;
 
-/** Union type of sprint status values */
 export type SprintStatus = (typeof SprintStatus)[keyof typeof SprintStatus];
+export const SprintStatusSchema = z.enum(SprintStatus);
+export const SprintStatusValues = Object.values(SprintStatus) as [SprintStatus, ...SprintStatus[]];
 
-/** Member invitation/activation status */
+// ─── MemberStatus ────────────────────────────────────────────────────────────
 export const MemberStatus = {
   Active: 'active',
   Pending: 'pending',
@@ -47,14 +58,16 @@ export const MemberStatus = {
   AccessRevoked: 'access_revoked',
 } as const;
 
-/** Union type of member status values */
 export type MemberStatus = (typeof MemberStatus)[keyof typeof MemberStatus];
+export const MemberStatusSchema = z.enum(MemberStatus);
+export const MemberStatusValues = Object.values(MemberStatus) as [MemberStatus, ...MemberStatus[]];
 
-/** Subscription tier levels */
+// ─── SubscriptionTier ────────────────────────────────────────────────────────
 export const SubscriptionTier = {
   Free: 'free',
   Premium: 'premium',
 } as const;
 
-/** Union type of subscription tier values */
 export type SubscriptionTier = (typeof SubscriptionTier)[keyof typeof SubscriptionTier];
+export const SubscriptionTierSchema = z.enum(SubscriptionTier);
+export const SubscriptionTierValues = Object.values(SubscriptionTier) as [SubscriptionTier, ...SubscriptionTier[]];

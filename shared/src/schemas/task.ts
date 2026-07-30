@@ -1,5 +1,14 @@
 import { z } from 'zod';
 import { TaskPriority } from '../constants/roles.js';
+import {
+  uuid,
+  nonEmptyString,
+  optionalString,
+  nullableOptionalString,
+  isoDateTime,
+  nonNegativeInt,
+  uuidArray,
+} from '../validators/common.js';
 
 /**
  * Task entity schema.
@@ -7,33 +16,33 @@ import { TaskPriority } from '../constants/roles.js';
  */
 export const TaskSchema = z.object({
   /** Unique task identifier (UUID v4) */
-  id: z.uuid(),
+  id: uuid(),
   /** Owning tenant ID */
-  tenantId: z.uuid(),
+  tenantId: uuid(),
   /** Parent project ID */
-  projectId: z.uuid(),
+  projectId: uuid(),
   /** Parent board ID */
-  boardId: z.uuid(),
+  boardId: uuid(),
   /** Column the task is currently in */
-  columnId: z.uuid(),
+  columnId: uuid(),
   /** Optional sprint assignment (null if in backlog) */
-  sprintId: z.uuid().nullable(),
+  sprintId: uuid().nullable(),
   /** Task title */
-  title: z.string().min(1).max(200),
+  title: nonEmptyString(200, 'Task title'),
   /** Optional detailed description (markdown) */
-  description: z.string().max(5000).nullable().optional(),
+  description: nullableOptionalString(5000),
   /** User IDs assigned to this task */
-  assigneeIds: z.array(z.uuid()),
+  assigneeIds: uuidArray(),
   /** Task priority level */
   priority: z.enum(TaskPriority),
   /** Position/order within the column (for drag-and-drop) */
-  position: z.number().nonnegative(),
+  position: nonNegativeInt(),
   /** User ID of the task creator */
-  createdBy: z.uuid(),
+  createdBy: uuid(),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.iso.datetime(),
+  createdAt: isoDateTime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.iso.datetime(),
+  updatedAt: isoDateTime(),
 });
 
 /** Inferred Task type */
@@ -43,14 +52,14 @@ export type Task = z.infer<typeof TaskSchema>;
  * Schema for creating a new task.
  */
 export const CreateTaskSchema = z.object({
-  title: z.string().min(1, 'Task title is required').max(200, 'Task title must be at most 200 characters'),
-  description: z.string().max(5000).optional(),
-  projectId: z.uuid('Invalid project ID'),
-  boardId: z.uuid('Invalid board ID'),
-  columnId: z.uuid('Invalid column ID'),
-  sprintId: z.uuid('Invalid sprint ID').optional(),
+  title: nonEmptyString(200, 'Task title'),
+  description: optionalString(5000),
+  projectId: uuid(),
+  boardId: uuid(),
+  columnId: uuid(),
+  sprintId: uuid().optional(),
   priority: z.enum(TaskPriority).default('medium'),
-  assigneeIds: z.array(z.uuid()).default([]),
+  assigneeIds: uuidArray().default([]),
 });
 
 /** Inferred CreateTask type */
@@ -61,14 +70,10 @@ export type CreateTask = z.infer<typeof CreateTaskSchema>;
  * All fields are optional (partial update).
  */
 export const UpdateTaskSchema = z.object({
-  title: z
-    .string()
-    .min(1, 'Task title cannot be empty')
-    .max(200, 'Task title must be at most 200 characters')
-    .optional(),
-  description: z.string().max(5000).optional(),
+  title: nonEmptyString(200, 'Task title').optional(),
+  description: optionalString(5000),
   priority: z.enum(TaskPriority).optional(),
-  assigneeIds: z.array(z.uuid()).optional(),
+  assigneeIds: uuidArray().optional(),
 });
 
 /** Inferred UpdateTask type */
@@ -79,9 +84,9 @@ export type UpdateTask = z.infer<typeof UpdateTaskSchema>;
  * Used for drag-and-drop operations on the board.
  */
 export const MoveTaskSchema = z.object({
-  taskId: z.uuid('Invalid task ID'),
-  targetColumnId: z.uuid('Invalid target column ID'),
-  targetSprintId: z.uuid('Invalid target sprint ID').optional(),
+  taskId: uuid(),
+  targetColumnId: uuid(),
+  targetSprintId: uuid().optional(),
 });
 
 /** Inferred MoveTask type */
@@ -91,8 +96,8 @@ export type MoveTask = z.infer<typeof MoveTaskSchema>;
  * Schema for assigning/unassigning users to a task.
  */
 export const AssignTaskSchema = z.object({
-  taskId: z.uuid('Invalid task ID'),
-  assigneeIds: z.array(z.uuid()),
+  taskId: uuid(),
+  assigneeIds: uuidArray(),
 });
 
 /** Inferred AssignTask type */
@@ -105,33 +110,33 @@ export type AssignTask = z.infer<typeof AssignTaskSchema>;
  */
 export const MyTaskSchema = z.object({
   /** Unique task identifier (UUID v4) */
-  id: z.uuid(),
+  id: uuid(),
   /** Owning tenant ID */
-  tenantId: z.uuid(),
+  tenantId: uuid(),
   /** Tenant display name */
-  tenantName: z.string(),
+  tenantName: nonEmptyString(100, 'Tenant name'),
   /** Parent project ID */
-  projectId: z.uuid(),
+  projectId: uuid(),
   /** Project display name */
-  projectName: z.string(),
+  projectName: nonEmptyString(100, 'Project name'),
   /** Parent board ID */
-  boardId: z.uuid(),
+  boardId: uuid(),
   /** Column the task is currently in */
-  columnId: z.uuid(),
+  columnId: uuid(),
   /** Column display title */
-  columnTitle: z.string(),
+  columnTitle: nonEmptyString(50, 'Column title'),
   /** Task title */
-  title: z.string(),
+  title: nonEmptyString(200, 'Task title'),
   /** Optional detailed description */
   description: z.string().nullable(),
   /** Task priority level */
   priority: z.enum(TaskPriority),
   /** Optional sprint assignment (null if in backlog) */
-  sprintId: z.uuid().nullable(),
+  sprintId: uuid().nullable(),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.iso.datetime(),
+  createdAt: isoDateTime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.iso.datetime(),
+  updatedAt: isoDateTime(),
 });
 
 /** Inferred MyTask type */

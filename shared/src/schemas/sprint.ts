@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SprintStatus } from '../constants/roles.js';
+import { uuid, nonEmptyString, optionalString, nullableOptionalString, isoDateTime } from '../validators/common.js';
 
 /**
  * Sprint entity schema.
@@ -7,27 +8,27 @@ import { SprintStatus } from '../constants/roles.js';
  */
 export const SprintSchema = z.object({
   /** Unique sprint identifier (UUID v4) */
-  id: z.uuid(),
+  id: uuid(),
   /** Owning tenant ID */
-  tenantId: z.uuid(),
+  tenantId: uuid(),
   /** Parent project ID */
-  projectId: z.uuid(),
+  projectId: uuid(),
   /** Sprint name (e.g., "Sprint 1") */
-  name: z.string().min(1).max(100),
+  name: nonEmptyString(100, 'Sprint name'),
   /** Sprint start date (ISO 8601 date) */
-  startDate: z.iso.datetime(),
+  startDate: isoDateTime(),
   /** Sprint end date (ISO 8601 date) */
-  endDate: z.iso.datetime(),
+  endDate: isoDateTime(),
   /** Optional sprint goal description */
-  goal: z.string().max(500).nullable().optional(),
+  goal: nullableOptionalString(500),
   /** Sprint lifecycle status */
   status: z.enum(SprintStatus),
   /** IDs of tasks assigned to this sprint */
-  taskIds: z.array(z.uuid()),
+  taskIds: z.array(uuid()),
   /** Creation timestamp (ISO 8601) */
-  createdAt: z.iso.datetime(),
+  createdAt: isoDateTime(),
   /** Last update timestamp (ISO 8601) */
-  updatedAt: z.iso.datetime(),
+  updatedAt: isoDateTime(),
 });
 
 /** Inferred Sprint type */
@@ -37,10 +38,10 @@ export type Sprint = z.infer<typeof SprintSchema>;
  * Schema for creating a new sprint.
  */
 export const CreateSprintSchema = z.object({
-  name: z.string().min(1, 'Sprint name is required').max(100, 'Sprint name must be at most 100 characters'),
-  startDate: z.iso.datetime('Invalid start date'),
-  endDate: z.iso.datetime('Invalid end date'),
-  goal: z.string().max(500).optional(),
+  name: nonEmptyString(100, 'Sprint name'),
+  startDate: isoDateTime(),
+  endDate: isoDateTime(),
+  goal: optionalString(500),
 });
 
 /** Inferred CreateSprint type */
@@ -51,14 +52,10 @@ export type CreateSprint = z.infer<typeof CreateSprintSchema>;
  * All fields are optional (partial update).
  */
 export const UpdateSprintSchema = z.object({
-  name: z
-    .string()
-    .min(1, 'Sprint name cannot be empty')
-    .max(100, 'Sprint name must be at most 100 characters')
-    .optional(),
-  startDate: z.iso.datetime('Invalid start date').optional(),
-  endDate: z.iso.datetime('Invalid end date').optional(),
-  goal: z.string().max(500).optional(),
+  name: nonEmptyString(100, 'Sprint name').optional(),
+  startDate: isoDateTime().optional(),
+  endDate: isoDateTime().optional(),
+  goal: optionalString(500),
   status: z.enum(SprintStatus).optional(),
 });
 
