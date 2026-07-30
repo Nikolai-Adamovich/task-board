@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { form, FormField, submit, schema, required, email } from '@angular/forms/signals';
-import { AuthClient } from '@services/auth-client';
+import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
@@ -28,7 +28,7 @@ interface LoginModel {
   templateUrl: './login.html',
 })
 export class Login {
-  private readonly authService = inject(AuthClient);
+  private readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
   protected readonly error = signal('');
   private readonly model = signal<LoginModel>({ email: '', password: '' });
@@ -45,7 +45,7 @@ export class Login {
           this.error.set('');
 
           try {
-            await this.authService.login(this.model());
+            await this.authStore.login(this.model());
             await this.router.navigateByUrl('/');
           } catch (err) {
             this.error.set(this.getErrorMessage(err));

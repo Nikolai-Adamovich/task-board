@@ -20,7 +20,7 @@ describe('authGuard', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideRouter([]),
+        provideRouter([{ path: 'auth/login', redirectTo: '/' }]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
       ],
     });

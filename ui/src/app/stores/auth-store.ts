@@ -1,9 +1,8 @@
 import { Service, signal, computed, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { API_BASE_URL } from '@app/api-url.token';
-import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import type { User, AuthResponse } from '@task-board/shared';
+import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { AuthClient } from '@services/auth-client';
+import type { User, AuthResponse, LoginRequest, RegisterRequest } from '@task-board/shared';
 
 const TOKEN_KEY = 'taskboard_token';
 
@@ -16,11 +15,12 @@ interface JwtPayload {
 /**
  * Signal-based auth store.
  * Manages the current user, JWT token, tenant context, and authentication state.
+ * Uses AuthClient for all HTTP calls — the store only handles orchestration and state.
  */
 @Service()
 export class AuthStore {
-  private readonly http = inject(HttpClient);
-  private readonly apiBaseUrl = inject(API_BASE_URL);
+  private readonly authClient = inject(AuthClient);
+  private readonly router = inject(Router);
   readonly currentUser = signal<User | null>(null);
   readonly token = signal<string | null>(null);
   readonly tenantId = signal<string | null>(null);
@@ -46,38 +46,45 @@ export class AuthStore {
   }
 
   /** Log in with email/password and store the result */
-  login(email: string, password: string): void {
-    this.http.post<AuthResponse>(`${this.apiBaseUrl}/auth/login`, { email, password }).subscribe({
-      next: (res) => this.setSession(res),
-      error: (err) => {
-        throw err;
-      },
-    });
+  async login(credentials: LoginRequest): Promise<void> {
+    const res = await firstValueFrom(this.authClient.login(credentials));
+
+    this.setSession(res);
   }
 
   /** Register a new user and store the result */
-  register(displayName: string, email: string, password: string): void {
-    this.http
-      .post<AuthResponse>(`${this.apiBaseUrl}/auth/register`, {
-        displayName,
-        email,
-        password,
-      })
-      .subscribe({
-        next: (res) => this.setSession(res),
-        error: (err) => {
-          throw err;
-        },
-      });
+  async register(data: RegisterRequest): Promise<void> {
+    const res = await firstValueFrom(this.authClient.register(data));
+
+    this.setSession(res);
   }
 
-  /** Clear all auth state and localStorage */
+  /** Fetch the current user using the stored token. */
+  async fetchCurrentUser(): Promise<User> {
+    try {
+      const user = await firstValueFrom(this.authClient.getCurrentUser());
+
+      this.currentUser.set(user);
+      return user;
+    } catch (err: unknown) {
+      // Only clear session on 401 (invalid/expired token).
+      // For other errors (network, 500, etc.) keep the token so the
+      // user stays logged in.
+      if (this.isUnauthorized(err)) {
+        this.logout();
+      }
+      throw err;
+    }
+  }
+
+  /** Clear all auth state, localStorage, and redirect to login */
   logout(): void {
     this.currentUser.set(null);
     this.token.set(null);
     this.tenantId.set(null);
     this.tenantRole.set(null);
     localStorage.removeItem(TOKEN_KEY);
+    this.router.navigate(['/auth/login']);
   }
 
   /** Manually set the tenant context (e.g. when switching tenants) */
@@ -97,6 +104,10 @@ export class AuthStore {
     this.currentUser.set(response.user);
     this.decodeJwtPayload(response.token);
     localStorage.setItem(TOKEN_KEY, response.token);
+  }
+
+  private isUnauthorized(err: unknown): boolean {
+    return err !== null && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 401;
   }
 
   /** Decode tenant-related fields from the JWT payload */
@@ -121,22 +132,5 @@ export class AuthStore {
       this.tenantId.set(null);
       this.tenantRole.set(null);
     }
-  }
-
-  /** Fetch the current user using the stored token. Returns an Observable. */
-  fetchCurrentUser(): Observable<User> {
-    return this.http.get<User>(`${this.apiBaseUrl}/auth/me`).pipe(
-      tap({
-        next: (user) => this.currentUser.set(user),
-        error: (err) => {
-          // Only clear session on 401 (invalid/expired token).
-          // For other errors (network, 500, etc.) keep the token so the
-          // user stays logged in.
-          if (err.status === 401) {
-            this.logout();
-          }
-        },
-      }),
-    );
   }
 }
