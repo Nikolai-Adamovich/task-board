@@ -17,7 +17,7 @@ import type { MyInvitation } from '@task-board/shared';
   templateUrl: './invitation-view.html',
 })
 export class InvitationView {
-  private readonly tenantService = inject(TenantClient);
+  private readonly tenantClient = inject(TenantClient);
   readonly invitations = input<MyInvitation[]>([]);
   readonly invitationHandled = output();
   protected readonly acceptingId = signal<string | null>(null);
@@ -25,7 +25,7 @@ export class InvitationView {
 
   protected acceptInvitation(invitation: MyInvitation): void {
     this.acceptingId.set(invitation.id);
-    this.tenantService.acceptInvitationById(invitation.id).subscribe({
+    this.tenantClient.acceptInvitationById(invitation.id).subscribe({
       next: () => {
         this.acceptingId.set(null);
         this.invitationHandled.emit();
@@ -36,7 +36,7 @@ export class InvitationView {
 
   protected declineInvitation(invitation: MyInvitation): void {
     this.decliningId.set(invitation.id);
-    this.tenantService.declineInvitation(invitation.id).subscribe({
+    this.tenantClient.declineInvitation(invitation.id).subscribe({
       next: () => {
         this.decliningId.set(null);
         this.invitationHandled.emit();

@@ -35,7 +35,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   templateUrl: './project-list.html',
 })
 export class ProjectList implements OnInit {
-  private readonly projectService = inject(ProjectClient);
+  private readonly projectClient = inject(ProjectClient);
   private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   protected readonly projects = signal<Project[]>([]);
@@ -66,7 +66,7 @@ export class ProjectList implements OnInit {
 
   protected loadProjects(): void {
     this.loading.set(true);
-    this.projectService.list().subscribe({
+    this.projectClient.list().subscribe({
       next: (res) => {
         this.projects.set(res.data);
         this.loading.set(false);
@@ -78,7 +78,7 @@ export class ProjectList implements OnInit {
   protected createProject(): void {
     if (!this.newProject.name || !this.newProject.slug) return;
     this.creating.set(true);
-    this.projectService.create(this.newProject).subscribe({
+    this.projectClient.create(this.newProject).subscribe({
       next: (project) => {
         this.projects.update((list) => [...list, project]);
         this.showCreateModal.set(false);

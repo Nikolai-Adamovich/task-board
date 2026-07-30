@@ -40,7 +40,7 @@ const priorityColorMap: Record<string, string> = {
   templateUrl: './task-detail.html',
 })
 export class TaskDetail implements OnInit {
-  private readonly taskService = inject(TaskClient);
+  private readonly taskClient = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
   /** Bound via withComponentInputBinding() */
@@ -57,7 +57,7 @@ export class TaskDetail implements OnInit {
 
   private loadTask(): void {
     this.loading.set(true);
-    this.taskService.getById(this.taskId()).subscribe({
+    this.taskClient.getById(this.taskId()).subscribe({
       next: (task) => {
         this.task.set(task);
         this.loading.set(false);
@@ -97,7 +97,7 @@ export class TaskDetail implements OnInit {
 
     if (!t) return;
     this.saving.set(true);
-    this.taskService.update(t.id, this.editForm).subscribe({
+    this.taskClient.update(t.id, this.editForm).subscribe({
       next: (updated) => {
         this.task.set(updated);
         this.isEditing.set(false);
@@ -109,7 +109,7 @@ export class TaskDetail implements OnInit {
 
   protected deleteTask(task: Task): void {
     if (!confirm('Are you sure you want to delete this task?')) return;
-    this.taskService.delete(task.id).subscribe({
+    this.taskClient.delete(task.id).subscribe({
       next: () => {
         this.router.navigate(['/tenants', task.tenantId, 'projects', task.projectId]);
       },

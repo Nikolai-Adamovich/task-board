@@ -53,8 +53,8 @@ const statusColorMap: Record<string, string> = {
   templateUrl: './sprint-list.html',
 })
 export class SprintList implements OnInit {
-  private readonly sprintService = inject(SprintClient);
-  private readonly projectService = inject(ProjectClient);
+  private readonly sprintClient = inject(SprintClient);
+  private readonly projectClient = inject(ProjectClient);
   private readonly authStore = inject(AuthStore);
   /** Bound via withComponentInputBinding() — optional for tenant-level view */
   readonly projectId = input<string>();
@@ -131,7 +131,7 @@ export class SprintList implements OnInit {
     const projectId = this.projectId();
 
     if (projectId) {
-      this.sprintService.list(projectId).subscribe({
+      this.sprintClient.list(projectId).subscribe({
         next: (res) => {
           this.sprints.set(res.data);
           this.loading.set(false);
@@ -140,12 +140,12 @@ export class SprintList implements OnInit {
       });
     } else {
       // Tenant-level view: load sprints and projects in parallel
-      this.sprintService.listByTenant().subscribe({
+      this.sprintClient.listByTenant().subscribe({
         next: (sprintRes) => {
           this.sprints.set(sprintRes.data);
 
           // Load projects to resolve names
-          this.projectService.list(1, 100).subscribe({
+          this.projectClient.list(1, 100).subscribe({
             next: (projectRes) => {
               this.projects.set(projectRes.data);
 
@@ -179,7 +179,7 @@ export class SprintList implements OnInit {
       goal: this.newSprint.goal,
     };
 
-    this.sprintService.create(projectId, data).subscribe({
+    this.sprintClient.create(projectId, data).subscribe({
       next: (sprint) => {
         this.sprints.update((list) => [...list, sprint]);
         this.showCreateModal.set(false);

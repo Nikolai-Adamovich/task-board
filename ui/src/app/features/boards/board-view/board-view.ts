@@ -36,8 +36,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   templateUrl: './board-view.html',
 })
 export class BoardView implements OnInit {
-  private readonly boardService = inject(BoardClient);
-  private readonly taskService = inject(TaskClient);
+  private readonly boardClient = inject(BoardClient);
+  private readonly taskClient = inject(TaskClient);
   private readonly router = inject(Router);
   /** Bound via withComponentInputBinding() */
   readonly boardId = input.required<string>();
@@ -70,7 +70,7 @@ export class BoardView implements OnInit {
 
   private loadBoard(): void {
     this.loading.set(true);
-    this.boardService.getById(this.boardId()).subscribe({
+    this.boardClient.getById(this.boardId()).subscribe({
       next: (board) => {
         this.board.set(board);
         this.newTask.projectId = board.projectId;
@@ -84,7 +84,7 @@ export class BoardView implements OnInit {
   }
 
   private loadColumns(): void {
-    this.boardService.listColumns(this.boardId()).subscribe({
+    this.boardClient.listColumns(this.boardId()).subscribe({
       next: (res) => {
         const sorted = res.data.sort((a, b) => a.position - b.position);
 
@@ -99,7 +99,7 @@ export class BoardView implements OnInit {
   private loadTasks(): void {
     const query: TaskQuery = { boardId: this.boardId(), limit: 200 };
 
-    this.taskService.list(query).subscribe({
+    this.taskClient.list(query).subscribe({
       next: (res) => this.tasks.set(res.data),
     });
   }
@@ -113,7 +113,7 @@ export class BoardView implements OnInit {
   protected onTaskDrop(event: { task: Task; targetColumnId: string }): void {
     if (event.task.columnId === event.targetColumnId) return;
 
-    this.taskService
+    this.taskClient
       .move({
         taskId: event.task.id,
         targetColumnId: event.targetColumnId,
@@ -132,7 +132,7 @@ export class BoardView implements OnInit {
   protected createTask(): void {
     if (!this.newTask.title || !this.newTask.columnId) return;
     this.creatingTask.set(true);
-    this.taskService.create(this.newTask).subscribe({
+    this.taskClient.create(this.newTask).subscribe({
       next: (task) => {
         this.tasks.update((list) => [...list, task]);
         this.showCreateTask.set(false);

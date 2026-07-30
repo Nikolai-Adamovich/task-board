@@ -39,8 +39,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   templateUrl: './project-detail.html',
 })
 export class ProjectDetail implements OnInit {
-  private readonly projectService = inject(ProjectClient);
-  private readonly boardService = inject(BoardClient);
+  private readonly projectClient = inject(ProjectClient);
+  private readonly boardClient = inject(BoardClient);
   private readonly authStore = inject(AuthStore);
   /** Bound via withComponentInputBinding() */
   readonly projectId = input.required<string>();
@@ -92,7 +92,7 @@ export class ProjectDetail implements OnInit {
 
   private loadProject(): void {
     this.loading.set(true);
-    this.projectService.getById(this.projectId()).subscribe({
+    this.projectClient.getById(this.projectId()).subscribe({
       next: (project) => {
         this.project.set(project);
         this.loadBoards();
@@ -104,13 +104,13 @@ export class ProjectDetail implements OnInit {
   }
 
   private loadBoards(): void {
-    this.boardService.list(this.projectId()).subscribe({
+    this.boardClient.list(this.projectId()).subscribe({
       next: (res) => this.boards.set(res.data),
     });
   }
 
   private loadMembers(): void {
-    this.projectService.listMembers(this.projectId()).subscribe({
+    this.projectClient.listMembers(this.projectId()).subscribe({
       next: (res) => this.members.set(res.data),
     });
   }
@@ -118,7 +118,7 @@ export class ProjectDetail implements OnInit {
   protected createBoard(): void {
     if (!this.newBoard.name) return;
     this.creatingBoard.set(true);
-    this.boardService.create(this.projectId(), this.newBoard).subscribe({
+    this.boardClient.create(this.projectId(), this.newBoard).subscribe({
       next: (board) => {
         this.boards.update((list) => [...list, board]);
         this.showCreateBoard.set(false);
@@ -134,7 +134,7 @@ export class ProjectDetail implements OnInit {
   protected addMember(): void {
     if (!this.newMemberUserId) return;
     this.addingMember.set(true);
-    this.projectService.addMember(this.projectId(), this.newMemberUserId, this.newMemberRole).subscribe({
+    this.projectClient.addMember(this.projectId(), this.newMemberUserId, this.newMemberRole).subscribe({
       next: () => {
         this.loadMembers();
         this.showAddMember.set(false);
@@ -148,7 +148,7 @@ export class ProjectDetail implements OnInit {
 
   protected onRoleChange(member: ProjectMember, newRole: string): void {
     if (newRole === member.role) return;
-    this.projectService.updateMemberRole(this.projectId(), member.userId, newRole).subscribe({
+    this.projectClient.updateMemberRole(this.projectId(), member.userId, newRole).subscribe({
       next: () => this.loadMembers(),
     });
   }
@@ -161,7 +161,7 @@ export class ProjectDetail implements OnInit {
   protected removeMember(): void {
     if (!this.memberToRemove) return;
     this.removingMember.set(true);
-    this.projectService.removeMember(this.projectId(), this.memberToRemove.userId).subscribe({
+    this.projectClient.removeMember(this.projectId(), this.memberToRemove.userId).subscribe({
       next: () => {
         this.loadMembers();
         this.showRemoveConfirm.set(false);

@@ -48,7 +48,7 @@ const statusColorMap: Record<string, string> = {
   templateUrl: './tenant-member-list.html',
 })
 export class TenantMemberList implements OnInit {
-  private readonly tenantService = inject(TenantClient);
+  private readonly tenantClient = inject(TenantClient);
   private readonly authStore = inject(AuthStore);
   /** Bound via withComponentInputBinding() */
   readonly tenantId = input.required<string>();
@@ -89,7 +89,7 @@ export class TenantMemberList implements OnInit {
 
   private loadMembers(): void {
     this.loading.set(true);
-    this.tenantService.listMembers(this.tenantId()).subscribe({
+    this.tenantClient.listMembers(this.tenantId()).subscribe({
       next: (res) => {
         this.members.set(res.data);
         this.loading.set(false);
@@ -102,7 +102,7 @@ export class TenantMemberList implements OnInit {
     if (!this.inviteEmail) return;
 
     this.inviting.set(true);
-    this.tenantService.inviteMember(this.tenantId(), this.inviteEmail, this.inviteRole).subscribe({
+    this.tenantClient.inviteMember(this.tenantId(), this.inviteEmail, this.inviteRole).subscribe({
       next: () => {
         this.inviting.set(false);
         this.showInviteDialog.set(false);
@@ -117,7 +117,7 @@ export class TenantMemberList implements OnInit {
   protected changeRole(member: TenantMember, newRole: string | undefined | null): void {
     if (!newRole || newRole === member.role || !member.userId) return;
 
-    this.tenantService.updateMemberRole(this.tenantId(), member.userId, newRole).subscribe({
+    this.tenantClient.updateMemberRole(this.tenantId(), member.userId, newRole).subscribe({
       next: (updated) => {
         this.members.update((list) => list.map((m) => (m.userId === updated.userId ? updated : m)));
       },
@@ -129,7 +129,7 @@ export class TenantMemberList implements OnInit {
 
     this.removingUserId.set(member.userId);
 
-    this.tenantService.removeMember(this.tenantId(), member.userId).subscribe({
+    this.tenantClient.removeMember(this.tenantId(), member.userId).subscribe({
       next: () => {
         this.members.update((list) => list.filter((m) => m.userId !== member.userId));
         this.removingUserId.set(null);
@@ -142,7 +142,7 @@ export class TenantMemberList implements OnInit {
     if (!member.userId) return;
 
     this.actioningUserId.set(member.userId);
-    this.tenantService.revokeAccess(this.tenantId(), member.userId).subscribe({
+    this.tenantClient.revokeAccess(this.tenantId(), member.userId).subscribe({
       next: () => {
         this.members.update((list) =>
           list.map((m) => (m.userId === member.userId ? { ...m, status: 'access_revoked' as const } : m)),
@@ -157,7 +157,7 @@ export class TenantMemberList implements OnInit {
     if (!member.userId) return;
 
     this.actioningUserId.set(member.userId);
-    this.tenantService.resendInvitation(this.tenantId(), member.userId).subscribe({
+    this.tenantClient.resendInvitation(this.tenantId(), member.userId).subscribe({
       next: () => this.actioningUserId.set(null),
       error: () => this.actioningUserId.set(null),
     });
@@ -167,7 +167,7 @@ export class TenantMemberList implements OnInit {
     if (!member.userId) return;
 
     this.actioningUserId.set(member.userId);
-    this.tenantService.hardDeleteMember(this.tenantId(), member.userId).subscribe({
+    this.tenantClient.hardDeleteMember(this.tenantId(), member.userId).subscribe({
       next: () => {
         this.members.update((list) => list.filter((m) => m.userId !== member.userId));
         this.actioningUserId.set(null);

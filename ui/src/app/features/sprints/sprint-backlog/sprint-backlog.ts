@@ -12,8 +12,8 @@ import type { Task, Sprint } from '@task-board/shared';
   templateUrl: './sprint-backlog.html',
 })
 export class SprintBacklog implements OnInit {
-  private readonly taskService = inject(TaskClient);
-  private readonly sprintService = inject(SprintClient);
+  private readonly taskClient = inject(TaskClient);
+  private readonly sprintClient = inject(SprintClient);
   readonly projectId = input.required<string>();
   readonly boardId = input<string>('');
   readonly targetSprint = input<Sprint | null>(null);
@@ -39,7 +39,7 @@ export class SprintBacklog implements OnInit {
   private loadBacklog(): void {
     this.loading.set(true);
     // Load tasks with no sprint (backlog)
-    this.taskService.list({ projectId: this.projectId(), sprintId: null, limit: 200 }).subscribe({
+    this.taskClient.list({ projectId: this.projectId(), sprintId: null, limit: 200 }).subscribe({
       next: (res) => {
         this.backlogTasks.set(res.data);
         this.loading.set(false);
@@ -52,7 +52,7 @@ export class SprintBacklog implements OnInit {
     const sprint = this.targetSprint();
 
     if (!sprint) return;
-    this.sprintService.addTask(sprint.id, taskId).subscribe({
+    this.sprintClient.addTask(sprint.id, taskId).subscribe({
       next: () => {
         this.backlogTasks.update((list) => list.filter((t) => t.id !== taskId));
         this.taskAdded.emit(taskId);

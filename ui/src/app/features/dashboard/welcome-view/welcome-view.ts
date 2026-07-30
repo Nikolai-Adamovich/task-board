@@ -18,14 +18,14 @@ import type { MyInvitation } from '@task-board/shared';
 })
 export class WelcomeView {
   protected readonly authStore = inject(AuthStore);
-  private readonly tenantService = inject(TenantClient);
+  private readonly tenantClient = inject(TenantClient);
   readonly invitations = input<MyInvitation[]>([]);
   readonly invitationHandled = output();
   protected readonly acceptingId = signal<string | null>(null);
 
   protected acceptInvitation(invitation: MyInvitation): void {
     this.acceptingId.set(invitation.id);
-    this.tenantService.acceptInvitationById(invitation.id).subscribe({
+    this.tenantClient.acceptInvitationById(invitation.id).subscribe({
       next: () => {
         this.acceptingId.set(null);
         this.invitationHandled.emit();

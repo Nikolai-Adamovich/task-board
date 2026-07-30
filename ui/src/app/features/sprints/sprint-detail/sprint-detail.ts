@@ -25,8 +25,8 @@ const statusColorMap: Record<string, string> = {
   templateUrl: './sprint-detail.html',
 })
 export class SprintDetail implements OnInit {
-  private readonly sprintService = inject(SprintClient);
-  private readonly taskService = inject(TaskClient);
+  private readonly sprintClient = inject(SprintClient);
+  private readonly taskClient = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
   /** Bound via withComponentInputBinding() */
   readonly sprintId = input.required<string>();
@@ -70,7 +70,7 @@ export class SprintDetail implements OnInit {
 
   private loadSprint(): void {
     this.loading.set(true);
-    this.sprintService.getById(this.sprintId()).subscribe({
+    this.sprintClient.getById(this.sprintId()).subscribe({
       next: (sprint) => {
         this.sprint.set(sprint);
         this.loadSprintTasks(sprint);
@@ -82,7 +82,7 @@ export class SprintDetail implements OnInit {
 
   private loadSprintTasks(sprint: Sprint): void {
     if (sprint.taskIds.length === 0) return;
-    this.taskService.list({ sprintId: sprint.id, limit: 200 }).subscribe({
+    this.taskClient.list({ sprintId: sprint.id, limit: 200 }).subscribe({
       next: (res) => this.sprintTasks.set(res.data),
     });
   }
@@ -91,7 +91,7 @@ export class SprintDetail implements OnInit {
     const s = this.sprint();
 
     if (!s) return;
-    this.sprintService.removeTask(s.id, taskId).subscribe({
+    this.sprintClient.removeTask(s.id, taskId).subscribe({
       next: () => {
         this.sprintTasks.update((list) => list.filter((t) => t.id !== taskId));
         this.sprint.update((sp) => (sp ? { ...sp, taskIds: sp.taskIds.filter((id) => id !== taskId) } : null));
