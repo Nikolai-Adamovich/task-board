@@ -1,7 +1,10 @@
-import type { Task, CreateTask, UpdateTask, MoveTask, AssignTask } from '@task-board/shared';
+import type { Task, CreateTask, UpdateTask, MoveTask, AssignTask, MyTask } from '@task-board/shared';
 import { ForbiddenError, NotFoundError, ValidationError } from '../middleware/error-handler.js';
 import { TaskRepository, type TaskFilters } from '../repositories/task.repository.js';
 import { ColumnRepository } from '../repositories/column.repository.js';
+import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
+import { TenantRepository } from '../repositories/tenant.repository.js';
+import { ProjectRepository } from '../repositories/project.repository.js';
 
 // ─── Task Service ────────────────────────────────────────────────────────────
 
@@ -9,6 +12,9 @@ export class TaskService {
   constructor(
     private readonly taskRepo: TaskRepository,
     private readonly columnRepo: ColumnRepository,
+    private readonly tenantMemberRepo: TenantMemberRepository,
+    private readonly tenantRepo: TenantRepository,
+    private readonly projectRepo: ProjectRepository,
   ) {}
 
   /**
@@ -165,6 +171,75 @@ export class TaskService {
     }
 
     return updated;
+  }
+
+  // ─── Cross-Tenant "My Tasks" ──────────────────────────────────────────────
+
+  /**
+   * Get all tasks assigned to the user across all active tenant memberships.
+   * Denormalizes tenant name, project name, and column title for the dashboard.
+   */
+  async getMyTasks(userId: string): Promise<MyTask[]> {
+    // 1. Get all active tenant memberships for the user
+    const memberships = await this.tenantMemberRepo.findByUser(userId);
+    const activeTenantIds = memberships.filter((m) => m.status === 'active').map((m) => m.tenantId);
+
+    if (activeTenantIds.length === 0) return [];
+
+    // 2. Find tasks across all active tenants where user is assignee
+    const taskDocs = await this.taskRepo.findByAssignee(userId, activeTenantIds);
+    // 3. Batch lookup caches to avoid redundant queries
+    const tenantNames = new Map<string, string>();
+    const projectNames = new Map<string, string>();
+    const columnTitles = new Map<string, string>();
+    // 4. Denormalize with tenant/project/column names
+    const result: MyTask[] = [];
+
+    for (const doc of taskDocs) {
+      // Tenant name
+      if (!tenantNames.has(doc.tenantId)) {
+        const tenant = await this.tenantRepo.findById(doc.tenantId);
+
+        tenantNames.set(doc.tenantId, tenant?.name ?? '');
+      }
+
+      // Project name
+      const projectKey = `${doc.tenantId}:${doc.projectId}`;
+
+      if (!projectNames.has(projectKey)) {
+        const project = await this.projectRepo.findById(doc.tenantId, doc.projectId);
+
+        projectNames.set(projectKey, project?.name ?? '');
+      }
+
+      // Column title
+      const columnKey = `${doc.tenantId}:${doc.columnId}`;
+
+      if (!columnTitles.has(columnKey)) {
+        const column = await this.columnRepo.findById(doc.tenantId, doc.columnId);
+
+        columnTitles.set(columnKey, column?.name ?? '');
+      }
+
+      result.push({
+        id: doc.id,
+        tenantId: doc.tenantId,
+        tenantName: tenantNames.get(doc.tenantId) ?? '',
+        projectId: doc.projectId,
+        projectName: projectNames.get(projectKey) ?? '',
+        boardId: doc.boardId,
+        columnId: doc.columnId,
+        columnTitle: columnTitles.get(columnKey) ?? '',
+        title: doc.title,
+        description: doc.description ?? null,
+        priority: doc.priority as MyTask['priority'],
+        sprintId: doc.sprintId,
+        createdAt: doc.createdAt.toISOString(),
+        updatedAt: doc.updatedAt.toISOString(),
+      });
+    }
+
+    return result;
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────

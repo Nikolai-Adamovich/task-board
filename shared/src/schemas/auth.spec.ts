@@ -5,7 +5,15 @@
  * Testing both valid and invalid inputs ensures contract compliance between frontend and backend.
  */
 import { describe, it, expect } from 'vitest';
-import { LoginRequestSchema, RegisterRequestSchema, AuthResponseSchema } from './auth.js';
+import {
+  LoginRequestSchema,
+  RegisterRequestSchema,
+  AuthResponseSchema,
+  AcceptInvitationSchema,
+  InvitationDetailsSchema,
+  MyInvitationSchema,
+  PendingInvitationSchema,
+} from './auth.js';
 
 // ─── LoginRequestSchema ──────────────────────────────────────────────────────
 
@@ -223,6 +231,236 @@ describe('AuthResponseSchema', () => {
       token: 'jwt-token-string',
       user: { ...validUser, id: 'not-a-uuid' },
     });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── AcceptInvitationSchema ─────────────────────────────────────────────────
+
+describe('AcceptInvitationSchema', () => {
+  it('should accept valid token-only invitation acceptance', () => {
+    const result = AcceptInvitationSchema.safeParse({ token: 'invite-token-abc123' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept invitation with password and displayName for new user', () => {
+    const result = AcceptInvitationSchema.safeParse({
+      token: 'invite-token-abc123',
+      password: 'securePass123',
+      displayName: 'New User',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject empty token', () => {
+    const result = AcceptInvitationSchema.safeParse({ token: '' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing token', () => {
+    const result = AcceptInvitationSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject password shorter than 8 characters', () => {
+    const result = AcceptInvitationSchema.safeParse({
+      token: 'invite-token-abc123',
+      password: 'short',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept with all optional fields omitted', () => {
+    const result = AcceptInvitationSchema.safeParse({ token: 'valid-token' });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.password).toBeUndefined();
+      expect(result.data.displayName).toBeUndefined();
+    }
+  });
+});
+
+// ─── InvitationDetailsSchema ────────────────────────────────────────────────
+
+describe('InvitationDetailsSchema', () => {
+  const validInvitationDetails = {
+    email: 'invited@example.com',
+    tenantName: 'Acme Corp',
+    role: 'member' as const,
+    status: 'pending' as const,
+    isRegistered: false,
+  };
+
+  it('should accept valid invitation details', () => {
+    const result = InvitationDetailsSchema.safeParse(validInvitationDetails);
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept invitation details for existing user', () => {
+    const result = InvitationDetailsSchema.safeParse({
+      ...validInvitationDetails,
+      isRegistered: true,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject invalid email', () => {
+    const result = InvitationDetailsSchema.safeParse({
+      ...validInvitationDetails,
+      email: 'not-an-email',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid role', () => {
+    const result = InvitationDetailsSchema.safeParse({
+      ...validInvitationDetails,
+      role: 'superadmin',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid status', () => {
+    const result = InvitationDetailsSchema.safeParse({
+      ...validInvitationDetails,
+      status: 'invalid',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = InvitationDetailsSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── MyInvitationSchema ──────────────────────────────────────────────────────
+
+describe('MyInvitationSchema', () => {
+  const validMyInvitation = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    tenantId: '660e8400-e29b-41d4-a716-446655440001',
+    tenantName: 'Acme Corp',
+    role: 'member' as const,
+    invitedEmail: 'invited@example.com',
+    invitedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('should accept valid my-invitation data', () => {
+    const result = MyInvitationSchema.safeParse(validMyInvitation);
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept null invitedAt', () => {
+    const result = MyInvitationSchema.safeParse({ ...validMyInvitation, invitedAt: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject invalid id UUID', () => {
+    const result = MyInvitationSchema.safeParse({ ...validMyInvitation, id: 'not-a-uuid' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid tenantId UUID', () => {
+    const result = MyInvitationSchema.safeParse({ ...validMyInvitation, tenantId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid email', () => {
+    const result = MyInvitationSchema.safeParse({ ...validMyInvitation, invitedEmail: 'not-an-email' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid role', () => {
+    const result = MyInvitationSchema.safeParse({ ...validMyInvitation, role: 'superadmin' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = MyInvitationSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── PendingInvitationSchema ─────────────────────────────────────────────────
+
+describe('PendingInvitationSchema', () => {
+  const validPendingInvitation = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    tenantId: '660e8400-e29b-41d4-a716-446655440001',
+    userId: '770e8400-e29b-41d4-a716-446655440002',
+    invitedEmail: 'pending@example.com',
+    role: 'admin' as const,
+    status: 'pending' as const,
+    invitedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('should accept valid pending invitation data', () => {
+    const result = PendingInvitationSchema.safeParse(validPendingInvitation);
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept null userId (invitee without account)', () => {
+    const result = PendingInvitationSchema.safeParse({ ...validPendingInvitation, userId: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept null invitedEmail', () => {
+    const result = PendingInvitationSchema.safeParse({ ...validPendingInvitation, invitedEmail: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept null invitedAt', () => {
+    const result = PendingInvitationSchema.safeParse({ ...validPendingInvitation, invitedAt: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept all member statuses including access_revoked', () => {
+    for (const status of ['active', 'pending', 'declined', 'access_revoked'] as const) {
+      const result = PendingInvitationSchema.safeParse({ ...validPendingInvitation, status });
+
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it('should reject invalid status', () => {
+    const result = PendingInvitationSchema.safeParse({ ...validPendingInvitation, status: 'banned' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid role', () => {
+    const result = PendingInvitationSchema.safeParse({ ...validPendingInvitation, role: 'superadmin' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = PendingInvitationSchema.safeParse({});
 
     expect(result.success).toBe(false);
   });

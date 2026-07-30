@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { form, FormField, submit, schema, required, email, minLength, maxLength } from '@angular/forms/signals';
 import { AuthClient } from '@services/auth-client';
+import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
@@ -30,6 +31,7 @@ interface RegisterModel {
 })
 export class Register {
   private readonly authService = inject(AuthClient);
+  private readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
   protected readonly error = signal('');
   private readonly model = signal<RegisterModel>({ displayName: '', email: '', password: '' });
@@ -51,7 +53,12 @@ export class Register {
 
           try {
             await this.authService.register(this.model());
-            await this.router.navigateByUrl('/');
+
+            if (this.authStore.needsWorkspace()) {
+              await this.router.navigateByUrl('/workspace/create');
+            } else {
+              await this.router.navigateByUrl('/');
+            }
           } catch (err) {
             this.error.set(this.getErrorMessage(err));
           }

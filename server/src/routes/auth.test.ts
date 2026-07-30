@@ -24,6 +24,17 @@ vi.mock('../services/auth.service.js', () => ({
     register: vi
       .fn()
       .mockResolvedValue({ token: 'jwt-token', user: { id: '1', email: 'new@test', displayName: 'New' } }),
+    acceptInvitation: vi
+      .fn()
+      .mockResolvedValue({ token: 'jwt-token', user: { id: '2', email: 'invited@test', displayName: 'Invited' } }),
+    getInvitationDetails: vi.fn().mockResolvedValue({
+      email: 'invited@test',
+      tenantName: 'Acme',
+      role: 'member',
+      status: 'pending',
+      isRegistered: false,
+    }),
+    me: vi.fn().mockResolvedValue({ id: '1', email: 'test@test', displayName: 'Test' }),
   })),
 }));
 
@@ -251,5 +262,73 @@ describe('POST /api/v1/auth/register', () => {
     const res = await postJson(app, '/api/v1/auth/register', { email: 'a@b.com', password: '12345678' });
 
     expect(res.status).toBe(422);
+  });
+});
+
+// ─── POST /api/v1/auth/accept-invitation ─────────────────────────────────────
+
+describe('POST /api/v1/auth/accept-invitation', () => {
+  const app = createTestApp();
+
+  it('should return 200 for valid token-only acceptance', async () => {
+    const res = await postJson(app, '/api/v1/auth/accept-invitation', { token: 'invite-token-abc123' });
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.token).toBeDefined();
+    expect(body.user).toBeDefined();
+  });
+
+  it('should return 200 for acceptance with password and displayName', async () => {
+    const res = await postJson(app, '/api/v1/auth/accept-invitation', {
+      token: 'invite-token-abc123',
+      password: 'securePass123',
+      displayName: 'New User',
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('should return 422 for empty token', async () => {
+    const res = await postJson(app, '/api/v1/auth/accept-invitation', { token: '' });
+
+    expect(res.status).toBe(422);
+  });
+
+  it('should return 422 for missing token', async () => {
+    const res = await postJson(app, '/api/v1/auth/accept-invitation', {});
+
+    expect(res.status).toBe(422);
+  });
+
+  it('should return 422 for password shorter than 8 chars', async () => {
+    const res = await postJson(app, '/api/v1/auth/accept-invitation', {
+      token: 'invite-token-abc123',
+      password: 'short',
+    });
+
+    expect(res.status).toBe(422);
+  });
+});
+
+// ─── GET /api/v1/auth/invitations/:token ─────────────────────────────────────
+
+describe('GET /api/v1/auth/invitations/:token', () => {
+  const app = createTestApp();
+
+  it('should return 200 with invitation details', async () => {
+    const res = await app.request('/api/v1/auth/invitations/invite-token-abc123', { method: 'GET' }, TEST_ENV);
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.email).toBe('invited@test');
+    expect(body.tenantName).toBe('Acme');
+    expect(body.role).toBe('member');
+    expect(body.status).toBe('pending');
+    expect(body.isRegistered).toBe(false);
   });
 });

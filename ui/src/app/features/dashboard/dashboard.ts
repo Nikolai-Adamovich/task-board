@@ -1,46 +1,85 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
+import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { AuthStore } from '@stores/auth-store';
 import { TenantClient } from '@services/tenant-client';
-import { ProjectClient } from '@services/project-client';
+import { TaskClient } from '@services/task-client';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import { HlmCardImports } from '@spartan-ng/helm/card';
-import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
-import type { Project } from '@task-board/shared';
+import type { TenantWithRole, MyInvitation, MyTask } from '@task-board/shared';
+
+// Sub-views
+import { LandingPage } from './landing-page/landing-page';
+import { WelcomeView } from './welcome-view/welcome-view';
+import { InvitationView } from './invitation-view/invitation-view';
+import { MemberDashboard } from './member-dashboard/member-dashboard';
+import { OwnerDashboard } from './owner-dashboard/owner-dashboard';
+
+type DashboardState = 'visitor' | 'new-user' | 'pending-invitations' | 'member' | 'owner';
 
 @Component({
   selector: 'ui-dashboard',
-  imports: [RouterLink, DatePipe, HlmSpinnerImports, HlmCardImports, HlmAvatarImports],
+  imports: [HlmSpinnerImports, LandingPage, WelcomeView, InvitationView, MemberDashboard, OwnerDashboard],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
   protected readonly authStore = inject(AuthStore);
   protected readonly tenantService = inject(TenantClient);
-  private readonly projectService = inject(ProjectClient);
-  protected readonly projects = signal<Project[]>([]);
+  protected readonly taskClient = inject(TaskClient);
+  protected readonly tenants = signal<TenantWithRole[]>([]);
+  protected readonly invitations = signal<MyInvitation[]>([]);
+  protected readonly tasks = signal<MyTask[]>([]);
   protected readonly loading = signal(true);
+  protected readonly dashboardState = computed<DashboardState>(() => {
+    if (!this.authStore.isAuthenticated()) return 'visitor';
+    if (this.invitations().length > 0 && this.tenants().length === 0) return 'pending-invitations';
+    if (this.tenants().length === 0) return 'new-user';
+    if (this.tenants().some((t) => t.role === 'owner')) return 'owner';
+    return 'member';
+  });
 
   ngOnInit(): void {
-    // fetchCurrentUser is now handled by the authGuard before the
-    // Dashboard loads. No need to call it here.
+    if (!this.authStore.isAuthenticated()) {
+      this.loading.set(false);
+      return;
+    }
 
-    // Load tenants first, then load projects once tenant is available
+    // Load tenants (with roles)
     this.tenantService.loadTenants().subscribe({
       next: () => {
-        if (this.tenantService.activeTenant()) {
-          this.loadProjects();
-        }
+        this.tenants.set(this.tenantService.tenants() as TenantWithRole[]);
+        this.loadData();
       },
+      error: () => this.loading.set(false),
     });
   }
 
-  private loadProjects(): void {
-    this.loading.set(true);
-    this.projectService.list(1, 6).subscribe({
+  private loadData(): void {
+    let pending = 2;
+    const done = () => {
+      if (--pending === 0) this.loading.set(false);
+    };
+
+    this.tenantService.getMyInvitations().subscribe({
       next: (res) => {
-        this.projects.set(res.data);
-        this.loading.set(false);
+        this.invitations.set(res.data);
+        done();
+      },
+      error: () => done(),
+    });
+
+    this.taskClient.getMyTasks().subscribe({
+      next: (res) => {
+        this.tasks.set(res.data);
+        done();
+      },
+      error: () => done(),
+    });
+  }
+
+  protected onInvitationHandled(): void {
+    this.loading.set(true);
+    this.tenantService.loadTenants().subscribe({
+      next: () => {
+        this.tenants.set(this.tenantService.tenants() as TenantWithRole[]);
+        this.loadData();
       },
       error: () => this.loading.set(false),
     });

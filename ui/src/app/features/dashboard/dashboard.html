@@ -1,105 +1,23 @@
-<div class="mx-auto max-w-5xl">
-  <!-- Welcome header -->
-  <div class="mb-8">
-    <h2 class="text-2xl font-bold text-foreground">
-      Welcome back
-      @if (authStore.currentUser(); as user) {
-        , {{ user.displayName }}
-      }
-    </h2>
-    <p class="mt-1 text-sm text-muted-foreground">Here's an overview of your workspace.</p>
+@if (loading()) {
+  <div class="flex items-center justify-center py-20">
+    <hlm-spinner />
   </div>
-
-  <!-- Active tenant info -->
-  @if (tenantService.activeTenant(); as tenant) {
-    <hlm-card class="mb-6">
-      <div hlmCardContent>
-        <div class="flex items-center gap-3">
-          <hlm-avatar class="h-10 w-10">
-            <div hlmAvatarFallback class="text-sm font-bold">
-              {{ tenant.name.substring(0, 2).toUpperCase() }}
-            </div>
-          </hlm-avatar>
-          <div>
-            <h3 class="text-base font-semibold text-foreground">{{ tenant.name }}</h3>
-            <p class="text-xs text-muted-foreground">Active workspace</p>
-          </div>
-        </div>
-      </div>
-    </hlm-card>
-  }
-
-  <!-- Quick stats -->
-  <div class="mb-8 grid gap-4 sm:grid-cols-2">
-    <hlm-card>
-      <div hlmCardContent>
-        <p class="text-xs font-medium uppercase text-muted-foreground">Projects</p>
-        @if (loading()) {
-          <hlm-spinner class="mt-2 text-sm" />
-        } @else {
-          <p class="mt-1 text-3xl font-bold text-foreground">{{ projects().length }}</p>
-        }
-      </div>
-    </hlm-card>
-    <hlm-card>
-      <div hlmCardContent>
-        <p class="text-xs font-medium uppercase text-muted-foreground">Active Tenant</p>
-        <p class="mt-1 text-lg font-semibold text-foreground">
-          {{ tenantService.activeTenant()?.name ?? 'None' }}
-        </p>
-      </div>
-    </hlm-card>
-  </div>
-
-  <!-- Recent projects -->
-  <section>
-    <div class="mb-4 flex items-center justify-between">
-      <h3 class="text-lg font-semibold text-foreground">Recent Projects</h3>
-      @if (tenantService.activeTenant()) {
-        <a
-          [routerLink]="['/tenants', tenantService.activeTenant()!.id, 'projects']"
-          class="text-sm font-medium text-primary hover:underline"
-        >
-          View all →
-        </a>
-      }
-    </div>
-
-    @if (loading()) {
-      <div class="flex items-center justify-center py-8">
-        <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading projects...</span>
-      </div>
-    } @else if (projects().length === 0) {
-      <div class="rounded-lg border border-dashed border-border py-8 text-center">
-        <p class="text-sm text-muted-foreground">No projects yet.</p>
-        @if (tenantService.activeTenant()) {
-          <a
-            [routerLink]="['/tenants', tenantService.activeTenant()!.id, 'projects']"
-            class="mt-2 inline-block text-sm font-medium text-primary hover:underline"
-          >
-            Create your first project
-          </a>
-        }
-      </div>
-    } @else {
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        @for (project of projects().slice(0, 6); track project.id) {
-          <a
-            [routerLink]="['/tenants', tenantService.activeTenant()!.id, 'projects', project.id]"
-            class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
-          >
-            <h4 class="text-sm font-semibold text-foreground group-hover:text-primary">
-              {{ project.name }}
-            </h4>
-            @if (project.description) {
-              <p class="mt-1 line-clamp-1 text-xs text-muted-foreground">{{ project.description }}</p>
-            }
-            <p class="mt-2 text-xs text-muted-foreground">
-              {{ project.createdAt | date: 'mediumDate' }}
-            </p>
-          </a>
-        }
-      </div>
+} @else {
+  @switch (dashboardState()) {
+    @case ('visitor') {
+      <ui-landing-page />
     }
-  </section>
-</div>
+    @case ('new-user') {
+      <ui-welcome-view [invitations]="invitations()" (invitationHandled)="onInvitationHandled()" />
+    }
+    @case ('pending-invitations') {
+      <ui-invitation-view [invitations]="invitations()" (invitationHandled)="onInvitationHandled()" />
+    }
+    @case ('member') {
+      <ui-member-dashboard [tenants]="tenants()" [tasks]="tasks()" />
+    }
+    @case ('owner') {
+      <ui-owner-dashboard [tenants]="tenants()" [tasks]="tasks()" />
+    }
+  }
+}

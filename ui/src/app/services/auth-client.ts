@@ -21,20 +21,14 @@ export class AuthClient {
   async login(credentials: LoginRequest): Promise<void> {
     const res = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/auth/login`, credentials));
 
-    this.authStore.token.set(res.token);
-    this.authStore.currentUser.set(res.user);
-
-    localStorage.setItem('taskboard_token', res.token);
+    this.authStore.setSession(res);
   }
 
   /** Register a new user and store session */
   async register(data: RegisterRequest): Promise<void> {
     const res = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/auth/register`, data));
 
-    this.authStore.token.set(res.token);
-    this.authStore.currentUser.set(res.user);
-
-    localStorage.setItem('taskboard_token', res.token);
+    this.authStore.setSession(res);
   }
 
   /** Clear session and redirect to login */

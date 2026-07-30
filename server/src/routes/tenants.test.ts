@@ -34,6 +34,7 @@ const mockMember = {
 vi.mock('../services/tenant.service.js', () => ({
   TenantService: vi.fn().mockImplementation(() => ({
     listTenantsForUser: vi.fn().mockResolvedValue([mockTenant]),
+    listTenantsWithRole: vi.fn().mockResolvedValue([{ ...mockTenant, role: 'owner' }]),
     createTenant: vi.fn().mockResolvedValue(mockTenant),
     getTenant: vi.fn().mockResolvedValue(mockTenant),
     updateTenant: vi.fn().mockResolvedValue(mockTenant),
@@ -42,6 +43,10 @@ vi.mock('../services/tenant.service.js', () => ({
     inviteMember: vi.fn().mockResolvedValue(mockMember),
     updateMemberRole: vi.fn().mockResolvedValue(mockMember),
     removeMember: vi.fn().mockResolvedValue(undefined),
+    getPendingInvitationsByTenant: vi.fn().mockResolvedValue([]),
+    revokeAccess: vi.fn().mockResolvedValue(undefined),
+    resendInvitation: vi.fn().mockResolvedValue(undefined),
+    hardDeleteMember: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 

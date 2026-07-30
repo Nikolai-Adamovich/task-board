@@ -4,9 +4,15 @@ import { validateBody } from '../middleware/validation.js';
 import { TaskService } from '../services/task.service.js';
 import { TaskRepository, type TaskFilters } from '../repositories/task.repository.js';
 import { ColumnRepository } from '../repositories/column.repository.js';
+import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
+import { TenantRepository } from '../repositories/tenant.repository.js';
+import { ProjectRepository } from '../repositories/project.repository.js';
 import { getCollection } from '../db/mongo.js';
 import type { TaskDocument } from '../repositories/task.repository.js';
 import type { ColumnDocument } from '../repositories/column.repository.js';
+import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
+import type { TenantDocument } from '../repositories/tenant.repository.js';
+import type { ProjectDocument } from '../repositories/project.repository.js';
 import { CreateTaskSchema, UpdateTaskSchema, MoveTaskSchema, AssignTaskSchema } from '@task-board/shared';
 
 // ─── Task Routes ─────────────────────────────────────────────────────────────
@@ -163,6 +169,9 @@ export function createTaskRoutes(): Hono<AppEnv> {
 function createTaskService(): TaskService {
   const taskRepo = new TaskRepository(getCollection<TaskDocument>('tasks'));
   const columnRepo = new ColumnRepository(getCollection<ColumnDocument>('columns'));
+  const tenantMemberRepo = new TenantMemberRepository(getCollection<TenantMemberDocument>('tenant_members'));
+  const tenantRepo = new TenantRepository(getCollection<TenantDocument>('tenants'));
+  const projectRepo = new ProjectRepository(getCollection<ProjectDocument>('projects'));
 
-  return new TaskService(taskRepo, columnRepo);
+  return new TaskService(taskRepo, columnRepo, tenantMemberRepo, tenantRepo, projectRepo);
 }

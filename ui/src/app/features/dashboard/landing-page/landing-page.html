@@ -1,0 +1,62 @@
+<div class="mx-auto max-w-4xl py-12">
+  <!-- Hero Section -->
+  <div class="mb-16 text-center">
+    <h1 class="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">Task Board</h1>
+    <p class="mt-4 text-lg text-muted-foreground">Simple project management for teams</p>
+    <div class="mt-8 flex items-center justify-center gap-4">
+      <a hlmBtn size="lg" routerLink="/auth/register"> Get Started </a>
+      <a hlmBtn variant="outline" size="lg" routerLink="/auth/login"> Sign In </a>
+    </div>
+  </div>
+
+  <!-- Feature Cards -->
+  <div class="grid gap-6 sm:grid-cols-2">
+    <hlm-card>
+      <div hlmCardContent class="pt-6">
+        <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <ng-icon name="lucideLayoutDashboard" class="h-5 w-5 text-primary" />
+        </div>
+        <h3 class="text-base font-semibold text-foreground">Kanban Boards</h3>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Visualize your workflow with drag-and-drop boards. Track tasks across columns from backlog to done.
+        </p>
+      </div>
+    </hlm-card>
+
+    <hlm-card>
+      <div hlmCardContent class="pt-6">
+        <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <ng-icon name="lucideFolderKanban" class="h-5 w-5 text-primary" />
+        </div>
+        <h3 class="text-base font-semibold text-foreground">Sprints</h3>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Plan and execute sprints with ease. Track velocity and deliver on time.
+        </p>
+      </div>
+    </hlm-card>
+
+    <hlm-card>
+      <div hlmCardContent class="pt-6">
+        <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <ng-icon name="lucideUsers" class="h-5 w-5 text-primary" />
+        </div>
+        <h3 class="text-base font-semibold text-foreground">Team Collaboration</h3>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Invite team members, assign roles, and collaborate in real time on projects.
+        </p>
+      </div>
+    </hlm-card>
+
+    <hlm-card>
+      <div hlmCardContent class="pt-6">
+        <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <ng-icon name="lucideBuilding2" class="h-5 w-5 text-primary" />
+        </div>
+        <h3 class="text-base font-semibold text-foreground">Multi-Workspace</h3>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Manage multiple workspaces for different teams or clients from a single account.
+        </p>
+      </div>
+    </hlm-card>
+  </div>
+</div>

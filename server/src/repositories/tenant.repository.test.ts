@@ -26,6 +26,7 @@ function makeDoc(overrides: Partial<TenantDocument> = {}): TenantDocument {
     id: 'tenant-123',
     name: 'Test Tenant',
     slug: 'test-tenant',
+    subscription: 'free',
     createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
@@ -52,6 +53,7 @@ describe('TenantRepository', () => {
         id: 'tenant-123',
         name: 'Test Tenant',
         slug: 'test-tenant',
+        subscription: 'free',
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
       });

@@ -1,0 +1,75 @@
+<div class="flex min-h-screen items-center justify-center bg-surface-50">
+  <hlm-card class="w-full max-w-md">
+    <hlm-card-header>
+      <h3 hlmCardTitle>Create your workspace</h3>
+      <p hlmCardDescription>Set up a workspace to start managing your projects.</p>
+    </hlm-card-header>
+
+    <div hlmCardContent>
+      @if (error()) {
+        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() }}
+        </div>
+      }
+
+      <form id="workspace-form" (submit)="onSubmit(); $event.preventDefault()">
+        <hlm-field-group>
+          <hlm-field>
+            <label hlmFieldLabel for="workspace-name">Workspace Name</label>
+            <input
+              hlmInput
+              id="workspace-name"
+              type="text"
+              [formField]="workspaceForm.name"
+              placeholder="My Workspace"
+              (input)="onNameChange()"
+            />
+            @if (workspaceForm.name().touched() && workspaceForm.name().errors().length) {
+              <p hlm-field-error>{{ workspaceForm.name().errors()[0].message }}</p>
+            }
+          </hlm-field>
+
+          <hlm-field>
+            <label hlmFieldLabel for="workspace-slug">Slug</label>
+            <input
+              hlmInput
+              id="workspace-slug"
+              type="text"
+              [formField]="workspaceForm.slug"
+              placeholder="my-workspace"
+            />
+            @if (workspaceForm.slug().touched() && workspaceForm.slug().errors().length) {
+              <p hlm-field-error>{{ workspaceForm.slug().errors()[0].message }}</p>
+            }
+            <p class="mt-1 text-xs text-muted-foreground">
+              Used in URLs. Only lowercase letters, numbers, and hyphens.
+            </p>
+          </hlm-field>
+
+          <div class="space-y-1">
+            <span class="text-sm font-medium text-foreground">Subscription Plan</span>
+            <div class="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-foreground">
+              Free — Up to 3 projects and 5 users
+            </div>
+          </div>
+        </hlm-field-group>
+      </form>
+    </div>
+
+    <hlm-card-footer>
+      <button
+        hlmBtn
+        type="submit"
+        form="workspace-form"
+        class="w-full"
+        [disabled]="workspaceForm().invalid() || workspaceForm().submitting()"
+      >
+        @if (workspaceForm().submitting()) {
+          <hlm-spinner /> Creating workspace...
+        } @else {
+          Create Workspace
+        }
+      </button>
+    </hlm-card-footer>
+  </hlm-card>
+</div>

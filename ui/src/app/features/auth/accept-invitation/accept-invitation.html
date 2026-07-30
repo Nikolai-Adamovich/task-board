@@ -1,0 +1,139 @@
+<div class="flex min-h-screen items-center justify-center bg-surface-50">
+  @if (loading()) {
+    <div class="flex items-center justify-center">
+      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading invitation...</span>
+    </div>
+  } @else if (error() && !invitation()) {
+    <hlm-card class="w-full max-w-md">
+      <hlm-card-header>
+        <h3 hlmCardTitle>Invitation Error</h3>
+      </hlm-card-header>
+      <div hlmCardContent>
+        <div class="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() }}
+        </div>
+      </div>
+      <hlm-card-footer>
+        <a routerLink="/auth/login" hlmBtn variant="outline" class="w-full">Go to Login</a>
+      </hlm-card-footer>
+    </hlm-card>
+  } @else if (invitation(); as inv) {
+    <hlm-card class="w-full max-w-md">
+      <hlm-card-header>
+        <h3 hlmCardTitle>Accept Invitation</h3>
+        <p hlmCardDescription>You've been invited to join a workspace.</p>
+      </hlm-card-header>
+
+      <div hlmCardContent>
+        @if (error()) {
+          <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+            {{ error() }}
+          </div>
+        }
+
+        <!-- Invitation details (readonly) -->
+        <div class="mb-4 space-y-2 rounded-md bg-muted/50 p-3">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">Email</span>
+            <span class="text-sm font-medium text-foreground">{{ inv.email }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">Workspace</span>
+            <span class="text-sm font-medium text-foreground">{{ inv.tenantName }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">Role</span>
+            <span hlmBadge variant="outline">{{ inv.role }}</span>
+          </div>
+        </div>
+
+        @if (inv.isRegistered) {
+          <!-- Existing user: just accept -->
+          <p class="text-sm text-muted-foreground">
+            You already have an account. Click below to accept this invitation.
+          </p>
+        } @else {
+          <!-- New user: show registration form -->
+          <form id="invitation-form" (submit)="onSubmit(); $event.preventDefault()">
+            <hlm-field-group>
+              <hlm-field>
+                <label hlmFieldLabel for="displayName">Display Name</label>
+                <input
+                  hlmInput
+                  id="displayName"
+                  type="text"
+                  [formField]="invitationForm.displayName"
+                  autocomplete="name"
+                  placeholder="John Doe"
+                />
+                @if (invitationForm.displayName().touched() && invitationForm.displayName().errors().length) {
+                  <p hlm-field-error>{{ invitationForm.displayName().errors()[0].message }}</p>
+                }
+              </hlm-field>
+
+              <hlm-field>
+                <label hlmFieldLabel for="password">Password</label>
+                <input
+                  hlmInput
+                  id="password"
+                  type="password"
+                  [formField]="invitationForm.password"
+                  autocomplete="new-password"
+                  placeholder="••••••••"
+                />
+                @if (invitationForm.password().touched() && invitationForm.password().errors().length) {
+                  <p hlm-field-error>{{ invitationForm.password().errors()[0].message }}</p>
+                }
+              </hlm-field>
+
+              <hlm-field>
+                <label hlmFieldLabel for="confirmPassword">Confirm Password</label>
+                <input
+                  hlmInput
+                  id="confirmPassword"
+                  type="password"
+                  [formField]="invitationForm.confirmPassword"
+                  autocomplete="new-password"
+                  placeholder="••••••••"
+                />
+                @if (invitationForm.confirmPassword().touched() && invitationForm.confirmPassword().errors().length) {
+                  <p hlm-field-error>{{ invitationForm.confirmPassword().errors()[0].message }}</p>
+                }
+              </hlm-field>
+            </hlm-field-group>
+          </form>
+        }
+      </div>
+
+      <hlm-card-footer class="flex-col gap-2">
+        @if (inv.isRegistered) {
+          <button hlmBtn class="w-full" [disabled]="submitting()" (click)="acceptAsExistingUser()">
+            @if (submitting()) {
+              <hlm-spinner /> Accepting...
+            } @else {
+              Accept Invitation
+            }
+          </button>
+        } @else {
+          <button
+            hlmBtn
+            type="submit"
+            form="invitation-form"
+            class="w-full"
+            [disabled]="invitationForm().invalid() || invitationForm().submitting() || submitting()"
+          >
+            @if (invitationForm().submitting() || submitting()) {
+              <hlm-spinner /> Creating account...
+            } @else {
+              Create Account & Accept
+            }
+          </button>
+        }
+        <p class="text-center text-sm text-muted-foreground">
+          Already have an account?
+          <a routerLink="/auth/login" class="font-medium text-primary hover:underline">Sign in</a>
+        </p>
+      </hlm-card-footer>
+    </hlm-card>
+  }
+</div>

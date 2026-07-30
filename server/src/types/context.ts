@@ -16,6 +16,8 @@ export interface AppEnv {
     MONGODB_URI: string;
     JWT_SECRET: string;
     ALLOWED_ORIGINS?: string;
+    RESEND_API_KEY?: string;
+    FRONTEND_URL?: string;
   };
   Variables: {
     userId: string;

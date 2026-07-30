@@ -9,6 +9,7 @@ interface TenantMemberDocument {
   userId: string;
   tenantId: string;
   role: string;
+  status: string;
 }
 
 // ─── Tenant Context Middleware ────────────────────────────────────────────────
@@ -49,6 +50,17 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
 
   if (!membership) {
     throw new ForbiddenError('You are not a member of this tenant');
+  }
+
+  // Check membership status
+  if (membership.status !== 'active') {
+    if (membership.status === 'pending') {
+      throw new ForbiddenError('Your membership is pending. Please accept the invitation first.');
+    }
+    if (membership.status === 'declined') {
+      throw new ForbiddenError('Your membership has been declined.');
+    }
+    throw new ForbiddenError('Your membership is not active');
   }
 
   // Set tenant context for downstream handlers

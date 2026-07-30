@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TenantRole } from '../constants/roles.js';
+import { MemberStatus, SubscriptionTier, TenantRole } from '../constants/roles.js';
 
 /**
  * Tenant (organization) entity schema.
@@ -16,6 +16,8 @@ export const TenantSchema = z.object({
     .min(2)
     .max(80)
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
+  /** Subscription tier */
+  subscription: z.enum(SubscriptionTier),
   /** Creation timestamp (ISO 8601) */
   createdAt: z.iso.datetime(),
   /** Last update timestamp (ISO 8601) */
@@ -35,6 +37,7 @@ export const CreateTenantSchema = z.object({
     .min(2, 'Slug must be at least 2 characters')
     .max(80, 'Slug must be at most 80 characters')
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
+  subscription: z.enum(SubscriptionTier).default('free'),
 });
 
 /** Inferred CreateTenant type */
@@ -66,13 +69,44 @@ export type UpdateTenant = z.infer<typeof UpdateTenantSchema>;
  * Represents a user's membership in a tenant with a specific role.
  */
 export const TenantMemberSchema = z.object({
-  /** User ID of the member */
-  userId: z.uuid(),
+  /** User ID of the member (null for pending invitations) */
+  userId: z.uuid().nullable(),
   /** Tenant ID */
   tenantId: z.uuid(),
   /** Role of the user within the tenant */
   role: z.enum(TenantRole),
+  /** Member status */
+  status: z.enum(MemberStatus),
+  /** Email address for pending invitations */
+  invitedEmail: z.email().nullable(),
+  /** Invitation token for pending invitations */
+  invitationToken: z.string().nullable(),
+  /** Timestamp when the invitation was sent (ISO 8601) */
+  invitedAt: z.iso.datetime().nullable(),
 });
 
 /** Inferred TenantMember type */
 export type TenantMember = z.infer<typeof TenantMemberSchema>;
+
+/**
+ * Schema for inviting a new member to a tenant.
+ */
+export const InviteMemberSchema = z.object({
+  email: z.email({ message: 'Invalid email address', pattern: z.regexes.html5Email }),
+  role: z.enum(TenantRole),
+});
+
+/** Inferred InviteMember type */
+export type InviteMember = z.infer<typeof InviteMemberSchema>;
+
+/**
+ * Tenant entity with the current user's role.
+ * Used by the "list my tenants" endpoint so the UI knows
+ * what role the caller has without an extra request.
+ */
+export const TenantWithRoleSchema = TenantSchema.extend({
+  role: z.enum(TenantRole),
+});
+
+/** Inferred TenantWithRole type */
+export type TenantWithRole = z.infer<typeof TenantWithRoleSchema>;

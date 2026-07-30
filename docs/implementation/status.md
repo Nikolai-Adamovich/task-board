@@ -1,39 +1,42 @@
 # Task Board MVP — Implementation Status
 
-> **Last updated:** 2026-07-29 **Current stage:** Phase 9 Complete — Missing UI Features
+> **Last updated:** 2026-07-30 **Current stage:** Phase 11 Complete — Jira-Style Dashboard
 
 ---
 
 ## Pipeline Progress
 
-| Stage     | Status      | Artifact                     | Notes                                                                                                                                   |
-| --------- | ----------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Analyst   | ✅ Approved | `technical_specification.md` | Version/modernity audit complete; blocking questions resolved                                                                           |
-| Architect | ✅ Approved | `architecture.md`            | Updated to v2.0.0: Angular 22 zoneless/signals, Zod v4, Tailwind v4, MongoDB v7                                                         |
-| Planner   | ✅ Approved | `plan.md`                    | Updated to v2.0.0: 94 tasks across 10 phases aligned with spec/architecture v2.0.0                                                      |
-| Developer | ✅ Complete | Source code                  | All 9 phases implemented: shared package, backend (Hono on Workers), frontend (Angular 22), integration tests, CI/CD, deployment config |
+| Stage     | Status      | Artifact                     | Notes                                                                  |
+| --------- | ----------- | ---------------------------- | ---------------------------------------------------------------------- |
+| Analyst   | ✅ Approved | `technical_specification.md` | Updated to v4.0.0: user workflow, invitations, subscription tiers      |
+| Architect | ✅ Approved | `architecture.md`            | Updated to v4.0.0: invitation system, subscription model, Resend email |
+| Planner   | ✅ Approved | `plan.md`                    | Updated to v4.0.0: 122 tasks across 11 phases (28 new in Phase 10)     |
+| Developer | ✅ Complete | Source code                  | Phase 11 implemented: Jira-style dashboard with 5 adaptive states      |
 
 ## Phase Summary
 
-| Phase | Description                                              | Status      | Notes                                                                      |
-| ----- | -------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- |
-| 1     | Project scaffolding & shared package                     | ✅ Complete | npm workspaces, TypeScript 6, ESLint 9, Prettier 3, Husky, Commitlint      |
-| 2     | Shared package — schemas & validators                    | ✅ Complete | Zod v4 schemas, UUID/slug/pagination validators, API contracts             |
-| 3     | Backend — auth & tenancy                                 | ✅ Complete | Hono on Workers, JWT auth, multi-tenant context, MongoDB Driver v7         |
-| 4     | Backend — projects, boards, columns                      | ✅ Complete | Full CRUD with RBAC, board default columns                                 |
-| 5     | Backend — tasks & sprints                                | ✅ Complete | Task CRUD, move/assign, sprint CRUD, task-sprint association               |
-| 6     | Frontend — auth & shell                                  | ✅ Complete | Angular 22 zoneless, login/register, app shell, tenant switcher            |
-| 7     | Frontend — features (projects, boards, tasks, sprints)   | ✅ Complete | Kanban board view, drag-and-drop, sprint management                        |
-| 8     | Integration & Polish                                     | ✅ Complete | E2E API integration verified, 312 tests, CI/CD pipeline, deployment config |
-| 9     | Missing UI Features (tenant settings, member management) | ✅ Complete | Tenant settings, tenant members, project member management, RBAC UI        |
+| Phase | Description                                                                  | Status      | Notes                                                                                                |
+| ----- | ---------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| 1     | Project scaffolding & shared package                                         | ✅ Complete | npm workspaces, TypeScript 6, ESLint 9, Prettier 3, Husky, Commitlint                                |
+| 2     | Shared package — schemas & validators                                        | ✅ Complete | Zod v4 schemas, UUID/slug/pagination validators, API contracts                                       |
+| 3     | Backend — auth & tenancy                                                     | ✅ Complete | Hono on Workers, JWT auth, multi-tenant context, MongoDB Driver v7                                   |
+| 4     | Backend — projects, boards, columns                                          | ✅ Complete | Full CRUD with RBAC, board default columns                                                           |
+| 5     | Backend — tasks & sprints                                                    | ✅ Complete | Task CRUD, move/assign, sprint CRUD, task-sprint association                                         |
+| 6     | Frontend — auth & shell                                                      | ✅ Complete | Angular 22 zoneless, login/register, app shell, tenant switcher                                      |
+| 7     | Frontend — features (projects, boards, tasks, sprints)                       | ✅ Complete | Kanban board view, drag-and-drop, sprint management                                                  |
+| 8     | Integration & Polish                                                         | ✅ Complete | E2E API integration verified, 312 tests, CI/CD pipeline, deployment config                           |
+| 9     | Missing UI Features (tenant settings, member management)                     | ✅ Complete | Tenant settings, tenant members, project member management, RBAC UI                                  |
+| 10    | User Workflow Rework (invitations, subscriptions, registration)              | ✅ Complete | New registration flow, invitation system, subscription tiers, 6 new UI components                    |
+| 11    | Jira-Style Dashboard (5 adaptive states, landing page, cross-tenant queries) | ✅ Complete | Visitor landing, new-user CTA, invitation management, member/owner dashboards, access_revoked status |
 
 ## Test Results
 
-| Package   | Framework | Tests   | Status          |
-| --------- | --------- | ------- | --------------- |
-| shared    | Vitest    | 151     | ✅ All pass     |
-| server    | Vitest    | 344     | ✅ All pass     |
-| **Total** |           | **495** | **✅ All pass** |
+| Package   | Framework     | Tests   | Status          |
+| --------- | ------------- | ------- | --------------- |
+| shared    | Vitest        | 215     | ✅ All pass     |
+| server    | Vitest        | 361     | ✅ All pass     |
+| ui        | Karma/Jasmine | 53      | ✅ All pass     |
+| **Total** |               | **629** | **✅ All pass** |
 
 ### Build Status
 
@@ -137,6 +140,101 @@
 - `server/src/routes/tasks.test.ts` — Task API route tests (37 tests)
 - `server/src/routes/sprints.test.ts` — Sprint API route tests (27 tests)
 
+## Files Created/Modified in Phase 10
+
+### Shared package updates
+
+- `shared/src/constants/roles.ts` — Added `MemberStatus`, `SubscriptionTier` constants
+- `shared/src/schemas/tenant.ts` — Updated `TenantSchema` (subscription), `TenantMemberSchema` (nullable userId, status,
+  invitation fields), added `InviteMemberSchema`
+- `shared/src/schemas/auth.ts` — Added `AcceptInvitationSchema`, `InvitationDetailsSchema`
+- `shared/src/contracts/tenant.contracts.ts` — Updated `addMember` contract body
+- `shared/src/contracts/auth.contracts.ts` — Added `acceptInvitation`, `getInvitation` contracts
+- `shared/src/index.ts` — Updated barrel exports
+
+### Backend updates
+
+- `server/src/services/email.service.ts` — New: `EmailService` (Resend) + `ConsoleEmailService`
+- `server/src/repositories/tenant-member.repository.ts` — Updated: nullable userId, invitation fields, new query methods
+- `server/src/repositories/tenant.repository.ts` — Updated: subscription field
+- `server/src/repositories/project.repository.ts` — Updated: added `countByTenant()`
+- `server/src/services/auth.service.ts` — Updated: no auto-tenant, tenantId:null JWT, acceptInvitation,
+  getInvitationDetails
+- `server/src/services/tenant.service.ts` — Updated: subscription limits, invitation flow with email
+- `server/src/services/project.service.ts` — Updated: subscription limit check
+- `server/src/middleware/tenant-context.ts` — Updated: status check (active/pending/declined)
+- `server/src/routes/auth.ts` — Updated: added accept-invitation and invitation details routes
+- `server/src/routes/tenants.ts` — Updated: invite body validation, EmailService wiring
+- `server/src/types/context.ts` — Updated: added RESEND_API_KEY, FRONTEND_URL bindings
+
+### Frontend updates
+
+- `ui/src/app/stores/auth-store.ts` — Updated: tenantId signal, needsWorkspace computed
+- `ui/src/app/services/tenant-client.ts` — Updated: getInvitationDetails, acceptInvitation, createTenant methods
+- `ui/src/app/services/auth-client.ts` — Updated: simplified register/login with setSession
+- `ui/src/app/features/auth/register/register.ts` — Updated: redirect to workspace/create
+- `ui/src/app/features/auth/accept-invitation/accept-invitation.ts` — New: invitation acceptance page
+- `ui/src/app/features/tenants/create-workspace/create-workspace.ts` — New: workspace creation page
+- `ui/src/app/features/tenants/upgrade/upgrade.ts` — New: mock upgrade page
+- `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts` — Updated: pending status badges
+- `ui/src/app/shell/tenant-switcher/tenant-switcher.ts` — Updated: null tenant handling
+- `ui/src/app/app.routes.ts` — Updated: added 3 new routes
+
+### Test updates
+
+- `shared/src/schemas/tenant.spec.ts` — Updated fixtures for new fields
+- `shared/src/schemas/auth.spec.ts` — Added invitation schema tests
+- `server/src/services/auth.service.test.ts` — Rewritten for new auth flow
+- `server/src/services/tenant.service.test.ts` — Updated for invitation flow
+- `server/src/routes/auth.test.ts` — Added invitation route tests
+- `server/src/repositories/tenant.repository.test.ts` — Updated fixtures
+
+## Files Created/Modified in Phase 11
+
+### Shared package
+
+- `shared/src/constants/roles.ts` — Added `'access_revoked'` to MemberStatus
+- `shared/src/schemas/tenant.ts` — Added TenantWithRoleSchema
+- `shared/src/schemas/auth.ts` — Added MyInvitationSchema, PendingInvitationSchema
+- `shared/src/schemas/task.ts` — Added MyTaskSchema
+- `shared/src/types/tenant.ts`, `auth.ts`, `task.ts` — Added new type exports
+- `shared/src/contracts/tenant.contracts.ts` — Updated list response to TenantWithRole
+- `shared/src/contracts/auth.contracts.ts` — Added getMyInvitations, getMyTasks contracts
+- `shared/src/index.ts` — Updated barrel exports
+
+### Backend
+
+- `server/src/repositories/tenant-member.repository.ts` — Added findById, updateStatusById, deleteById, findByEmail,
+  findByInvitedEmail, id field
+- `server/src/repositories/task.repository.ts` — Added findByAssignee (cross-tenant)
+- `server/src/services/tenant.service.ts` — Added listTenantsWithRole, getMyInvitations, getPendingInvitationsByTenant,
+  declineInvitation, revokeAccess, resendInvitation, hardDeleteMember
+- `server/src/services/task.service.ts` — Added getMyTasks (cross-tenant aggregation)
+- `server/src/routes/invitations.ts` — New: cross-tenant invitation routes
+- `server/src/routes/tenants.ts` — Updated: listTenantsWithRole, pending invitations, revoke/resend/hard-delete
+- `server/src/index.ts` — Registered invitation routes, cross-tenant tasks/my endpoint
+
+### Frontend
+
+- `ui/src/app/app.routes.ts` — Removed authGuard from root route
+- `ui/src/app/features/dashboard/dashboard.ts` — Reworked as 5-state orchestrator
+- `ui/src/app/features/dashboard/landing-page/` — New: visitor marketing page
+- `ui/src/app/features/dashboard/welcome-view/` — New: new-user CTA
+- `ui/src/app/features/dashboard/invitation-view/` — New: pending invitations
+- `ui/src/app/features/dashboard/member-dashboard/` — New: member view
+- `ui/src/app/features/dashboard/owner-dashboard/` — New: owner view
+- `ui/src/app/features/tenants/tenant-member-list/` — Updated: access_revoked badge, revoke/resend/hard-delete actions
+- `ui/src/app/services/tenant-client.ts` — Added getMyInvitations, getTenantPendingInvitations, declineInvitation,
+  revokeAccess, resendInvitation, hardDeleteMember, acceptInvitationById
+- `ui/src/app/services/task-client.ts` — Added getMyTasks
+
+### Tests
+
+- `shared/src/schemas/tenant.spec.ts` — Added TenantWithRole tests, access_revoked
+- `shared/src/schemas/auth.spec.ts` — Added MyInvitation, PendingInvitation tests
+- `shared/src/schemas/task.spec.ts` — Added MyTask tests
+- `server/src/routes/tenants.test.ts` — Updated mock for listTenantsWithRole
+
 ## Architecture Overview
 
 ```
@@ -150,15 +248,16 @@ task-board/
 
 ### API Endpoints (all prefixed `/api/v1`)
 
-| Resource | Endpoints                                                 |
-| -------- | --------------------------------------------------------- |
-| Health   | `GET /health`                                             |
-| Auth     | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
-| Tenants  | CRUD + member management                                  |
-| Projects | CRUD + member management                                  |
-| Boards   | CRUD + column management (nested)                         |
-| Tasks    | CRUD + move + assign                                      |
-| Sprints  | CRUD + task association                                   |
+| Resource    | Endpoints                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Health      | `GET /health`                                                                                                            |
+| Auth        | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /auth/accept-invitation`, `GET /auth/invitation/:token` |
+| Tenants     | CRUD + member management + pending invitations, revoke/resend/hard-delete                                                |
+| Projects    | CRUD + member management                                                                                                 |
+| Boards      | CRUD + column management (nested)                                                                                        |
+| Tasks       | CRUD + move + assign + cross-tenant `GET /tasks/my`                                                                      |
+| Sprints     | CRUD + task association                                                                                                  |
+| Invitations | `GET /invitations/my`, `DELETE /invitations/:id`                                                                         |
 
 ### Deployment Targets
 
@@ -170,16 +269,21 @@ task-board/
 
 ## Stage History
 
-| Date       | Stage     | Action           | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ---------- | --------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-28 | Init      | Pipeline started | Existing artifacts reviewed: technical_specification.md (929 lines), architecture.md (1195 lines), plan.md (1253 lines/80 tasks)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| 2026-07-28 | Analyst   | ✅ Approved      | **v2.0.0 update:** Added §1.4 Technology Versions. Updated Zod schemas to v4. Added Angular 22 patterns. Resolved all 4 blocking questions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 2026-07-28 | Architect | ✅ Approved      | **v2.0.0 alignment:** Updated architecture.md to match spec v2.0.0. Angular zoneless, signal-based services, Zod v4, Tailwind v4 CSS-first, MongoDB v7, Hono 4.8, TypeScript 6.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| 2026-07-28 | Planner   | ✅ Approved      | **v2.0.0 alignment:** Updated plan.md with 80 tasks across 8+1 phases.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 2026-07-28 | Developer | ✅ Phase 1–7     | All implementation phases complete: shared package, backend API (161 tests), frontend Angular 22 app.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 2026-07-28 | Developer | ✅ Phase 8       | **Integration & Polish:** (1) Enhanced CORS with configurable ALLOWED_ORIGINS. (2) Created 151 shared package unit tests across 10 spec files. (3) Verified all 161 backend tests pass. (4) Set up Playwright E2E test framework with 5 test files. (5) Created GitHub Actions CI/CD pipeline. (6) Configured deployment scripts for Cloudflare Workers + Pages. (7) Full build verification: shared ✅, server ✅ (2791 KiB), UI ✅ (306 kB initial). Type checking clean. **Total: 312 tests, all passing.**                                                                                                    |
-| 2026-07-29 | Developer | ✅ Phase 9       | **Missing UI Features:** (1) Added `GET /tenants/:tenantId/members` backend route. (2) Extended `AuthStore` with `tenantRole` signal from JWT. (3) Extended `TenantClient` with 6 member/tenant management methods. (4) Created `TenantSettingsComponent` with edit form and danger zone delete. (5) Created `TenantMemberListComponent` with invite dialog, inline role editing, and remove. (6) Added settings/members routes and sidebar links. (7) Extended `ProjectDetailComponent` with add/remove/role-change member controls. (8) Full RBAC UI gating based on tenant role. Build passes, 345 tests pass. |
-| 2026-07-29 | Developer | ✅ API Tests     | **Route tests for all APIs:** Created 6 route test files (tenants, projects, boards, columns, tasks, sprints) with 150 tests covering all HTTP endpoints. Total: 344 server tests, 495 across all packages.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Date       | Stage     | Action             | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------- | --------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-28 | Init      | Pipeline started   | Existing artifacts reviewed: technical_specification.md (929 lines), architecture.md (1195 lines), plan.md (1253 lines/80 tasks)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 2026-07-28 | Analyst   | ✅ Approved        | **v2.0.0 update:** Added §1.4 Technology Versions. Updated Zod schemas to v4. Added Angular 22 patterns. Resolved all 4 blocking questions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 2026-07-28 | Architect | ✅ Approved        | **v2.0.0 alignment:** Updated architecture.md to match spec v2.0.0. Angular zoneless, signal-based services, Zod v4, Tailwind v4 CSS-first, MongoDB v7, Hono 4.8, TypeScript 6.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 2026-07-28 | Planner   | ✅ Approved        | **v2.0.0 alignment:** Updated plan.md with 80 tasks across 8+1 phases.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 2026-07-28 | Developer | ✅ Phase 1–7       | All implementation phases complete: shared package, backend API (161 tests), frontend Angular 22 app.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-07-28 | Developer | ✅ Phase 8         | **Integration & Polish:** (1) Enhanced CORS with configurable ALLOWED_ORIGINS. (2) Created 151 shared package unit tests across 10 spec files. (3) Verified all 161 backend tests pass. (4) Set up Playwright E2E test framework with 5 test files. (5) Created GitHub Actions CI/CD pipeline. (6) Configured deployment scripts for Cloudflare Workers + Pages. (7) Full build verification: shared ✅, server ✅ (2791 KiB), UI ✅ (306 kB initial). Type checking clean. **Total: 312 tests, all passing.**                                                                                                                             |
+| 2026-07-29 | Developer | ✅ Phase 9         | **Missing UI Features:** (1) Added `GET /tenants/:tenantId/members` backend route. (2) Extended `AuthStore` with `tenantRole` signal from JWT. (3) Extended `TenantClient` with 6 member/tenant management methods. (4) Created `TenantSettingsComponent` with edit form and danger zone delete. (5) Created `TenantMemberListComponent` with invite dialog, inline role editing, and remove. (6) Added settings/members routes and sidebar links. (7) Extended `ProjectDetailComponent` with add/remove/role-change member controls. (8) Full RBAC UI gating based on tenant role. Build passes, 345 tests pass.                          |
+| 2026-07-29 | Developer | ✅ API Tests       | **Route tests for all APIs:** Created 6 route test files (tenants, projects, boards, columns, tasks, sprints) with 150 tests covering all HTTP endpoints. Total: 344 server tests, 495 across all packages.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 2026-07-29 | Analyst   | ✅ Approved v3.0.0 | **v3.0.0 update:** Updated technical_specification.md with user workflow rework: invitation-based registration, subscription tiers, new auth flow.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-07-29 | Architect | ✅ Approved v3.0.0 | **v3.0.0 update:** Updated architecture.md with invitation system architecture, Resend email integration, subscription model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 2026-07-29 | Planner   | ✅ Approved v3.0.0 | **v3.0.0 update:** Updated plan.md with 122 tasks across 11 phases. Added 28 new tasks (T-095 through T-122) in Phase 10.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 2026-07-29 | Developer | ✅ Phase 10        | **User Workflow Rework:** (1) New registration flow without auto-tenant creation. (2) Email-based invitation system with Resend. (3) Subscription tier limits (free/pro/enterprise). (4) Workspace creation page. (5) Invitation acceptance page. (6) Mock upgrade page. (7) Pending member status badges. (8) Updated auth flow with tenantId:null JWT. (9) 6 new test files / updated tests. **Total: 599 tests, all passing.**                                                                                                                                                                                                          |
+| 2026-07-30 | Developer | ✅ Phase 11        | **Jira-Style Dashboard:** (1) 5-state dashboard orchestrator (visitor, new-user, invitation, member, owner). (2) Visitor landing page with marketing content. (3) New-user CTA for workspace creation. (4) Cross-tenant invitation management (`GET /invitations/my`, decline). (5) Cross-tenant task aggregation (`GET /tasks/my`). (6) Owner dashboard with pending invitations and member management. (7) `access_revoked` member status with revoke/resend/hard-delete actions. (8) `TenantWithRoleSchema` for role-aware tenant listing. (9) Removed authGuard from root route for visitor access. **Total: 629 tests, all passing.** |
 
 ## Current Blockers
 
@@ -187,21 +291,29 @@ None.
 
 ## Decisions Log
 
-| Date       | Decision                                     | Rationale                                                                                                             |
-| ---------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-28 | Reuse existing artifacts as base             | All three docs exist and are comprehensive; update in place for latest versions                                       |
-| 2026-07-28 | Access-token-only JWT (24h expiry)           | Sufficient for MVP; refresh tokens add complexity without educational value                                           |
-| 2026-07-28 | Configurable column names on board create    | `CreateBoardSchema.columnNames` array; `DefaultColumnNames` as fallback                                               |
-| 2026-07-28 | Task comments/activity logs out of MVP       | Not in scope for vertical slice; can be added post-MVP                                                                |
-| 2026-07-28 | Password reset/email verification out of MVP | Basic email/password auth only; post-MVP enhancement                                                                  |
-| 2026-07-28 | Zod v4 with `z.interface()`                  | Better performance than `z.object()`; `zod/mini` for frontend tree-shaking                                            |
-| 2026-07-28 | Angular 22 zoneless by default               | No `zone.js`; all reactivity via signals; zoneless is default in Angular 21+                                          |
-| 2026-07-28 | Tailwind CSS v4 CSS-first config             | No `tailwind.config.js`; `@theme` directive in CSS; auto content detection                                            |
-| 2026-07-28 | MongoDB Driver v7 (async-only)               | Drops legacy callbacks; all operations return promises                                                                |
-| 2026-07-28 | CORS via ALLOWED_ORIGINS env var             | Configurable per-environment; '*' in dev, explicit origins in production                                              |
-| 2026-07-28 | Vitest for shared + server tests             | Already configured in server; fast, native ESM support                                                                |
-| 2026-07-28 | Playwright for E2E tests                     | Industry standard; Chromium-based; good Angular integration                                                           |
-| 2026-07-28 | Cloudflare Workers + Pages deployment        | Serverless backend + static frontend; global edge distribution                                                        |
-| 2026-07-29 | Spartan UI for all new components            | Maximize reuse of existing Helm components (Button, Dialog, Field, Input, NativeSelect, Badge, Avatar, Card, Spinner) |
-| 2026-07-29 | RBAC via AuthStore.tenantRole signal         | Derive role from JWT payload; gates UI controls without extra API calls                                               |
-| 2026-07-29 | Tenant member invite by email                | Backend accepts `{ email, role }` not `userId`; user must exist in system                                             |
+| Date       | Decision                                       | Rationale                                                                                                             |
+| ---------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-28 | Reuse existing artifacts as base               | All three docs exist and are comprehensive; update in place for latest versions                                       |
+| 2026-07-28 | Access-token-only JWT (24h expiry)             | Sufficient for MVP; refresh tokens add complexity without educational value                                           |
+| 2026-07-28 | Configurable column names on board create      | `CreateBoardSchema.columnNames` array; `DefaultColumnNames` as fallback                                               |
+| 2026-07-28 | Task comments/activity logs out of MVP         | Not in scope for vertical slice; can be added post-MVP                                                                |
+| 2026-07-28 | Password reset/email verification out of MVP   | Basic email/password auth only; post-MVP enhancement                                                                  |
+| 2026-07-28 | Zod v4 with `z.interface()`                    | Better performance than `z.object()`; `zod/mini` for frontend tree-shaking                                            |
+| 2026-07-28 | Angular 22 zoneless by default                 | No `zone.js`; all reactivity via signals; zoneless is default in Angular 21+                                          |
+| 2026-07-28 | Tailwind CSS v4 CSS-first config               | No `tailwind.config.js`; `@theme` directive in CSS; auto content detection                                            |
+| 2026-07-28 | MongoDB Driver v7 (async-only)                 | Drops legacy callbacks; all operations return promises                                                                |
+| 2026-07-28 | CORS via ALLOWED_ORIGINS env var               | Configurable per-environment; '*' in dev, explicit origins in production                                              |
+| 2026-07-28 | Vitest for shared + server tests               | Already configured in server; fast, native ESM support                                                                |
+| 2026-07-28 | Playwright for E2E tests                       | Industry standard; Chromium-based; good Angular integration                                                           |
+| 2026-07-28 | Cloudflare Workers + Pages deployment          | Serverless backend + static frontend; global edge distribution                                                        |
+| 2026-07-29 | Spartan UI for all new components              | Maximize reuse of existing Helm components (Button, Dialog, Field, Input, NativeSelect, Badge, Avatar, Card, Spinner) |
+| 2026-07-29 | RBAC via AuthStore.tenantRole signal           | Derive role from JWT payload; gates UI controls without extra API calls                                               |
+| 2026-07-29 | Tenant member invite by email                  | Backend accepts `{ email, role }` not `userId`; user must exist in system                                             |
+| 2026-07-29 | Invitation-based registration flow             | Users register without auto-tenant; redirected to workspace create or accept invitation                               |
+| 2026-07-29 | Resend for transactional email                 | EmailService abstraction; ConsoleEmailService for local dev; Resend for production                                    |
+| 2026-07-29 | Subscription tiers (free/pro/enterprise)       | Limits on projects/members per tenant; enforced at service layer                                                      |
+| 2026-07-29 | RESEND_API_KEY + FRONTEND_URL in wrangler      | Required for email sending and invitation links in production; must be configured in `wrangler.toml`                  |
+| 2026-07-30 | `access_revoked` status for revoking access    | Soft-delete approach; member record stays but access is revoked; allows resend to re-activate                         |
+| 2026-07-30 | Application-level cross-tenant aggregation     | Different tenants may be in different databases; aggregation done at service layer, not DB level                      |
+| 2026-07-30 | GET /tenants response includes role per tenant | Enables dashboard state detection on frontend without extra API calls                                                 |
+| 2026-07-30 | Root route (/) removes authGuard               | Visitor landing page accessible without authentication; individual feature routes still guarded                       |

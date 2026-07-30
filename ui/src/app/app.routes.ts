@@ -13,12 +13,20 @@ export const routes: Routes = [
     path: 'auth/register',
     loadComponent: () => import('./features/auth/register/register').then((m) => m.Register),
   },
+  {
+    path: 'auth/accept-invitation',
+    loadComponent: () => import('./features/auth/accept-invitation/accept-invitation').then((m) => m.AcceptInvitation),
+  },
 
-  // Root redirect to dashboard
+  // Root — dashboard handles all states internally (no authGuard)
   {
     path: '',
-    canActivate: [authGuard],
     loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
+  },
+  {
+    path: 'workspace/create',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/tenants/create-workspace/create-workspace').then((m) => m.CreateWorkspace),
   },
 
   // Tenant-scoped routes (authenticated + tenant guard)
@@ -35,6 +43,10 @@ export const routes: Routes = [
         path: 'settings/members',
         loadComponent: () =>
           import('./features/tenants/tenant-member-list/tenant-member-list').then((m) => m.TenantMemberList),
+      },
+      {
+        path: 'upgrade',
+        loadComponent: () => import('./features/tenants/upgrade/upgrade').then((m) => m.Upgrade),
       },
       {
         path: 'projects',

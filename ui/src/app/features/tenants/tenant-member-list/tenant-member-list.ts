@@ -1,7 +1,7 @@
 import { Component, inject, input, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { provideIcons, NgIcon } from '@ng-icons/core';
-import { lucideUserPlus, lucideTrash2, lucideShield } from '@ng-icons/lucide';
+import { lucideUserPlus, lucideTrash2, lucideShield, lucideBan, lucideRefreshCw, lucideSkull } from '@ng-icons/lucide';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -22,6 +22,12 @@ const roleColorMap: Record<string, string> = {
   admin: 'bg-blue-100 text-blue-700',
   member: 'bg-gray-100 text-gray-600',
 };
+const statusColorMap: Record<string, string> = {
+  active: 'bg-green-100 text-green-700',
+  pending: 'bg-amber-100 text-amber-700',
+  declined: 'bg-red-100 text-red-700',
+  access_revoked: 'bg-red-100 text-red-700',
+};
 
 @Component({
   selector: 'ui-tenant-member-list',
@@ -38,7 +44,7 @@ const roleColorMap: Record<string, string> = {
     HlmBadgeImports,
     HlmAvatarImports,
   ],
-  providers: [provideIcons({ lucideUserPlus, lucideTrash2, lucideShield })],
+  providers: [provideIcons({ lucideUserPlus, lucideTrash2, lucideShield, lucideBan, lucideRefreshCw, lucideSkull })],
   templateUrl: './tenant-member-list.html',
 })
 export class TenantMemberList implements OnInit {
@@ -54,6 +60,7 @@ export class TenantMemberList implements OnInit {
   protected inviteEmail = '';
   protected inviteRole = 'member';
   protected readonly removingUserId = signal<string | null>(null);
+  protected readonly actioningUserId = signal<string | null>(null);
   protected readonly canManage = computed(() => {
     const role = this.authStore.tenantRole();
 
@@ -62,6 +69,10 @@ export class TenantMemberList implements OnInit {
 
   protected getRoleColor(role: string): string {
     return roleColorMap[role] ?? 'bg-gray-100 text-gray-600';
+  }
+
+  protected getStatusColor(status: string): string {
+    return statusColorMap[status] ?? 'bg-gray-100 text-gray-600';
   }
 
   protected onDialogStateChange(state: BrnDialogState): void {
@@ -104,7 +115,7 @@ export class TenantMemberList implements OnInit {
   }
 
   protected changeRole(member: TenantMember, newRole: string | undefined | null): void {
-    if (!newRole || newRole === member.role) return;
+    if (!newRole || newRole === member.role || !member.userId) return;
 
     this.tenantService.updateMemberRole(this.tenantId(), member.userId, newRole).subscribe({
       next: (updated) => {
@@ -114,6 +125,8 @@ export class TenantMemberList implements OnInit {
   }
 
   protected removeMember(member: TenantMember): void {
+    if (!member.userId) return;
+
     this.removingUserId.set(member.userId);
 
     this.tenantService.removeMember(this.tenantId(), member.userId).subscribe({
@@ -125,11 +138,50 @@ export class TenantMemberList implements OnInit {
     });
   }
 
+  protected revokeAccess(member: TenantMember): void {
+    if (!member.userId) return;
+
+    this.actioningUserId.set(member.userId);
+    this.tenantService.revokeAccess(this.tenantId(), member.userId).subscribe({
+      next: () => {
+        this.members.update((list) =>
+          list.map((m) => (m.userId === member.userId ? { ...m, status: 'access_revoked' as const } : m)),
+        );
+        this.actioningUserId.set(null);
+      },
+      error: () => this.actioningUserId.set(null),
+    });
+  }
+
+  protected resendInvitation(member: TenantMember): void {
+    if (!member.userId) return;
+
+    this.actioningUserId.set(member.userId);
+    this.tenantService.resendInvitation(this.tenantId(), member.userId).subscribe({
+      next: () => this.actioningUserId.set(null),
+      error: () => this.actioningUserId.set(null),
+    });
+  }
+
+  protected hardDeleteMember(member: TenantMember): void {
+    if (!member.userId) return;
+
+    this.actioningUserId.set(member.userId);
+    this.tenantService.hardDeleteMember(this.tenantId(), member.userId).subscribe({
+      next: () => {
+        this.members.update((list) => list.filter((m) => m.userId !== member.userId));
+        this.actioningUserId.set(null);
+      },
+      error: () => this.actioningUserId.set(null),
+    });
+  }
+
   protected isOwner(member: TenantMember): boolean {
     return member.role === 'owner';
   }
 
-  protected getInitials(userId: string): string {
+  protected getInitials(userId: string | null): string {
+    if (!userId) return '??';
     return userId.substring(0, 2).toUpperCase();
   }
 }

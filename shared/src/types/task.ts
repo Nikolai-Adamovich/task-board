@@ -5,6 +5,7 @@ import type {
   UpdateTaskSchema,
   MoveTaskSchema,
   AssignTaskSchema,
+  MyTaskSchema,
 } from '../schemas/task.js';
 
 /** Task entity type */
@@ -21,3 +22,6 @@ export type MoveTask = z.infer<typeof MoveTaskSchema>;
 
 /** Assign task request body type */
 export type AssignTask = z.infer<typeof AssignTaskSchema>;
+
+/** Denormalized task for cross-tenant "my tasks" view */
+export type MyTask = z.infer<typeof MyTaskSchema>;

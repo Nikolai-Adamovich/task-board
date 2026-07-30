@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto';
-import type { User, AuthResponse, RegisterRequest, LoginRequest } from '@task-board/shared';
+import type { User, AuthResponse, RegisterRequest, LoginRequest, InvitationDetails } from '@task-board/shared';
 import { ConflictError, NotFoundError, UnauthorizedError } from '../middleware/error-handler.js';
 import { UserRepository } from '../repositories/user.repository.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
@@ -11,8 +10,8 @@ interface JwtPayload {
   sub: string;
   email: string;
   displayName: string;
-  tenantId: string;
-  tenantRole: string;
+  tenantId: string | null;
+  tenantRole: string | null;
   iat: number;
   exp: number;
 }
@@ -62,7 +61,8 @@ export class AuthService {
 
   /**
    * Register a new user.
-   * Creates the user, auto-creates a personal tenant, and adds the user as owner.
+   * Creates the user and activates any pending invitations for the email.
+   * If no pending invitations exist, issues a JWT with tenantId: null.
    */
   async register(input: RegisterRequest): Promise<AuthResponse> {
     // Check if email is already taken
@@ -81,22 +81,22 @@ export class AuthService {
       displayName: input.displayName,
       passwordHash,
     });
-    // Auto-create a personal tenant using the user's display name
-    const slug = this.generateSlug(input.displayName);
-    const tenant = await this.tenantRepo.create({
-      name: `${input.displayName}'s Workspace`,
-      slug,
-    });
+    // Check for pending invitations and activate them
+    const pendingInvitations = await this.tenantMemberRepo.findPendingByEmail(input.email);
+    let firstTenantId: string | null = null;
+    let firstTenantRole: string | null = null;
 
-    // Add user as owner of the tenant
-    await this.tenantMemberRepo.create({
-      userId: user.id,
-      tenantId: tenant.id,
-      role: 'owner',
-    });
+    for (const invitation of pendingInvitations) {
+      if (!invitation.invitationToken) continue;
+      await this.tenantMemberRepo.activateInvitation(invitation.invitationToken, user.id);
+      if (!firstTenantId) {
+        firstTenantId = invitation.tenantId;
+        firstTenantRole = invitation.role;
+      }
+    }
 
     // Generate JWT
-    const token = await this.generateToken(user, tenant.id, 'owner');
+    const token = await this.generateToken(user, firstTenantId, firstTenantRole);
 
     return { token, user };
   }
@@ -118,9 +118,9 @@ export class AuthService {
       throw new UnauthorizedError('Invalid email or password');
     }
 
-    // Find the user's first tenant membership for the token
+    // Find the user's first active tenant membership for the token
     const memberships = await this.tenantMemberRepo.findByUser(userDoc.id);
-    const membership = memberships[0];
+    const activeMembership = memberships.find((m) => m.status === 'active');
     const user: User = {
       id: userDoc.id,
       email: userDoc.email,
@@ -128,7 +128,7 @@ export class AuthService {
       createdAt: userDoc.createdAt.toISOString(),
       updatedAt: userDoc.updatedAt.toISOString(),
     };
-    const token = await this.generateToken(user, membership?.tenantId ?? '', membership?.role ?? 'member');
+    const token = await this.generateToken(user, activeMembership?.tenantId ?? null, activeMembership?.role ?? null);
 
     return { token, user };
   }
@@ -145,9 +145,96 @@ export class AuthService {
     return user;
   }
 
+  /**
+   * Accept an invitation to join a tenant.
+   * If the user doesn't exist yet, creates a new account using the provided password and displayName.
+   */
+  async acceptInvitation(input: { token: string; password?: string; displayName?: string }): Promise<AuthResponse> {
+    // Find the pending invitation by token
+    const invitation = await this.tenantMemberRepo.findByInvitationToken(input.token);
+
+    if (!invitation || invitation.status !== 'pending') {
+      throw new NotFoundError('Invalid or expired invitation');
+    }
+
+    if (!invitation.invitedEmail) {
+      throw new NotFoundError('Invitation has no associated email');
+    }
+
+    const invitedEmail = invitation.invitedEmail;
+    let user: User;
+    // Check if a user with the invited email already exists
+    const existingUser = await this.userRepo.findByEmail(invitedEmail);
+
+    if (existingUser) {
+      // Existing user — activate the membership
+      user = {
+        id: existingUser.id,
+        email: existingUser.email,
+        displayName: existingUser.displayName,
+        createdAt: existingUser.createdAt.toISOString(),
+        updatedAt: existingUser.updatedAt.toISOString(),
+      };
+      await this.tenantMemberRepo.activateInvitation(input.token, existingUser.id);
+    } else {
+      // New user — password and displayName are required
+      if (!input.password || !input.displayName) {
+        throw new ConflictError('Password and display name are required for new accounts');
+      }
+
+      const bcrypt = await import('bcryptjs');
+      const passwordHash = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
+
+      user = await this.userRepo.create({
+        email: invitedEmail,
+        displayName: input.displayName,
+        passwordHash,
+      });
+
+      await this.tenantMemberRepo.activateInvitation(input.token, user.id);
+    }
+
+    // Generate JWT with the tenant from the invitation
+    const token = await this.generateToken(user, invitation.tenantId, invitation.role);
+
+    return { token, user };
+  }
+
+  /**
+   * Get invitation details by token.
+   */
+  async getInvitationDetails(token: string): Promise<InvitationDetails> {
+    const invitation = await this.tenantMemberRepo.findByInvitationToken(token);
+
+    if (!invitation) {
+      throw new NotFoundError('Invitation not found');
+    }
+
+    if (!invitation.invitedEmail) {
+      throw new NotFoundError('Invitation has no associated email');
+    }
+
+    const tenant = await this.tenantRepo.findById(invitation.tenantId);
+
+    if (!tenant) {
+      throw new NotFoundError('Tenant not found');
+    }
+
+    // Check if the invited email corresponds to a registered user
+    const existingUser = await this.userRepo.findByEmail(invitation.invitedEmail);
+
+    return {
+      email: invitation.invitedEmail,
+      tenantName: tenant.name,
+      role: invitation.role as InvitationDetails['role'],
+      status: invitation.status as InvitationDetails['status'],
+      isRegistered: existingUser !== null,
+    };
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
-  private async generateToken(user: User, tenantId: string, tenantRole: string): Promise<string> {
+  private async generateToken(user: User, tenantId: string | null, tenantRole: string | null): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     const payload: JwtPayload = {
       sub: user.id,
@@ -160,15 +247,5 @@ export class AuthService {
     };
 
     return signJwt(payload, this.jwtSecret);
-  }
-
-  private generateSlug(displayName: string): string {
-    const base = displayName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-    const suffix = randomUUID().slice(0, 8);
-
-    return `${base}-${suffix}`;
   }
 }

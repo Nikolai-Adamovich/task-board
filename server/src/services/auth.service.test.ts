@@ -27,6 +27,9 @@ function createMockTenantMemberRepo() {
     findByUserAndTenant: vi.fn(),
     findByTenant: vi.fn(),
     findByUser: vi.fn(),
+    findByInvitationToken: vi.fn(),
+    findPendingByEmail: vi.fn(),
+    activateInvitation: vi.fn(),
     create: vi.fn(),
     updateRole: vi.fn(),
     delete: vi.fn(),
@@ -54,7 +57,7 @@ describe('AuthService', () => {
   // ── register ────────────────────────────────────────────────────────────
 
   describe('register', () => {
-    it('creates user, tenant, membership, and returns token', async () => {
+    it('creates user and returns token with null tenant when no pending invitations', async () => {
       userRepo.findByEmail.mockResolvedValue(null);
       userRepo.create.mockResolvedValue({
         id: 'user-1',
@@ -63,18 +66,7 @@ describe('AuthService', () => {
         createdAt: NOW,
         updatedAt: NOW,
       });
-      tenantRepo.create.mockResolvedValue({
-        id: 'tenant-1',
-        name: "New User's Workspace",
-        slug: 'new-user-abc12345',
-        createdAt: NOW,
-        updatedAt: NOW,
-      });
-      memberRepo.create.mockResolvedValue({
-        userId: 'user-1',
-        tenantId: 'tenant-1',
-        role: 'owner',
-      });
+      memberRepo.findPendingByEmail.mockResolvedValue([]);
 
       const result = await service.register({
         email: 'new@example.com',
@@ -96,17 +88,58 @@ describe('AuthService', () => {
       expect(createCall.passwordHash).not.toBe('securepass123');
       expect(createCall.passwordHash.length).toBeGreaterThan(10);
 
-      expect(tenantRepo.create).toHaveBeenCalledWith(expect.objectContaining({ name: "New User's Workspace" }));
-      expect(memberRepo.create).toHaveBeenCalledWith({
-        userId: 'user-1',
-        tenantId: 'tenant-1',
-        role: 'owner',
-      });
+      // No auto-tenant creation
+      expect(tenantRepo.create).not.toHaveBeenCalled();
 
       expect(result.token).toBeDefined();
       expect(typeof result.token).toBe('string');
       expect(result.token.split('.')).toHaveLength(3); // JWT format
       expect(result.user.email).toBe('new@example.com');
+    });
+
+    it('activates pending invitations and sets tenantId in token', async () => {
+      userRepo.findByEmail.mockResolvedValue(null);
+      userRepo.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'invited@example.com',
+        displayName: 'Invited User',
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+      memberRepo.findPendingByEmail.mockResolvedValue([
+        {
+          userId: null,
+          tenantId: 'tenant-1',
+          role: 'member',
+          status: 'pending',
+          invitedEmail: 'invited@example.com',
+          invitationToken: 'token-abc',
+          invitedAt: new Date(),
+        },
+      ]);
+      memberRepo.activateInvitation.mockResolvedValue({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        role: 'member',
+        status: 'active',
+      });
+
+      const result = await service.register({
+        email: 'invited@example.com',
+        password: 'securepass123',
+        displayName: 'Invited User',
+      });
+
+      expect(memberRepo.findPendingByEmail).toHaveBeenCalledWith('invited@example.com');
+      expect(memberRepo.activateInvitation).toHaveBeenCalledWith('token-abc', 'user-1');
+
+      // JWT should contain the tenant from the invitation
+      const parts = result.token.split('.');
+      const payloadJson = atob((parts[1] ?? '').replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(payloadJson);
+
+      expect(payload.tenantId).toBe('tenant-1');
+      expect(payload.tenantRole).toBe('member');
     });
 
     it('throws ConflictError when email is already taken', async () => {
@@ -143,6 +176,10 @@ describe('AuthService', () => {
           userId: 'user-1',
           tenantId: 'tenant-1',
           role: 'owner',
+          status: 'active',
+          invitedEmail: null,
+          invitationToken: null,
+          invitedAt: null,
         },
       ]);
 
@@ -208,6 +245,200 @@ describe('AuthService', () => {
     });
   });
 
+  // ── acceptInvitation ────────────────────────────────────────────────────
+
+  describe('acceptInvitation', () => {
+    it('activates invitation for existing user', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue({
+        userId: null,
+        tenantId: 'tenant-1',
+        role: 'member',
+        status: 'pending',
+        invitedEmail: 'existing@example.com',
+        invitationToken: 'token-abc',
+        invitedAt: new Date(),
+      });
+      userRepo.findByEmail.mockResolvedValue({
+        id: 'user-existing',
+        email: 'existing@example.com',
+        displayName: 'Existing User',
+        createdAt: new Date(NOW),
+        updatedAt: new Date(NOW),
+      });
+      memberRepo.activateInvitation.mockResolvedValue({
+        userId: 'user-existing',
+        tenantId: 'tenant-1',
+        role: 'member',
+        status: 'active',
+      });
+
+      const result = await service.acceptInvitation({ token: 'token-abc' });
+
+      expect(memberRepo.findByInvitationToken).toHaveBeenCalledWith('token-abc');
+      expect(memberRepo.activateInvitation).toHaveBeenCalledWith('token-abc', 'user-existing');
+      expect(result.user.id).toBe('user-existing');
+      expect(result.token).toBeDefined();
+    });
+
+    it('creates new user and activates invitation when password and displayName provided', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue({
+        userId: null,
+        tenantId: 'tenant-1',
+        role: 'member',
+        status: 'pending',
+        invitedEmail: 'new@example.com',
+        invitationToken: 'token-abc',
+        invitedAt: new Date(),
+      });
+      userRepo.findByEmail.mockResolvedValue(null);
+      userRepo.create.mockResolvedValue({
+        id: 'user-new',
+        email: 'new@example.com',
+        displayName: 'New User',
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+      memberRepo.activateInvitation.mockResolvedValue({
+        userId: 'user-new',
+        tenantId: 'tenant-1',
+        role: 'member',
+        status: 'active',
+      });
+
+      const result = await service.acceptInvitation({
+        token: 'token-abc',
+        password: 'securePass123',
+        displayName: 'New User',
+      });
+
+      expect(userRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'new@example.com',
+          displayName: 'New User',
+        }),
+      );
+      expect(memberRepo.activateInvitation).toHaveBeenCalledWith('token-abc', 'user-new');
+      expect(result.user.id).toBe('user-new');
+    });
+
+    it('throws ConflictError when new user missing password', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue({
+        userId: null,
+        tenantId: 'tenant-1',
+        role: 'member',
+        status: 'pending',
+        invitedEmail: 'new@example.com',
+        invitationToken: 'token-abc',
+        invitedAt: new Date(),
+      });
+      userRepo.findByEmail.mockResolvedValue(null);
+
+      await expect(service.acceptInvitation({ token: 'token-abc' })).rejects.toThrow(
+        'Password and display name are required',
+      );
+    });
+
+    it('throws NotFoundError for invalid token', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue(null);
+
+      await expect(service.acceptInvitation({ token: 'invalid' })).rejects.toThrow('Invalid or expired invitation');
+    });
+
+    it('throws NotFoundError for non-pending invitation', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        role: 'member',
+        status: 'active',
+        invitedEmail: 'a@b.com',
+        invitationToken: 'token-abc',
+        invitedAt: null,
+      });
+
+      await expect(service.acceptInvitation({ token: 'token-abc' })).rejects.toThrow('Invalid or expired invitation');
+    });
+  });
+
+  // ── getInvitationDetails ────────────────────────────────────────────────
+
+  describe('getInvitationDetails', () => {
+    it('returns invitation details for valid token', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue({
+        userId: null,
+        tenantId: 'tenant-1',
+        role: 'member',
+        status: 'pending',
+        invitedEmail: 'invited@example.com',
+        invitationToken: 'token-abc',
+        invitedAt: new Date(),
+      });
+      tenantRepo.findById.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Acme Corp',
+        slug: 'acme-corp',
+        subscription: 'free',
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+      userRepo.findByEmail.mockResolvedValue(null);
+
+      const result = await service.getInvitationDetails('token-abc');
+
+      expect(result.email).toBe('invited@example.com');
+      expect(result.tenantName).toBe('Acme Corp');
+      expect(result.role).toBe('member');
+      expect(result.status).toBe('pending');
+      expect(result.isRegistered).toBe(false);
+    });
+
+    it('sets isRegistered to true for existing user', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue({
+        userId: null,
+        tenantId: 'tenant-1',
+        role: 'admin',
+        status: 'pending',
+        invitedEmail: 'existing@example.com',
+        invitationToken: 'token-abc',
+        invitedAt: new Date(),
+      });
+      tenantRepo.findById.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Acme Corp',
+        slug: 'acme-corp',
+        subscription: 'free',
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+      userRepo.findByEmail.mockResolvedValue({ id: 'user-1', email: 'existing@example.com' });
+
+      const result = await service.getInvitationDetails('token-abc');
+
+      expect(result.isRegistered).toBe(true);
+      expect(result.role).toBe('admin');
+    });
+
+    it('throws NotFoundError for invalid token', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue(null);
+
+      await expect(service.getInvitationDetails('invalid')).rejects.toThrow('Invitation not found');
+    });
+
+    it('throws NotFoundError when tenant is missing', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue({
+        userId: null,
+        tenantId: 'missing-tenant',
+        role: 'member',
+        status: 'pending',
+        invitedEmail: 'a@b.com',
+        invitationToken: 'token-abc',
+        invitedAt: new Date(),
+      });
+      tenantRepo.findById.mockResolvedValue(null);
+
+      await expect(service.getInvitationDetails('token-abc')).rejects.toThrow('Tenant not found');
+    });
+  });
+
   // ── JWT token format ────────────────────────────────────────────────────
 
   describe('JWT token', () => {
@@ -220,18 +451,7 @@ describe('AuthService', () => {
         createdAt: NOW,
         updatedAt: NOW,
       });
-      tenantRepo.create.mockResolvedValue({
-        id: 'tenant-1',
-        name: "New User's Workspace",
-        slug: 'new-user-abc12345',
-        createdAt: NOW,
-        updatedAt: NOW,
-      });
-      memberRepo.create.mockResolvedValue({
-        userId: 'user-1',
-        tenantId: 'tenant-1',
-        role: 'owner',
-      });
+      memberRepo.findPendingByEmail.mockResolvedValue([]);
 
       const result = await service.register({
         email: 'new@example.com',
@@ -246,8 +466,8 @@ describe('AuthService', () => {
       expect(payload.sub).toBe('user-1');
       expect(payload.email).toBe('new@example.com');
       expect(payload.displayName).toBe('New User');
-      expect(payload.tenantId).toBe('tenant-1');
-      expect(payload.tenantRole).toBe('owner');
+      expect(payload.tenantId).toBeNull(); // No auto-tenant on register
+      expect(payload.tenantRole).toBeNull();
       expect(payload.iat).toBeDefined();
       expect(payload.exp).toBe(payload.iat + 24 * 60 * 60); // 24h expiry
     });

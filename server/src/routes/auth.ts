@@ -10,7 +10,7 @@ import { getCollection } from '../db/mongo.js';
 import type { UserDocument } from '../repositories/user.repository.js';
 import type { TenantDocument } from '../repositories/tenant.repository.js';
 import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
-import { RegisterRequestSchema, LoginRequestSchema } from '@task-board/shared';
+import { RegisterRequestSchema, LoginRequestSchema, AcceptInvitationSchema } from '@task-board/shared';
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────────
 
@@ -50,6 +50,32 @@ export function createAuthRoutes(): Hono<AppEnv> {
     };
     const service = createAuthService(c);
     const result = await service.login(body);
+
+    return c.json(result, 200);
+  });
+
+  /**
+   * POST /accept-invitation — Accept an invitation to join a tenant.
+   * Public endpoint — no auth required.
+   * Returns 200 with { token, user }.
+   */
+  router.post('/accept-invitation', validateBody(AcceptInvitationSchema), async (c) => {
+    const body = c.get('validatedBody' as never) as { token: string; password?: string; displayName?: string };
+    const service = createAuthService(c);
+    const result = await service.acceptInvitation(body);
+
+    return c.json(result, 200);
+  });
+
+  /**
+   * GET /invitations/:token — Get invitation details by token.
+   * Public endpoint — no auth required.
+   * Returns 200 with invitation details.
+   */
+  router.get('/invitations/:token', async (c) => {
+    const token = c.req.param('token');
+    const service = createAuthService(c);
+    const result = await service.getInvitationDetails(token);
 
     return c.json(result, 200);
   });

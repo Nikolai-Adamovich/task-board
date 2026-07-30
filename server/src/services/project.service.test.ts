@@ -8,6 +8,7 @@ function createMockProjectRepo() {
     findById: vi.fn(),
     findByTenant: vi.fn(),
     findBySlug: vi.fn(),
+    countByTenant: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -52,15 +53,28 @@ function makeProjectMember(overrides: Record<string, unknown> = {}) {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
+function createMockTenantRepo() {
+  return {
+    findById: vi.fn(),
+    findBySlug: vi.fn(),
+    findAll: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  };
+}
+
 describe('ProjectService', () => {
   let projectRepo: ReturnType<typeof createMockProjectRepo>;
   let memberRepo: ReturnType<typeof createMockProjectMemberRepo>;
+  let tenantRepo: ReturnType<typeof createMockTenantRepo>;
   let service: ProjectService;
 
   beforeEach(() => {
     projectRepo = createMockProjectRepo();
     memberRepo = createMockProjectMemberRepo();
-    service = new ProjectService(projectRepo as never, memberRepo as never);
+    tenantRepo = createMockTenantRepo();
+    service = new ProjectService(projectRepo as never, memberRepo as never, tenantRepo as never);
   });
 
   // ── listProjects ──────────────────────────────────────────────────────────
@@ -88,6 +102,8 @@ describe('ProjectService', () => {
 
   describe('createProject', () => {
     it('creates a project and adds the creator as admin', async () => {
+      tenantRepo.findById.mockResolvedValue({ subscription: 'free' });
+      projectRepo.countByTenant.mockResolvedValue(0);
       projectRepo.findBySlug.mockResolvedValue(null);
       projectRepo.create.mockResolvedValue(makeProject());
       memberRepo.create.mockResolvedValue(makeProjectMember());

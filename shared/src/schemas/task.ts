@@ -97,3 +97,42 @@ export const AssignTaskSchema = z.object({
 
 /** Inferred AssignTask type */
 export type AssignTask = z.infer<typeof AssignTaskSchema>;
+
+/**
+ * Denormalized task schema for the cross-tenant "my tasks" view.
+ * Contains contextual fields (tenant name, project name, column title)
+ * so the dashboard can render without extra lookups.
+ */
+export const MyTaskSchema = z.object({
+  /** Unique task identifier (UUID v4) */
+  id: z.uuid(),
+  /** Owning tenant ID */
+  tenantId: z.uuid(),
+  /** Tenant display name */
+  tenantName: z.string(),
+  /** Parent project ID */
+  projectId: z.uuid(),
+  /** Project display name */
+  projectName: z.string(),
+  /** Parent board ID */
+  boardId: z.uuid(),
+  /** Column the task is currently in */
+  columnId: z.uuid(),
+  /** Column display title */
+  columnTitle: z.string(),
+  /** Task title */
+  title: z.string(),
+  /** Optional detailed description */
+  description: z.string().nullable(),
+  /** Task priority level */
+  priority: z.enum(TaskPriority),
+  /** Optional sprint assignment (null if in backlog) */
+  sprintId: z.uuid().nullable(),
+  /** Creation timestamp (ISO 8601) */
+  createdAt: z.iso.datetime(),
+  /** Last update timestamp (ISO 8601) */
+  updatedAt: z.iso.datetime(),
+});
+
+/** Inferred MyTask type */
+export type MyTask = z.infer<typeof MyTaskSchema>;

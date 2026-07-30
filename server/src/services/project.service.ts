@@ -2,6 +2,7 @@ import type { Project, ProjectMember, CreateProject, UpdateProject } from '@task
 import { ConflictError, ForbiddenError, NotFoundError } from '../middleware/error-handler.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
 import { ProjectMemberRepository } from '../repositories/project-member.repository.js';
+import { TenantRepository } from '../repositories/tenant.repository.js';
 
 // ─── Project Service ─────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ export class ProjectService {
   constructor(
     private readonly projectRepo: ProjectRepository,
     private readonly projectMemberRepo: ProjectMemberRepository,
+    private readonly tenantRepo: TenantRepository,
   ) {}
 
   // ─── Project CRUD ──────────────────────────────────────────────────────────
@@ -26,6 +28,17 @@ export class ProjectService {
    */
   async createProject(tenantId: string, userId: string, userRole: string, input: CreateProject): Promise<Project> {
     this.requireTenantAdmin(userRole);
+
+    // Check subscription limit (max 3 projects per workspace for free tier)
+    const tenant = await this.tenantRepo.findById(tenantId);
+
+    if (tenant && tenant.subscription === 'free') {
+      const projectCount = await this.projectRepo.countByTenant(tenantId);
+
+      if (projectCount >= 3) {
+        throw new ForbiddenError('Free plan allows max 3 projects per workspace. Upgrade to premium for unlimited.');
+      }
+    }
 
     // Check slug uniqueness within tenant
     const existing = await this.projectRepo.findBySlug(tenantId, input.slug);

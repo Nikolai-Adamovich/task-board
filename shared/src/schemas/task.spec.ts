@@ -6,7 +6,14 @@
  * for all task-related operations (CRUD, move, assign).
  */
 import { describe, it, expect } from 'vitest';
-import { TaskSchema, CreateTaskSchema, UpdateTaskSchema, MoveTaskSchema, AssignTaskSchema } from './task.js';
+import {
+  TaskSchema,
+  CreateTaskSchema,
+  UpdateTaskSchema,
+  MoveTaskSchema,
+  AssignTaskSchema,
+  MyTaskSchema,
+} from './task.js';
 
 // ─── TaskSchema ──────────────────────────────────────────────────────────────
 
@@ -214,6 +221,86 @@ describe('AssignTaskSchema', () => {
       taskId: '550e8400-e29b-41d4-a716-446655440000',
       assigneeIds: ['not-a-uuid'],
     });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── MyTaskSchema ────────────────────────────────────────────────────────────
+
+describe('MyTaskSchema', () => {
+  const validMyTask = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    tenantId: '660e8400-e29b-41d4-a716-446655440001',
+    tenantName: 'Acme Corp',
+    projectId: '770e8400-e29b-41d4-a716-446655440002',
+    projectName: 'Project Alpha',
+    boardId: '880e8400-e29b-41d4-a716-446655440003',
+    columnId: '990e8400-e29b-41d4-a716-446655440004',
+    columnTitle: 'In Progress',
+    title: 'Implement login page',
+    description: 'Build the login form',
+    priority: 'medium' as const,
+    sprintId: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('should accept a valid my-task', () => {
+    const result = MyTaskSchema.safeParse(validMyTask);
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept my-task with null description', () => {
+    const result = MyTaskSchema.safeParse({ ...validMyTask, description: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept my-task with null sprintId (backlog)', () => {
+    const result = MyTaskSchema.safeParse({ ...validMyTask, sprintId: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept my-task with valid sprintId', () => {
+    const result = MyTaskSchema.safeParse({
+      ...validMyTask,
+      sprintId: 'aa0e8400-e29b-41d4-a716-446655440005',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept all priority levels', () => {
+    for (const priority of ['low', 'medium', 'high', 'critical'] as const) {
+      const result = MyTaskSchema.safeParse({ ...validMyTask, priority });
+
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it('should reject invalid priority', () => {
+    const result = MyTaskSchema.safeParse({ ...validMyTask, priority: 'urgent' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid id UUID', () => {
+    const result = MyTaskSchema.safeParse({ ...validMyTask, id: 'not-a-uuid' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid tenantId UUID', () => {
+    const result = MyTaskSchema.safeParse({ ...validMyTask, tenantId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = MyTaskSchema.safeParse({});
 
     expect(result.success).toBe(false);
   });

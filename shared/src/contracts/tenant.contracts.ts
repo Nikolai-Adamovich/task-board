@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { TenantSchema, CreateTenantSchema, UpdateTenantSchema, TenantMemberSchema } from '../schemas/tenant.js';
+import {
+  TenantSchema,
+  CreateTenantSchema,
+  UpdateTenantSchema,
+  TenantMemberSchema,
+  InviteMemberSchema,
+  TenantWithRoleSchema,
+} from '../schemas/tenant.js';
 import { ErrorResponseSchema } from '../schemas/common.js';
 import { TenantRole } from '../constants/roles.js';
 
@@ -25,7 +32,7 @@ export const tenantContracts = {
       limit: z.coerce.number().int().min(1).max(100).default(20),
     }),
     response: z.object({
-      data: z.array(TenantSchema),
+      data: z.array(TenantWithRoleSchema),
       total: z.number().int().nonnegative(),
       page: z.number().int().positive(),
       limit: z.number().int().positive(),
@@ -58,14 +65,11 @@ export const tenantContracts = {
     error: ErrorResponseSchema,
   },
 
-  /** Add a member to a tenant */
+  /** Invite a member to a tenant */
   addMember: {
     method: 'POST' as const,
     path: '/tenants/:id/members',
-    body: z.object({
-      userId: z.uuid(),
-      role: z.enum(TenantRole),
-    }),
+    body: InviteMemberSchema,
     response: TenantMemberSchema,
     error: ErrorResponseSchema,
   },

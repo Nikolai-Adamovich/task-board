@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
 import type { Tenant } from '@task-board/shared';
 
+// Required MongoDB indexes:
+// - { slug: 1 } (unique)
+// - { id: 1 } (unique)
+
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
 export interface TenantDocument {
@@ -9,6 +13,7 @@ export interface TenantDocument {
   id: string;
   name: string;
   slug: string;
+  subscription: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,6 +25,7 @@ function toDomain(doc: TenantDocument): Tenant {
     id: doc.id,
     name: doc.name,
     slug: doc.slug,
+    subscription: doc.subscription as Tenant['subscription'],
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };
@@ -48,12 +54,13 @@ export class TenantRepository {
     return docs.map(toDomain);
   }
 
-  async create(input: { name: string; slug: string }): Promise<Tenant> {
+  async create(input: { name: string; slug: string; subscription?: string }): Promise<Tenant> {
     const now = new Date();
     const doc: TenantDocument = {
       id: randomUUID(),
       name: input.name,
       slug: input.slug,
+      subscription: input.subscription ?? 'free',
       createdAt: now,
       updatedAt: now,
     };

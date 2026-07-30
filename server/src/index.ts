@@ -2,11 +2,23 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import type { AppEnv } from './types/context.js';
-import { connectMongo } from './db/mongo.js';
+import { connectMongo, getCollection } from './db/mongo.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { authMiddleware } from './middleware/auth.js';
 import { tenantContextMiddleware } from './middleware/tenant-context.js';
 import { routeRegistry } from './routes/index.js';
+import { createInvitationRoutes } from './routes/invitations.js';
+import { TaskService } from './services/task.service.js';
+import { TaskRepository } from './repositories/task.repository.js';
+import { ColumnRepository } from './repositories/column.repository.js';
+import { TenantMemberRepository } from './repositories/tenant-member.repository.js';
+import { TenantRepository } from './repositories/tenant.repository.js';
+import { ProjectRepository } from './repositories/project.repository.js';
+import type { TaskDocument } from './repositories/task.repository.js';
+import type { ColumnDocument } from './repositories/column.repository.js';
+import type { TenantMemberDocument } from './repositories/tenant-member.repository.js';
+import type { TenantDocument } from './repositories/tenant.repository.js';
+import type { ProjectDocument } from './repositories/project.repository.js';
 
 // ─── Hono App Bootstrap ──────────────────────────────────────────────────────
 
@@ -60,6 +72,25 @@ app.use('/api/v1/*', authMiddleware);
 // Tenant list/create are cross-tenant operations. Specific tenant operations
 // (get/update/delete) check membership via the tenant service internally.
 app.route('/api/v1/tenants', routeRegistry.tenants);
+
+// ── Invitation routes (auth only — cross-tenant, no tenant context) ───────────
+app.route('/api/v1/invitations', createInvitationRoutes());
+
+// ── Cross-tenant "my tasks" (auth only — no tenant context needed) ────────────
+// Must be registered BEFORE tenantContextMiddleware since it doesn't require
+// a specific tenant. Returns all tasks assigned to the user across all tenants.
+app.get('/api/v1/tasks/my', async (c) => {
+  const userId = c.get('userId');
+  const taskRepo = new TaskRepository(getCollection<TaskDocument>('tasks'));
+  const columnRepo = new ColumnRepository(getCollection<ColumnDocument>('columns'));
+  const tenantMemberRepo = new TenantMemberRepository(getCollection<TenantMemberDocument>('tenant_members'));
+  const tenantRepo = new TenantRepository(getCollection<TenantDocument>('tenants'));
+  const projectRepo = new ProjectRepository(getCollection<ProjectDocument>('projects'));
+  const service = new TaskService(taskRepo, columnRepo, tenantMemberRepo, tenantRepo, projectRepo);
+  const tasks = await service.getMyTasks(userId);
+
+  return c.json({ data: tasks, total: tasks.length });
+});
 
 // ── Tenant-scoped routes (auth + tenant context required) ─────────────────────
 app.use('/api/v1/*', tenantContextMiddleware);

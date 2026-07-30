@@ -1,5 +1,11 @@
 import type { z } from 'zod';
-import type { TenantSchema, CreateTenantSchema, UpdateTenantSchema, TenantMemberSchema } from '../schemas/tenant.js';
+import type {
+  TenantSchema,
+  CreateTenantSchema,
+  UpdateTenantSchema,
+  TenantMemberSchema,
+  TenantWithRoleSchema,
+} from '../schemas/tenant.js';
 
 /** Tenant entity type */
 export type Tenant = z.infer<typeof TenantSchema>;
@@ -12,3 +18,6 @@ export type UpdateTenant = z.infer<typeof UpdateTenantSchema>;
 
 /** Tenant member type */
 export type TenantMember = z.infer<typeof TenantMemberSchema>;
+
+/** Tenant with the current user's role */
+export type TenantWithRole = z.infer<typeof TenantWithRoleSchema>;

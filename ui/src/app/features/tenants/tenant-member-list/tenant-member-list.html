@@ -25,7 +25,7 @@
     <hlm-card>
       <div hlmCardContent class="p-0">
         <div class="divide-y divide-border">
-          @for (member of members(); track member.userId) {
+          @for (member of members(); track member.userId ?? member.invitedEmail) {
             <div class="flex items-center justify-between px-4 py-3">
               <div class="flex items-center gap-3">
                 <hlm-avatar class="h-8 w-8">
@@ -33,10 +33,25 @@
                     {{ getInitials(member.userId) }}
                   </div>
                 </hlm-avatar>
-                <span class="text-sm text-foreground">{{ member.userId }}</span>
+                <div class="flex flex-col">
+                  <span class="text-sm text-foreground">
+                    {{
+                      member.status === 'pending' ? (member.invitedEmail ?? 'Pending') : (member.userId ?? 'Unknown')
+                    }}
+                  </span>
+                </div>
                 <span hlmBadge [class]="getRoleColor(member.role)">
                   {{ member.role }}
                 </span>
+                @if (member.status === 'pending') {
+                  <span hlmBadge [class]="getStatusColor(member.status)"> Pending </span>
+                } @else if (member.status === 'active') {
+                  <span hlmBadge [class]="getStatusColor(member.status)"> Active </span>
+                } @else if (member.status === 'access_revoked') {
+                  <span hlmBadge [class]="getStatusColor(member.status)"> Access Revoked </span>
+                } @else if (member.status === 'declined') {
+                  <span hlmBadge [class]="getStatusColor(member.status)"> Declined </span>
+                }
               </div>
               @if (canManage()) {
                 <div class="flex items-center gap-2">
@@ -46,12 +61,69 @@
                         <option hlmNativeSelectOption [value]="role">{{ role }}</option>
                       }
                     </hlm-native-select>
+
+                    <!-- Revoke access button (for active or pending members) -->
+                    @if (member.status === 'active' || member.status === 'pending') {
+                      <button
+                        hlmBtn
+                        variant="ghost"
+                        size="sm"
+                        (click)="revokeAccess(member)"
+                        [disabled]="actioningUserId() === member.userId"
+                        title="Revoke access"
+                      >
+                        @if (actioningUserId() === member.userId) {
+                          <hlm-spinner class="h-4 w-4" />
+                        } @else {
+                          <ng-icon name="lucideBan" class="h-4 w-4 text-orange-600" />
+                        }
+                      </button>
+                    }
+
+                    <!-- Resend invitation button (for pending members) -->
+                    @if (member.status === 'pending') {
+                      <button
+                        hlmBtn
+                        variant="ghost"
+                        size="sm"
+                        (click)="resendInvitation(member)"
+                        [disabled]="actioningUserId() === member.userId"
+                        title="Resend invitation"
+                      >
+                        @if (actioningUserId() === member.userId) {
+                          <hlm-spinner class="h-4 w-4" />
+                        } @else {
+                          <ng-icon name="lucideRefreshCw" class="h-4 w-4 text-blue-600" />
+                        }
+                      </button>
+                    }
+
+                    <!-- Hard delete button (for access_revoked or declined) -->
+                    @if (member.status === 'access_revoked' || member.status === 'declined') {
+                      <button
+                        hlmBtn
+                        variant="ghost"
+                        size="sm"
+                        (click)="hardDeleteMember(member)"
+                        [disabled]="actioningUserId() === member.userId"
+                        title="Permanently delete"
+                      >
+                        @if (actioningUserId() === member.userId) {
+                          <hlm-spinner class="h-4 w-4" />
+                        } @else {
+                          <ng-icon name="lucideSkull" class="h-4 w-4 text-destructive" />
+                        }
+                      </button>
+                    }
+
+                    <!-- Remove member button (always for non-owner) -->
                     <button
                       hlmBtn
                       variant="ghost"
                       size="sm"
                       (click)="removeMember(member)"
                       [disabled]="removingUserId() === member.userId"
+                      title="Remove member"
                     >
                       @if (removingUserId() === member.userId) {
                         <hlm-spinner class="h-4 w-4" />

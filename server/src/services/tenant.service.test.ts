@@ -19,6 +19,9 @@ function createMockTenantMemberRepo() {
     findByUserAndTenant: vi.fn(),
     findByTenant: vi.fn(),
     findByUser: vi.fn(),
+    findByInvitedEmailAndTenant: vi.fn(),
+    countActiveByTenant: vi.fn(),
+    countOwnedTenants: vi.fn(),
     create: vi.fn(),
     updateRole: vi.fn(),
     delete: vi.fn(),
@@ -40,6 +43,7 @@ function makeTenant(overrides: Record<string, unknown> = {}) {
     id: 'tenant-1',
     name: 'Test Workspace',
     slug: 'test-workspace',
+    subscription: 'free',
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,
@@ -51,29 +55,43 @@ function makeMember(overrides: Record<string, unknown> = {}) {
     userId: 'user-1',
     tenantId: 'tenant-1',
     role: 'owner',
+    status: 'active',
+    invitedEmail: null,
+    invitationToken: null,
+    invitedAt: null,
     ...overrides,
   };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
+function createMockEmailService() {
+  return {
+    sendInvitationEmail: vi.fn().mockResolvedValue(undefined),
+    sendEmail: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('TenantService', () => {
   let tenantRepo: ReturnType<typeof createMockTenantRepo>;
   let memberRepo: ReturnType<typeof createMockTenantMemberRepo>;
   let userRepo: ReturnType<typeof createMockUserRepo>;
+  let emailService: ReturnType<typeof createMockEmailService>;
   let service: TenantService;
 
   beforeEach(() => {
     tenantRepo = createMockTenantRepo();
     memberRepo = createMockTenantMemberRepo();
     userRepo = createMockUserRepo();
-    service = new TenantService(tenantRepo as never, memberRepo as never, userRepo as never);
+    emailService = createMockEmailService();
+    service = new TenantService(tenantRepo as never, memberRepo as never, userRepo as never, emailService as never);
   });
 
   // ── createTenant ────────────────────────────────────────────────────────
 
   describe('createTenant', () => {
     it('creates a tenant and adds the user as owner', async () => {
+      memberRepo.countOwnedTenants.mockResolvedValue(0);
       tenantRepo.findBySlug.mockResolvedValue(null);
       tenantRepo.create.mockResolvedValue(makeTenant());
       memberRepo.create.mockResolvedValue(makeMember());
@@ -81,36 +99,40 @@ describe('TenantService', () => {
       const result = await service.createTenant('user-1', {
         name: 'Test Workspace',
         slug: 'test-workspace',
+        subscription: 'free',
       });
 
       expect(tenantRepo.create).toHaveBeenCalledWith({
         name: 'Test Workspace',
         slug: 'test-workspace',
+        subscription: 'free',
       });
       expect(memberRepo.create).toHaveBeenCalledWith({
         userId: 'user-1',
         tenantId: 'tenant-1',
         role: 'owner',
+        status: 'active',
       });
       expect(result.name).toBe('Test Workspace');
     });
 
     it('throws ConflictError when slug is already taken', async () => {
+      memberRepo.countOwnedTenants.mockResolvedValue(0);
       tenantRepo.findBySlug.mockResolvedValue(makeTenant());
 
-      await expect(service.createTenant('user-1', { name: 'X', slug: 'test-workspace' })).rejects.toThrow(
-        'already exists',
-      );
+      await expect(
+        service.createTenant('user-1', { name: 'X', slug: 'test-workspace', subscription: 'free' }),
+      ).rejects.toThrow('already exists');
     });
   });
 
   // ── listTenantsForUser ──────────────────────────────────────────────────
 
   describe('listTenantsForUser', () => {
-    it('returns all tenants the user is a member of', async () => {
+    it('returns all tenants the user is an active member of', async () => {
       memberRepo.findByUser.mockResolvedValue([
-        makeMember({ tenantId: 't1' }),
-        makeMember({ tenantId: 't2', role: 'member' }),
+        makeMember({ tenantId: 't1', status: 'active' }),
+        makeMember({ tenantId: 't2', role: 'member', status: 'active' }),
       ]);
       tenantRepo.findById
         .mockResolvedValueOnce(makeTenant({ id: 't1', name: 'Tenant 1' }))
@@ -216,35 +238,75 @@ describe('TenantService', () => {
   // ── inviteMember ────────────────────────────────────────────────────────
 
   describe('inviteMember', () => {
-    it('adds a member when requester is owner', async () => {
+    it('creates a pending invitation and sends email for existing user', async () => {
       memberRepo.findByUserAndTenant
         .mockResolvedValueOnce(makeMember({ role: 'owner' })) // first call: requester check
-        .mockResolvedValueOnce(null); // second call: existing member check
+        .mockResolvedValueOnce(null); // second call: existing member check (not active)
+      tenantRepo.findById.mockResolvedValue(makeTenant());
+      memberRepo.findByInvitedEmailAndTenant.mockResolvedValue(null);
       userRepo.findByEmail.mockResolvedValue({
         id: 'user-2',
         email: 'invited@example.com',
       });
-      memberRepo.create.mockResolvedValue(makeMember({ userId: 'user-2', role: 'member' }));
+      userRepo.findById.mockResolvedValue({ id: 'user-1', displayName: 'Owner' });
+      memberRepo.create.mockResolvedValue(
+        makeMember({ userId: 'user-2', role: 'member', status: 'pending', invitedEmail: 'invited@example.com' }),
+      );
 
       const result = await service.inviteMember('user-1', 'tenant-1', 'invited@example.com', 'member');
 
-      expect(result.userId).toBe('user-2');
-      expect(userRepo.findByEmail).toHaveBeenCalledWith('invited@example.com');
-    });
-
-    it('throws NotFoundError when invited user does not exist', async () => {
-      memberRepo.findByUserAndTenant.mockResolvedValue(makeMember({ role: 'owner' }));
-      userRepo.findByEmail.mockResolvedValue(null);
-
-      await expect(service.inviteMember('user-1', 'tenant-1', 'noone@example.com', 'member')).rejects.toThrow(
-        'not found',
+      expect(result.status).toBe('pending');
+      expect(memberRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-2',
+          tenantId: 'tenant-1',
+          role: 'member',
+          status: 'pending',
+          invitedEmail: 'invited@example.com',
+        }),
       );
     });
 
-    it('throws ConflictError when user is already a member', async () => {
+    it('creates a pending invitation for unregistered user', async () => {
+      memberRepo.findByUserAndTenant.mockResolvedValue(makeMember({ role: 'owner' }));
+      tenantRepo.findById.mockResolvedValue(makeTenant());
+      memberRepo.findByInvitedEmailAndTenant.mockResolvedValue(null);
+      userRepo.findByEmail.mockResolvedValue(null); // user not found
+      userRepo.findById.mockResolvedValue({ id: 'user-1', displayName: 'Owner' });
+      memberRepo.create.mockResolvedValue(
+        makeMember({ userId: null, role: 'member', status: 'pending', invitedEmail: 'new@example.com' }),
+      );
+
+      const result = await service.inviteMember('user-1', 'tenant-1', 'new@example.com', 'member');
+
+      expect(result.status).toBe('pending');
+      expect(memberRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: null,
+          status: 'pending',
+          invitedEmail: 'new@example.com',
+        }),
+      );
+    });
+
+    it('throws ConflictError when invitation already exists', async () => {
+      memberRepo.findByUserAndTenant.mockResolvedValue(makeMember({ role: 'owner' }));
+      tenantRepo.findById.mockResolvedValue(makeTenant());
+      memberRepo.findByInvitedEmailAndTenant.mockResolvedValue(
+        makeMember({ status: 'pending', invitedEmail: 'x@y.com' }),
+      );
+
+      await expect(service.inviteMember('user-1', 'tenant-1', 'x@y.com', 'member')).rejects.toThrow(
+        'invitation for this email already exists',
+      );
+    });
+
+    it('throws ConflictError when user is already an active member', async () => {
       memberRepo.findByUserAndTenant
         .mockResolvedValueOnce(makeMember({ role: 'owner' })) // requester check
-        .mockResolvedValueOnce(makeMember({ userId: 'user-2' })); // already member
+        .mockResolvedValueOnce(makeMember({ userId: 'user-2', status: 'active' })); // already member
+      tenantRepo.findById.mockResolvedValue(makeTenant());
+      memberRepo.findByInvitedEmailAndTenant.mockResolvedValue(null);
       userRepo.findByEmail.mockResolvedValue({ id: 'user-2', email: 'x@y.com' });
 
       await expect(service.inviteMember('user-1', 'tenant-1', 'x@y.com', 'member')).rejects.toThrow('already a member');

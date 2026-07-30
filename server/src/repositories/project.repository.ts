@@ -87,4 +87,8 @@ export class ProjectRepository {
 
     return result.deletedCount > 0;
   }
+
+  async countByTenant(tenantId: string): Promise<number> {
+    return this.collection.countDocuments({ tenantId });
+  }
 }

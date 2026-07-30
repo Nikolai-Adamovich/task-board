@@ -1,13 +1,26 @@
+import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
 import type { TenantMember } from '@task-board/shared';
+
+// Required MongoDB indexes:
+// - { userId: 1, tenantId: 1 } (unique, partial filter: { userId: { $ne: null } })
+// - { invitationToken: 1 } (unique, sparse)
+// - { invitedEmail: 1, tenantId: 1 } (unique, sparse)
+// - { tenantId: 1 }
+// - { id: 1 } (unique)
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
 export interface TenantMemberDocument {
   _id?: import('mongodb').ObjectId;
-  userId: string;
+  id: string;
+  userId: string | null;
   tenantId: string;
   role: string;
+  status: string;
+  invitedEmail: string | null;
+  invitationToken: string | null;
+  invitedAt: Date | null;
   createdAt: Date;
 }
 
@@ -18,6 +31,10 @@ function toDomain(doc: TenantMemberDocument): TenantMember {
     userId: doc.userId,
     tenantId: doc.tenantId,
     role: doc.role as TenantMember['role'],
+    status: doc.status as TenantMember['status'],
+    invitedEmail: doc.invitedEmail,
+    invitationToken: doc.invitationToken,
+    invitedAt: doc.invitedAt ? doc.invitedAt.toISOString() : null,
   };
 }
 
@@ -44,11 +61,85 @@ export class TenantMemberRepository {
     return docs.map(toDomain);
   }
 
-  async create(input: { userId: string; tenantId: string; role: string }): Promise<TenantMember> {
+  async findByInvitationToken(token: string): Promise<TenantMemberDocument | null> {
+    return this.collection.findOne({ invitationToken: token });
+  }
+
+  async findPendingByEmail(email: string): Promise<TenantMemberDocument[]> {
+    return this.collection.find({ invitedEmail: email, status: 'pending' }).toArray();
+  }
+
+  async activateInvitation(token: string, userId: string): Promise<TenantMember | null> {
+    const result = await this.collection.findOneAndUpdate(
+      { invitationToken: token, status: 'pending' },
+      { $set: { userId, status: 'active', invitedAt: null } },
+      { returnDocument: 'after' },
+    );
+
+    return result ? toDomain(result) : null;
+  }
+
+  async findByInvitedEmailAndTenant(email: string, tenantId: string): Promise<TenantMemberDocument | null> {
+    return this.collection.findOne({ invitedEmail: email, tenantId, status: 'pending' });
+  }
+
+  async countActiveByTenant(tenantId: string): Promise<number> {
+    return this.collection.countDocuments({ tenantId, status: 'active' });
+  }
+
+  async countOwnedTenants(userId: string): Promise<number> {
+    return this.collection.countDocuments({ userId, role: 'owner' });
+  }
+
+  async findPendingByTenant(tenantId: string): Promise<TenantMemberDocument[]> {
+    return this.collection.find({ tenantId, status: 'pending' }).toArray();
+  }
+
+  async findById(id: string): Promise<TenantMemberDocument | null> {
+    return this.collection.findOne({ id });
+  }
+
+  async updateStatusById(id: string, status: string): Promise<TenantMember | null> {
+    const result = await this.collection.findOneAndUpdate({ id }, { $set: { status } }, { returnDocument: 'after' });
+
+    return result ? toDomain(result) : null;
+  }
+
+  async deleteById(id: string): Promise<boolean> {
+    const result = await this.collection.deleteOne({ id });
+
+    return result.deletedCount > 0;
+  }
+
+  async findByEmail(email: string): Promise<TenantMemberDocument[]> {
+    return this.collection
+      .find({
+        $or: [{ invitedEmail: email }, { userId: email }],
+      })
+      .toArray();
+  }
+
+  async findByInvitedEmail(email: string): Promise<TenantMemberDocument[]> {
+    return this.collection.find({ invitedEmail: email }).toArray();
+  }
+
+  async create(input: {
+    userId: string | null;
+    tenantId: string;
+    role: string;
+    status: string;
+    invitedEmail?: string | null;
+    invitationToken?: string | null;
+  }): Promise<TenantMember> {
     const doc: TenantMemberDocument = {
+      id: randomUUID(),
       userId: input.userId,
       tenantId: input.tenantId,
       role: input.role,
+      status: input.status ?? 'active',
+      invitedEmail: input.invitedEmail ?? null,
+      invitationToken: input.invitationToken ?? null,
+      invitedAt: input.status === 'pending' ? new Date() : null,
       createdAt: new Date(),
     };
 
@@ -60,6 +151,16 @@ export class TenantMemberRepository {
     const result = await this.collection.findOneAndUpdate(
       { userId, tenantId },
       { $set: { role } },
+      { returnDocument: 'after' },
+    );
+
+    return result ? toDomain(result) : null;
+  }
+
+  async updateStatus(tenantId: string, userId: string, status: string): Promise<TenantMember | null> {
+    const result = await this.collection.findOneAndUpdate(
+      { userId, tenantId },
+      { $set: { status } },
       { returnDocument: 'after' },
     );
 

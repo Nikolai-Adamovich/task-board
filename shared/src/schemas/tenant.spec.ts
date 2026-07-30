@@ -5,7 +5,13 @@
  * Validating these schemas ensures correct data shapes for CRUD operations.
  */
 import { describe, it, expect } from 'vitest';
-import { TenantSchema, CreateTenantSchema, UpdateTenantSchema, TenantMemberSchema } from './tenant.js';
+import {
+  TenantSchema,
+  CreateTenantSchema,
+  UpdateTenantSchema,
+  TenantMemberSchema,
+  TenantWithRoleSchema,
+} from './tenant.js';
 
 // ─── TenantSchema ────────────────────────────────────────────────────────────
 
@@ -14,6 +20,7 @@ describe('TenantSchema', () => {
     id: '550e8400-e29b-41d4-a716-446655440000',
     name: 'Acme Corp',
     slug: 'acme-corp',
+    subscription: 'free' as const,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
@@ -140,6 +147,10 @@ describe('TenantMemberSchema', () => {
     userId: '550e8400-e29b-41d4-a716-446655440000',
     tenantId: '660e8400-e29b-41d4-a716-446655440001',
     role: 'owner' as const,
+    status: 'active' as const,
+    invitedEmail: null,
+    invitationToken: null,
+    invitedAt: null,
   };
 
   it('should accept a valid tenant member', () => {
@@ -156,14 +167,75 @@ describe('TenantMemberSchema', () => {
     }
   });
 
+  it('should accept all member statuses including access_revoked', () => {
+    for (const status of ['active', 'pending', 'declined', 'access_revoked'] as const) {
+      const result = TenantMemberSchema.safeParse({ ...validMember, status });
+
+      expect(result.success).toBe(true);
+    }
+  });
+
   it('should reject invalid role', () => {
     const result = TenantMemberSchema.safeParse({ ...validMember, role: 'superadmin' });
 
     expect(result.success).toBe(false);
   });
 
+  it('should reject invalid status', () => {
+    const result = TenantMemberSchema.safeParse({ ...validMember, status: 'banned' });
+
+    expect(result.success).toBe(false);
+  });
+
   it('should reject invalid userId UUID', () => {
     const result = TenantMemberSchema.safeParse({ ...validMember, userId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── TenantWithRoleSchema ────────────────────────────────────────────────────
+
+describe('TenantWithRoleSchema', () => {
+  const validTenantWithRole = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    name: 'Acme Corp',
+    slug: 'acme-corp',
+    subscription: 'free' as const,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    role: 'owner' as const,
+  };
+
+  it('should accept a valid tenant with role', () => {
+    const result = TenantWithRoleSchema.safeParse(validTenantWithRole);
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept all tenant roles', () => {
+    for (const role of ['owner', 'admin', 'member'] as const) {
+      const result = TenantWithRoleSchema.safeParse({ ...validTenantWithRole, role });
+
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it('should reject missing role', () => {
+    const result = TenantWithRoleSchema.safeParse({
+      id: validTenantWithRole.id,
+      name: validTenantWithRole.name,
+      slug: validTenantWithRole.slug,
+      subscription: validTenantWithRole.subscription,
+      createdAt: validTenantWithRole.createdAt,
+      updatedAt: validTenantWithRole.updatedAt,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid role', () => {
+    const result = TenantWithRoleSchema.safeParse({ ...validTenantWithRole, role: 'superadmin' });
 
     expect(result.success).toBe(false);
   });

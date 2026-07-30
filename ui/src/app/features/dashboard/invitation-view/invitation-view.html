@@ -1,0 +1,68 @@
+<div class="mx-auto max-w-3xl py-12">
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-foreground">You have pending invitations</h1>
+    <p class="mt-2 text-muted-foreground">Accept an invitation to join a workspace, or create your own.</p>
+  </div>
+
+  <!-- Invitation Cards -->
+  <div class="space-y-4">
+    @for (invitation of invitations(); track invitation.id) {
+      <hlm-card>
+        <div hlmCardContent class="pt-6">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <ng-icon name="lucideBuilding2" class="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 class="text-base font-semibold text-foreground">{{ invitation.tenantName }}</h3>
+                <div class="mt-1 flex items-center gap-2">
+                  <span hlmBadge class="bg-blue-100 text-blue-700">{{ invitation.role }}</span>
+                  @if (invitation.invitedAt) {
+                    <span class="text-xs text-muted-foreground">
+                      Invited {{ invitation.invitedAt | date: 'mediumDate' }}
+                    </span>
+                  }
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                hlmBtn
+                variant="outline"
+                size="sm"
+                (click)="declineInvitation(invitation)"
+                [disabled]="decliningId() === invitation.id || acceptingId() === invitation.id"
+              >
+                @if (decliningId() === invitation.id) {
+                  <hlm-spinner class="mr-1 h-3 w-3" />
+                }
+                Decline
+              </button>
+              <button
+                hlmBtn
+                size="sm"
+                (click)="acceptInvitation(invitation)"
+                [disabled]="acceptingId() === invitation.id || decliningId() === invitation.id"
+              >
+                @if (acceptingId() === invitation.id) {
+                  <hlm-spinner class="mr-1 h-3 w-3" />
+                }
+                Accept
+              </button>
+            </div>
+          </div>
+        </div>
+      </hlm-card>
+    }
+  </div>
+
+  <!-- Create own workspace link -->
+  <div class="mt-8 text-center">
+    <p class="text-sm text-muted-foreground">
+      Or
+      <a routerLink="/workspace/create" class="font-medium text-primary hover:underline">create your own workspace</a>
+    </p>
+  </div>
+</div>

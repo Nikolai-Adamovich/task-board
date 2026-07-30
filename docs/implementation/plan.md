@@ -1,15 +1,15 @@
 # Task Board MVP — Implementation Plan
 
-> **Version:** 2.0.0 **Date:** 2026-07-28 **Status:** Approved **Reference:**
-> [Technical Specification v2.0.0](../implementation/technical_specification.md) ·
-> [Architecture v2.0.0](../implementation/architecture.md) · [Project Description](../project_description.md)
+> **Version:** 4.0.0 **Date:** 2026-07-30 **Status:** Approved **Reference:**
+> [Technical Specification v4.0.0](../implementation/technical_specification.md) ·
+> [Architecture v4.0.0](../implementation/architecture.md) · [Project Description](../project_description.md)
 
 ---
 
 ## Summary
 
-- **Total tasks:** 94
-- **Phases:** 10 (Phase 0–Phase 9)
+- **Total tasks:** 148
+- **Phases:** 12 (Phase 0–Phase 11)
 - **First deployable vertical slice:** Tasks T-001 through T-053, T-054 through T-065, T-066 through T-071, T-074 (see
   [Vertical Slice Mapping](#vertical-slice-mapping))
 
@@ -1561,6 +1561,1138 @@ settings, tenant member management, and project member management.
 
 ---
 
+## Phase 10: User Workflow Rework
+
+> Implements v3.0.0 changes: registration no longer auto-creates a tenant, subscription tiers (free/premium) with
+> limits, and email-based invitation system supporting unregistered users. See
+> [Technical Specification §13–14](technical_specification.md:1812) and [Architecture §7](architecture.md:1097).
+
+### T-095: Add MemberStatus and SubscriptionTier constants to shared package
+
+- **Goal:** Add the two new constant arrays to [`shared/src/constants/roles.ts`](shared/src/constants/roles.ts:1) and
+  export them from the barrel file.
+- **Files to modify:**
+  - [`shared/src/constants/roles.ts`](shared/src/constants/roles.ts:1)
+  - [`shared/src/index.ts`](shared/src/index.ts:1)
+- **Dependencies:** T-016 (shared package skeleton)
+- **Acceptance criteria:**
+  - `MemberStatus` is `['active', 'pending', 'declined'] as const`
+  - `SubscriptionTier` is `['free', 'premium'] as const`
+  - Both are exported from [`shared/src/index.ts`](shared/src/index.ts:1)
+  - `tsc --noEmit` passes in the shared package
+
+### T-096: Update shared tenant schemas and types for subscription and invitation
+
+- **Goal:** Add `subscription` field to [`TenantSchema`](shared/src/schemas/tenant.ts:8), update
+  [`TenantMemberSchema`](shared/src/schemas/tenant.ts:68) with new fields (nullable `userId`, `status`, `invitedEmail`,
+  `invitationToken`, `invitedAt`), add [`InviteMemberSchema`](shared/src/schemas/tenant.ts) for the invite-by-email
+  body, and update derived types.
+- **Files to modify:**
+  - [`shared/src/schemas/tenant.ts`](shared/src/schemas/tenant.ts:1)
+  - [`shared/src/types/tenant.ts`](shared/src/types/tenant.ts:1)
+- **Dependencies:** T-095
+- **Acceptance criteria:**
+  - `TenantSchema` includes `subscription: z.enum(SubscriptionTier)`
+  - `TenantMemberSchema` includes `status`, `invitedEmail` (nullable), `invitationToken` (nullable), `invitedAt`
+    (nullable), and `userId` is nullable (`z.uuid().nullable()`)
+  - `InviteMemberSchema` validates `{ email: z.email(), role: z.enum(TenantRole) }`
+  - `CreateTenantSchema` includes optional `subscription` field with default `'free'`
+  - All derived types (`Tenant`, `TenantMember`, `InviteMember`, `CreateTenant`) are correct
+  - `tsc --noEmit` passes in the shared package
+
+### T-097: Add invitation schemas and types to shared auth package
+
+- **Goal:** Add [`AcceptInvitationSchema`](shared/src/schemas/auth.ts) and
+  [`InvitationDetailsSchema`](shared/src/schemas/auth.ts) to the auth schemas, update derived types.
+- **Files to modify:**
+  - [`shared/src/schemas/auth.ts`](shared/src/schemas/auth.ts:1)
+  - [`shared/src/types/auth.ts`](shared/src/types/auth.ts:1)
+- **Dependencies:** T-096
+- **Acceptance criteria:**
+  - `AcceptInvitationSchema` validates `{ token: z.string().min(1) }`
+  - `InvitationDetailsSchema` validates `{ tenantName, invitedEmail, role, status }`
+  - `AuthResponseSchema` is unchanged (still returns `{ token, user }`)
+  - Derived types `AcceptInvitation` and `InvitationDetails` are exported
+  - `tsc --noEmit` passes in the shared package
+
+### T-098: Update shared API contracts and barrel exports for invitation flow
+
+- **Goal:** Update [`tenant.contracts.ts`](shared/src/contracts/tenant.contracts.ts:1) so `addMember` body uses
+  `InviteMemberSchema` (`{ email, role }`) instead of `{ userId, role }`. Add `acceptInvitation` and `getInvitation`
+  contracts to [`auth.contracts.ts`](shared/src/contracts/auth.contracts.ts:1). Update barrel exports in
+  [`shared/src/index.ts`](shared/src/index.ts:1).
+- **Files to modify:**
+  - [`shared/src/contracts/tenant.contracts.ts`](shared/src/contracts/tenant.contracts.ts:1)
+  - [`shared/src/contracts/auth.contracts.ts`](shared/src/contracts/auth.contracts.ts:1)
+  - [`shared/src/index.ts`](shared/src/index.ts:1)
+- **Dependencies:** T-096, T-097
+- **Acceptance criteria:**
+  - `tenantContracts.addMember.body` validates `{ email, role }` using `InviteMemberSchema`
+  - `authContracts.acceptInvitation` defines `POST /auth/accept-invitation` with `AcceptInvitationSchema` body
+  - `authContracts.getInvitation` defines `GET /invitations/:token` (public, no auth)
+  - All new schemas, types, and constants are exported from [`shared/src/index.ts`](shared/src/index.ts:1)
+  - `tsc --noEmit` passes across the monorepo
+
+### T-099: Update TenantMemberRepository for new fields, nullable userId, and invitation queries
+
+- **Goal:** Update [`TenantMemberDocument`](server/src/repositories/tenant-member.repository.ts:6) shape to include
+  `status`, `invitedEmail`, `invitationToken`, `invitedAt`, and nullable `userId`. Add invitation lookup methods and
+  ensure new MongoDB indexes are created.
+- **Files to modify:**
+  - [`server/src/repositories/tenant-member.repository.ts`](server/src/repositories/tenant-member.repository.ts:1)
+- **Dependencies:** T-096
+- **Acceptance criteria:**
+  - `TenantMemberDocument` includes `status: string`, `invitedEmail: string | null`, `invitationToken: string | null`,
+    `invitedAt: Date | null`, `userId: string | null`
+  - `create()` accepts new fields (`status`, `invitedEmail`, `invitationToken`, `invitedAt`)
+  - New method `findByInvitationToken(token: string): Promise<TenantMember | null>` — queries by `invitationToken` index
+  - New method `findByInvitedEmailAndTenant(email: string, tenantId: string): Promise<TenantMember | null>`
+  - New method `findActiveByUser(userId: string): Promise<TenantMember[]>` — filters by `{ userId, status: 'active' }`
+  - `toDomain()` mapper maps all new fields
+  - `delete()` works with nullable userId (use `invitationToken` or `_id` for pending members)
+  - MongoDB indexes created on startup: `{ invitationToken: 1 }` unique sparse, `{ invitedEmail: 1, tenantId: 1 }`
+    unique sparse, compound `{ userId: 1, tenantId: 1 }` with partial filter `{ userId: { $ne: null } }`
+
+### T-100: Update TenantRepository for subscription field
+
+- **Goal:** Add `subscription` field to the [`TenantDocument`](server/src/repositories/tenant.repository.ts:7) and all
+  repository methods that create or map tenant documents.
+- **Files to modify:**
+  - [`server/src/repositories/tenant.repository.ts`](server/src/repositories/tenant.repository.ts:1)
+- **Dependencies:** T-096
+- **Acceptance criteria:**
+  - `TenantDocument` includes `subscription: string`
+  - `create()` accepts and stores `subscription` field (defaults to `'free'`)
+  - `toDomain()` maps `subscription` to the domain `Tenant` type
+  - `update()` can change `subscription` field
+
+### T-101: Create EmailService with Resend integration
+
+- **Goal:** Create a new [`EmailService`](server/src/services/email.service.ts) that sends invitation emails via Resend
+  in production and logs to console in development. Uses the `resend` npm package.
+- **Files to create:**
+  - `server/src/services/email.service.ts`
+- **Files to modify:**
+  - `server/package.json` (add `resend` dependency)
+- **Dependencies:** None
+- **Acceptance criteria:**
+  - `EmailService` interface with `sendInvitation(to, tenantName, role, token): Promise<void>` method
+  - `ResendEmailService` implementation uses `resend` npm package to send email with invitation link
+  - `ConsoleEmailService` implementation logs invitation link to console (for development)
+  - Invitation link format: `${FRONTEND_URL}/auth/accept-invitation?token=<token>`
+  - Email subject and body include tenant name and assigned role
+  - Factory function selects implementation based on `RESEND_API_KEY` env var presence
+  - Unit tests cover both implementations
+
+### T-102: Update AuthService — remove auto-tenant creation, add acceptInvitation, null tenantId JWT
+
+- **Goal:** Refactor [`AuthService`](server/src/services/auth.service.ts:55) so registration creates only the user (no
+  tenant), login issues `tenantId: null` when user has no active memberships, and add a new `acceptInvitation` method
+  per [spec §14.7](technical_specification.md:2097).
+- **Files to modify:**
+  - [`server/src/services/auth.service.ts`](server/src/services/auth.service.ts:1)
+  - [`server/src/services/auth.service.test.ts`](server/src/services/auth.service.test.ts:1)
+- **Dependencies:** T-099, T-101
+- **Acceptance criteria:**
+  - `register()` no longer creates a tenant or TenantMember; JWT issued with `tenantId: null`, `tenantRole: null`
+  - `login()` checks active memberships via `TenantMemberRepository.findActiveByUser()`; if none exist, JWT is issued
+    with `tenantId: null`
+  - `JwtPayload` interface updated: `tenantId: string | null`, `tenantRole: string | null`
+  - `acceptInvitation(token, userId)` method:
+    - Looks up TenantMember by `invitationToken`
+    - Validates `status === 'pending'`
+    - Validates authenticated user's email matches `invitedEmail`
+    - Updates TenantMember: sets `userId`, `status: 'active'`, clears `invitationToken`
+    - Returns updated TenantMember
+  - `generateToken()` accepts nullable `tenantId` and `tenantRole`
+  - All existing and new tests pass
+
+### T-103: Update TenantService — subscription limit checks and invitation flow with email
+
+- **Goal:** Add subscription limit enforcement to
+  [`TenantService.createTenant()`](server/src/services/tenant.service.ts:19) and update
+  [`inviteMember()`](server/src/services/tenant.service.ts:127) to support unregistered users per
+  [spec §14](technical_specification.md:1866).
+- **Files to modify:**
+  - [`server/src/services/tenant.service.ts`](server/src/services/tenant.service.ts:1)
+  - [`server/src/services/tenant.service.test.ts`](server/src/services/tenant.service.test.ts:1)
+- **Dependencies:** T-099, T-100, T-101, T-102
+- **Acceptance criteria:**
+  - `createTenant()`:
+    - Accepts `subscription` field in input (defaults to `'free'`)
+    - For `subscription: 'free'`: checks if user already owns a free workspace; rejects with 403
+      `SUBSCRIPTION_LIMIT_EXCEEDED` if so
+    - For `subscription: 'premium'`: no workspace count limit
+    - Creates Tenant with `subscription` field, creates TenantMember as owner with `status: 'active'`
+  - `inviteMember()`:
+    - If user found by email: creates TenantMember with `status: 'active'` (existing behavior, with new fields)
+    - If user NOT found: generates `invitationToken` (crypto.randomUUID), creates TenantMember with `userId: null`,
+      `status: 'pending'`, `invitedEmail`, `invitationToken`, `invitedAt`
+    - Delegates email sending to `EmailService.sendInvitation()`
+    - Prevents duplicate pending invitations for same `(email, tenantId)` → 409
+    - Prevents inviting email that is already an active member → 409
+  - New method `getInvitationByToken(token): Promise<InvitationDetails>` (public, no auth)
+  - `deleteTenant()` updated to also delete pending members
+  - All existing and new tests pass
+
+### T-104: Update ProjectService — subscription limit checks
+
+- **Goal:** Add subscription limit enforcement to [`ProjectService`](server/src/services/project.service.ts:8) per
+  [spec §14.2](technical_specification.md:1879).
+- **Files to modify:**
+  - [`server/src/services/project.service.ts`](server/src/services/project.service.ts:1)
+  - [`server/src/services/project.service.test.ts`](server/src/services/project.service.test.ts:1)
+- **Dependencies:** T-100
+- **Acceptance criteria:**
+  - `createProject()` checks tenant's `subscription` field:
+    - Free: max 3 projects per workspace; rejects with 403 `SUBSCRIPTION_LIMIT_EXCEEDED` if exceeded
+    - Premium: no limit
+  - `addMember()` checks tenant's `subscription` field:
+    - Free: max 10 members per project; rejects with 403 `SUBSCRIPTION_LIMIT_EXCEEDED` if exceeded
+    - Premium: no limit
+  - `ProjectService` constructor updated to accept `TenantRepository` for reading subscription field
+  - All existing and new tests pass
+
+### T-105: Update TenantContextMiddleware and RBAC for status check and pending member exclusion
+
+- **Goal:** Update [`tenantContextMiddleware`](server/src/middleware/tenant-context.ts:30) to check `status: 'active'`
+  and update [`RBACMiddleware`](server/src/middleware/rbac.ts:27) to explicitly exclude pending/declined members per
+  [spec §3.4](technical_specification.md:301).
+- **Files to modify:**
+  - [`server/src/middleware/tenant-context.ts`](server/src/middleware/tenant-context.ts:1)
+  - [`server/src/middleware/rbac.ts`](server/src/middleware/rbac.ts:1)
+  - [`server/src/middleware/tenant-context.test.ts`](server/src/middleware/tenant-context.test.ts) (create if missing)
+  - [`server/src/middleware/rbac.test.ts`](server/src/middleware/rbac.test.ts:1)
+- **Dependencies:** T-099
+- **Acceptance criteria:**
+  - Tenant context middleware query now includes `status: 'active'` in the filter
+    (`{ userId, tenantId, status: 'active' }`)
+  - Pending/declined members are rejected with 403
+  - RBAC middleware checks `userRole` is not null/undefined (defense-in-depth)
+  - Unit tests verify: active member passes, pending member rejected, declined member rejected
+
+### T-106: Add invitation routes to server auth routes
+
+- **Goal:** Add [`POST /auth/accept-invitation`](server/src/routes/auth.ts) (authenticated) and
+  [`GET /invitations/:token`](server/src/routes/auth.ts) (public, no auth) endpoints per
+  [spec §4.2](technical_specification.md:332).
+- **Files to modify:**
+  - [`server/src/routes/auth.ts`](server/src/routes/auth.ts:1)
+  - [`server/src/index.ts`](server/src/index.ts:1) (register public invitation route)
+  - [`server/src/routes/auth.test.ts`](server/src/routes/auth.test.ts:1)
+- **Dependencies:** T-097, T-102, T-103
+- **Acceptance criteria:**
+  - `POST /auth/accept-invitation`:
+    - Requires authentication (authMiddleware)
+    - Body validated with `AcceptInvitationSchema`
+    - Calls `AuthService.acceptInvitation(token, userId)`
+    - Returns 200 with updated TenantMember
+  - `GET /invitations/:token`:
+    - Public endpoint — no auth middleware applied
+    - Returns invitation details (tenantName, invitedEmail, role, status)
+    - Returns 404 if token not found or invitation is not pending
+  - Public route registered before auth middleware in [`server/src/index.ts`](server/src/index.ts:1)
+  - Tests cover both endpoints
+
+### T-107: Update tenant routes — invite body uses email instead of userId
+
+- **Goal:** Update the [`POST /:tenantId/members`](server/src/routes/tenants.ts:112) route to validate the body against
+  `InviteMemberSchema` (`{ email, role }`) instead of `{ userId, role }`, and pass `email` to the service layer.
+- **Files to modify:**
+  - [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:1)
+  - [`server/src/routes/tenants.test.ts`](server/src/routes/tenants.test.ts:1)
+- **Dependencies:** T-098, T-103
+- **Acceptance criteria:**
+  - Route body validated with `InviteMemberSchema` (`{ email: z.email(), role: z.enum(TenantRole) }`)
+  - `TenantService.inviteMember()` called with `email` instead of `userId`
+  - Response includes full TenantMember (with `status`, `invitedEmail`, etc.)
+  - Tests cover both registered-user and unregistered-user invite flows
+
+### T-108: Update AuthStore to handle tenantId: null from JWT
+
+- **Goal:** Update [`AuthStore`](ui/src/app/stores/auth-store.ts:15) to extract and expose `tenantId` from the JWT
+  payload, handling the `null` case for users with no workspaces.
+- **Files to modify:**
+  - [`ui/src/app/stores/auth-store.ts`](ui/src/app/stores/auth-store.ts:1)
+  - [`ui/src/app/stores/auth-store.spec.ts`](ui/src/app/stores/auth-store.spec.ts:1)
+- **Dependencies:** T-102
+- **Acceptance criteria:**
+  - `decodeTenantRole()` also extracts `tenantId` from JWT payload
+  - New `tenantId` signal: `signal<string | null>(null)`
+  - `tenantId` is `null` when JWT has `tenantId: null` (new user with no workspaces)
+  - `setSession()` updates `tenantId` signal
+  - `logout()` clears `tenantId` signal
+  - Tests verify: JWT with null tenantId → `tenantId()` is null; JWT with tenantId → `tenantId()` is set
+
+### T-109: Update TenantClient with invitation and subscription methods
+
+- **Goal:** Extend [`TenantClient`](ui/src/app/services/tenant-client.ts:13) with methods for accepting invitations,
+  getting invitation details, and upgrading subscription.
+- **Files to modify:**
+  - [`ui/src/app/services/tenant-client.ts`](ui/src/app/services/tenant-client.ts:1)
+  - `ui/src/app/services/tenant-client.spec.ts`
+- **Dependencies:** T-098
+- **Acceptance criteria:**
+  - `acceptInvitation(token: string): Observable<TenantMember>` — calls `POST /auth/accept-invitation`
+  - `getInvitation(token: string): Observable<InvitationDetails>` — calls `GET /invitations/:token`
+  - `upgradeSubscription(tenantId: string): Observable<Tenant>` — calls `PATCH /tenants/:tenantId` with
+    `{ subscription: 'premium' }`
+  - All methods correctly typed using shared package types
+  - Tests cover each new method (correct URL, HTTP method, request/response handling)
+
+### T-110: Update RegisterComponent — redirect to workspace creation when tenantId is null
+
+- **Goal:** Update [`Register`](ui/src/app/features/auth/register/register.ts:31) so that after successful registration,
+  if the user has no tenants (`tenantId` is null), they are redirected to workspace creation instead of `/`.
+- **Files to modify:**
+  - [`ui/src/app/features/auth/register/register.ts`](ui/src/app/features/auth/register/register.ts:1)
+  - [`ui/src/app/features/auth/register/register.spec.ts`](ui/src/app/features/auth/register/register.spec.ts:1)
+- **Dependencies:** T-108
+- **Acceptance criteria:**
+  - After successful registration, checks `authStore.tenantId()`
+  - If `null`: navigates to `/create-workspace`
+  - If set: navigates to `/` (existing behavior)
+  - Invitation token from query params is preserved for post-registration acceptance
+  - Tests verify both redirect paths
+
+### T-111: Create AcceptInvitationComponent
+
+- **Goal:** Create the public invitation acceptance page at `/auth/accept-invitation?token=...` per
+  [spec §14.3.3](technical_specification.md:1922).
+- **Files to create:**
+  - `ui/src/app/features/auth/accept-invitation/accept-invitation.ts`
+  - `ui/src/app/features/auth/accept-invitation/accept-invitation.html`
+  - `ui/src/app/features/auth/accept-invitation/accept-invitation.spec.ts`
+- **Dependencies:** T-108, T-109
+- **Acceptance criteria:**
+  - Route: `/auth/accept-invitation` — no auth guard (public page)
+  - Reads `token` from query params
+  - Calls `TenantClient.getInvitation(token)` to fetch and display invitation details
+  - If user is not authenticated: shows invitation details + "Register" and "Login" links (with token preserved)
+  - If user is authenticated and email matches: calls `TenantClient.acceptInvitation(token)`, then calls
+    `POST /auth/switch-tenant` to get JWT with new tenant context, redirects to tenant
+  - If user is authenticated but email doesn't match: shows error message
+  - Loading and error states handled
+  - Spartan UI: `HlmCardImports`, `HlmButtonImports`, `HlmSpinnerImports`, `HlmBadgeImports`
+  - Angular 22 patterns: signals, `@if`, `inject()`
+
+### T-112: Create WorkspaceCreateComponent
+
+- **Goal:** Create a workspace creation page shown when a user has no workspaces (`tenantId: null`) per
+  [spec §13.4](technical_specification.md:1844).
+- **Files to create:**
+  - `ui/src/app/features/tenants/create-workspace/create-workspace.ts`
+  - `ui/src/app/features/tenants/create-workspace/create-workspace.html`
+  - `ui/src/app/features/tenants/create-workspace/create-workspace.spec.ts`
+- **Dependencies:** T-108, T-109
+- **Acceptance criteria:**
+  - Route: `/create-workspace` — guarded by `authGuard` but not `tenantGuard`
+  - Form with: workspace name, slug (auto-generated from name), subscription tier selector (free/premium)
+  - Default subscription: `'free'`
+  - Submit calls `POST /tenants` via `TenantClient` then `POST /auth/switch-tenant` to get JWT with tenant context
+  - After creation: redirects to `/tenants/:tenantId/projects` (the new tenant)
+  - "Upgrade to Premium" link navigates to `/tenants/:tenantId/upgrade` after creation (for free users)
+  - Error states: slug conflict (409), validation errors (422)
+  - Spartan UI: `HlmCardImports`, `HlmFieldImports`, `HlmInputImports`, `HlmButtonImports`, `HlmSpinnerImports`,
+    `HlmNativeSelectImports`
+  - Angular 22 patterns: signal forms, signals, `@if`, `inject()`
+
+### T-113: Update TenantSwitcher to handle null tenant state
+
+- **Goal:** Update [`TenantSwitcher`](ui/src/app/shell/tenant-switcher/tenant-switcher.ts:15) to gracefully handle the
+  case where the user has zero tenants (new user with no workspaces).
+- **Files to modify:**
+  - [`ui/src/app/shell/tenant-switcher/tenant-switcher.ts`](ui/src/app/shell/tenant-switcher/tenant-switcher.ts:1)
+  - [`ui/src/app/shell/tenant-switcher/tenant-switcher.html`](ui/src/app/shell/tenant-switcher/tenant-switcher.html:1)
+  - `ui/src/app/shell/tenant-switcher/tenant-switcher.spec.ts` (create if missing)
+- **Dependencies:** T-108
+- **Acceptance criteria:**
+  - When `tenants()` is empty or `null`, show "No workspaces" with a "Create Workspace" link
+  - Link navigates to `/create-workspace`
+  - Existing dropdown behavior preserved when tenants exist
+  - Subscription tier badge (free/premium) shown next to tenant name in dropdown
+  - Tests verify empty state and populated state
+
+### T-114: Update TenantMemberListComponent with pending status badges
+
+- **Goal:** Update [`TenantMemberList`](ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts) to display
+  member status badges (active/pending/declined) and show `invitedEmail` for pending members.
+- **Files to modify:**
+  - [`ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts`](ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts)
+  - [`ui/src/app/features/tenants/tenant-member-list/tenant-member-list.html`](ui/src/app/features/tenants/tenant-member-list/tenant-member-list.html)
+  - `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.spec.ts`
+- **Dependencies:** T-086, T-096
+- **Acceptance criteria:**
+  - Each member row shows a status badge: "Active" (green), "Pending" (yellow), "Declined" (red)
+  - Pending members display `invitedEmail` instead of `userId` (since userId is null)
+  - `@for` track expression handles both active members (by `userId`) and pending members (by `invitationToken` or
+    `_id`)
+  - Role editing and remove buttons work for pending members (to cancel invitation)
+  - `HlmBadgeImports` used for status badges
+  - Tests verify badge rendering for each status
+
+### T-115: Create mock UpgradeComponent
+
+- **Goal:** Create a mock payment page for upgrading a tenant to premium tier per
+  [spec §14.5](technical_specification.md:2006).
+- **Files to create:**
+  - `ui/src/app/features/tenants/upgrade/upgrade.ts`
+  - `ui/src/app/features/tenants/upgrade/upgrade.html`
+  - `ui/src/app/features/tenants/upgrade/upgrade.spec.ts`
+- **Dependencies:** T-109
+- **Acceptance criteria:**
+  - Route: `/tenants/:tenantId/upgrade` — guarded by `authGuard` + `tenantGuard`
+  - Displays plan summary: Premium features (unlimited projects, unlimited members)
+  - Shows simulated price (e.g., "$9.99/month")
+  - Disclaimer: "Demo — no real payment is processed"
+  - "Pay Now" button calls `TenantClient.upgradeSubscription(tenantId)`
+  - After success: shows success message, redirects to tenant settings
+  - "Cancel" button navigates back
+  - Only visible when `tenant.subscription === 'free'`; redirects if already premium
+  - Spartan UI: `HlmCardImports`, `HlmButtonImports`, `HlmSpinnerImports`
+  - Angular 22 patterns: signals, `@if`, `inject()`
+
+### T-116: Add new frontend routes for invitation, workspace creation, and upgrade
+
+- **Goal:** Register the new routes in [`app.routes.ts`](ui/src/app/app.routes.ts:26) and update sidebar navigation to
+  include an "Upgrade" link for free-tier tenants.
+- **Files to modify:**
+  - [`ui/src/app/app.routes.ts`](ui/src/app/app.routes.ts:26)
+  - [`ui/src/app/shell/sidebar/sidebar.html`](ui/src/app/shell/sidebar/sidebar.html:1)
+- **Dependencies:** T-111, T-112, T-113, T-115
+- **Acceptance criteria:**
+  - `/auth/accept-invitation` route lazy-loads `AcceptInvitationComponent` — no auth guard
+  - `/create-workspace` route lazy-loads `WorkspaceCreateComponent` — auth guard only (no tenant guard)
+  - `/tenants/:tenantId/upgrade` route lazy-loads `UpgradeComponent` — inside tenant children
+  - Sidebar shows "Upgrade to Premium" link for free-tier tenants (owner/admin only)
+  - All routes load without errors
+
+### T-117: Shared package tests for new schemas, types, and constants
+
+- **Goal:** Add comprehensive tests for all new and updated shared package artifacts.
+- **Files to modify:**
+  - [`shared/src/schemas/tenant.spec.ts`](shared/src/schemas/tenant.spec.ts:1)
+  - [`shared/src/schemas/auth.spec.ts`](shared/src/schemas/auth.spec.ts:1)
+- **Dependencies:** T-098
+- **Acceptance criteria:**
+  - `TenantSchema` validates documents with `subscription` field
+  - `TenantMemberSchema` validates documents with all new fields (nullable userId, status, invitedEmail, etc.)
+  - `InviteMemberSchema` validates `{ email, role }` and rejects invalid inputs
+  - `AcceptInvitationSchema` validates `{ token }`
+  - `InvitationDetailsSchema` validates response shape
+  - `CreateTenantSchema` defaults `subscription` to `'free'`
+  - `MemberStatus` and `SubscriptionTier` constants have correct values
+  - Coverage ≥ 80% on new code
+
+### T-118: Backend service tests for AuthService, TenantService, ProjectService, and EmailService
+
+- **Goal:** Add and update tests for all modified backend services covering the new subscription limit logic, invitation
+  flow, and registration changes.
+- **Files to modify:**
+  - [`server/src/services/auth.service.test.ts`](server/src/services/auth.service.test.ts:1)
+  - [`server/src/services/tenant.service.test.ts`](server/src/services/tenant.service.test.ts:1)
+  - [`server/src/services/project.service.test.ts`](server/src/services/project.service.test.ts:1)
+- **Files to create:**
+  - `server/src/services/email.service.test.ts`
+- **Dependencies:** T-102, T-103, T-104, T-106
+- **Acceptance criteria:**
+  - AuthService: register returns JWT with `tenantId: null`; login with no tenants returns `tenantId: null`;
+    `acceptInvitation` activates membership correctly
+  - TenantService: free workspace limit (SE-1) enforced; unregistered invitation creates pending member with token;
+    email sent; duplicate invitation returns 409; `getInvitationByToken` returns details
+  - ProjectService: free project limit (SE-3) enforced; free member limit (SE-5) enforced; premium unlimited
+  - EmailService: `ConsoleEmailService` logs link; `ResendEmailService` calls API
+  - Coverage ≥ 80% on new code
+
+### T-119: Backend middleware tests for TenantContext and RBAC status check
+
+- **Goal:** Add tests verifying that pending and declined members are rejected by the middleware pipeline.
+- **Files to modify:**
+  - [`server/src/middleware/rbac.test.ts`](server/src/middleware/rbac.test.ts:1)
+- **Files to create:**
+  - `server/src/middleware/tenant-context.test.ts`
+- **Dependencies:** T-105
+- **Acceptance criteria:**
+  - Tenant context middleware: active member → passes; pending member → 403; declined member → 403; missing X-Tenant-Id
+    → 400
+  - RBAC middleware: no userRole → 403; valid role → passes; owner bypasses restrictions
+  - Coverage ≥ 80%
+
+### T-120: Frontend component tests for new and updated components
+
+- **Goal:** Add unit tests for all new and modified frontend components.
+- **Files to create:**
+  - `ui/src/app/features/auth/accept-invitation/accept-invitation.spec.ts`
+  - `ui/src/app/features/tenants/create-workspace/create-workspace.spec.ts`
+  - `ui/src/app/features/tenants/upgrade/upgrade.spec.ts`
+- **Files to modify:**
+  - [`ui/src/app/features/auth/register/register.spec.ts`](ui/src/app/features/auth/register/register.spec.ts:1)
+  - `ui/src/app/shell/tenant-switcher/tenant-switcher.spec.ts` (create if missing)
+  - `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.spec.ts`
+  - `ui/src/app/services/tenant-client.spec.ts`
+  - [`ui/src/app/stores/auth-store.spec.ts`](ui/src/app/stores/auth-store.spec.ts:1)
+- **Dependencies:** T-110, T-111, T-112, T-113, T-114, T-115, T-116
+- **Acceptance criteria:**
+  - AcceptInvitation: shows invitation details; handles authenticated/unauthenticated states; error on email mismatch
+  - CreateWorkspace: form submits correctly; redirect after creation; slug auto-generation
+  - Upgrade: mock payment flow; redirect after upgrade; premium tenant redirects away
+  - Register: redirects to `/create-workspace` when `tenantId` is null
+  - TenantSwitcher: shows "No workspaces" empty state; "Create Workspace" link present
+  - TenantMemberList: status badges render; pending members show invitedEmail
+  - TenantClient: new methods tested
+  - AuthStore: `tenantId` signal tested
+  - Coverage ≥ 80% on new code
+
+### T-121: E2E tests for user workflow rework
+
+- **Goal:** Add Playwright 1.55.0 E2E tests covering the new registration flow (no auto-tenant), workspace creation,
+  invitation system, and subscription limits.
+- **Files to create:**
+  - `ui/e2e/workflow-rework.spec.ts`
+- **Dependencies:** T-116, T-120
+- **Acceptance criteria:**
+  - E2E: register → redirected to create-workspace → create free workspace → tenant active
+  - E2E: register → create workspace → upgrade to premium → subscription shows "Premium"
+  - E2E: owner invites unregistered email → pending member shown → invitee registers → accepts invitation → member
+    becomes active
+  - E2E: free workspace blocked from creating 4th project (SUBSCRIPTION_LIMIT_EXCEEDED)
+  - E2E: free workspace blocked from adding 11th project member
+  - E2E: tenant switcher shows empty state for new user with no workspaces
+  - `npx playwright test` passes for the new spec file
+
+### T-122: Full integration verification of user workflow rework
+
+- **Goal:** Run the complete quality gate suite across the entire monorepo and verify all user workflow rework features
+  work end-to-end. Fix any issues found.
+- **Files to modify:**
+  - Various (fix any issues found during verification)
+- **Dependencies:** T-117, T-118, T-119, T-120, T-121
+- **Acceptance criteria:**
+  - `npm run build` succeeds for all workspaces (shared, server, ui)
+  - `npm test` passes for all workspaces (≥ 80% coverage on new code)
+  - `npm run lint` passes with zero errors
+  - `tsc --noEmit` passes across the entire monorepo (zero TypeScript errors)
+  - Full user journey works end-to-end: register (no tenant) → create free workspace → create project → invite member
+    (registered) → invite member (unregistered) → register as invitee → accept invitation → upgrade to premium → create
+    more projects → verify limits enforced
+
+---
+
+## Phase 11: Jira-Style Dashboard
+
+### T-123: Add 'access_revoked' to MemberStatus and create TenantWithRole schema
+
+- **Goal:** Add `'access_revoked'` to the [`MemberStatus`](shared/src/constants/roles.ts:14) constant and create a new
+  [`TenantWithRole`](shared/src/schemas/tenant.ts) schema that extends [`TenantSchema`](shared/src/schemas/tenant.ts:8)
+  with the user's membership role. This enables the dashboard to detect owner vs member state from a single API call.
+- **Files to modify:**
+  - [`shared/src/constants/roles.ts`](shared/src/constants/roles.ts:14) — add `'access_revoked'` to `MemberStatus`
+  - [`shared/src/schemas/tenant.ts`](shared/src/schemas/tenant.ts:1) — add `TenantWithRoleSchema`
+  - [`shared/src/types/tenant.ts`](shared/src/types/tenant.ts:1) — add `TenantWithRole` type
+  - [`shared/src/index.ts`](shared/src/index.ts:1) — export `TenantWithRoleSchema` and `TenantWithRole`
+- **Dependencies:** T-098
+- **Acceptance criteria:**
+  - `MemberStatus` is `['active', 'pending', 'declined', 'access_revoked']`
+  - `TenantWithRoleSchema` validates a `Tenant` + `role: z.enum(TenantRole)` field
+  - `TenantWithRole` type is exported from `@task-board/shared`
+  - Existing `TenantMemberSchema` still validates with the new status value
+  - `tsc --noEmit` passes in the shared package
+
+### T-124: Create invitation and cross-tenant task schemas
+
+- **Goal:** Add Zod v4 schemas and TypeScript types for cross-tenant dashboard data: pending invitations for the
+  authenticated user, pending invitations sent by a tenant, and tasks assigned to the user across all tenants. These
+  schemas power the dashboard's State 2 (pending invitations), State 3 (member), and State 4 (owner) views.
+- **Files to modify:**
+  - [`shared/src/schemas/tenant.ts`](shared/src/schemas/tenant.ts:1) — add `MyInvitationSchema`,
+    `MyInvitationsResponseSchema`, `PendingInvitationSchema`, `PendingInvitationsResponseSchema`
+  - [`shared/src/schemas/task.ts`](shared/src/schemas/task.ts:1) — add `MyTaskSchema` (extends `TaskSchema` with
+    `tenantName`, `projectName`, `columnTitle`), `MyTasksResponseSchema`
+  - [`shared/src/types/tenant.ts`](shared/src/types/tenant.ts:1) — add `MyInvitation`, `PendingInvitation` types
+  - [`shared/src/types/task.ts`](shared/src/types/task.ts:1) — add `MyTask` type
+  - [`shared/src/index.ts`](shared/src/index.ts:1) — export all new schemas and types
+- **Dependencies:** T-123
+- **Acceptance criteria:**
+  - `MyInvitationSchema` validates `{ id, tenantId, tenantName, role, invitedAt }` per spec §15.10.1
+  - `MyInvitationsResponseSchema` validates `{ data: MyInvitation[], total: number }`
+  - `PendingInvitationSchema` validates `{ id, invitedEmail, role, invitedAt }` per spec §15.10.3
+  - `PendingInvitationsResponseSchema` validates `{ data: PendingInvitation[], total: number }`
+  - `MyTaskSchema` validates `Task` + `{ tenantName, projectName, columnTitle }` per spec §15.10.2
+  - `MyTasksResponseSchema` validates `{ data: MyTask[], total, page, limit }`
+  - All types are exported from `@task-board/shared`
+  - `tsc --noEmit` passes in the shared package
+
+### T-125: Add new API contracts for dashboard endpoints
+
+- **Goal:** Define API contracts for the four new dashboard endpoints and update the existing `GET /tenants` contract to
+  return [`TenantWithRole[]`](shared/src/schemas/tenant.ts) instead of `Tenant[]`. Contracts are the source of truth for
+  frontend→backend type safety.
+- **Files to modify:**
+  - [`shared/src/contracts/auth.contracts.ts`](shared/src/contracts/auth.contracts.ts:1) — add `getMyInvitations`
+    contract (`GET /invitations/my`), `declineInvitation` contract (`DELETE /invitations/:invitationId`)
+  - [`shared/src/contracts/task.contracts.ts`](shared/src/contracts/task.contracts.ts:1) — add `getMyTasks` contract
+    (`GET /tasks/my` with `page`, `limit`, `priority` query params)
+  - [`shared/src/contracts/tenant.contracts.ts`](shared/src/contracts/tenant.contracts.ts:1) — add
+    `getPendingInvitations` contract (`GET /tenants/:tenantId/invitations/pending`); update `list` contract response to
+    use `TenantWithRoleSchema` instead of `TenantSchema`
+- **Dependencies:** T-124
+- **Acceptance criteria:**
+  - `authContracts.getMyInvitations` defines `GET /invitations/my` returning `MyInvitationsResponseSchema`
+  - `authContracts.declineInvitation` defines `DELETE /invitations/:invitationId` returning 204
+  - `taskContracts.getMyTasks` defines `GET /tasks/my` with `page`, `limit`, `priority` query returning
+    `MyTasksResponseSchema`
+  - `tenantContracts.getPendingInvitations` defines `GET /tenants/:tenantId/invitations/pending` returning
+    `PendingInvitationsResponseSchema`
+  - `tenantContracts.list` response uses `z.array(TenantWithRoleSchema)` instead of `z.array(TenantSchema)`
+  - `tsc --noEmit` passes in the shared package
+
+### T-126: Add repository methods and MongoDB indexes for dashboard queries
+
+- **Goal:** Add new repository methods needed by the dashboard feature and create MongoDB indexes for efficient
+  cross-tenant queries. The [`TenantMemberRepository`](server/src/repositories/tenant-member.repository.ts:40) needs
+  methods to find/update/delete members by their invitation ID (not by userId+tenantId). The
+  [`TaskRepository`](server/src/repositories/task.repository.ts:58) needs a method to find tasks by assignee across
+  multiple tenant IDs.
+- **Files to modify:**
+  - [`server/src/repositories/tenant-member.repository.ts`](server/src/repositories/tenant-member.repository.ts:40) —
+    add `findById(id)`, `updateStatusById(id, status)`, `deleteById(id)`
+  - [`server/src/repositories/task.repository.ts`](server/src/repositories/task.repository.ts:58) — add
+    `findByAssigneeAcrossTenants(tenantIds, userId, options)` with pagination and optional priority filter
+  - [`server/src/db/mongo.ts`](server/src/db/mongo.ts:1) — add index creation for
+    `{ tenantId: 1, assigneeIds: 1, updatedAt: -1 }` on `tasks` collection and `{ invitedEmail: 1, status: 1 }` on
+    `tenant_members` collection
+- **Dependencies:** T-124
+- **Acceptance criteria:**
+  - `findById(id)` returns a single `TenantMemberDocument` by its `_id` (or `id` field)
+  - `updateStatusById(id, status)` updates the status field of a member by ID
+  - `deleteById(id)` permanently removes a member record
+  - `findByAssigneeAcrossTenants(tenantIds, userId, { page, limit, priority })` returns
+    `{ data: Task[]; total: number }` with tasks sorted by `updatedAt` descending
+  - MongoDB indexes are created on startup for the specified collections
+  - `tsc --noEmit` passes in the server package
+
+### T-127: Extend TenantService with invitation management and tenant-with-role methods
+
+- **Goal:** Add service methods to [`TenantService`](server/src/services/tenant.service.ts:13) for: listing tenants with
+  the user's role (augmented `GET /tenants`), cross-tenant invitation lookup, declining/revoking/resending invitations,
+  and hard-deleting members. These methods power the dashboard's state detection and the owner's invitation management
+  panel.
+- **Files to modify:**
+  - [`server/src/services/tenant.service.ts`](server/src/services/tenant.service.ts:13) — add methods:
+    - `listTenantsWithRole(userId)` → `TenantWithRole[]` (joins tenant_members to get role per tenant)
+    - `getMyInvitations(userEmail)` → `MyInvitation[]` (cross-tenant: queries `tenant_members` by email, joins tenant
+      names)
+    - `getPendingInvitationsByTenant(userId, tenantId)` → `PendingInvitation[]` (RBAC: owner/admin only)
+    - `declineInvitation(userId, invitationId)` → void (sets status to `'declined'`, validates email match)
+    - `revokeAccess(requesterId, tenantId, memberId)` → void (RBAC: owner/admin; sets status to `'access_revoked'`)
+    - `resendInvitation(requesterId, tenantId, memberId)` → void (RBAC: owner/admin; resets status to `'pending'`,
+      re-sends email)
+    - `hardDeleteMember(requesterId, tenantId, memberId)` → void (RBAC: owner/admin; permanent delete)
+- **Files to modify:**
+  - [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:1) — update `GET /` handler to call
+    `listTenantsWithRole()` instead of `listTenantsForUser()`
+- **Dependencies:** T-123, T-126
+- **Acceptance criteria:**
+  - `listTenantsWithRole` returns each tenant with the user's `role` field from `tenant_members`
+  - `getMyInvitations` returns pending invitations where `invitedEmail` matches, with `tenantName` denormalized
+  - `getPendingInvitationsByTenant` throws `ForbiddenError` if requester is not owner/admin
+  - `declineInvitation` validates that the authenticated user's email matches `invitedEmail` and status is `'pending'`
+  - `revokeAccess` sets status to `'access_revoked'`; only owner/admin can call
+  - `resendInvitation` resets status to `'pending'` and re-triggers invitation email
+  - `hardDeleteMember` permanently removes the member record; only owner/admin can call
+  - All methods enforce RBAC where specified
+  - `tsc --noEmit` passes in the server package
+
+### T-128: Add getMyTasks() to TaskService with cross-tenant aggregation
+
+- **Goal:** Add a [`getMyTasks()`](server/src/services/task.service.ts) method to
+  [`TaskService`](server/src/services/task.service.ts:8) that returns tasks assigned to the authenticated user across
+  all their active tenants. This is an application-level aggregation (not a DB-level join) because tenants could
+  theoretically reside in different databases (spec §15.10.2, BQ-DASH-3).
+- **Files to modify:**
+  - [`server/src/services/task.service.ts`](server/src/services/task.service.ts:8) — add `getMyTasks(userId, query)`
+    method. Implementation:
+    1. Get user's active tenant memberships via `TenantMemberRepository.findByUser(userId)`
+    2. Filter to `status === 'active'` and extract `tenantId` list
+    3. Call `TaskRepository.findByAssigneeAcrossTenants(tenantIds, userId, { page, limit, priority })`
+    4. For each task, resolve `tenantName` (from `TenantRepository`), `projectName` (from `ProjectRepository`),
+       `columnTitle` (from `ColumnRepository`)
+    5. Return `{ data: MyTask[], total, page, limit }`
+  - [`server/src/services/task.service.ts`](server/src/services/task.service.ts:8) — update constructor to accept
+    `TenantMemberRepository`, `TenantRepository`, `ProjectRepository`, and `ColumnRepository` dependencies (or inject
+    them)
+- **Dependencies:** T-126
+- **Acceptance criteria:**
+  - `getMyTasks` returns tasks where `assigneeIds` includes `userId` across all active tenants
+  - Each task in the response includes denormalized `tenantName`, `projectName`, and `columnTitle`
+  - Results are sorted by `updatedAt` descending
+  - Pagination (`page`, `limit`) works correctly
+  - `priority` filter narrows results to the specified priority
+  - Returns empty result (not error) when user has no active memberships
+  - `tsc --noEmit` passes in the server package
+
+### T-129: Create cross-tenant invitation routes
+
+- **Goal:** Create a new route file [`server/src/routes/invitations.ts`](server/src/routes/invitations.ts) for
+  cross-tenant invitation endpoints and register them in the app before the tenant-context middleware. These routes
+  require authentication but NOT the `X-Tenant-Id` header (spec §15.10.1, §15.10.4).
+- **Files to create:**
+  - `server/src/routes/invitations.ts` — Hono router with:
+    - `GET /my` — calls `TenantService.getMyInvitations(userEmail)`, returns `MyInvitationsResponseSchema` shape
+    - `DELETE /:invitationId` — calls `TenantService.declineInvitation(userId, invitationId)`, returns 204
+- **Files to modify:**
+  - [`server/src/routes/index.ts`](server/src/routes/index.ts:1) — add `invitations` to `routeRegistry`
+  - [`server/src/index.ts`](server/src/index.ts:1) — mount invitation routes at `/api/v1/invitations` AFTER
+    `authMiddleware` but BEFORE `tenantContextMiddleware` (cross-tenant, no `X-Tenant-Id` required)
+- **Dependencies:** T-127
+- **Acceptance criteria:**
+  - `GET /api/v1/invitations/my` returns pending invitations for the authenticated user's email
+  - `DELETE /api/v1/invitations/:invitationId` sets invitation status to `'declined'` and returns 204
+  - Both endpoints require a valid JWT (auth middleware) but do NOT require `X-Tenant-Id`
+  - `DELETE` returns 403 if the authenticated user's email does not match `invitedEmail`
+  - `DELETE` returns 404 if the invitation does not exist or is not `'pending'`
+
+### T-130: Add cross-tenant GET /tasks/my route
+
+- **Goal:** Register the `GET /tasks/my` cross-tenant endpoint. This route must be accessible without the `X-Tenant-Id`
+  header, so it must be registered before the tenant-context middleware — similar to the invitation routes in T-129.
+  Since `/tasks/my` is a specific sub-path, it can be registered before the tenant-scoped task routes without conflict.
+- **Files to modify:**
+  - [`server/src/routes/tasks.ts`](server/src/routes/tasks.ts:1) — add `GET /my` handler that calls
+    `TaskService.getMyTasks(userId, { page, limit, priority })`
+  - [`server/src/index.ts`](server/src/index.ts:1) — register the cross-tenant `GET /tasks/my` route before
+    `tenantContextMiddleware` (the tenant-scoped task routes remain after it)
+- **Dependencies:** T-128
+- **Acceptance criteria:**
+  - `GET /api/v1/tasks/my` returns tasks assigned to the user across all active tenants
+  - Response shape matches `MyTasksResponseSchema`: `{ data, total, page, limit }`
+  - Query params `page`, `limit`, `priority` work correctly
+  - Does NOT require `X-Tenant-Id` header
+  - Returns 401 if not authenticated
+  - The existing tenant-scoped `GET /api/v1/tasks` still works correctly with `X-Tenant-Id`
+
+### T-131: Add tenant-scoped pending invitations and member management routes
+
+- **Goal:** Add tenant-scoped endpoints for the owner/admin to view pending invitations they sent and manage members
+  (resend, revoke, hard-delete). These endpoints are inside the tenant-scoped pipeline and require `X-Tenant-Id` plus
+  owner/admin RBAC (spec §15.10.3).
+- **Files to modify:**
+  - [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:1) — add routes:
+    - `GET /:tenantId/invitations/pending` — calls `TenantService.getPendingInvitationsByTenant(userId, tenantId)`,
+      returns `PendingInvitationsResponseSchema` shape
+    - `PATCH /:tenantId/members/:memberId/resend` — calls
+      `TenantService.resendInvitation(requesterId, tenantId, memberId)`, returns 200 with updated member
+    - `PATCH /:tenantId/members/:memberId/revoke` — calls `TenantService.revokeAccess(requesterId, tenantId, memberId)`,
+      returns 200 with updated member
+    - `DELETE /:tenantId/members/:memberId` — update existing handler to support hard-delete for
+      `access_revoked`/`declined` members (calls `TenantService.hardDeleteMember`)
+- **Dependencies:** T-127
+- **Acceptance criteria:**
+  - `GET /tenants/:tenantId/invitations/pending` returns pending invitations for the tenant; owner/admin only
+  - `PATCH /tenants/:tenantId/members/:memberId/resend` resets invitation to `'pending'` and re-sends email
+  - `PATCH /tenants/:tenantId/members/:memberId/revoke` sets status to `'access_revoked'`
+  - `DELETE /tenants/:tenantId/members/:memberId` permanently deletes a `declined`/`access_revoked` member
+  - All endpoints return 403 if the requester is not owner/admin
+  - All endpoints require `X-Tenant-Id` header
+
+### T-132: Verify and update tenant-context middleware for 'access_revoked' status
+
+- **Goal:** Verify that the [`TenantContextMiddleware`](server/src/middleware/tenant-context.ts) rejects members with
+  `'access_revoked'` status with a 403 response. If this was already implemented in Phase 10, add explicit test
+  coverage.
+- **Files to modify:**
+  - [`server/src/middleware/tenant-context.ts`](server/src/middleware/tenant-context.ts:1) — verify `'access_revoked'`
+    is in the rejected status list
+  - `server/src/middleware/tenant-context.test.ts` — add test case for `'access_revoked'` → 403
+- **Dependencies:** T-123
+- **Acceptance criteria:**
+  - A request with a valid JWT but `access_revoked` membership receives 403 Forbidden
+  - Test case explicitly covers `'access_revoked'` status rejection
+  - `npm test` passes for tenant-context middleware tests
+
+### T-133: Extend TenantClient with dashboard methods
+
+- **Goal:** Add frontend service methods to [`TenantClient`](ui/src/app/services/tenant-client.ts:23) for the new
+  dashboard API endpoints. Also update [`loadTenants()`](ui/src/app/services/tenant-client.ts:30) to handle the
+  augmented `TenantWithRole[]` response from the updated `GET /tenants` contract.
+- **Files to modify:**
+  - [`ui/src/app/services/tenant-client.ts`](ui/src/app/services/tenant-client.ts:23) — add methods:
+    - `getMyInvitations()` → `Observable<{ data: MyInvitation[]; total: number }>` — calls `GET /invitations/my`
+    - `getPendingInvitations(tenantId)` → `Observable<{ data: PendingInvitation[]; total: number }>` — calls
+      `GET /tenants/:tenantId/invitations/pending`
+    - `declineInvitation(invitationId)` → `Observable<void>` — calls `DELETE /invitations/:invitationId`
+    - `revokeAccess(tenantId, memberId)` → `Observable<void>` — calls
+      `PATCH /tenants/:tenantId/members/:memberId/revoke`
+    - `resendInvitation(tenantId, memberId)` → `Observable<void>` — calls
+      `PATCH /tenants/:tenantId/members/:memberId/resend`
+    - `hardDeleteMember(tenantId, memberId)` → `Observable<void>` — calls `DELETE /tenants/:tenantId/members/:memberId`
+  - Update `loadTenants()` to use `TenantWithRole[]` type (the `tenants` signal type changes from `Tenant[]` to
+    `TenantWithRole[]`)
+- **Dependencies:** T-125, T-129, T-131
+- **Acceptance criteria:**
+  - All new methods call the correct API endpoints with correct HTTP methods
+  - `loadTenants()` correctly handles the `role` field in the response
+  - `tenants` signal type is `TenantWithRole[]` (includes `role` per tenant)
+  - Cross-tenant methods (`getMyInvitations`, `declineInvitation`) do NOT send `X-Tenant-Id` header
+  - `tsc --noEmit` passes in the ui package
+
+### T-134: Add getMyTasks() to TaskClient
+
+- **Goal:** Add a cross-tenant [`getMyTasks()`](ui/src/app/services/task-client.ts) method to
+  [`TaskClient`](ui/src/app/services/task-client.ts:27) that fetches tasks assigned to the current user across all
+  tenants. This endpoint does NOT require the `X-Tenant-Id` header.
+- **Files to modify:**
+  - [`ui/src/app/services/task-client.ts`](ui/src/app/services/task-client.ts:27) — add method:
+    - `getMyTasks(page?, limit?, priority?)` → `Observable<MyTasksResponse>` — calls `GET /tasks/my` with query params
+- **Dependencies:** T-125, T-130
+- **Acceptance criteria:**
+  - `getMyTasks()` calls `GET /api/v1/tasks/my` with `page`, `limit`, `priority` query params
+  - Does NOT send `X-Tenant-Id` header (uses the API_BASE_URL directly, not through tenant interceptor)
+  - Returns `MyTasksResponse` shape with denormalized `tenantName`, `projectName`, `columnTitle`
+  - `tsc --noEmit` passes in the ui package
+
+### T-135: Remove authGuard from root route
+
+- **Goal:** Remove [`authGuard`](ui/src/app/guards/auth.guard.ts:24) from the root route (`/`) in
+  [`app.routes.ts`](ui/src/app/app.routes.ts:6) so that unauthenticated visitors can see the landing page. The
+  [`Dashboard`](ui/src/app/features/dashboard/dashboard.ts:17) component internally handles all states including the
+  visitor state (spec §15.7.1). All other authenticated routes retain their guards.
+- **Files to modify:**
+  - [`ui/src/app/app.routes.ts`](ui/src/app/app.routes.ts:23) — remove `canActivate: [authGuard]` from the root
+    `path: ''` route
+- **Dependencies:** None (can be done independently)
+- **Acceptance criteria:**
+  - Root route (`/`) renders the `Dashboard` component without requiring authentication
+  - Unauthenticated visitors can access `/` without being redirected to `/auth/login`
+  - All other authenticated routes (`/workspace/create`, `/tenants/:tenantId/*`) still use `authGuard`
+  - `tsc --noEmit` passes in the ui package
+
+### T-136: Rework Dashboard component as stateful orchestrator
+
+- **Goal:** Rewrite the [`Dashboard`](ui/src/app/features/dashboard/dashboard.ts:17) component from a simple project
+  list into a stateful orchestrator that detects the user's state (visitor/new-user/pending-invitations/member/owner)
+  and delegates to child sub-view components. The state detection algorithm follows spec §15.4 and architecture §12.2.
+- **Files to modify:**
+  - [`ui/src/app/features/dashboard/dashboard.ts`](ui/src/app/features/dashboard/dashboard.ts:1) — full rewrite:
+    - Remove `ProjectClient` dependency and project-loading logic
+    - Add signals: `dashboardState`, `tenants`, `myTasks`, `pendingInvitations`, `sentInvitations`, `taskStats`
+    - Implement state detection in `ngOnInit()`: check `authStore.isAuthenticated()` → if true, load tenants +
+      invitations in parallel via `Promise.all()` → determine state from data
+    - Add `computed()` signals: `isOwner`, `isMember`, `hasInvitations`
+    - Add `effect()` to trigger secondary data loading (tasks, sent invitations) after state is determined
+    - Error handling: if `GET /invitations/my` fails, treat as zero invitations (non-blocking); if `GET /tenants` fails,
+      show error state with retry
+  - [`ui/src/app/features/dashboard/dashboard.html`](ui/src/app/features/dashboard/dashboard.html:1) — full rewrite:
+    - `@switch (dashboardState())` with cases for `'loading'`, `'visitor'`, `'new-user'`, `'pending-invitations'`,
+      `'member'`, `'owner'`
+    - Each case renders the corresponding child component with `@defer` for lazy loading
+    - Loading case shows `hlm-spinner`
+- **Dependencies:** T-133, T-134, T-135
+- **Acceptance criteria:**
+  - Visitor (unauthenticated): renders `LandingPageComponent` with no API calls
+  - New user (authenticated, zero tenants, zero invitations): renders `WelcomeViewComponent`
+  - Pending invitations: renders `InvitationViewComponent` with invitation cards
+  - Member: renders `MemberDashboardComponent` with workspaces and tasks
+  - Owner: renders `OwnerDashboardComponent` with workspaces, tasks, and sent invitations
+  - Loading state shows a centered spinner
+  - `GET /invitations/my` failure degrades gracefully (treats as zero invitations)
+  - `GET /tenants` failure shows error state with retry button
+  - Angular 22 patterns: signals, `computed()`, `effect()`, `@switch`, `@defer`, `inject()`
+
+### T-137: Create LandingPageComponent (State 0: Visitor)
+
+- **Goal:** Create a static marketing-style landing page for unauthenticated visitors. This is the first thing users see
+  when they visit `/`. It contains no backend calls and no loading state (spec §15.5).
+- **Files to create:**
+  - `ui/src/app/features/dashboard/visitor/landing-page.ts` — standalone component with:
+    - Hero section: headline "Task Board — Simple, powerful project management", subheadline, CTA buttons
+    - Features section: 3–4 feature cards (Kanban boards, Sprint management, Team collaboration, Multi-workspace)
+    - Free plan callout: 1 workspace, 3 projects, 10 users per project
+    - Footer CTA: "Ready to get started? Create your free account"
+    - Spartan UI: `HlmButtonImports`, `HlmCardImports`
+    - Tailwind CSS for styling; no `HlmSpinnerImports` needed
+- **Dependencies:** T-135
+- **Acceptance criteria:**
+  - Renders for unauthenticated visitors at `/`
+  - "Get Started" button links to `/auth/register`
+  - "Log In" button links to `/auth/login`
+  - Feature cards display Kanban, Sprint, Collaboration, Multi-workspace descriptions
+  - Free plan limits are displayed (1 workspace, 3 projects, 10 users)
+  - Footer CTA links to `/auth/register`
+  - No HTTP requests are made
+  - Component is standalone with Angular 22 `@if` / `@for` control flow
+
+### T-138: Create WelcomeViewComponent (State 1: New User)
+
+- **Goal:** Create the welcome view for authenticated users who have zero tenants and zero pending invitations. This
+  component guides new users to create their first workspace (spec §15.6).
+- **Files to create:**
+  - `ui/src/app/features/dashboard/new-user/welcome-view.ts` — standalone component with:
+    - Welcome header: "Welcome to Task Board, {displayName}!"
+    - CTA card with "Create your first workspace" button → navigates to `/workspace/create`
+    - Free plan info card: limits (1 workspace, 3 projects, 10 users), link to Premium info
+    - Input: `user` signal (from parent dashboard)
+    - Spartan UI: `HlmButtonImports`, `HlmCardImports`, `HlmSpinnerImports`
+    - Angular 22 patterns: `input()`, `@if`, `RouterLink`
+- **Dependencies:** T-136
+- **Acceptance criteria:**
+  - Shows for authenticated users with zero tenants and zero invitations
+  - Displays user's display name in the welcome header
+  - "Create your first workspace" button navigates to `/workspace/create`
+  - Free plan limits are displayed
+  - Component is standalone with Tailwind CSS styling
+
+### T-139: Create InvitationViewComponent (State 2: Pending Invitations)
+
+- **Goal:** Create the pending invitations view for authenticated users who have no tenants but have pending
+  invitations. Shows invitation cards with accept/decline actions and a secondary CTA to create a workspace (spec
+  §15.7).
+- **Files to create:**
+  - `ui/src/app/features/dashboard/pending-invitations/invitation-view.ts` — standalone component with:
+    - Header: "You have pending invitations"
+    - Invitation cards (one per invitation): workspace name, invited role (badge), inviter info
+    - "Accept" button → calls existing `TenantClient.acceptInvitation()` with the invitation token, then signals parent
+      to reload state
+    - "Decline" button → calls `TenantClient.declineInvitation(invitationId)`, removes card from list; if no invitations
+      remain, signals parent to transition to State 1
+    - Secondary CTA: "Or create your own workspace" → `/workspace/create`
+    - Inputs: `invitations` signal (from parent dashboard)
+    - Outputs: `accepted` event (signals parent to reload tenants), `allDeclined` event (signals parent to transition to
+      new-user state)
+    - Spartan UI: `HlmButtonImports`, `HlmCardImports`, `HlmBadgeImports`, `HlmSpinnerImports`
+    - Angular 22 patterns: `input()`, `output()`, `@for`, `@if`, `signal()`
+- **Dependencies:** T-133, T-136
+- **Acceptance criteria:**
+  - Renders invitation cards with workspace name, role badge, and inviter email
+  - "Accept" button calls `POST /auth/accept-invitation` and signals parent to reload
+  - "Decline" button calls `DELETE /invitations/:id` and removes the card
+  - When all invitations are declined, component signals parent to transition to State 1
+  - "Or create your own workspace" link navigates to `/workspace/create`
+  - Error on accept/decline shows a toast; card remains visible
+
+### T-140: Create MemberDashboardComponent (State 3: Member)
+
+- **Goal:** Create the member dashboard for authenticated users who belong to one or more workspaces as a `member` or
+  `admin` (not owner). Shows "My Workspaces", "My Recent Tasks", and "Quick Stats" sections (spec §15.8).
+- **Files to create:**
+  - `ui/src/app/features/dashboard/member/member-dashboard.ts` — standalone component with:
+    - "My Workspaces" section: workspace cards with name, role badge (computed from tenant data), click →
+      `Router.navigate` to `/tenants/:tenantId/projects`
+    - "My Recent Tasks" section: up to 10 tasks from `myTasks` input, showing title, priority badge, project name,
+      column name; click → navigate to `/tenants/:tenantId/projects/:projectId/tasks/:taskId`
+    - "Quick Stats" section: total assigned tasks, breakdown by priority (low/medium/high/critical)
+    - Inputs: `tenants` (TenantWithRole[]), `tasks` (MyTask[]), `stats` (task stats object)
+    - Spartan UI: `HlmButtonImports`, `HlmCardImports`, `HlmBadgeImports`, `HlmSpinnerImports`
+    - Angular 22 patterns: `input()`, `@for`, `@if`, `computed()`, `RouterLink`
+- **Dependencies:** T-136
+- **Acceptance criteria:**
+  - "My Workspaces" cards show workspace name and user's role as a badge
+  - Clicking a workspace card navigates to `/tenants/:tenantId/projects`
+  - "My Recent Tasks" shows up to 10 tasks with title, priority badge, project name, column name
+  - Clicking a task navigates to the task detail page (`/tenants/:tenantId/projects/:projectId/tasks/:taskId`)
+  - "Quick Stats" shows total count and priority breakdown
+  - Component handles empty states (no workspaces, no tasks) gracefully
+
+### T-141: Create OwnerDashboardComponent (State 4: Owner)
+
+- **Goal:** Create the owner dashboard for authenticated users who own one or more workspaces. Includes everything from
+  the member dashboard, plus "Pending Invitations Sent" section, workspace management links, and a "Create another
+  workspace" button (spec §15.9).
+- **Files to create:**
+  - `ui/src/app/features/dashboard/owner/owner-dashboard.ts` — standalone component with:
+    - All content from MemberDashboardComponent (My Workspaces, My Recent Tasks, Quick Stats) — either inline or by
+      composing `<ui-member-dashboard>` internally
+    - "Pending Invitations Sent" section (for owned tenants): invitation cards with invitee email, role, invited date;
+      "Resend" button → `TenantClient.resendInvitation()`; "Cancel" button → `TenantClient.declineInvitation()`
+    - Workspace management links per owned workspace: Settings → `/tenants/:tenantId/settings`, Members →
+      `/tenants/:tenantId/settings/members`, Upgrade (if free) → `/tenants/:tenantId/upgrade`
+    - "Create another workspace" button → `/workspace/create` (visible only if under subscription limit: 1 free
+      workspace)
+    - Inputs: `tenants` (TenantWithRole[]), `tasks` (MyTask[]), `stats`, `pendingInvitations` (PendingInvitation[])
+    - Spartan UI: `HlmButtonImports`, `HlmCardImports`, `HlmBadgeImports`, `HlmSpinnerImports`
+    - Angular 22 patterns: `input()`, `@for`, `@if`, `computed()`, `RouterLink`
+- **Dependencies:** T-133, T-136
+- **Acceptance criteria:**
+  - Owner sees all member dashboard content (My Workspaces, My Recent Tasks, Quick Stats)
+  - "Pending Invitations Sent" shows invitee email, role, and invited date for owned tenants
+  - "Resend" button calls resend endpoint and shows success feedback
+  - "Cancel" button calls decline endpoint and removes the invitation card
+  - Workspace management links (Settings, Members, Upgrade) are visible for owned workspaces only
+  - "Create another workspace" is visible only when user owns fewer than 1 free workspace
+  - Component handles empty states gracefully (no pending invitations, no tasks)
+
+### T-142: Update TenantMemberList with 'access_revoked' status and new actions
+
+- **Goal:** Update the existing
+  [`TenantMemberList`](ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts:49) component to support the
+  new `'access_revoked'` status badge and add action buttons for resending invitations, revoking access, and
+  hard-deleting members.
+- **Files to modify:**
+  - [`ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts`](ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts:49)
+    — add:
+    - `'access_revoked'` entry to `statusColorMap` (e.g., `'bg-gray-200 text-gray-500'`)
+    - `resendInvitation(member)` method → calls `TenantClient.resendInvitation()`
+    - `revokeAccess(member)` method → calls `TenantClient.revokeAccess()`
+    - `hardDeleteMember(member)` method → calls `TenantClient.hardDeleteMember()`
+    - Computed signals for which actions are available per member status
+  - [`ui/src/app/features/tenants/tenant-member-list/tenant-member-list.html`](ui/src/app/features/tenants/tenant-member-list/tenant-member-list.html:1)
+    — add:
+    - `access_revoked` status badge rendering
+    - "Resend" button for `pending` and `declined` members
+    - "Revoke" button for `active` members (non-owner)
+    - "Hard Delete" button for `declined` and `access_revoked` members
+    - Confirmation dialog for destructive actions (revoke, hard-delete)
+- **Dependencies:** T-133
+- **Acceptance criteria:**
+  - `'access_revoked'` members display a gray status badge
+  - "Resend" button is visible for `pending` and `declined` members; calls resend endpoint
+  - "Revoke" button is visible for `active` (non-owner) members; calls revoke endpoint
+  - "Hard Delete" button is visible for `declined` and `access_revoked` members; shows confirmation dialog
+  - After each action, the member list reloads to reflect the updated status
+  - Only owner/admin can see management action buttons (existing `canManage` computed)
+
+### T-143: Shared package tests for new schemas, types, and constants
+
+- **Goal:** Add comprehensive tests for all new and updated shared package artifacts introduced in Phase 11.
+- **Files to modify:**
+  - [`shared/src/schemas/tenant.spec.ts`](shared/src/schemas/tenant.spec.ts:1) — test `TenantWithRoleSchema`,
+    `MyInvitationSchema`, `MyInvitationsResponseSchema`, `PendingInvitationSchema`, `PendingInvitationsResponseSchema`
+  - [`shared/src/schemas/task.spec.ts`](shared/src/schemas/task.spec.ts:1) — test `MyTaskSchema`,
+    `MyTasksResponseSchema`
+  - `shared/src/constants/roles.spec.ts` (create if missing) — test `MemberStatus` includes `'access_revoked'`
+- **Dependencies:** T-125
+- **Acceptance criteria:**
+  - `TenantWithRoleSchema` validates a tenant with `role` field and rejects missing `role`
+  - `MyInvitationSchema` validates the shape from spec §15.10.1
+  - `PendingInvitationSchema` validates the shape from spec §15.10.3
+  - `MyTaskSchema` validates `Task` + denormalized fields
+  - `MemberStatus` includes all four values: `'active'`, `'pending'`, `'declined'`, `'access_revoked'`
+  - Coverage ≥ 80% on new code
+
+### T-144: Backend service tests for TenantService and TaskService dashboard methods
+
+- **Goal:** Add and update tests for all new backend service methods introduced for the dashboard feature.
+- **Files to modify:**
+  - [`server/src/services/tenant.service.test.ts`](server/src/services/tenant.service.test.ts:1) — test:
+    - `listTenantsWithRole` returns tenants with correct role per user
+    - `getMyInvitations` returns pending invitations with denormalized tenant names
+    - `getPendingInvitationsByTenant` returns pending invitations for owner/admin; throws for member
+    - `declineInvitation` sets status to `'declined'`; rejects email mismatch; rejects non-pending
+    - `revokeAccess` sets status to `'access_revoked'`; owner/admin only
+    - `resendInvitation` resets to `'pending'` and sends email; owner/admin only
+    - `hardDeleteMember` permanently deletes; owner/admin only
+  - [`server/src/services/task.service.test.ts`](server/src/services/task.service.test.ts:1) — test:
+    - `getMyTasks` returns tasks across all active tenants
+    - `getMyTasks` returns denormalized `tenantName`, `projectName`, `columnTitle`
+    - `getMyTasks` pagination works
+    - `getMyTasks` priority filter works
+    - `getMyTasks` returns empty for user with no memberships
+- **Dependencies:** T-127, T-128
+- **Acceptance criteria:**
+  - All new service methods have test coverage
+  - RBAC enforcement is tested (owner/admin checks)
+  - Edge cases: email mismatch, non-pending status, empty memberships
+  - Coverage ≥ 80% on new code
+
+### T-145: Backend route tests for new dashboard endpoints
+
+- **Goal:** Add tests for all new backend routes introduced for the dashboard feature.
+- **Files to create:**
+  - `server/src/routes/invitations.test.ts` — test:
+    - `GET /invitations/my` returns pending invitations for authenticated user
+    - `GET /invitations/my` returns empty array when no pending invitations
+    - `DELETE /invitations/:invitationId` declines a pending invitation (204)
+    - `DELETE /invitations/:invitationId` returns 403 on email mismatch
+    - `DELETE /invitations/:invitationId` returns 404 on non-pending invitation
+- **Files to modify:**
+  - [`server/src/routes/tasks.test.ts`](server/src/routes/tasks.test.ts:1) — add tests for:
+    - `GET /tasks/my` returns tasks across all tenants
+    - `GET /tasks/my` pagination and priority filter
+    - `GET /tasks/my` returns 401 without auth
+  - [`server/src/routes/tenants.test.ts`](server/src/routes/tenants.test.ts:1) — add tests for:
+    - `GET /tenants/:tenantId/invitations/pending` returns pending invitations (owner/admin)
+    - `GET /tenants/:tenantId/invitations/pending` returns 403 for member role
+    - `PATCH /tenants/:tenantId/members/:memberId/resend` resets invitation
+    - `PATCH /tenants/:tenantId/members/:memberId/revoke` sets access_revoked
+    - `DELETE /tenants/:tenantId/members/:memberId` hard-deletes declined/revoked member
+- **Dependencies:** T-129, T-130, T-131
+- **Acceptance criteria:**
+  - All new endpoints have test coverage
+  - Cross-tenant endpoints work without `X-Tenant-Id` header
+  - Tenant-scoped endpoints enforce `X-Tenant-Id` and RBAC
+  - Error cases (401, 403, 404) are tested
+  - Coverage ≥ 80% on new code
+
+### T-146: Frontend component and service tests for dashboard
+
+- **Goal:** Add unit tests for all new and modified frontend components and services introduced for the dashboard.
+- **Files to create:**
+  - `ui/src/app/features/dashboard/dashboard.spec.ts` — test Dashboard orchestrator:
+    - Visitor state: no API calls, renders landing page
+    - New user state: renders welcome view
+    - Pending invitations state: renders invitation view
+    - Member state: renders member dashboard
+    - Owner state: renders owner dashboard
+    - Loading state: shows spinner
+    - Error handling: `GET /invitations/my` failure degrades gracefully
+  - `ui/src/app/features/dashboard/visitor/landing-page.spec.ts` — test static content renders
+  - `ui/src/app/features/dashboard/new-user/welcome-view.spec.ts` — test welcome CTA
+  - `ui/src/app/features/dashboard/pending-invitations/invitation-view.spec.ts` — test accept/decline
+  - `ui/src/app/features/dashboard/member/member-dashboard.spec.ts` — test workspaces, tasks, stats
+  - `ui/src/app/features/dashboard/owner/owner-dashboard.spec.ts` — test sent invitations, management links
+- **Files to modify:**
+  - [`ui/src/app/services/tenant-client.spec.ts`](ui/src/app/services/tenant-client.ts) (create if missing) — test new
+    methods: `getMyInvitations`, `getPendingInvitations`, `declineInvitation`, `revokeAccess`, `resendInvitation`,
+    `hardDeleteMember`, updated `loadTenants` with role field
+  - `ui/src/app/services/task-client.spec.ts` (create if missing) — test `getMyTasks` method
+  - `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.spec.ts` (create if missing) — test
+    `access_revoked` badge, resend/revoke/hard-delete actions
+- **Dependencies:** T-137, T-138, T-139, T-140, T-141, T-142
+- **Acceptance criteria:**
+  - Dashboard orchestrator: all 5 states verified with mocked stores and services
+  - Each sub-view component: renders correctly with expected inputs
+  - Service methods: correct HTTP calls verified with `HttpTestingController`
+  - TenantMemberList: new status badge and action buttons tested
+  - Coverage ≥ 80% on new code
+
+### T-147: E2E tests for dashboard states and flows
+
+- **Goal:** Add Playwright E2E tests covering all dashboard states and the full user journey through the dashboard.
+- **Files to create:**
+  - `ui/e2e/dashboard.spec.ts` — test scenarios:
+    - Visitor sees landing page at `/` with "Get Started" and "Log In" buttons
+    - Visitor clicks "Get Started" → navigates to `/auth/register`
+    - New user (authenticated, no tenants) sees welcome view with "Create your first workspace"
+    - New user clicks "Create your first workspace" → navigates to `/workspace/create`
+    - Pending invitations: user sees invitation cards; can accept → transitions to member/owner view
+    - Pending invitations: user declines invitation → card removed; all declined → transitions to new-user
+    - Member dashboard: sees "My Workspaces" and "My Recent Tasks"
+    - Owner dashboard: sees "Pending Invitations Sent", management links, "Create another workspace"
+    - Full journey: visitor → register → create workspace → invite member → see owner dashboard with pending invitation
+- **Dependencies:** T-142, T-146
+- **Acceptance criteria:**
+  - All E2E scenarios pass
+  - `npx playwright test` passes for the dashboard spec file
+  - Tests cover both happy paths and error paths (decline invitation, empty states)
+
+### T-148: Full integration verification of dashboard feature
+
+- **Goal:** Run the complete quality gate suite across the entire monorepo and verify all dashboard features work
+  end-to-end. Fix any issues found during verification.
+- **Files to modify:**
+  - Various (fix any issues found during verification)
+- **Dependencies:** T-143, T-144, T-145, T-146, T-147
+- **Acceptance criteria:**
+  - `npm run build` succeeds for all workspaces (shared, server, ui)
+  - `npm test` passes for all workspaces (≥ 80% coverage on new code)
+  - `npm run lint` passes with zero errors
+  - `tsc --noEmit` passes across the entire monorepo (zero TypeScript errors)
+  - Full user journey works end-to-end: visit `/` as visitor → register → create workspace → navigate dashboard as owner
+    → invite member → switch to invitee account → accept invitation → see member dashboard → decline another invitation
+    → verify state transitions
+
+---
+
 ## Vertical Slice Mapping
 
 The first deployable vertical slice delivers the **core Kanban flow** end-to-end: auth → tenant → project → board →
@@ -1602,12 +2734,39 @@ tasks → sprints, with RBAC enforced throughout.
 | Backend foundation  | T-017 through T-025 |
 | Frontend foundation | T-054 through T-060 |
 
+### User workflow rework tasks (Phase 10)
+
+| Step | Feature                                          | Tasks                                           |
+| ---- | ------------------------------------------------ | ----------------------------------------------- |
+| 1    | **Shared: constants, schemas, types, contracts** | T-095, T-096, T-097, T-098                      |
+| 2    | **Backend: repositories**                        | T-099, T-100                                    |
+| 3    | **Backend: services**                            | T-101, T-102, T-103, T-104                      |
+| 4    | **Backend: middleware + routes**                 | T-105, T-106, T-107                             |
+| 5    | **Frontend: stores + services**                  | T-108, T-109                                    |
+| 6    | **Frontend: components + routes**                | T-110, T-111, T-112, T-113, T-114, T-115, T-116 |
+| 7    | **Tests + verification**                         | T-117, T-118, T-119, T-120, T-121, T-122        |
+
+### Dashboard tasks (Phase 11)
+
+| Step | Feature                                          | Tasks                                    |
+| ---- | ------------------------------------------------ | ---------------------------------------- |
+| 1    | **Shared: constants, schemas, types, contracts** | T-123, T-124, T-125                      |
+| 2    | **Backend: repositories + indexes**              | T-126                                    |
+| 3    | **Backend: services**                            | T-127, T-128                             |
+| 4    | **Backend: routes**                              | T-129, T-130, T-131, T-132               |
+| 5    | **Frontend: services**                           | T-133, T-134                             |
+| 6    | **Frontend: routing + orchestrator**             | T-135, T-136                             |
+| 7    | **Frontend: sub-view components**                | T-137, T-138, T-139, T-140, T-141, T-142 |
+| 8    | **Tests + verification**                         | T-143, T-144, T-145, T-146, T-147, T-148 |
+
 ### Integration tasks
 
-| Task  | Description                                                           |
-| ----- | --------------------------------------------------------------------- |
-| T-074 | Connect frontend to backend and verify the full end-to-end flow       |
-| T-094 | Verify all Phase 9 features work end-to-end (settings, members, RBAC) |
+| Task  | Description                                                                       |
+| ----- | --------------------------------------------------------------------------------- |
+| T-074 | Connect frontend to backend and verify the full end-to-end flow                   |
+| T-094 | Verify all Phase 9 features work end-to-end (settings, members, RBAC)             |
+| T-122 | Verify user workflow rework end-to-end (no auto-tenant, subscriptions, invites)   |
+| T-148 | Verify dashboard feature end-to-end (all 5 states, invitation flow, cross-tenant) |
 
 ---
 
@@ -1629,3 +2788,9 @@ The tasks are ordered for execution as follows:
 9. **Phase 8** (T-074–T-080): Integration, testing, CI/CD, deployment, and hardening
 10. **Phase 9** (T-081–T-094): Missing UI features (backend fix, service layer, tenant settings, tenant members, project
     members, testing)
+11. **Phase 10** (T-095–T-122): User workflow rework — no auto-tenant registration, subscription tiers (free/premium),
+    email-based invitation system, workspace creation page, mock upgrade page
+12. **Phase 11** (T-123–T-148): Jira-style adaptive dashboard — visitor landing page, new-user welcome, pending
+    invitations view, member dashboard (my workspaces + my tasks), owner dashboard (sent invitations + management),
+    cross-tenant endpoints (`GET /invitations/my`, `GET /tasks/my`), `access_revoked` member status, tenant-member
+    management actions (resend, revoke, hard-delete)

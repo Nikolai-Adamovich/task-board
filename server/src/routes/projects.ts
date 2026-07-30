@@ -4,9 +4,11 @@ import { validateBody } from '../middleware/validation.js';
 import { ProjectService } from '../services/project.service.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
 import { ProjectMemberRepository } from '../repositories/project-member.repository.js';
+import { TenantRepository } from '../repositories/tenant.repository.js';
 import { getCollection } from '../db/mongo.js';
 import type { ProjectDocument } from '../repositories/project.repository.js';
 import type { ProjectMemberDocument } from '../repositories/project-member.repository.js';
+import type { TenantDocument } from '../repositories/tenant.repository.js';
 import { CreateProjectSchema, UpdateProjectSchema, ProjectRole } from '@task-board/shared';
 import { z } from 'zod';
 
@@ -182,6 +184,7 @@ export function createProjectRoutes(): Hono<AppEnv> {
 function createProjectService(): ProjectService {
   const projectRepo = new ProjectRepository(getCollection<ProjectDocument>('projects'));
   const projectMemberRepo = new ProjectMemberRepository(getCollection<ProjectMemberDocument>('project_members'));
+  const tenantRepo = new TenantRepository(getCollection<TenantDocument>('tenants'));
 
-  return new ProjectService(projectRepo, projectMemberRepo);
+  return new ProjectService(projectRepo, projectMemberRepo, tenantRepo);
 }

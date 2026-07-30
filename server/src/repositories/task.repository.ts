@@ -156,6 +156,17 @@ export class TaskRepository {
   }
 
   /**
+   * Find all tasks where the given user is assigned, scoped to the provided tenant IDs.
+   * Used for the cross-tenant "my tasks" feature.
+   */
+  async findByAssignee(userId: string, tenantIds: string[]): Promise<TaskDocument[]> {
+    return this.collection
+      .find({ assigneeIds: userId, tenantId: { $in: tenantIds } })
+      .sort({ updatedAt: -1 })
+      .toArray();
+  }
+
+  /**
    * Get the max position in a column for auto-assigning position.
    */
   async getMaxPosition(tenantId: string, boardId: string, columnId: string): Promise<number> {

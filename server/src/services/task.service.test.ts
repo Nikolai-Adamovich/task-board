@@ -73,7 +73,7 @@ describe('TaskService', () => {
   beforeEach(() => {
     taskRepo = createMockTaskRepo();
     columnRepo = createMockColumnRepo();
-    service = new TaskService(taskRepo as never, columnRepo as never);
+    service = new TaskService(taskRepo as never, columnRepo as never, {} as never, {} as never, {} as never);
   });
 
   // ── listTasks ────────────────────────────────────────────────────────────

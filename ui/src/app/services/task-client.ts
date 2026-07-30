@@ -2,7 +2,7 @@ import { Service, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Task, CreateTask, UpdateTask, MoveTask } from '@task-board/shared';
+import type { Task, CreateTask, UpdateTask, MoveTask, MyTask } from '@task-board/shared';
 
 /** Query params for filtering tasks */
 export interface TaskQuery {
@@ -70,5 +70,12 @@ export class TaskClient {
   /** Assign users to a task */
   assign(taskId: string, assigneeIds: string[]): Observable<Task> {
     return this.http.post<Task>(`${this.baseUrl}/tasks/${taskId}/assign`, { assigneeIds });
+  }
+
+  // ─── Cross-Tenant "My Tasks" ──────────────────────────────────────────────
+
+  /** Get tasks assigned to the current user across all tenants */
+  getMyTasks(): Observable<{ data: MyTask[]; total: number }> {
+    return this.http.get<{ data: MyTask[]; total: number }>(`${this.baseUrl}/tasks/my`);
   }
 }
