@@ -1,24 +1,23 @@
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
+import { AuthStore } from '@stores/auth-store';
 
 /**
  * Functional HTTP interceptor that handles error responses:
- * - 401 → redirect to /auth/login
+ * - 401 → clear auth state and redirect to /auth/login
  * - 403 → permission denied (throw error)
  * - 422 → validation errors (throw with details)
  * - Other → generic error
  */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
-  const router = inject(Router);
+  const authStore = inject(AuthStore);
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
       switch (error.status) {
         case 401:
-          // Redirect to login on unauthorized
-          router.navigate(['/auth/login']);
+          authStore.logout();
           break;
 
         case 403:

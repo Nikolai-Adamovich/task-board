@@ -61,20 +61,10 @@ export class AuthStore {
 
   /** Fetch the current user using the stored token. */
   async fetchCurrentUser(): Promise<User> {
-    try {
-      const user = await firstValueFrom(this.authClient.getCurrentUser());
+    const user = await firstValueFrom(this.authClient.getCurrentUser());
 
-      this.currentUser.set(user);
-      return user;
-    } catch (err: unknown) {
-      // Only clear session on 401 (invalid/expired token).
-      // For other errors (network, 500, etc.) keep the token so the
-      // user stays logged in.
-      if (this.isUnauthorized(err)) {
-        this.logout();
-      }
-      throw err;
-    }
+    this.currentUser.set(user);
+    return user;
   }
 
   /** Clear all auth state, localStorage, and redirect to login */
@@ -104,10 +94,6 @@ export class AuthStore {
     this.currentUser.set(response.user);
     this.decodeJwtPayload(response.token);
     localStorage.setItem(TOKEN_KEY, response.token);
-  }
-
-  private isUnauthorized(err: unknown): boolean {
-    return err !== null && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 401;
   }
 
   /** Decode tenant-related fields from the JWT payload */
