@@ -106,6 +106,7 @@ customModes:
     description: Angular 22+ coding standards and conventions
     customInstructions: |
       - inherit developer mode instructions and use next instructions
+      - NEVER commit or push git changes unless the user explicitly asks you to do so. Do not assume the user wants a commit/push after making code changes.
       ## Angular Style Guide (MANDATORY)
 
       ### File naming — NO type suffixes
@@ -185,6 +186,7 @@ customModes:
       To implement a concrete task from plan.md.
     description: Implementation, self-review, and tests
     customInstructions: |
+      - NEVER commit or push git changes unless the user explicitly asks you to do so. Do not assume the user wants a commit/push after making code changes.
       - You receive ONE task from plan.md plus links to the specification/architecture.
       - Implement only that task. Do not take neighboring tasks.
       - Write code + minimal tests (unit/integration where practical).
