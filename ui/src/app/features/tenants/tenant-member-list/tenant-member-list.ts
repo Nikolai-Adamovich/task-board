@@ -114,7 +114,7 @@ export class TenantMemberList implements OnInit {
     });
   }
 
-  protected changeRole(member: TenantMember, newRole: string | undefined | null): void {
+  protected changeRole(member: TenantMember, newRole: TenantRole | undefined | null): void {
     if (!newRole || newRole === member.role || !member.userId) return;
 
     this.tenantClient.updateMemberRole(this.tenantId(), member.userId, newRole).subscribe({

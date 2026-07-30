@@ -1,4 +1,11 @@
-import type { User, AuthResponse, RegisterRequest, LoginRequest, InvitationDetails } from '@task-board/shared';
+import type {
+  User,
+  AuthResponse,
+  RegisterRequest,
+  LoginRequest,
+  InvitationDetails,
+  TenantRole,
+} from '@task-board/shared';
 import { ConflictError, NotFoundError, UnauthorizedError } from '../middleware/error-handler.js';
 import { UserRepository } from '../repositories/user.repository.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
@@ -11,7 +18,7 @@ interface JwtPayload {
   email: string;
   displayName: string;
   tenantId: string | null;
-  tenantRole: string | null;
+  tenantRole: TenantRole | null;
   iat: number;
   exp: number;
 }
@@ -84,14 +91,14 @@ export class AuthService {
     // Check for pending invitations and activate them
     const pendingInvitations = await this.tenantMemberRepo.findPendingByEmail(input.email);
     let firstTenantId: string | null = null;
-    let firstTenantRole: string | null = null;
+    let firstTenantRole: TenantRole | null = null;
 
     for (const invitation of pendingInvitations) {
       if (!invitation.invitationToken) continue;
       await this.tenantMemberRepo.activateInvitation(invitation.invitationToken, user.id);
       if (!firstTenantId) {
         firstTenantId = invitation.tenantId;
-        firstTenantRole = invitation.role;
+        firstTenantRole = invitation.role as TenantRole;
       }
     }
 
@@ -195,7 +202,7 @@ export class AuthService {
     }
 
     // Generate JWT with the tenant from the invitation
-    const token = await this.generateToken(user, invitation.tenantId, invitation.role);
+    const token = await this.generateToken(user, invitation.tenantId, invitation.role as TenantRole);
 
     return { token, user };
   }
@@ -234,7 +241,7 @@ export class AuthService {
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
-  private async generateToken(user: User, tenantId: string | null, tenantRole: string | null): Promise<string> {
+  private async generateToken(user: User, tenantId: string | null, tenantRole: TenantRole | null): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     const payload: JwtPayload = {
       sub: user.id,
