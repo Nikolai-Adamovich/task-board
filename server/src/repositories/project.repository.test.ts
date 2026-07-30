@@ -1,0 +1,186 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ProjectRepository } from './project.repository.js';
+import type { ProjectDocument } from './project.repository.js';
+import type { Collection, InsertOneResult, DeleteResult } from 'mongodb';
+
+// ─── Mock Collection Helper ──────────────────────────────────────────────────
+
+function createMockCollection() {
+  return {
+    findOne: vi.fn(),
+    find: vi.fn(),
+    insertOne: vi.fn(),
+    findOneAndUpdate: vi.fn(),
+    deleteOne: vi.fn(),
+    countDocuments: vi.fn(),
+  } as unknown as Collection<ProjectDocument> & {
+    findOne: ReturnType<typeof vi.fn>;
+    find: ReturnType<typeof vi.fn>;
+    insertOne: ReturnType<typeof vi.fn>;
+    findOneAndUpdate: ReturnType<typeof vi.fn>;
+    deleteOne: ReturnType<typeof vi.fn>;
+    countDocuments: ReturnType<typeof vi.fn>;
+  };
+}
+
+function makeDoc(overrides: Partial<ProjectDocument> = {}): ProjectDocument {
+  return {
+    id: 'project-123',
+    tenantId: 'tenant-1',
+    name: 'Test Project',
+    slug: 'test-project',
+    description: 'A test project',
+    createdAt: new Date('2025-01-01T00:00:00Z'),
+    updatedAt: new Date('2025-01-01T00:00:00Z'),
+    ...overrides,
+  };
+}
+
+describe('ProjectRepository', () => {
+  let collection: ReturnType<typeof createMockCollection>;
+  let repo: ProjectRepository;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    repo = new ProjectRepository(collection);
+  });
+
+  describe('findById', () => {
+    it('returns a mapped project when found', async () => {
+      collection.findOne.mockResolvedValue(makeDoc());
+
+      const result = await repo.findById('tenant-1', 'project-123');
+
+      expect(collection.findOne).toHaveBeenCalledWith({ id: 'project-123', tenantId: 'tenant-1' });
+      expect(result).toEqual({
+        id: 'project-123',
+        tenantId: 'tenant-1',
+        name: 'Test Project',
+        slug: 'test-project',
+        description: 'A test project',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      });
+    });
+
+    it('returns null when not found', async () => {
+      collection.findOne.mockResolvedValue(null);
+
+      const result = await repo.findById('tenant-1', 'missing');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findByTenant', () => {
+    it('returns all projects for a tenant', async () => {
+      const toArray = vi
+        .fn()
+        .mockResolvedValue([makeDoc({ id: 'p1', name: 'Project 1' }), makeDoc({ id: 'p2', name: 'Project 2' })]);
+
+      collection.find.mockReturnValue({ toArray });
+
+      const result = await repo.findByTenant('tenant-1');
+
+      expect(collection.find).toHaveBeenCalledWith({ tenantId: 'tenant-1' });
+      expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('findBySlug', () => {
+    it('queries by slug and tenantId', async () => {
+      collection.findOne.mockResolvedValue(makeDoc());
+
+      const result = await repo.findBySlug('tenant-1', 'test-project');
+
+      expect(collection.findOne).toHaveBeenCalledWith({ tenantId: 'tenant-1', slug: 'test-project' });
+      expect(result?.slug).toBe('test-project');
+    });
+
+    it('returns null when not found', async () => {
+      collection.findOne.mockResolvedValue(null);
+
+      const result = await repo.findBySlug('tenant-1', 'missing');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('create', () => {
+    it('inserts a document and returns the domain project', async () => {
+      collection.insertOne.mockResolvedValue({ acknowledged: true } as InsertOneResult);
+
+      const result = await repo.create('tenant-1', {
+        name: 'New Project',
+        slug: 'new-project',
+      });
+
+      expect(collection.insertOne).toHaveBeenCalledTimes(1);
+
+      const insertedDoc = collection.insertOne.mock.calls[0]?.[0] as ProjectDocument;
+
+      expect(insertedDoc.name).toBe('New Project');
+      expect(insertedDoc.slug).toBe('new-project');
+      expect(insertedDoc.tenantId).toBe('tenant-1');
+      expect(insertedDoc.description).toBeNull();
+      expect(insertedDoc.id).toBeDefined();
+
+      expect(result.name).toBe('New Project');
+      expect(typeof result.createdAt).toBe('string');
+    });
+  });
+
+  describe('update', () => {
+    it('returns the updated project', async () => {
+      const updated = makeDoc({ name: 'Updated' });
+
+      collection.findOneAndUpdate.mockResolvedValue(updated);
+
+      const result = await repo.update('tenant-1', 'project-123', { name: 'Updated' });
+
+      expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
+        { id: 'project-123', tenantId: 'tenant-1' },
+        { $set: { name: 'Updated', updatedAt: expect.any(Date) } },
+        { returnDocument: 'after' },
+      );
+      expect(result?.name).toBe('Updated');
+    });
+
+    it('returns null when project not found', async () => {
+      collection.findOneAndUpdate.mockResolvedValue(null);
+
+      const result = await repo.update('tenant-1', 'missing', { name: 'X' });
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('delete', () => {
+    it('returns true when a document was deleted', async () => {
+      collection.deleteOne.mockResolvedValue({ deletedCount: 1 } as DeleteResult);
+
+      const result = await repo.delete('tenant-1', 'project-123');
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when no document was deleted', async () => {
+      collection.deleteOne.mockResolvedValue({ deletedCount: 0 } as DeleteResult);
+
+      const result = await repo.delete('tenant-1', 'missing');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('countByTenant', () => {
+    it('returns the count of projects for a tenant', async () => {
+      collection.countDocuments.mockResolvedValue(5);
+
+      const result = await repo.countByTenant('tenant-1');
+
+      expect(collection.countDocuments).toHaveBeenCalledWith({ tenantId: 'tenant-1' });
+      expect(result).toBe(5);
+    });
+  });
+});
