@@ -1,8 +1,8 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { AuthStore } from '@stores/auth-store';
+import { AuthClient } from '@services/auth-client';
 import { TenantClient } from '@services/tenant-client';
 import { TaskClient } from '@services/task-client';
-import { firstValueFrom } from 'rxjs';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import type { TenantWithRole, MyInvitation, MyTask } from '@task-board/shared';
 
@@ -22,6 +22,7 @@ type DashboardState = 'visitor' | 'new-user' | 'pending-invitations' | 'member' 
 })
 export class Dashboard implements OnInit {
   protected readonly authStore = inject(AuthStore);
+  private readonly authClient = inject(AuthClient);
   protected readonly tenantService = inject(TenantClient);
   protected readonly taskClient = inject(TaskClient);
   protected readonly tenants = signal<TenantWithRole[]>([]);
@@ -41,7 +42,7 @@ export class Dashboard implements OnInit {
     // currentUser is not loaded yet. Fetch it before checking auth state.
     if (!this.authStore.currentUser() && this.authStore.token()) {
       try {
-        await firstValueFrom(this.authStore.fetchCurrentUser());
+        await this.authClient.fetchCurrentUser();
       } catch {
         // 401 → fetchCurrentUser calls logout(); other errors → still not authenticated
         this.loading.set(false);
