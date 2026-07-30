@@ -7,6 +7,8 @@
 import { describe, it, expect } from 'vitest';
 import { ProjectSchema, CreateProjectSchema, UpdateProjectSchema, ProjectMemberSchema } from './project.js';
 
+// Note: InviteMemberSchema is from tenant, but ProjectSchema and friends are from project
+
 // ─── ProjectSchema ───────────────────────────────────────────────────────────
 
 describe('ProjectSchema', () => {
@@ -100,6 +102,137 @@ describe('UpdateProjectSchema', () => {
   });
 });
 
+// ─── ProjectSchema — additional validation ───────────────────────────────────
+
+describe('ProjectSchema — field validation', () => {
+  const validProject = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    tenantId: '660e8400-e29b-41d4-a716-446655440001',
+    name: 'My Project',
+    slug: 'my-project',
+    description: 'A test project',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('should reject invalid id UUID', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, id: 'not-a-uuid' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid tenantId UUID', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, tenantId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject empty name', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, name: '' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject name exceeding 100 characters', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, name: 'a'.repeat(101) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid slug (starts with hyphen)', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, slug: '-bad-slug' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject slug with uppercase letters', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, slug: 'Bad-Slug' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject slug ending with hyphen', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, slug: 'bad-slug-' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject single-character slug', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, slug: 'a' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid createdAt datetime', () => {
+    const result = ProjectSchema.safeParse({ ...validProject, createdAt: 'not-a-date' });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── CreateProjectSchema — additional validation ─────────────────────────────
+
+describe('CreateProjectSchema — field validation', () => {
+  it('should reject name exceeding 100 characters', () => {
+    const result = CreateProjectSchema.safeParse({
+      name: 'a'.repeat(101),
+      slug: 'new-project',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid slug (starts with hyphen)', () => {
+    const result = CreateProjectSchema.safeParse({
+      name: 'Project',
+      slug: '-bad-slug',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject slug exceeding 80 characters', () => {
+    const result = CreateProjectSchema.safeParse({
+      name: 'Project',
+      slug: 'a'.repeat(81),
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject description exceeding 500 characters', () => {
+    const result = CreateProjectSchema.safeParse({
+      name: 'Project',
+      slug: 'new-project',
+      description: 'a'.repeat(501),
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── UpdateProjectSchema — additional validation ─────────────────────────────
+
+describe('UpdateProjectSchema — field validation', () => {
+  it('should reject name exceeding 100 characters', () => {
+    const result = UpdateProjectSchema.safeParse({ name: 'a'.repeat(101) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject empty name', () => {
+    const result = UpdateProjectSchema.safeParse({ name: '' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid slug', () => {
+    const result = UpdateProjectSchema.safeParse({ slug: 'Bad-Slug' });
+
+    expect(result.success).toBe(false);
+  });
+});
+
 // ─── ProjectMemberSchema ─────────────────────────────────────────────────────
 
 describe('ProjectMemberSchema', () => {
@@ -126,6 +259,30 @@ describe('ProjectMemberSchema', () => {
 
   it('should reject invalid project role', () => {
     const result = ProjectMemberSchema.safeParse({ ...validMember, role: 'owner' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid userId UUID', () => {
+    const result = ProjectMemberSchema.safeParse({ ...validMember, userId: 'not-a-uuid' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid projectId UUID', () => {
+    const result = ProjectMemberSchema.safeParse({ ...validMember, projectId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid tenantId UUID', () => {
+    const result = ProjectMemberSchema.safeParse({ ...validMember, tenantId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = ProjectMemberSchema.safeParse({});
 
     expect(result.success).toBe(false);
   });

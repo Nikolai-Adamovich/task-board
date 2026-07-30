@@ -188,4 +188,150 @@ describe('ListQuerySchema', () => {
       expect(result.data.limit).toBe(20);
     }
   });
+
+  it('should coerce string page and limit to numbers', () => {
+    const result = ListQuerySchema.safeParse({ page: '5', limit: '30' });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.page).toBe(5);
+      expect(result.data.limit).toBe(30);
+    }
+  });
+
+  it('should accept search with empty string', () => {
+    const result = ListQuerySchema.safeParse({ search: '' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject page of 0 after coerce', () => {
+    const result = ListQuerySchema.safeParse({ page: '0', limit: '20' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject limit exceeding 100 after coerce', () => {
+    const result = ListQuerySchema.safeParse({ page: '1', limit: '101' });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── ErrorResponseSchema — additional validation ─────────────────────────────
+
+describe('ErrorResponseSchema — additional validation', () => {
+  it('should accept error with empty string code', () => {
+    const result = ErrorResponseSchema.safeParse({ code: '', message: 'Error' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept error with empty string message', () => {
+    const result = ErrorResponseSchema.safeParse({ code: 'ERR', message: '' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept error with array details', () => {
+    const result = ErrorResponseSchema.safeParse({
+      code: 'VALIDATION_ERROR',
+      message: 'Validation failed',
+      details: [{ field: 'email', message: 'invalid' }],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept error without details', () => {
+    const result = ErrorResponseSchema.safeParse({
+      code: 'NOT_FOUND',
+      message: 'Resource not found',
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+// ─── createPaginatedResponseSchema — additional validation ───────────────────
+
+describe('createPaginatedResponseSchema — additional validation', () => {
+  const ItemSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+  });
+  const PaginatedItemsSchema = createPaginatedResponseSchema(ItemSchema);
+
+  it('should reject missing data field', () => {
+    const result = PaginatedItemsSchema.safeParse({
+      total: 10,
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing total field', () => {
+    const result = PaginatedItemsSchema.safeParse({
+      data: [],
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing page field', () => {
+    const result = PaginatedItemsSchema.safeParse({
+      data: [],
+      total: 0,
+      limit: 20,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing limit field', () => {
+    const result = PaginatedItemsSchema.safeParse({
+      data: [],
+      total: 0,
+      page: 1,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject non-integer total', () => {
+    const result = PaginatedItemsSchema.safeParse({
+      data: [],
+      total: 1.5,
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject zero page', () => {
+    const result = PaginatedItemsSchema.safeParse({
+      data: [],
+      total: 0,
+      page: 0,
+      limit: 20,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject zero limit', () => {
+    const result = PaginatedItemsSchema.safeParse({
+      data: [],
+      total: 0,
+      page: 1,
+      limit: 0,
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

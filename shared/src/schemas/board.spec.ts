@@ -166,3 +166,133 @@ describe('CreateColumnSchema', () => {
     expect(result.success).toBe(false);
   });
 });
+
+// ─── BoardSchema — additional validation ─────────────────────────────────────
+
+describe('BoardSchema — field validation', () => {
+  const validBoard = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    tenantId: '660e8400-e29b-41d4-a716-446655440001',
+    projectId: '770e8400-e29b-41d4-a716-446655440002',
+    name: 'Sprint Board',
+    description: 'Main project board',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('should reject invalid id UUID', () => {
+    const result = BoardSchema.safeParse({ ...validBoard, id: 'not-a-uuid' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid tenantId UUID', () => {
+    const result = BoardSchema.safeParse({ ...validBoard, tenantId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid projectId UUID', () => {
+    const result = BoardSchema.safeParse({ ...validBoard, projectId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid createdAt datetime', () => {
+    const result = BoardSchema.safeParse({ ...validBoard, createdAt: 'not-a-date' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = BoardSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── CreateBoardSchema — additional validation ───────────────────────────────
+
+describe('CreateBoardSchema — field validation', () => {
+  it('should reject missing name', () => {
+    const result = CreateBoardSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject name exceeding 100 characters', () => {
+    const result = CreateBoardSchema.safeParse({ name: 'a'.repeat(101) });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── UpdateBoardSchema — additional validation ───────────────────────────────
+
+describe('UpdateBoardSchema — field validation', () => {
+  it('should reject name exceeding 100 characters', () => {
+    const result = UpdateBoardSchema.safeParse({ name: 'a'.repeat(101) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject empty name', () => {
+    const result = UpdateBoardSchema.safeParse({ name: '' });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── ColumnSchema — additional validation ────────────────────────────────────
+
+describe('ColumnSchema — field validation', () => {
+  const validColumn = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    boardId: '660e8400-e29b-41d4-a716-446655440001',
+    tenantId: '770e8400-e29b-41d4-a716-446655440002',
+    name: 'To Do',
+    position: 0,
+    isDefault: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('should reject name exceeding 50 characters', () => {
+    const result = ColumnSchema.safeParse({ ...validColumn, name: 'a'.repeat(51) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid id UUID', () => {
+    const result = ColumnSchema.safeParse({ ...validColumn, id: 'not-a-uuid' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid boardId UUID', () => {
+    const result = ColumnSchema.safeParse({ ...validColumn, boardId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = ColumnSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── CreateColumnSchema — additional validation ──────────────────────────────
+
+describe('CreateColumnSchema — field validation', () => {
+  it('should reject missing name', () => {
+    const result = CreateColumnSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject name exceeding 50 characters', () => {
+    const result = CreateColumnSchema.safeParse({ name: 'a'.repeat(51) });
+
+    expect(result.success).toBe(false);
+  });
+});

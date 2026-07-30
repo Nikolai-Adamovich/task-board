@@ -305,3 +305,199 @@ describe('MyTaskSchema', () => {
     expect(result.success).toBe(false);
   });
 });
+
+// ─── TaskSchema — additional validation ──────────────────────────────────────
+
+describe('TaskSchema — additional field validation', () => {
+  const validTask = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    tenantId: '660e8400-e29b-41d4-a716-446655440001',
+    projectId: '770e8400-e29b-41d4-a716-446655440002',
+    boardId: '880e8400-e29b-41d4-a716-446655440003',
+    columnId: '990e8400-e29b-41d4-a716-446655440004',
+    sprintId: null,
+    title: 'Implement login page',
+    description: 'Build the login form with email/password',
+    assigneeIds: [],
+    priority: 'medium' as const,
+    position: 0,
+    createdBy: 'aa0e8400-e29b-41d4-a716-446655440005',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('should accept task with null description', () => {
+    const result = TaskSchema.safeParse({ ...validTask, description: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept task with description at max boundary (5000 chars)', () => {
+    const result = TaskSchema.safeParse({ ...validTask, description: 'a'.repeat(5000) });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject description exceeding 5000 characters', () => {
+    const result = TaskSchema.safeParse({ ...validTask, description: 'a'.repeat(5001) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid createdBy UUID', () => {
+    const result = TaskSchema.safeParse({ ...validTask, createdBy: 'not-a-uuid' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid createdAt datetime', () => {
+    const result = TaskSchema.safeParse({ ...validTask, createdAt: 'not-a-date' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing required fields', () => {
+    const result = TaskSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── CreateTaskSchema — additional validation ────────────────────────────────
+
+describe('CreateTaskSchema — additional field validation', () => {
+  const validCreate = {
+    title: 'New Task',
+    projectId: '550e8400-e29b-41d4-a716-446655440000',
+    boardId: '660e8400-e29b-41d4-a716-446655440001',
+    columnId: '770e8400-e29b-41d4-a716-446655440002',
+  };
+
+  it('should default priority to medium', () => {
+    const result = CreateTaskSchema.safeParse(validCreate);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.priority).toBe('medium');
+    }
+  });
+
+  it('should default assigneeIds to empty array', () => {
+    const result = CreateTaskSchema.safeParse(validCreate);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.assigneeIds).toEqual([]);
+    }
+  });
+
+  it('should reject title exceeding 200 characters', () => {
+    const result = CreateTaskSchema.safeParse({ ...validCreate, title: 'a'.repeat(201) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject description exceeding 5000 characters', () => {
+    const result = CreateTaskSchema.safeParse({ ...validCreate, description: 'a'.repeat(5001) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid boardId UUID', () => {
+    const result = CreateTaskSchema.safeParse({ ...validCreate, boardId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid columnId UUID', () => {
+    const result = CreateTaskSchema.safeParse({ ...validCreate, columnId: 'bad' });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── UpdateTaskSchema — additional validation ────────────────────────────────
+
+describe('UpdateTaskSchema — additional field validation', () => {
+  it('should reject title exceeding 200 characters', () => {
+    const result = UpdateTaskSchema.safeParse({ title: 'a'.repeat(201) });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject empty title', () => {
+    const result = UpdateTaskSchema.safeParse({ title: '' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid priority value', () => {
+    const result = UpdateTaskSchema.safeParse({ priority: 'urgent' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid assignee UUID in array', () => {
+    const result = UpdateTaskSchema.safeParse({ assigneeIds: ['not-a-uuid'] });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── MoveTaskSchema — additional validation ──────────────────────────────────
+
+describe('MoveTaskSchema — additional field validation', () => {
+  it('should reject missing taskId', () => {
+    const result = MoveTaskSchema.safeParse({
+      targetColumnId: '660e8400-e29b-41d4-a716-446655440001',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing targetColumnId', () => {
+    const result = MoveTaskSchema.safeParse({
+      taskId: '550e8400-e29b-41d4-a716-446655440000',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid targetColumnId UUID', () => {
+    const result = MoveTaskSchema.safeParse({
+      taskId: '550e8400-e29b-41d4-a716-446655440000',
+      targetColumnId: 'bad',
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── AssignTaskSchema — additional validation ────────────────────────────────
+
+describe('AssignTaskSchema — additional field validation', () => {
+  it('should reject missing taskId', () => {
+    const result = AssignTaskSchema.safeParse({
+      assigneeIds: ['660e8400-e29b-41d4-a716-446655440001'],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing assigneeIds', () => {
+    const result = AssignTaskSchema.safeParse({
+      taskId: '550e8400-e29b-41d4-a716-446655440000',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept multiple assignees', () => {
+    const result = AssignTaskSchema.safeParse({
+      taskId: '550e8400-e29b-41d4-a716-446655440000',
+      assigneeIds: ['660e8400-e29b-41d4-a716-446655440001', '770e8400-e29b-41d4-a716-446655440002'],
+    });
+
+    expect(result.success).toBe(true);
+  });
+});

@@ -10,6 +10,7 @@ import {
   CreateTenantSchema,
   UpdateTenantSchema,
   TenantMemberSchema,
+  InviteMemberSchema,
   TenantWithRoleSchema,
 } from './tenant.js';
 
@@ -241,9 +242,164 @@ describe('TenantMemberSchema', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('should accept null userId (pending invitation)', () => {
+    const result = TenantMemberSchema.safeParse({ ...validMember, userId: null, status: 'pending' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept non-null invitedEmail for pending member', () => {
+    const result = TenantMemberSchema.safeParse({
+      ...validMember,
+      status: 'pending',
+      invitedEmail: 'invited@example.com',
+      invitationToken: 'some-token',
+      invitedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept null invitedEmail for active member', () => {
+    const result = TenantMemberSchema.safeParse({ ...validMember, invitedEmail: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept null invitationToken for active member', () => {
+    const result = TenantMemberSchema.safeParse({ ...validMember, invitationToken: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept null invitedAt for active member', () => {
+    const result = TenantMemberSchema.safeParse({ ...validMember, invitedAt: null });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject invalid tenantId UUID', () => {
+    const result = TenantMemberSchema.safeParse({ ...validMember, tenantId: 'not-a-uuid' });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── InviteMemberSchema ──────────────────────────────────────────────────────
+
+describe('InviteMemberSchema', () => {
+  it('should accept valid invite-member data', () => {
+    const result = InviteMemberSchema.safeParse({
+      email: 'newmember@example.com',
+      role: 'member',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept all tenant roles', () => {
+    for (const role of ['owner', 'admin', 'member'] as const) {
+      const result = InviteMemberSchema.safeParse({ email: 'user@example.com', role });
+
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it('should reject invalid email', () => {
+    const result = InviteMemberSchema.safeParse({
+      email: 'not-an-email',
+      role: 'member',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject empty email', () => {
+    const result = InviteMemberSchema.safeParse({
+      email: '',
+      role: 'member',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject invalid role', () => {
+    const result = InviteMemberSchema.safeParse({
+      email: 'user@example.com',
+      role: 'superadmin',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing email', () => {
+    const result = InviteMemberSchema.safeParse({ role: 'member' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject missing role', () => {
+    const result = InviteMemberSchema.safeParse({ email: 'user@example.com' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject completely empty object', () => {
+    const result = InviteMemberSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+  });
 });
 
 // ─── TenantWithRoleSchema ────────────────────────────────────────────────────
+
+// ─── TenantSchema additional tests ───────────────────────────────────────────
+
+// (TenantSchema additional validation from earlier)
+
+// ─── CreateTenantSchema — subscription default ───────────────────────────────
+
+describe('CreateTenantSchema — subscription', () => {
+  it('should default subscription to free when not provided', () => {
+    const result = CreateTenantSchema.safeParse({ name: 'Org', slug: 'new-org' });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.subscription).toBe('free');
+    }
+  });
+
+  it('should accept subscription: free', () => {
+    const result = CreateTenantSchema.safeParse({
+      name: 'Org',
+      slug: 'new-org',
+      subscription: 'free',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept subscription: premium', () => {
+    const result = CreateTenantSchema.safeParse({
+      name: 'Org',
+      slug: 'new-org',
+      subscription: 'premium',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject invalid subscription tier', () => {
+    const result = CreateTenantSchema.safeParse({
+      name: 'Org',
+      slug: 'new-org',
+      subscription: 'enterprise',
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
 
 describe('TenantWithRoleSchema', () => {
   const validTenantWithRole = {
