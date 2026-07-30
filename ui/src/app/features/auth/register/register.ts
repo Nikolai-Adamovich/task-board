@@ -51,12 +51,7 @@ export class Register {
 
           try {
             await this.authStore.register(this.model());
-
-            if (this.authStore.needsWorkspace()) {
-              await this.router.navigateByUrl('/workspace/create');
-            } else {
-              await this.router.navigateByUrl('/');
-            }
+            await this.router.navigateByUrl('/');
           } catch (err) {
             this.error.set(this.getErrorMessage(err));
           }
