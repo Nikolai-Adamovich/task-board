@@ -64,7 +64,7 @@ export class SprintList implements OnInit {
   protected readonly creating = signal(false);
   protected readonly showCreateModal = signal(false);
   /** Track which project groups are expanded */
-  protected readonly expandedGroups = signal<Record<string, boolean>>({});
+  private readonly expandedGroups = signal<Record<string, boolean>>({});
   protected startDateStr = '';
   protected endDateStr = '';
   protected newSprint: Omit<CreateSprint, 'startDate' | 'endDate'> & {

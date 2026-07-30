@@ -17,7 +17,7 @@ import type { Tenant } from '@task-board/shared';
 export class TenantSwitcher {
   protected readonly tenantStore = inject(TenantStore);
   protected readonly authStore = inject(AuthStore);
-  protected readonly router = inject(Router);
+  private readonly router = inject(Router);
   protected readonly isOpen = signal(false);
 
   protected toggleDropdown(): void {

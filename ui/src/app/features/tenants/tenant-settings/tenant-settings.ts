@@ -43,7 +43,7 @@ export class TenantSettings implements OnInit {
   protected slug = '';
   /** Current tenant name, used for delete confirmation comparison */
   protected readonly currentTenantName = computed(() => this.tenantStore.activeTenant()?.name ?? '');
-  protected readonly tenantId = computed(() => this.tenantStore.activeTenant()?.id ?? null);
+  private readonly tenantId = computed(() => this.tenantStore.activeTenant()?.id ?? null);
   protected readonly canEdit = computed(() => {
     const role = this.authStore.tenantRole();
 

@@ -21,10 +21,10 @@ type DashboardState = 'visitor' | 'new-user' | 'pending-invitations' | 'member' 
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
-  protected readonly authStore = inject(AuthStore);
-  protected readonly tenantStore = inject(TenantStore);
-  protected readonly tenantClient = inject(TenantClient);
-  protected readonly taskClient = inject(TaskClient);
+  private readonly authStore = inject(AuthStore);
+  private readonly tenantStore = inject(TenantStore);
+  private readonly tenantClient = inject(TenantClient);
+  private readonly taskClient = inject(TaskClient);
   protected readonly tenants = signal<TenantWithRole[]>([]);
   protected readonly invitations = signal<MyInvitation[]>([]);
   protected readonly tasks = signal<MyTask[]>([]);

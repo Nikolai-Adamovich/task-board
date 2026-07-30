@@ -64,7 +64,7 @@ export class ProjectList implements OnInit {
     }
   }
 
-  protected loadProjects(): void {
+  private loadProjects(): void {
     this.loading.set(true);
     this.projectClient.list().subscribe({
       next: (res) => {

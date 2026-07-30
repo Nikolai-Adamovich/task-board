@@ -41,7 +41,7 @@ export class AcceptInvitation implements OnInit {
   protected readonly submitting = signal(false);
   protected readonly error = signal('');
   protected readonly invitation = signal<InvitationDetails | null>(null);
-  protected readonly token = signal('');
+  private readonly token = signal('');
   private readonly model = signal<InvitationFormModel>({ displayName: '', password: '', confirmPassword: '' });
   protected readonly invitationForm = form(
     this.model,
