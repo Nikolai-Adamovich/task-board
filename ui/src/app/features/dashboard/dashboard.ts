@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { AuthStore } from '@stores/auth-store';
 import { TenantClient } from '@services/tenant-client';
 import { TaskClient } from '@services/task-client';
+import { firstValueFrom } from 'rxjs';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import type { TenantWithRole, MyInvitation, MyTask } from '@task-board/shared';
 
@@ -35,7 +36,19 @@ export class Dashboard implements OnInit {
     return 'member';
   });
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
+    // After page reload the token is restored from localStorage but
+    // currentUser is not loaded yet. Fetch it before checking auth state.
+    if (!this.authStore.currentUser() && this.authStore.token()) {
+      try {
+        await firstValueFrom(this.authStore.fetchCurrentUser());
+      } catch {
+        // 401 → fetchCurrentUser calls logout(); other errors → still not authenticated
+        this.loading.set(false);
+        return;
+      }
+    }
+
     if (!this.authStore.isAuthenticated()) {
       this.loading.set(false);
       return;
