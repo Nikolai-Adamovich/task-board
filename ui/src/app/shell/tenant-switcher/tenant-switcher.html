@@ -13,7 +13,7 @@
       aria-haspopup="listbox"
       [attr.aria-expanded]="isOpen()"
     >
-      @if (tenantService.activeTenant(); as tenant) {
+      @if (tenantStore.activeTenant(); as tenant) {
         <span class="font-medium">{{ tenant.name }}</span>
       } @else {
         <span class="text-muted-foreground">Select workspace</span>
@@ -26,7 +26,7 @@
         class="absolute left-0 z-50 mt-1 w-56 rounded-md border border-border bg-popover py-1 shadow-lg"
         role="listbox"
       >
-        @for (tenant of tenantService.tenants(); track tenant.id) {
+        @for (tenant of tenantStore.tenants(); track tenant.id) {
           <button
             class="flex w-full items-center px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
             [class.bg-primary/10]="isActive(tenant)"

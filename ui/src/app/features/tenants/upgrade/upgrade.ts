@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideCheck, lucideArrowLeft, lucideCrown } from '@ng-icons/lucide';
-import { TenantClient } from '@services/tenant-client';
+import { TenantStore } from '@stores/tenant-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -17,12 +17,12 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 })
 export class Upgrade implements OnInit {
   private readonly router = inject(Router);
-  private readonly tenantClient = inject(TenantClient);
+  private readonly tenantStore = inject(TenantStore);
   protected readonly upgrading = signal(false);
   protected readonly success = signal(false);
   protected readonly error = signal('');
   protected readonly currentPlan = computed(() => {
-    const tenant = this.tenantClient.activeTenant();
+    const tenant = this.tenantStore.activeTenant();
 
     return tenant?.subscription ?? 'free';
   });
@@ -35,27 +35,29 @@ export class Upgrade implements OnInit {
   }
 
   protected upgrade(): void {
-    const tenant = this.tenantClient.activeTenant();
+    const tenant = this.tenantStore.activeTenant();
 
     if (!tenant) return;
 
     this.upgrading.set(true);
     this.error.set('');
 
-    this.tenantClient.updateTenant(tenant.id, { subscription: 'premium' }).subscribe({
-      next: () => {
+    this.tenantStore.updateTenant(tenant.id, { subscription: 'premium' }).then(
+      () => {
         this.success.set(true);
         this.upgrading.set(false);
       },
-      error: (err: HttpErrorResponse) => {
-        this.error.set(err.error?.message ?? 'Failed to upgrade. Please try again.');
+      (err: unknown) => {
+        const message = err instanceof HttpErrorResponse ? err.error?.message : 'Failed to upgrade. Please try again.';
+
+        this.error.set(message);
         this.upgrading.set(false);
       },
-    });
+    );
   }
 
   protected goBack(): void {
-    const tenant = this.tenantClient.activeTenant();
+    const tenant = this.tenantStore.activeTenant();
 
     if (tenant) {
       this.router.navigate(['/tenants', tenant.id, 'settings']);

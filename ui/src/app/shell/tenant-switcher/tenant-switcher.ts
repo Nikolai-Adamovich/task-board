@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideCheck, lucidePlus } from '@ng-icons/lucide';
-import { TenantClient } from '@services/tenant-client';
+import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NgIcon } from '@ng-icons/core';
@@ -15,7 +15,7 @@ import type { Tenant } from '@task-board/shared';
   templateUrl: './tenant-switcher.html',
 })
 export class TenantSwitcher {
-  protected readonly tenantService = inject(TenantClient);
+  protected readonly tenantStore = inject(TenantStore);
   protected readonly authStore = inject(AuthStore);
   protected readonly router = inject(Router);
   protected readonly isOpen = signal(false);
@@ -25,12 +25,12 @@ export class TenantSwitcher {
   }
 
   protected selectTenant(tenant: Tenant): void {
-    this.tenantService.setActiveTenant(tenant);
+    this.tenantStore.setActiveTenant(tenant);
     this.isOpen.set(false);
   }
 
   protected isActive(tenant: Tenant): boolean {
-    return this.tenantService.activeTenant()?.id === tenant.id;
+    return this.tenantStore.activeTenant()?.id === tenant.id;
   }
 
   protected navigateToCreate(): void {

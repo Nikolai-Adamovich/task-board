@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { TenantClient } from '@services/tenant-client';
+import { TenantStore } from '@stores/tenant-store';
 
 @Component({
   selector: 'ui-sidebar',
@@ -8,5 +8,5 @@ import { TenantClient } from '@services/tenant-client';
   templateUrl: './sidebar.html',
 })
 export class Sidebar {
-  protected readonly tenantService = inject(TenantClient);
+  protected readonly tenantStore = inject(TenantStore);
 }

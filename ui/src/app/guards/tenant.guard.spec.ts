@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRouteSnapshot, provideRouter, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { tenantGuard } from './tenant.guard';
-import { TenantClient } from '@services/tenant-client';
+import { TenantStore } from '@stores/tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Tenant } from '@task-board/shared';
 
@@ -57,10 +57,10 @@ describe('tenantGuard', () => {
   it('should allow access when active tenant matches', async () => {
     setup();
 
-    const tenantService = TestBed.inject(TenantClient);
+    const tenantStore = TestBed.inject(TenantStore);
 
-    tenantService.tenants.set([{ id: 'tenant-1', name: 'Test', slug: 'test' }] as Tenant[]);
-    tenantService.setActiveTenant({ id: 'tenant-1', name: 'Test', slug: 'test' } as Tenant);
+    tenantStore.tenants.set([{ id: 'tenant-1', name: 'Test', slug: 'test' }] as Tenant[]);
+    tenantStore.setActiveTenant({ id: 'tenant-1', name: 'Test', slug: 'test' } as Tenant);
 
     const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('tenant-1'), mockState));
 

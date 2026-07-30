@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { form, FormField, submit, schema, required, minLength, maxLength } from '@angular/forms/signals';
-import { TenantClient } from '@services/tenant-client';
+import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -32,7 +32,7 @@ function slugify(value: string): string {
 })
 export class CreateWorkspace {
   private readonly router = inject(Router);
-  private readonly tenantClient = inject(TenantClient);
+  private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   protected readonly error = signal('');
   private readonly model = signal<WorkspaceModel>({ name: '', slug: '' });
@@ -51,21 +51,13 @@ export class CreateWorkspace {
           this.error.set('');
 
           try {
-            await new Promise<void>((resolve, reject) => {
-              this.tenantClient
-                .createTenant({
-                  name: this.model().name,
-                  slug: this.model().slug,
-                  subscription: 'free',
-                })
-                .subscribe({
-                  next: (tenant) => {
-                    this.authStore.setTenantContext(tenant.id, 'owner');
-                    resolve();
-                  },
-                  error: (err) => reject(err),
-                });
+            const tenant = await this.tenantStore.createTenant({
+              name: this.model().name,
+              slug: this.model().slug,
+              subscription: 'free',
             });
+
+            this.authStore.setTenantContext(tenant.id, 'owner');
 
             await this.router.navigateByUrl('/');
           } catch (err) {

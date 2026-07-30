@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideFolderOpen } from '@ng-icons/lucide';
 import { ProjectClient } from '@services/project-client';
-import { TenantClient } from '@services/tenant-client';
+import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -36,7 +36,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 })
 export class ProjectList implements OnInit {
   private readonly projectService = inject(ProjectClient);
-  private readonly tenantService = inject(TenantClient);
+  private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   protected readonly projects = signal<Project[]>([]);
   protected readonly loading = signal(true);
@@ -56,7 +56,7 @@ export class ProjectList implements OnInit {
   }
 
   ngOnInit(): void {
-    const tenant = this.tenantService.activeTenant();
+    const tenant = this.tenantStore.activeTenant();
 
     if (tenant) {
       this.tenantId.set(tenant.id);

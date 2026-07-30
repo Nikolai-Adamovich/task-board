@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { AuthStore } from '@stores/auth-store';
+import { TenantStore } from '@stores/tenant-store';
 import { TenantClient } from '@services/tenant-client';
 import { TaskClient } from '@services/task-client';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -21,7 +22,8 @@ type DashboardState = 'visitor' | 'new-user' | 'pending-invitations' | 'member' 
 })
 export class Dashboard implements OnInit {
   protected readonly authStore = inject(AuthStore);
-  protected readonly tenantService = inject(TenantClient);
+  protected readonly tenantStore = inject(TenantStore);
+  protected readonly tenantClient = inject(TenantClient);
   protected readonly taskClient = inject(TaskClient);
   protected readonly tenants = signal<TenantWithRole[]>([]);
   protected readonly invitations = signal<MyInvitation[]>([]);
@@ -54,13 +56,13 @@ export class Dashboard implements OnInit {
     }
 
     // Load tenants (with roles)
-    this.tenantService.loadTenants().subscribe({
-      next: () => {
-        this.tenants.set(this.tenantService.tenants() as TenantWithRole[]);
+    this.tenantStore.loadTenants().then(
+      () => {
+        this.tenants.set(this.tenantStore.tenants() as TenantWithRole[]);
         this.loadData();
       },
-      error: () => this.loading.set(false),
-    });
+      () => this.loading.set(false),
+    );
   }
 
   private loadData(): void {
@@ -69,7 +71,7 @@ export class Dashboard implements OnInit {
       if (--pending === 0) this.loading.set(false);
     };
 
-    this.tenantService.getMyInvitations().subscribe({
+    this.tenantClient.getMyInvitations().subscribe({
       next: (res) => {
         this.invitations.set(res.data);
         done();
@@ -88,12 +90,12 @@ export class Dashboard implements OnInit {
 
   protected onInvitationHandled(): void {
     this.loading.set(true);
-    this.tenantService.loadTenants().subscribe({
-      next: () => {
-        this.tenants.set(this.tenantService.tenants() as TenantWithRole[]);
+    this.tenantStore.loadTenants().then(
+      () => {
+        this.tenants.set(this.tenantStore.tenants() as TenantWithRole[]);
         this.loadData();
       },
-      error: () => this.loading.set(false),
-    });
+      () => this.loading.set(false),
+    );
   }
 }

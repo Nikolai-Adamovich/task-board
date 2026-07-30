@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideSettings, lucideTrash2, lucideSave } from '@ng-icons/lucide';
-import { TenantClient } from '@services/tenant-client';
+import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -29,7 +29,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   templateUrl: './tenant-settings.html',
 })
 export class TenantSettings implements OnInit {
-  private readonly tenantService = inject(TenantClient);
+  private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
   protected readonly loading = signal(true);
@@ -42,8 +42,8 @@ export class TenantSettings implements OnInit {
   protected name = '';
   protected slug = '';
   /** Current tenant name, used for delete confirmation comparison */
-  protected readonly currentTenantName = computed(() => this.tenantService.activeTenant()?.name ?? '');
-  protected readonly tenantId = computed(() => this.tenantService.activeTenant()?.id ?? null);
+  protected readonly currentTenantName = computed(() => this.tenantStore.activeTenant()?.name ?? '');
+  protected readonly tenantId = computed(() => this.tenantStore.activeTenant()?.id ?? null);
   protected readonly canEdit = computed(() => {
     const role = this.authStore.tenantRole();
 
@@ -58,7 +58,7 @@ export class TenantSettings implements OnInit {
   }
 
   ngOnInit(): void {
-    const tenant = this.tenantService.activeTenant();
+    const tenant = this.tenantStore.activeTenant();
 
     if (tenant) {
       this.name = tenant.name;
@@ -78,33 +78,33 @@ export class TenantSettings implements OnInit {
     this.successMessage.set('');
     this.errorMessage.set('');
 
-    this.tenantService.updateTenant(id, { name: this.name, slug: this.slug }).subscribe({
-      next: () => {
+    this.tenantStore.updateTenant(id, { name: this.name, slug: this.slug }).then(
+      () => {
         this.successMessage.set('Tenant settings updated successfully.');
         this.saving.set(false);
       },
-      error: () => {
+      () => {
         this.errorMessage.set('Failed to update tenant settings.');
         this.saving.set(false);
       },
-    });
+    );
   }
 
   protected deleteTenant(): void {
-    const tenant = this.tenantService.activeTenant();
+    const tenant = this.tenantStore.activeTenant();
 
     if (!tenant || this.deleteConfirmName() !== tenant.name) return;
 
     this.deleting.set(true);
 
-    this.tenantService.deleteTenant(tenant.id).subscribe({
-      next: () => {
+    this.tenantStore.deleteTenant(tenant.id).then(
+      () => {
         this.router.navigate(['/']);
       },
-      error: () => {
+      () => {
         this.deleting.set(false);
         this.errorMessage.set('Failed to delete tenant.');
       },
-    });
+    );
   }
 }

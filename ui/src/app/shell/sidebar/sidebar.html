@@ -3,7 +3,7 @@
     <h1 class="text-lg font-bold text-primary-700">Task Board</h1>
   </div>
   <nav class="flex-1 space-y-1 px-3 py-4">
-    @if (tenantService.activeTenant(); as tenant) {
+    @if (tenantStore.activeTenant(); as tenant) {
       <a
         [routerLink]="['/tenants', tenant.id, 'projects']"
         routerLinkActive="bg-primary-50 text-primary-700 font-medium"

@@ -6,8 +6,8 @@ const TENANT_KEY = 'taskboard_tenant_id';
  * Functional HTTP interceptor that attaches the X-Tenant-Id header
  * to all requests except /auth/* endpoints.
  *
- * Reads tenant ID from localStorage to avoid circular dependency with TenantClient.
- * TenantClient.setActiveTenant() writes to localStorage, so this stays in sync.
+ * Reads tenant ID from localStorage to avoid circular dependency with TenantStore.
+ * TenantStore.setActiveTenant() writes to localStorage, so this stays in sync.
  */
 export const tenantInterceptor: HttpInterceptorFn = (req, next) => {
   // Skip tenant header for auth-related requests

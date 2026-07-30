@@ -1,7 +1,6 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { TenantClient } from '@services/tenant-client';
+import { TenantStore } from '@stores/tenant-store';
 
 /**
  * Functional route guard that ensures an active tenant is selected.
@@ -14,7 +13,7 @@ import { TenantClient } from '@services/tenant-client';
  * 3. No match in loaded tenants → redirect to /.
  */
 export const tenantGuard: CanActivateFn = async (route) => {
-  const tenantService = inject(TenantClient);
+  const tenantStore = inject(TenantStore);
   const router = inject(Router);
   const tenantId = route.paramMap.get('tenantId');
 
@@ -23,23 +22,23 @@ export const tenantGuard: CanActivateFn = async (route) => {
   }
 
   // If tenants haven't been loaded yet (page reload), fetch them first
-  if (tenantService.tenants().length === 0) {
+  if (tenantStore.tenants().length === 0) {
     try {
-      await firstValueFrom(tenantService.loadTenants());
+      await tenantStore.loadTenants();
     } catch {
       return router.parseUrl('/');
     }
   }
 
-  const activeTenant = tenantService.activeTenant();
+  const activeTenant = tenantStore.activeTenant();
 
   // If no active tenant or tenant mismatch, try to find from loaded tenants
   if (!activeTenant || activeTenant.id !== tenantId) {
-    const tenants = tenantService.tenants();
+    const tenants = tenantStore.tenants();
     const match = tenants.find((t) => t.id === tenantId);
 
     if (match) {
-      tenantService.setActiveTenant(match);
+      tenantStore.setActiveTenant(match);
       return true;
     }
 
