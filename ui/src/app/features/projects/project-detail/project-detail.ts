@@ -15,7 +15,7 @@ import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
-import { ProjectRole } from '@task-board/shared';
+import { ProjectRole, TenantRole } from '@task-board/shared';
 import type { Project, Board, ProjectMember, CreateBoard } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
@@ -59,12 +59,12 @@ export class ProjectDetail implements OnInit {
   protected newMemberUserId = '';
   protected newMemberRole = 'developer';
   protected memberToRemove: ProjectMember | null = null;
-  protected readonly projectRoles = [...ProjectRole];
+  protected readonly projectRoles = Object.values(ProjectRole);
   /** Whether the current user has admin/owner privileges */
   protected readonly isAdmin = computed(() => {
     const role = this.authStore.tenantRole();
 
-    return role === 'owner' || role === 'admin';
+    return role === TenantRole.Owner || role === TenantRole.Admin;
   });
 
   protected onDialogStateChange(state: BrnDialogState): void {

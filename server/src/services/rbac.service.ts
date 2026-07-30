@@ -1,4 +1,4 @@
-import { type TenantRole, ProjectRole } from '@task-board/shared';
+import type { TenantRole, ProjectRole } from '@task-board/shared';
 
 // ─── Permission Actions ──────────────────────────────────────────────────────
 
@@ -17,10 +17,6 @@ export type PermissionAction =
   | 'manage_sprint'
   | 'view_project'
   | 'manage_project_members';
-
-// ─── Role Hierarchies ────────────────────────────────────────────────────────
-
-type ProjectRoleType = (typeof ProjectRole)[number];
 
 // ─── Permission Matrix ───────────────────────────────────────────────────────
 
@@ -42,7 +38,7 @@ const tenantPermissions: Record<string, TenantRole[]> = {
  * Maps action → allowed project roles.
  * Tenant owners and tenant admins bypass project-level restrictions.
  */
-const projectPermissions: Record<string, ProjectRoleType[]> = {
+const projectPermissions: Record<string, ProjectRole[]> = {
   view_project: ['admin', 'developer', 'viewer'],
   manage_project_members: ['admin'],
   create_task: ['admin', 'developer'],
@@ -73,7 +69,7 @@ export class RbacService {
    */
   can(
     tenantRole: TenantRole | string,
-    projectRole: ProjectRoleType | string | null | undefined,
+    projectRole: ProjectRole | string | null | undefined,
     action: PermissionAction,
   ): boolean {
     // ── Tenant-level-only actions ──────────────────────────────────────────
@@ -124,6 +120,6 @@ export class RbacService {
       return false;
     }
 
-    return allowedRoles.includes(projectRole as ProjectRoleType);
+    return allowedRoles.includes(projectRole as ProjectRole);
   }
 }
