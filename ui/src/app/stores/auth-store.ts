@@ -1,4 +1,8 @@
-import { Service, signal, computed } from '@angular/core';
+import { Service, signal, computed, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { API_BASE_URL } from '@app/api-url.token';
+import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
 import type { User, AuthResponse } from '@task-board/shared';
 
 const TOKEN_KEY = 'taskboard_token';
@@ -15,6 +19,8 @@ interface JwtPayload {
  */
 @Service()
 export class AuthStore {
+  private readonly http = inject(HttpClient);
+  private readonly apiBaseUrl = inject(API_BASE_URL);
   readonly currentUser = signal<User | null>(null);
   readonly token = signal<string | null>(null);
   readonly tenantId = signal<string | null>(null);
@@ -37,6 +43,32 @@ export class AuthStore {
       this.token.set(stored);
       this.decodeJwtPayload(stored);
     }
+  }
+
+  /** Log in with email/password and store the result */
+  login(email: string, password: string): void {
+    this.http.post<AuthResponse>(`${this.apiBaseUrl}/auth/login`, { email, password }).subscribe({
+      next: (res) => this.setSession(res),
+      error: (err) => {
+        throw err;
+      },
+    });
+  }
+
+  /** Register a new user and store the result */
+  register(displayName: string, email: string, password: string): void {
+    this.http
+      .post<AuthResponse>(`${this.apiBaseUrl}/auth/register`, {
+        displayName,
+        email,
+        password,
+      })
+      .subscribe({
+        next: (res) => this.setSession(res),
+        error: (err) => {
+          throw err;
+        },
+      });
   }
 
   /** Clear all auth state and localStorage */
@@ -89,5 +121,22 @@ export class AuthStore {
       this.tenantId.set(null);
       this.tenantRole.set(null);
     }
+  }
+
+  /** Fetch the current user using the stored token. Returns an Observable. */
+  fetchCurrentUser(): Observable<User> {
+    return this.http.get<User>(`${this.apiBaseUrl}/auth/me`).pipe(
+      tap({
+        next: (user) => this.currentUser.set(user),
+        error: (err) => {
+          // Only clear session on 401 (invalid/expired token).
+          // For other errors (network, 500, etc.) keep the token so the
+          // user stays logged in.
+          if (err.status === 401) {
+            this.logout();
+          }
+        },
+      }),
+    );
   }
 }

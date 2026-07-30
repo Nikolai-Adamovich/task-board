@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
 import { AuthStore } from '@stores/auth-store';
-import { AuthClient } from '@services/auth-client';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * Functional route guard that redirects to /auth/login if not authenticated.
@@ -23,7 +23,6 @@ import { AuthClient } from '@services/auth-client';
  */
 export const authGuard: CanActivateFn = async () => {
   const authStore = inject(AuthStore);
-  const authClient = inject(AuthClient);
   const router = inject(Router);
 
   // Fast path: user already fully loaded (e.g. after login without page reload)
@@ -35,7 +34,7 @@ export const authGuard: CanActivateFn = async () => {
   // Call fetchCurrentUser and wait for the result before deciding.
   if (authStore.token()) {
     try {
-      await authClient.fetchCurrentUser();
+      await firstValueFrom(authStore.fetchCurrentUser());
       return true;
     } catch {
       // fetchCurrentUser already called logout() on 401 → token cleared.
