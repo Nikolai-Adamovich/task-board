@@ -5,6 +5,7 @@ import { HlmButton, provideBrnButtonConfig } from '@spartan-ng/helm/button';
 import { HlmSidebarService } from './hlm-sidebar.service';
 
 @Component({
+  // eslint-disable-next-line @angular-eslint/component-selector
   selector: 'button[hlmSidebarTrigger]',
   imports: [NgIcon],
   providers: [provideIcons({ lucidePanelLeft }), provideBrnButtonConfig({ variant: 'ghost', size: 'icon-sm' })],

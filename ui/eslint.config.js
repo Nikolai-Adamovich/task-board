@@ -41,7 +41,6 @@ export default [
         { allowConstructorOnly: true, allowEmpty: true, allowWithDecorator: true },
       ],
     },
-    ignores: ['dist/**', '.angular/**'],
   },
   // Unit test spec files are in tsconfig.spec.json (excluded from tsconfig.app.json).
   // Point them to the correct tsconfig so the ESLint project service resolves them.
@@ -68,20 +67,6 @@ export default [
       '@angular-eslint/component-selector': 'off',
       '@angular-eslint/directive-selector': 'off',
       '@angular-eslint/component-max-inline-declarations': 'off',
-    },
-  },
-  // Spartan UI library (libs/) uses 'hlm-' selectors and different code conventions.
-  // Relax project-specific rules that don't apply to generated library code.
-  {
-    files: ['**/libs/**/*.ts'],
-    rules: {
-      '@angular-eslint/component-selector': 'off',
-      '@angular-eslint/directive-selector': 'off',
-      '@angular-eslint/no-input-rename': 'off',
-      '@angular-eslint/component-max-inline-declarations': 'off',
-      '@stylistic/lines-between-class-members': 'off',
-      '@stylistic/padding-line-between-statements': 'off',
-      '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
   // Config files (playwright, vitest, etc.) are not part of any Angular project.

@@ -9,6 +9,7 @@ import { classes } from '@spartan-ng/helm/utils';
   providers: [provideIcons({ lucideLoader2 })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
+    'data-slot': 'spinner',
     role: 'status',
     '[attr.aria-label]': 'ariaLabel()',
   },
@@ -20,6 +21,7 @@ export class HlmSpinner {
    * Use provideIcons({ ... }) to register custom icons.
    */
   public readonly icon = input<string>('lucideLoader2');
+
   /** Aria label for the spinner for accessibility. */
   public readonly ariaLabel = input<string>('Loading', { alias: 'aria-label' });
 

@@ -11,17 +11,19 @@ import { classes } from '@spartan-ng/helm/utils';
 })
 export class HlmFieldDescription implements OnDestroy {
   private static _id = 0;
+
   private readonly _a11y = inject(BrnFieldA11yService, { optional: true, host: true });
+
   public readonly id = input<string>(`hlm-field-description-${HlmFieldDescription._id++}`);
+
   private _registeredId?: string;
+
   private readonly _cleanup: EffectRef | null = this._a11y
     ? effect(() => {
         const a11y = this._a11y;
-
         if (!a11y) return;
 
         const id = this.id();
-
         if (this._registeredId && this._registeredId !== id) {
           a11y.unregisterDescription(this._registeredId);
         }
