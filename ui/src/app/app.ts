@@ -1,9 +1,18 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { Header } from './shell/header/header';
+import { PreferencesStore } from './stores/preferences-store';
 
 @Component({
   selector: 'ui-root',
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, Header],
   templateUrl: './app.html',
 })
-export class App {}
+export class App {
+  constructor() {
+    // Eagerly inject the store to trigger its constructor,
+    // which restores the theme from localStorage before first paint.
+    // TODO: проверить. якобы нужно для быстрого применения темы (иначе будет мигать)
+    inject(PreferencesStore);
+  }
+}

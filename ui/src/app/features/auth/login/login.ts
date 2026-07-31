@@ -60,7 +60,7 @@ export class Login {
       return err.error?.message ?? err.message;
     }
 
-    return 'Login failed. Please try again.';
+    return 'Sign in failed. Please try again.';
   }
 
   protected onSubmit(): void {

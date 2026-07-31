@@ -1,0 +1,26 @@
+<div class="flex items-center justify-between">
+  <span class="text-sm">Zoom</span>
+  <div class="flex items-center gap-1">
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      aria-label="Zoom out"
+      [disabled]="preferencesStore.zoom() <= 25"
+      (click)="zoomOut()"
+    >
+      −
+    </button>
+    <span class="min-w-12 text-center text-sm tabular-nums" aria-live="polite"> {{ preferencesStore.zoom() }}% </span>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      aria-label="Zoom in"
+      [disabled]="preferencesStore.zoom() >= 500"
+      (click)="zoomIn()"
+    >
+      +
+    </button>
+  </div>
+</div>

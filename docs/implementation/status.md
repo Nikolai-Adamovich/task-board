@@ -1,17 +1,17 @@
 # Task Board MVP — Implementation Status
 
-> **Last updated:** 2026-07-30 **Current stage:** Phase 11 Complete — Jira-Style Dashboard
+> **Last updated:** 2026-07-31 **Current stage:** Phase 12 Complete — Header Redesign
 
 ---
 
 ## Pipeline Progress
 
-| Stage     | Status      | Artifact                     | Notes                                                                  |
-| --------- | ----------- | ---------------------------- | ---------------------------------------------------------------------- |
-| Analyst   | ✅ Approved | `technical_specification.md` | Updated to v4.0.0: user workflow, invitations, subscription tiers      |
-| Architect | ✅ Approved | `architecture.md`            | Updated to v4.0.0: invitation system, subscription model, Resend email |
-| Planner   | ✅ Approved | `plan.md`                    | Updated to v4.0.0: 122 tasks across 11 phases (28 new in Phase 10)     |
-| Developer | ✅ Complete | Source code                  | Phase 11 implemented: Jira-style dashboard with 5 adaptive states      |
+| Stage     | Status      | Artifact                     | Notes                                                                                   |
+| --------- | ----------- | ---------------------------- | --------------------------------------------------------------------------------------- |
+| Analyst   | ✅ Approved | `technical_specification.md` | Updated to v4.0.0: user workflow, invitations, subscription tiers                       |
+| Architect | ✅ Approved | `architecture.md`            | Updated to v4.0.0: invitation system, subscription model, Resend email                  |
+| Planner   | ✅ Approved | `plan.md`                    | Updated to v4.0.0: 122 tasks across 11 phases (28 new in Phase 10)                      |
+| Developer | ✅ Complete | Source code                  | Phase 12 implemented: Header redesign with user menu, themes, zoom, notifications, help |
 
 ## Phase Summary
 
@@ -28,23 +28,24 @@
 | 9     | Missing UI Features (tenant settings, member management)                     | ✅ Complete | Tenant settings, tenant members, project member management, RBAC UI                                  |
 | 10    | User Workflow Rework (invitations, subscriptions, registration)              | ✅ Complete | New registration flow, invitation system, subscription tiers, 6 new UI components                    |
 | 11    | Jira-Style Dashboard (5 adaptive states, landing page, cross-tenant queries) | ✅ Complete | Visitor landing, new-user CTA, invitation management, member/owner dashboards, access_revoked status |
+| 12    | Header Redesign (user menu, theme switcher, zoom, notifications, help pages) | ✅ Complete | Global sticky header, PreferencesStore, user-preferences API, dropdown-menu, accordion, 40 new files |
 
 ## Test Results
 
-| Package   | Framework     | Tests   | Status          |
-| --------- | ------------- | ------- | --------------- |
-| shared    | Vitest        | 215     | ✅ All pass     |
-| server    | Vitest        | 361     | ✅ All pass     |
-| ui        | Karma/Jasmine | 53      | ✅ All pass     |
-| **Total** |               | **629** | **✅ All pass** |
+| Package   | Framework     | Tests     | Status          |
+| --------- | ------------- | --------- | --------------- |
+| shared    | Vitest        | 437       | ✅ All pass     |
+| server    | Vitest        | 486       | ✅ All pass     |
+| ui        | Karma/Jasmine | 352       | ✅ All pass     |
+| **Total** |               | **1,275** | **✅ All pass** |
 
 ### Build Status
 
-| Package | Command                     | Status                                        |
-| ------- | --------------------------- | --------------------------------------------- |
-| shared  | `tsc`                       | ✅ Success                                    |
-| server  | `wrangler deploy --dry-run` | ✅ Success (2791 KiB / gzip: 386 KiB)         |
-| ui      | `ng build`                  | ✅ Success (306 kB initial / ~81 kB transfer) |
+| Package | Command                     | Status                                |
+| ------- | --------------------------- | ------------------------------------- |
+| shared  | `tsc`                       | ✅ Success                            |
+| server  | `wrangler deploy --dry-run` | ✅ Success (2791 KiB / gzip: 386 KiB) |
+| ui      | `ng build`                  | ✅ Success (~470 kB initial)          |
 
 ### Type Checking
 
@@ -317,3 +318,81 @@ None.
 | 2026-07-30 | Application-level cross-tenant aggregation     | Different tenants may be in different databases; aggregation done at service layer, not DB level                      |
 | 2026-07-30 | GET /tenants response includes role per tenant | Enables dashboard state detection on frontend without extra API calls                                                 |
 | 2026-07-30 | Root route (/) removes authGuard               | Visitor landing page accessible without authentication; individual feature routes still guarded                       |
+
+## Files Created in Phase 12
+
+### Header Redesign (28 tasks across 7 phases)
+
+**Spec & Architecture:**
+
+- `docs/implementation/header_spec.md` — Technical specification
+- `docs/implementation/header_architecture.md` — Architecture design
+- `docs/implementation/header_plan.md` — Implementation plan (28 tasks)
+
+**Shared Package (T-H002, T-H003, T-H004):**
+
+- `shared/src/schemas/user-preferences.ts` — UserPreferences Zod schemas
+- `shared/src/schemas/user-preferences.spec.ts` — Schema tests (25 tests)
+- `shared/src/contracts/user-preferences.contracts.ts` — API contracts
+- `shared/src/constants/paths.ts` — Added users.preferences path
+- `shared/src/index.ts` — Added barrel exports
+
+**Server (T-H005, T-H006, T-H007, T-H008):**
+
+- `server/src/repositories/user-preferences.repository.ts` — MongoDB data access
+- `server/src/repositories/user-preferences.repository.test.ts` — Repository tests
+- `server/src/services/user-preferences.service.ts` — Business logic
+- `server/src/services/user-preferences.service.test.ts` — Service tests
+- `server/src/routes/user-preferences.ts` — Hono route handlers
+- `server/src/routes/user-preferences.test.ts` — Route tests
+- `server/src/index.ts` — Registered user-preferences routes
+
+**Frontend — Stores & Services (T-H009, T-H010):**
+
+- `ui/src/app/services/user-preferences-client.ts` — HTTP client
+- `ui/src/app/stores/preferences-store.ts` — Signal-based store (zoom, theme, language)
+- `ui/src/app/stores/preferences-store.spec.ts` — Store tests
+
+**Frontend — Utilities (T-H011, T-H012):**
+
+- `ui/src/styles.css` — Added --header-height, --zoom, --role-* CSS variables, zoom transform
+- `ui/src/app/shell/header/role-color.util.ts` — Role-to-color mapping
+- `ui/src/app/shell/header/zoom.util.ts` — Zoom values array and navigation
+
+**Frontend — Header Components (T-H013–T-H023):**
+
+- `ui/src/app/shell/header/header-branding/` — App icon + "Task Board" link
+- `ui/src/app/shell/header/header-search/` — Search placeholder with icons
+- `ui/src/app/shell/header/sign-in-button/` — "Sign in" button (unauthenticated)
+- `ui/src/app/shell/header/user-menu/` — User dropdown menu (avatar, info, language, themes, zoom, preferences, sign
+  out)
+- `ui/src/app/shell/header/user-menu/user-menu-theme-sheet/` — Bottom sheet theme selector
+- `ui/src/app/shell/header/user-menu/user-menu-zoom-controls/` — Zoom −/+ controls
+- `ui/src/app/shell/header/notifications-button/` — Bell icon + right-side sheet
+- `ui/src/app/shell/header/help-menu/` — Help dropdown (FAQ, Docs, Support)
+- `ui/src/app/shell/header/header-actions/` — Conditional auth rendering container
+- `ui/src/app/shell/header/header.ts` — Rewritten root header component
+- `ui/src/app/shell/header/header.html` — Rewritten template
+- `ui/src/app/app.html` — Added global `<ui-header />`
+- `ui/src/app/app.ts` — Imported Header, PreferencesStore initialization
+- `ui/src/app/shell/app-shell/app-shell.html` — Removed `<ui-header />`
+- `ui/src/app/shell/app-shell/app-shell.ts` — Removed Header import, added PreferencesStore load
+
+**Frontend — Help Pages & Settings (T-H024, T-H025, T-H026):**
+
+- `ui/src/app/features/help/faq/` — FAQ page with Spartan Accordion
+- `ui/src/app/features/help/docs/` — Documentation placeholder page
+- `ui/src/app/features/help/support/` — Support contact form page
+- `ui/src/app/features/settings/` — Settings placeholder page
+- `ui/src/app/app.routes.ts` — Added /faq, /docs, /support, /settings routes
+
+**Spartan UI Components Installed (T-H001):**
+
+- `ui/libs/ui/dropdown-menu/` — 17 component files
+- `ui/libs/ui/accordion/` — 4 component files
+
+**Renaming (T-H027):**
+
+- `ui/src/app/features/auth/accept-invitation/accept-invitation.html` — "Go to Login" → "Go to Sign in"
+- `ui/src/app/features/auth/login/login.ts` — "Login failed" → "Sign in failed"
+- `ui/e2e/auth.spec.ts` — Test descriptions updated

@@ -1,0 +1,22 @@
+<hlm-sheet>
+  <button
+    hlmSheetTrigger
+    side="right"
+    hlmBtn
+    variant="ghost"
+    size="icon-sm"
+    aria-label="Notifications"
+    aria-haspopup="dialog"
+    (click)="sheetOpen.set(true)"
+  >
+    <ng-icon name="lucideBell" />
+  </button>
+  <hlm-sheet-content side="right" class="top-(--header-height) h-[calc(100vh-var(--header-height))]">
+    <hlm-sheet-header>
+      <h3 hlm-sheet-title>Notifications</h3>
+    </hlm-sheet-header>
+    <div class="p-4">
+      <p class="text-muted-foreground text-sm">No notifications</p>
+    </div>
+  </hlm-sheet-content>
+</hlm-sheet>

@@ -1,0 +1,27 @@
+<button
+  hlmBtn
+  variant="ghost"
+  size="icon-sm"
+  aria-label="Help"
+  aria-haspopup="menu"
+  [hlmDropdownMenuTrigger]="helpMenu"
+>
+  <ng-icon name="lucideCircleHelp" />
+</button>
+
+<ng-template #helpMenu>
+  <hlm-dropdown-menu>
+    <a hlmDropdownMenuItem routerLink="/faq">
+      <ng-icon name="lucideBookOpen" />
+      <span>FAQ</span>
+    </a>
+    <a hlmDropdownMenuItem routerLink="/docs">
+      <ng-icon name="lucideBookOpen" />
+      <span>Documentation</span>
+    </a>
+    <a hlmDropdownMenuItem routerLink="/support">
+      <ng-icon name="lucideLifeBuoy" />
+      <span>Support</span>
+    </a>
+  </hlm-dropdown-menu>
+</ng-template>

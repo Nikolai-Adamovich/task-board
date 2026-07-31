@@ -8,6 +8,7 @@ import { authMiddleware } from './middleware/auth.js';
 import { tenantContextMiddleware } from './middleware/tenant-context.js';
 import { routeRegistry } from './routes/index.js';
 import { createInvitationRoutes } from './routes/invitations.js';
+import { createUserPreferencesRoutes } from './routes/user-preferences.js';
 import { TaskService } from './services/task.service.js';
 import { TaskRepository } from './repositories/task.repository.js';
 import { ColumnRepository } from './repositories/column.repository.js';
@@ -75,6 +76,9 @@ app.route('/api/v1/tenants', routeRegistry.tenants);
 
 // ── Invitation routes (auth only — cross-tenant, no tenant context) ───────────
 app.route('/api/v1/invitations', createInvitationRoutes());
+
+// ── User preferences routes (auth only — no tenant context needed) ────────────
+app.route('/api/v1/users', createUserPreferencesRoutes());
 
 // ── Cross-tenant "my tasks" (auth only — no tenant context needed) ────────────
 // Must be registered BEFORE tenantContextMiddleware since it doesn't require

@@ -1,5 +1,5 @@
 /**
- * E2E tests for authentication flows: register, login, logout.
+ * E2E tests for authentication flows: register, sign in, sign out.
  *
  * These tests verify the complete auth user journey from the UI perspective.
  * They require both the Angular dev server (port 4200) and backend API (port 8787) to be running.
@@ -33,8 +33,8 @@ test.describe('Authentication', () => {
     });
   });
 
-  test.describe('Login', () => {
-    test('should display login form', async ({ page }) => {
+  test.describe('Sign in', () => {
+    test('should display sign in form', async ({ page }) => {
       await page.goto('/auth/login');
 
       // Verify the login form elements exist
@@ -42,7 +42,7 @@ test.describe('Authentication', () => {
       await expect(page.locator('input[type="password"]')).toBeVisible();
     });
 
-    test('should navigate to register page from login', async ({ page }) => {
+    test('should navigate to register page from sign in', async ({ page }) => {
       await page.goto('/auth/login');
 
       // Click the register link (if present)
@@ -55,10 +55,10 @@ test.describe('Authentication', () => {
     });
   });
 
-  test.describe('Logout', () => {
-    test('should redirect to login page after logout', async ({ page }) => {
-      // This test assumes a user is already logged in
-      // In a real E2E setup, you'd login first, then test logout
+  test.describe('Sign out', () => {
+    test('should redirect to sign in page after sign out', async ({ page }) => {
+      // This test assumes a user is already signed in
+      // In a real E2E setup, you'd sign in first, then test sign out
       await page.goto('/auth/login');
       await expect(page).toHaveURL(/\/auth\/login/);
     });

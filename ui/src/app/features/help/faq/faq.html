@@ -1,0 +1,12 @@
+<div class="mx-auto max-w-3xl px-4 py-8">
+  <h1 class="mb-6 text-2xl font-bold">Frequently Asked Questions</h1>
+
+  <hlm-accordion>
+    @for (item of faqItems; track item.question) {
+      <hlm-accordion-item>
+        <hlm-accordion-trigger>{{ item.question }}</hlm-accordion-trigger>
+        <hlm-accordion-content>{{ item.answer }}</hlm-accordion-content>
+      </hlm-accordion-item>
+    }
+  </hlm-accordion>
+</div>

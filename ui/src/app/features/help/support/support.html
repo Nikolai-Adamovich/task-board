@@ -1,0 +1,26 @@
+<div class="mx-auto max-w-3xl px-4 py-8">
+  <h1 class="mb-6 text-2xl font-bold">Support</h1>
+
+  <p class="mb-6 text-muted-foreground">
+    Have a question or need help? Fill out the form below and our support team will get back to you.
+  </p>
+
+  <form class="max-w-lg space-y-4" (submit)="$event.preventDefault()">
+    <hlm-field>
+      <label hlmFieldLabel for="support-name">Name</label>
+      <input hlmInput id="support-name" type="text" placeholder="Your name" autocomplete="name" />
+    </hlm-field>
+
+    <hlm-field>
+      <label hlmFieldLabel for="support-email">Email</label>
+      <input hlmInput id="support-email" type="email" placeholder="you&#64;example.com" autocomplete="email" />
+    </hlm-field>
+
+    <hlm-field>
+      <label hlmFieldLabel for="support-message">Message</label>
+      <textarea hlmTextarea id="support-message" rows="5" placeholder="Describe your issue or question..."></textarea>
+    </hlm-field>
+
+    <button hlmBtn type="submit">Submit</button>
+  </form>
+</div>

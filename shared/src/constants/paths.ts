@@ -17,6 +17,7 @@ export const ApiPaths = {
   users: {
     base: '/users',
     byId: '/users/:id',
+    preferences: '/users/:id/preferences',
   },
   projects: {
     base: '/projects',

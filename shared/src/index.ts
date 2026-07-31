@@ -104,6 +104,9 @@ export type { Task, CreateTask, UpdateTask, MoveTask, AssignTask, MyTask } from 
 export { SprintSchema, CreateSprintSchema, UpdateSprintSchema } from './schemas/sprint.js';
 export type { Sprint, CreateSprint, UpdateSprint } from './schemas/sprint.js';
 
+export { UserPreferencesSchema, UpdateUserPreferencesSchema } from './schemas/user-preferences.js';
+export type { UserPreferences, UpdateUserPreferences } from './schemas/user-preferences.js';
+
 // ─── Contracts ──────────────────────────────────────────────────────────────
 export type { ApiContract } from './contracts/common.contracts.js';
 export { authContracts } from './contracts/auth.contracts.js';
@@ -113,3 +116,4 @@ export { projectContracts } from './contracts/project.contracts.js';
 export { boardContracts } from './contracts/board.contracts.js';
 export { taskContracts } from './contracts/task.contracts.js';
 export { sprintContracts } from './contracts/sprint.contracts.js';
+export { userPreferencesContracts } from './contracts/user-preferences.contracts.js';

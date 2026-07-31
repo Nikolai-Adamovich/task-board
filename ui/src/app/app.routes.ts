@@ -91,6 +91,27 @@ export const routes: Routes = [
     ],
   },
 
+  // Help pages (public)
+  {
+    path: 'faq',
+    loadComponent: () => import('./features/help/faq/faq').then((m) => m.Faq),
+  },
+  {
+    path: 'docs',
+    loadComponent: () => import('./features/help/docs/docs').then((m) => m.Docs),
+  },
+  {
+    path: 'support',
+    loadComponent: () => import('./features/help/support/support').then((m) => m.Support),
+  },
+
+  // Settings (authenticated)
+  {
+    path: 'settings',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+  },
+
   // Wildcard redirect
   {
     path: '**',
