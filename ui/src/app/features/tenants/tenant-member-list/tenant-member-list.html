@@ -36,20 +36,22 @@
                 <div class="flex flex-col">
                   <span class="text-sm text-foreground">
                     {{
-                      member.status === 'pending' ? (member.invitedEmail ?? 'Pending') : (member.userId ?? 'Unknown')
+                      member.status === MemberStatus.Pending
+                        ? (member.invitedEmail ?? 'Pending')
+                        : (member.userId ?? 'Unknown')
                     }}
                   </span>
                 </div>
                 <span hlmBadge [class]="getRoleColor(member.role)">
                   {{ member.role }}
                 </span>
-                @if (member.status === 'pending') {
+                @if (member.status === MemberStatus.Pending) {
                   <span hlmBadge [class]="getStatusColor(member.status)"> Pending </span>
-                } @else if (member.status === 'active') {
+                } @else if (member.status === MemberStatus.Active) {
                   <span hlmBadge [class]="getStatusColor(member.status)"> Active </span>
-                } @else if (member.status === 'access_revoked') {
+                } @else if (member.status === MemberStatus.AccessRevoked) {
                   <span hlmBadge [class]="getStatusColor(member.status)"> Access Revoked </span>
-                } @else if (member.status === 'declined') {
+                } @else if (member.status === MemberStatus.Declined) {
                   <span hlmBadge [class]="getStatusColor(member.status)"> Declined </span>
                 }
               </div>
@@ -63,7 +65,7 @@
                     </hlm-native-select>
 
                     <!-- Revoke access button (for active or pending members) -->
-                    @if (member.status === 'active' || member.status === 'pending') {
+                    @if (member.status === MemberStatus.Active || member.status === MemberStatus.Pending) {
                       <button
                         hlmBtn
                         variant="ghost"
@@ -81,7 +83,7 @@
                     }
 
                     <!-- Resend invitation button (for pending members) -->
-                    @if (member.status === 'pending') {
+                    @if (member.status === MemberStatus.Pending) {
                       <button
                         hlmBtn
                         variant="ghost"
@@ -99,7 +101,7 @@
                     }
 
                     <!-- Hard delete button (for access_revoked or declined) -->
-                    @if (member.status === 'access_revoked' || member.status === 'declined') {
+                    @if (member.status === MemberStatus.AccessRevoked || member.status === MemberStatus.Declined) {
                       <button
                         hlmBtn
                         variant="ghost"
@@ -164,7 +166,7 @@
           <label hlmFieldLabel for="invite-role">Role</label>
           <hlm-native-select id="invite-role" [(ngModel)]="inviteRole" name="role">
             @for (role of roles; track role) {
-              @if (role !== 'owner') {
+              @if (role !== TenantRole.Owner) {
                 <option hlmNativeSelectOption [value]="role">{{ role }}</option>
               }
             }

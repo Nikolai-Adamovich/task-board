@@ -15,7 +15,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import type { TenantMember } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { TenantRole } from '@task-board/shared';
+import { MemberStatus, TenantRole } from '@task-board/shared';
 
 const roleColorMap: Record<string, string> = {
   owner: 'bg-purple-100 text-purple-700',
@@ -56,9 +56,11 @@ export class TenantMemberList implements OnInit {
   protected readonly loading = signal(true);
   protected readonly inviting = signal(false);
   protected readonly showInviteDialog = signal(false);
+  protected readonly TenantRole = TenantRole;
+  protected readonly MemberStatus = MemberStatus;
   protected readonly roles = Object.values(TenantRole);
   protected inviteEmail = '';
-  protected inviteRole = 'member';
+  protected inviteRole = TenantRole.Member;
   protected readonly removingUserId = signal<string | null>(null);
   protected readonly actioningUserId = signal<string | null>(null);
   protected readonly canManage = computed(() => {
@@ -79,7 +81,7 @@ export class TenantMemberList implements OnInit {
     if (state === 'closed') {
       this.showInviteDialog.set(false);
       this.inviteEmail = '';
-      this.inviteRole = 'member';
+      this.inviteRole = TenantRole.Member;
     }
   }
 
@@ -107,7 +109,7 @@ export class TenantMemberList implements OnInit {
         this.inviting.set(false);
         this.showInviteDialog.set(false);
         this.inviteEmail = '';
-        this.inviteRole = 'member';
+        this.inviteRole = TenantRole.Member;
         this.loadMembers();
       },
       error: () => this.inviting.set(false),
@@ -145,7 +147,7 @@ export class TenantMemberList implements OnInit {
     this.tenantClient.revokeAccess(this.tenantId(), member.userId).subscribe({
       next: () => {
         this.members.update((list) =>
-          list.map((m) => (m.userId === member.userId ? { ...m, status: 'access_revoked' as const } : m)),
+          list.map((m) => (m.userId === member.userId ? { ...m, status: MemberStatus.AccessRevoked } : m)),
         );
         this.actioningUserId.set(null);
       },

@@ -1,3 +1,4 @@
+import { TenantRole } from '@task-board/shared';
 import type { Sprint, Task, CreateSprint, UpdateSprint } from '@task-board/shared';
 import { ForbiddenError, NotFoundError, ConflictError } from '../middleware/error-handler.js';
 import { SprintRepository } from '../repositories/sprint.repository.js';
@@ -177,7 +178,7 @@ export class SprintService {
   }
 
   private requireAdmin(role: string): void {
-    if (role !== 'owner' && role !== 'admin') {
+    if (role !== TenantRole.Owner && role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can perform this action');
     }
   }

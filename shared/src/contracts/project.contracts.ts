@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HttpMethod } from '../constants/http.js';
 import { ProjectSchema, CreateProjectSchema, UpdateProjectSchema, ProjectMemberSchema } from '../schemas/project.js';
 import { ErrorResponseSchema } from '../schemas/common.js';
 import { ProjectRole } from '../constants/roles.js';
@@ -9,7 +10,7 @@ import { ProjectRole } from '../constants/roles.js';
 export const projectContracts = {
   /** Create a new project within a tenant */
   create: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/projects',
     body: CreateProjectSchema,
     response: ProjectSchema,
@@ -18,7 +19,7 @@ export const projectContracts = {
 
   /** List projects in a tenant */
   list: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/projects',
     query: z.object({
       page: z.coerce.number().int().positive().default(1),
@@ -37,7 +38,7 @@ export const projectContracts = {
 
   /** Get a project by ID */
   getById: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/projects/:id',
     response: ProjectSchema,
     error: ErrorResponseSchema,
@@ -45,7 +46,7 @@ export const projectContracts = {
 
   /** Update a project */
   update: {
-    method: 'PATCH' as const,
+    method: HttpMethod.Patch,
     path: '/projects/:id',
     body: UpdateProjectSchema,
     response: ProjectSchema,
@@ -54,7 +55,7 @@ export const projectContracts = {
 
   /** Delete a project */
   remove: {
-    method: 'DELETE' as const,
+    method: HttpMethod.Delete,
     path: '/projects/:id',
     response: z.object({ success: z.literal(true) }),
     error: ErrorResponseSchema,
@@ -62,7 +63,7 @@ export const projectContracts = {
 
   /** Add a member to a project */
   addMember: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/projects/:id/members',
     body: z.object({
       userId: z.uuid(),
@@ -74,7 +75,7 @@ export const projectContracts = {
 
   /** List members of a project */
   listMembers: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/projects/:id/members',
     response: z.object({
       data: z.array(ProjectMemberSchema),
@@ -85,7 +86,7 @@ export const projectContracts = {
 
   /** Update a member's role in a project */
   updateMember: {
-    method: 'PATCH' as const,
+    method: HttpMethod.Patch,
     path: '/projects/:id/members/:userId',
     body: z.object({
       role: z.enum(ProjectRole),
@@ -96,7 +97,7 @@ export const projectContracts = {
 
   /** Remove a member from a project */
   removeMember: {
-    method: 'DELETE' as const,
+    method: HttpMethod.Delete,
     path: '/projects/:id/members/:userId',
     response: z.object({ success: z.literal(true) }),
     error: ErrorResponseSchema,

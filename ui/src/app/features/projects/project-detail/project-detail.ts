@@ -57,7 +57,7 @@ export class ProjectDetail implements OnInit {
   protected readonly showRemoveConfirm = signal(false);
   protected readonly removingMember = signal(false);
   protected newMemberUserId = '';
-  protected newMemberRole = 'developer';
+  protected newMemberRole = ProjectRole.Developer;
   protected memberToRemove: ProjectMember | null = null;
   protected readonly projectRoles = Object.values(ProjectRole);
   /** Whether the current user has admin/owner privileges */
@@ -139,7 +139,7 @@ export class ProjectDetail implements OnInit {
         this.loadMembers();
         this.showAddMember.set(false);
         this.newMemberUserId = '';
-        this.newMemberRole = 'developer';
+        this.newMemberRole = ProjectRole.Developer;
         this.addingMember.set(false);
       },
       error: () => this.addingMember.set(false),

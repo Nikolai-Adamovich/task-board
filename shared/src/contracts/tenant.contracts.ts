@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HttpMethod } from '../constants/http.js';
 import {
   TenantSchema,
   CreateTenantSchema,
@@ -16,7 +17,7 @@ import { TenantRole } from '../constants/roles.js';
 export const tenantContracts = {
   /** Create a new tenant */
   create: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/tenants',
     body: CreateTenantSchema,
     response: TenantSchema,
@@ -25,7 +26,7 @@ export const tenantContracts = {
 
   /** List tenants for the current user */
   list: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/tenants',
     query: z.object({
       page: z.coerce.number().int().positive().default(1),
@@ -42,7 +43,7 @@ export const tenantContracts = {
 
   /** Get a tenant by ID */
   getById: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/tenants/:id',
     response: TenantSchema,
     error: ErrorResponseSchema,
@@ -50,7 +51,7 @@ export const tenantContracts = {
 
   /** Update a tenant */
   update: {
-    method: 'PATCH' as const,
+    method: HttpMethod.Patch,
     path: '/tenants/:id',
     body: UpdateTenantSchema,
     response: TenantSchema,
@@ -59,7 +60,7 @@ export const tenantContracts = {
 
   /** Delete a tenant */
   remove: {
-    method: 'DELETE' as const,
+    method: HttpMethod.Delete,
     path: '/tenants/:id',
     response: z.object({ success: z.literal(true) }),
     error: ErrorResponseSchema,
@@ -67,7 +68,7 @@ export const tenantContracts = {
 
   /** Invite a member to a tenant */
   addMember: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/tenants/:id/members',
     body: InviteMemberSchema,
     response: TenantMemberSchema,
@@ -76,7 +77,7 @@ export const tenantContracts = {
 
   /** List members of a tenant */
   listMembers: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/tenants/:id/members',
     response: z.object({
       data: z.array(TenantMemberSchema),
@@ -87,7 +88,7 @@ export const tenantContracts = {
 
   /** Update a member's role in a tenant */
   updateMember: {
-    method: 'PATCH' as const,
+    method: HttpMethod.Patch,
     path: '/tenants/:id/members/:userId',
     body: z.object({
       role: z.enum(TenantRole),
@@ -98,7 +99,7 @@ export const tenantContracts = {
 
   /** Remove a member from a tenant */
   removeMember: {
-    method: 'DELETE' as const,
+    method: HttpMethod.Delete,
     path: '/tenants/:id/members/:userId',
     response: z.object({ success: z.literal(true) }),
     error: ErrorResponseSchema,

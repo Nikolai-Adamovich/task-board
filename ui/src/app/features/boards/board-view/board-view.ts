@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
+import { TaskPriority } from '@task-board/shared';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
 import { ColumnView } from '../column-view/column-view';
@@ -54,7 +55,7 @@ export class BoardView implements OnInit {
     projectId: '',
     boardId: '',
     columnId: '',
-    priority: 'medium',
+    priority: TaskPriority.Medium,
     assigneeIds: [],
   };
 
@@ -142,7 +143,7 @@ export class BoardView implements OnInit {
           projectId: this.board()?.projectId ?? '',
           boardId: this.boardId(),
           columnId: this.columns()[0]?.id ?? '',
-          priority: 'medium',
+          priority: TaskPriority.Medium,
           assigneeIds: [],
         };
         this.creatingTask.set(false);

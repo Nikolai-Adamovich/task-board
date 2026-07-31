@@ -1,5 +1,6 @@
 import { Service, signal, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { TenantRole } from '@task-board/shared';
 import { TenantClient } from '@services/tenant-client';
 import type { TenantWithRole, CreateTenant } from '@task-board/shared';
 
@@ -44,7 +45,7 @@ export class TenantStore {
   async createTenant(data: CreateTenant): Promise<TenantWithRole> {
     const tenant = await firstValueFrom(this.tenantClient.createTenant(data));
     // Creator is always the owner
-    const tenantWithRole: TenantWithRole = { ...tenant, role: 'owner' };
+    const tenantWithRole: TenantWithRole = { ...tenant, role: TenantRole.Owner };
 
     this.tenants.update((list) => [...list, tenantWithRole]);
     this.setActiveTenant(tenantWithRole);
@@ -58,7 +59,7 @@ export class TenantStore {
   ): Promise<TenantWithRole> {
     const updated = await firstValueFrom(this.tenantClient.updateTenant(tenantId, data));
     const existing = this.tenants().find((t) => t.id === tenantId);
-    const updatedWithRole: TenantWithRole = { ...updated, role: existing?.role ?? 'member' };
+    const updatedWithRole: TenantWithRole = { ...updated, role: existing?.role ?? TenantRole.Member };
 
     if (this.activeTenant()?.id === tenantId) {
       this.activeTenant.set(updatedWithRole);

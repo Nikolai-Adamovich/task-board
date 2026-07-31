@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HttpMethod } from '../constants/http.js';
 import { UserSchema } from '../schemas/user.js';
 import { ErrorResponseSchema } from '../schemas/common.js';
 
@@ -9,7 +10,7 @@ import { ErrorResponseSchema } from '../schemas/common.js';
 export const userContracts = {
   /** Get a user by ID */
   getById: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/users/:id',
     response: UserSchema,
     error: ErrorResponseSchema,
@@ -17,7 +18,7 @@ export const userContracts = {
 
   /** List all users (admin endpoint) */
   list: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/users',
     query: z.object({
       page: z.coerce.number().int().positive().default(1),

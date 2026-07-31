@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HttpMethod } from '../constants/http.js';
 import {
   BoardSchema,
   CreateBoardSchema,
@@ -14,7 +15,7 @@ import { ErrorResponseSchema } from '../schemas/common.js';
 export const boardContracts = {
   /** Create a new board within a project */
   create: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/boards',
     body: CreateBoardSchema,
     response: BoardSchema,
@@ -23,7 +24,7 @@ export const boardContracts = {
 
   /** List boards in a project */
   list: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/boards',
     query: z.object({
       page: z.coerce.number().int().positive().default(1),
@@ -41,7 +42,7 @@ export const boardContracts = {
 
   /** Get a board by ID (includes columns) */
   getById: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/boards/:id',
     response: BoardSchema,
     error: ErrorResponseSchema,
@@ -49,7 +50,7 @@ export const boardContracts = {
 
   /** Update a board */
   update: {
-    method: 'PATCH' as const,
+    method: HttpMethod.Patch,
     path: '/boards/:id',
     body: UpdateBoardSchema,
     response: BoardSchema,
@@ -58,7 +59,7 @@ export const boardContracts = {
 
   /** Delete a board */
   remove: {
-    method: 'DELETE' as const,
+    method: HttpMethod.Delete,
     path: '/boards/:id',
     response: z.object({ success: z.literal(true) }),
     error: ErrorResponseSchema,
@@ -66,7 +67,7 @@ export const boardContracts = {
 
   /** Add a column to a board */
   addColumn: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/boards/:id/columns',
     body: CreateColumnSchema,
     response: ColumnSchema,
@@ -75,7 +76,7 @@ export const boardContracts = {
 
   /** List columns of a board */
   listColumns: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/boards/:id/columns',
     response: z.object({
       data: z.array(ColumnSchema),
@@ -86,7 +87,7 @@ export const boardContracts = {
 
   /** Update a column */
   updateColumn: {
-    method: 'PATCH' as const,
+    method: HttpMethod.Patch,
     path: '/boards/:id/columns/:columnId',
     body: z.object({
       name: z.string().min(1).max(50).optional(),
@@ -98,7 +99,7 @@ export const boardContracts = {
 
   /** Delete a column */
   removeColumn: {
-    method: 'DELETE' as const,
+    method: HttpMethod.Delete,
     path: '/boards/:id/columns/:columnId',
     response: z.object({ success: z.literal(true) }),
     error: ErrorResponseSchema,

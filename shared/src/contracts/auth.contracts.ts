@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HttpMethod } from '../constants/http.js';
 import {
   LoginRequestSchema,
   RegisterRequestSchema,
@@ -17,7 +18,7 @@ import { MyTaskSchema } from '../schemas/task.js';
 export const authContracts = {
   /** Register a new user account */
   register: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/auth/register',
     body: RegisterRequestSchema,
     response: AuthResponseSchema,
@@ -26,7 +27,7 @@ export const authContracts = {
 
   /** Log in with email and password */
   login: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/auth/login',
     body: LoginRequestSchema,
     response: AuthResponseSchema,
@@ -35,7 +36,7 @@ export const authContracts = {
 
   /** Get the currently authenticated user */
   me: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/auth/me',
     response: UserSchema,
     error: ErrorResponseSchema,
@@ -43,7 +44,7 @@ export const authContracts = {
 
   /** Accept an invitation to join a tenant */
   acceptInvitation: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/auth/accept-invitation',
     body: AcceptInvitationSchema,
     response: AuthResponseSchema,
@@ -52,7 +53,7 @@ export const authContracts = {
 
   /** Get invitation details by token */
   getInvitation: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/invitations/:token',
     response: InvitationDetailsSchema,
     error: ErrorResponseSchema,
@@ -60,7 +61,7 @@ export const authContracts = {
 
   /** Get pending invitations for the current user */
   getMyInvitations: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/invitations/my',
     response: z.array(MyInvitationSchema),
     error: ErrorResponseSchema,
@@ -68,7 +69,7 @@ export const authContracts = {
 
   /** Get all tasks assigned to the current user across tenants */
   getMyTasks: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/tasks/my',
     response: z.array(MyTaskSchema),
     error: ErrorResponseSchema,

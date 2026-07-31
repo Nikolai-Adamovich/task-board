@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
+import { MemberStatus, TenantRole } from '@task-board/shared';
 import type { TenantMember } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -66,13 +67,13 @@ export class TenantMemberRepository {
   }
 
   async findPendingByEmail(email: string): Promise<TenantMemberDocument[]> {
-    return this.collection.find({ invitedEmail: email, status: 'pending' }).toArray();
+    return this.collection.find({ invitedEmail: email, status: MemberStatus.Pending }).toArray();
   }
 
   async activateInvitation(token: string, userId: string): Promise<TenantMember | null> {
     const result = await this.collection.findOneAndUpdate(
-      { invitationToken: token, status: 'pending' },
-      { $set: { userId, status: 'active', invitedAt: null } },
+      { invitationToken: token, status: MemberStatus.Pending },
+      { $set: { userId, status: MemberStatus.Active, invitedAt: null } },
       { returnDocument: 'after' },
     );
 
@@ -80,19 +81,19 @@ export class TenantMemberRepository {
   }
 
   async findByInvitedEmailAndTenant(email: string, tenantId: string): Promise<TenantMemberDocument | null> {
-    return this.collection.findOne({ invitedEmail: email, tenantId, status: 'pending' });
+    return this.collection.findOne({ invitedEmail: email, tenantId, status: MemberStatus.Pending });
   }
 
   async countActiveByTenant(tenantId: string): Promise<number> {
-    return this.collection.countDocuments({ tenantId, status: 'active' });
+    return this.collection.countDocuments({ tenantId, status: MemberStatus.Active });
   }
 
   async countOwnedTenants(userId: string): Promise<number> {
-    return this.collection.countDocuments({ userId, role: 'owner' });
+    return this.collection.countDocuments({ userId, role: TenantRole.Owner });
   }
 
   async findPendingByTenant(tenantId: string): Promise<TenantMemberDocument[]> {
-    return this.collection.find({ tenantId, status: 'pending' }).toArray();
+    return this.collection.find({ tenantId, status: MemberStatus.Pending }).toArray();
   }
 
   async findById(id: string): Promise<TenantMemberDocument | null> {
@@ -136,10 +137,10 @@ export class TenantMemberRepository {
       userId: input.userId,
       tenantId: input.tenantId,
       role: input.role,
-      status: input.status ?? 'active',
+      status: input.status ?? MemberStatus.Active,
       invitedEmail: input.invitedEmail ?? null,
       invitationToken: input.invitationToken ?? null,
-      invitedAt: input.status === 'pending' ? new Date() : null,
+      invitedAt: input.status === MemberStatus.Pending ? new Date() : null,
       createdAt: new Date(),
     };
 

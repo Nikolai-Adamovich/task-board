@@ -18,6 +18,7 @@ import { firstValueFrom } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
+import { SubscriptionTier, TenantRole } from '@task-board/shared';
 import type { Project } from '@task-board/shared';
 
 @Component({
@@ -55,10 +56,12 @@ export class WorkspaceDetail implements OnInit {
   protected readonly isOwnerOrAdmin = computed(() => {
     const r = this.role();
 
-    return r === 'owner' || r === 'admin';
+    return r === TenantRole.Owner || r === TenantRole.Admin;
   });
-  protected readonly isOwner = computed(() => this.role() === 'owner');
-  protected readonly showUpgrade = computed(() => this.isOwner() && this.tenant()?.subscription === 'free');
+  protected readonly isOwner = computed(() => this.role() === TenantRole.Owner);
+  protected readonly showUpgrade = computed(
+    () => this.isOwner() && this.tenant()?.subscription === SubscriptionTier.Free,
+  );
 
   async ngOnInit(): Promise<void> {
     try {

@@ -13,10 +13,10 @@
     @case ('pending-invitations') {
       <ui-invitation-view [invitations]="invitations()" (invitationHandled)="onInvitationHandled()" />
     }
-    @case ('member') {
+    @case (TenantRole.Member) {
       <ui-member-dashboard [tenants]="tenants()" [tasks]="tasks()" />
     }
-    @case ('owner') {
+    @case (TenantRole.Owner) {
       <ui-owner-dashboard [tenants]="tenants()" [tasks]="tasks()" />
     }
   }

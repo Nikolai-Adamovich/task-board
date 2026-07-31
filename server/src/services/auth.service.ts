@@ -1,3 +1,4 @@
+import { MemberStatus } from '@task-board/shared';
 import type {
   User,
   AuthResponse,
@@ -127,7 +128,7 @@ export class AuthService {
 
     // Find the user's first active tenant membership for the token
     const memberships = await this.tenantMemberRepo.findByUser(userDoc.id);
-    const activeMembership = memberships.find((m) => m.status === 'active');
+    const activeMembership = memberships.find((m) => m.status === MemberStatus.Active);
     const user: User = {
       id: userDoc.id,
       email: userDoc.email,
@@ -160,7 +161,7 @@ export class AuthService {
     // Find the pending invitation by token
     const invitation = await this.tenantMemberRepo.findByInvitationToken(input.token);
 
-    if (!invitation || invitation.status !== 'pending') {
+    if (!invitation || invitation.status !== MemberStatus.Pending) {
       throw new NotFoundError('Invalid or expired invitation');
     }
 

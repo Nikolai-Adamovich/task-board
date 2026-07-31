@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { HttpMethod } from '../constants/http.js';
 import { ErrorResponseSchema, createPaginatedResponseSchema } from '../schemas/common.js';
 
 /**
@@ -7,7 +8,7 @@ import { ErrorResponseSchema, createPaginatedResponseSchema } from '../schemas/c
  */
 export interface ApiContract {
   /** HTTP method */
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method: HttpMethod;
   /** Relative path (appended to API_BASE_PATH) */
   path: string;
   /** Zod schema for the request body (undefined if no body) */

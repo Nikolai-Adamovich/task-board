@@ -1,4 +1,4 @@
-import type { TenantRole, ProjectRole } from '@task-board/shared';
+import { TenantRole, ProjectRole } from '@task-board/shared';
 
 // ─── Permission Actions ──────────────────────────────────────────────────────
 
@@ -25,13 +25,13 @@ export type PermissionAction =
  * Maps action → allowed tenant roles.
  */
 const tenantPermissions: Record<string, TenantRole[]> = {
-  manage_tenant: ['owner'],
-  create_project: ['owner', 'admin'],
-  delete_project: ['owner', 'admin'],
-  create_sprint: ['owner', 'admin'],
-  manage_sprint: ['owner', 'admin'],
-  crud_boards: ['owner', 'admin'],
-  crud_columns: ['owner', 'admin'],
+  manage_tenant: [TenantRole.Owner],
+  create_project: [TenantRole.Owner, TenantRole.Admin],
+  delete_project: [TenantRole.Owner, TenantRole.Admin],
+  create_sprint: [TenantRole.Owner, TenantRole.Admin],
+  manage_sprint: [TenantRole.Owner, TenantRole.Admin],
+  crud_boards: [TenantRole.Owner, TenantRole.Admin],
+  crud_columns: [TenantRole.Owner, TenantRole.Admin],
 };
 /**
  * Permission matrix for project-level actions.
@@ -39,13 +39,13 @@ const tenantPermissions: Record<string, TenantRole[]> = {
  * Tenant owners and tenant admins bypass project-level restrictions.
  */
 const projectPermissions: Record<string, ProjectRole[]> = {
-  view_project: ['admin', 'developer', 'viewer'],
-  manage_project_members: ['admin'],
-  create_task: ['admin', 'developer'],
-  edit_own_task: ['admin', 'developer'],
-  edit_any_task: ['admin'],
-  move_task: ['admin', 'developer'],
-  assign_task: ['admin', 'developer'],
+  view_project: [ProjectRole.Admin, ProjectRole.Developer, ProjectRole.Viewer],
+  manage_project_members: [ProjectRole.Admin],
+  create_task: [ProjectRole.Admin, ProjectRole.Developer],
+  edit_own_task: [ProjectRole.Admin, ProjectRole.Developer],
+  edit_any_task: [ProjectRole.Admin],
+  move_task: [ProjectRole.Admin, ProjectRole.Developer],
+  assign_task: [ProjectRole.Admin, ProjectRole.Developer],
 };
 
 // ─── RBAC Service ────────────────────────────────────────────────────────────
@@ -79,12 +79,12 @@ export class RbacService {
 
     // ── Project-level actions ──────────────────────────────────────────────
     // Tenant owners bypass all project-level restrictions
-    if (tenantRole === 'owner') {
+    if (tenantRole === TenantRole.Owner) {
       return true;
     }
 
     // Tenant admins bypass project-level restrictions
-    if (tenantRole === 'admin') {
+    if (tenantRole === TenantRole.Admin) {
       return true;
     }
 

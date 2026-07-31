@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
+import { SprintStatus } from '@task-board/shared';
 import type { Sprint } from '@task-board/shared';
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
@@ -79,7 +80,7 @@ export class SprintRepository {
       startDate: new Date(input.startDate),
       endDate: new Date(input.endDate),
       goal: input.goal ?? null,
-      status: 'planned',
+      status: SprintStatus.Planned,
       taskIds: [],
       createdAt: now,
       updatedAt: now,

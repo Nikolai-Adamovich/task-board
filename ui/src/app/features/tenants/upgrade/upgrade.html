@@ -38,7 +38,7 @@
           <div>
             <p class="text-lg font-semibold text-foreground capitalize">{{ currentPlan() }}</p>
             <p class="text-sm text-muted-foreground">
-              @if (currentPlan() === 'free') {
+              @if (currentPlan() === SubscriptionTier.Free) {
                 Up to 3 projects, 5 users per workspace
               } @else {
                 Unlimited projects and users
@@ -81,7 +81,7 @@
           <ng-icon name="lucideArrowLeft" class="mr-1" />
           Back
         </button>
-        <button hlmBtn (click)="upgrade()" [disabled]="upgrading() || currentPlan() === 'premium'">
+        <button hlmBtn (click)="upgrade()" [disabled]="upgrading() || currentPlan() === SubscriptionTier.Premium">
           @if (upgrading()) {
             <hlm-spinner /> Upgrading...
           } @else {

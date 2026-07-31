@@ -1,3 +1,4 @@
+import { TenantRole } from '@task-board/shared';
 import type { Column, CreateColumn } from '@task-board/shared';
 import { ForbiddenError, NotFoundError } from '../middleware/error-handler.js';
 import { ColumnRepository } from '../repositories/column.repository.js';
@@ -89,7 +90,7 @@ export class ColumnService {
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   private requireAdmin(role: string): void {
-    if (role !== 'owner' && role !== 'admin') {
+    if (role !== TenantRole.Owner && role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can perform this action');
     }
   }

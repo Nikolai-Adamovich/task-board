@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { SprintStatus } from '@task-board/shared';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
 import { SprintService } from '../services/sprint.service.js';
@@ -101,7 +102,7 @@ export function createSprintRoutes(): Hono<AppEnv> {
         startDate?: string;
         endDate?: string;
         goal?: string;
-        status?: 'planned' | 'active' | 'completed';
+        status?: SprintStatus;
       },
       userRole,
     );

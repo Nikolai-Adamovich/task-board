@@ -1,3 +1,4 @@
+import { SubscriptionTier, TenantRole, ProjectRole } from '@task-board/shared';
 import type { Project, ProjectMember, CreateProject, UpdateProject } from '@task-board/shared';
 import { ConflictError, ForbiddenError, NotFoundError } from '../middleware/error-handler.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
@@ -32,7 +33,7 @@ export class ProjectService {
     // Check subscription limit (max 3 projects per workspace for free tier)
     const tenant = await this.tenantRepo.findById(tenantId);
 
-    if (tenant && tenant.subscription === 'free') {
+    if (tenant && tenant.subscription === SubscriptionTier.Free) {
       const projectCount = await this.projectRepo.countByTenant(tenantId);
 
       if (projectCount >= 3) {
@@ -54,7 +55,7 @@ export class ProjectService {
       userId,
       projectId: project.id,
       tenantId,
-      role: 'admin',
+      role: ProjectRole.Admin,
     });
 
     return project;
@@ -190,7 +191,7 @@ export class ProjectService {
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   private requireTenantAdmin(role: string): void {
-    if (role !== 'owner' && role !== 'admin') {
+    if (role !== TenantRole.Owner && role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can perform this action');
     }
   }

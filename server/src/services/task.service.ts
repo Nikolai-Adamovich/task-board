@@ -1,3 +1,4 @@
+import { MemberStatus, TenantRole } from '@task-board/shared';
 import type { Task, CreateTask, UpdateTask, MoveTask, AssignTask, MyTask } from '@task-board/shared';
 import { ForbiddenError, NotFoundError, ValidationError } from '../middleware/error-handler.js';
 import { TaskRepository, type TaskFilters } from '../repositories/task.repository.js';
@@ -89,7 +90,7 @@ export class TaskService {
     const task = await this.requireTask(tenantId, id);
 
     // Members can only edit their own tasks
-    if (userRole === 'member' && task.createdBy !== userId) {
+    if (userRole === TenantRole.Member && task.createdBy !== userId) {
       throw new ForbiddenError('You can only edit your own tasks');
     }
 
@@ -182,7 +183,7 @@ export class TaskService {
   async getMyTasks(userId: string): Promise<MyTask[]> {
     // 1. Get all active tenant memberships for the user
     const memberships = await this.tenantMemberRepo.findByUser(userId);
-    const activeTenantIds = memberships.filter((m) => m.status === 'active').map((m) => m.tenantId);
+    const activeTenantIds = memberships.filter((m) => m.status === MemberStatus.Active).map((m) => m.tenantId);
 
     if (activeTenantIds.length === 0) return [];
 
@@ -254,7 +255,7 @@ export class TaskService {
   }
 
   private requireAdmin(role: string): void {
-    if (role !== 'owner' && role !== 'admin') {
+    if (role !== TenantRole.Owner && role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can perform this action');
     }
   }

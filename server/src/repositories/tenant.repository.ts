@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
+import { SubscriptionTier } from '@task-board/shared';
 import type { Tenant } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -63,7 +64,7 @@ export class TenantRepository {
       name: input.name,
       slug: input.slug,
       description: input.description ?? null,
-      subscription: input.subscription ?? 'free',
+      subscription: input.subscription ?? SubscriptionTier.Free,
       createdAt: now,
       updatedAt: now,
     };

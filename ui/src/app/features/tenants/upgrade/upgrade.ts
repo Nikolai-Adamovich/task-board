@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideCheck, lucideArrowLeft, lucideCrown } from '@ng-icons/lucide';
+import { SubscriptionTier } from '@task-board/shared';
 import { TenantStore } from '@stores/tenant-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -16,6 +17,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
   templateUrl: './upgrade.html',
 })
 export class Upgrade implements OnInit {
+  protected readonly SubscriptionTier = SubscriptionTier;
   private readonly router = inject(Router);
   private readonly tenantStore = inject(TenantStore);
   protected readonly upgrading = signal(false);
@@ -24,12 +26,12 @@ export class Upgrade implements OnInit {
   protected readonly currentPlan = computed(() => {
     const tenant = this.tenantStore.activeTenant();
 
-    return tenant?.subscription ?? 'free';
+    return tenant?.subscription ?? SubscriptionTier.Free;
   });
 
   ngOnInit(): void {
     // If already premium, show success state
-    if (this.currentPlan() === 'premium') {
+    if (this.currentPlan() === SubscriptionTier.Premium) {
       this.success.set(true);
     }
   }
@@ -42,7 +44,7 @@ export class Upgrade implements OnInit {
     this.upgrading.set(true);
     this.error.set('');
 
-    this.tenantStore.updateTenant(tenant.id, { subscription: 'premium' }).then(
+    this.tenantStore.updateTenant(tenant.id, { subscription: SubscriptionTier.Premium }).then(
       () => {
         this.success.set(true);
         this.upgrading.set(false);

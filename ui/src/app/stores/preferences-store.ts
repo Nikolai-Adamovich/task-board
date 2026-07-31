@@ -1,5 +1,6 @@
 import { Service, signal, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { Theme } from '@task-board/shared';
 import { UserPreferencesClient } from '@services/user-preferences-client';
 import { AuthStore } from '@stores/auth-store';
 import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
@@ -17,7 +18,7 @@ export class PreferencesStore {
   private readonly client = inject(UserPreferencesClient);
   private readonly authStore = inject(AuthStore);
   readonly zoom = signal<number>(100);
-  readonly theme = signal<'light' | 'dark'>('light');
+  readonly theme = signal<Theme>(Theme.Light);
   readonly language = signal<string>('en');
   private zoomDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -29,9 +30,9 @@ export class PreferencesStore {
   restoreThemeFromLocalStorage(): void {
     const stored = localStorage.getItem(THEME_KEY);
 
-    if (stored === 'dark') {
-      this.theme.set('dark');
-      document.documentElement.classList.add('dark');
+    if (stored === Theme.Dark) {
+      this.theme.set(Theme.Dark);
+      document.documentElement.classList.add(Theme.Dark);
     }
   }
 
@@ -54,13 +55,13 @@ export class PreferencesStore {
   }
 
   /** Set theme, toggle CSS class, sync localStorage, and save immediately to backend. */
-  setTheme(theme: 'light' | 'dark'): void {
+  setTheme(theme: Theme): void {
     this.theme.set(theme);
 
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
+    if (theme === Theme.Dark) {
+      document.documentElement.classList.add(Theme.Dark);
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove(Theme.Dark);
     }
 
     localStorage.setItem(THEME_KEY, theme);
@@ -80,10 +81,10 @@ export class PreferencesStore {
 
     document.documentElement.style.setProperty('--zoom', String(prefs.zoom / 100));
 
-    if (prefs.theme === 'dark') {
-      document.documentElement.classList.add('dark');
+    if (prefs.theme === Theme.Dark) {
+      document.documentElement.classList.add(Theme.Dark);
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove(Theme.Dark);
     }
 
     localStorage.setItem(THEME_KEY, prefs.theme);

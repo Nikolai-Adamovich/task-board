@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { ExpandState, SubscriptionTier } from '@task-board/shared';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideGlobe, lucideLogOut, lucidePalette, lucideSettings } from '@ng-icons/lucide';
@@ -38,11 +39,14 @@ import { UserMenuZoomControls } from './user-menu-zoom-controls/user-menu-zoom-c
   templateUrl: './user-menu.html',
 })
 export class UserMenu {
+  protected readonly ExpandState = ExpandState;
   private readonly authStore = inject(AuthStore);
   private readonly tenantStore = inject(TenantStore);
   protected readonly user = computed(() => this.authStore.currentUser());
   protected readonly role = computed(() => this.authStore.tenantRole());
-  protected readonly subscription = computed(() => this.tenantStore.activeTenant()?.subscription ?? 'free');
+  protected readonly subscription = computed(
+    () => this.tenantStore.activeTenant()?.subscription ?? SubscriptionTier.Free,
+  );
   protected readonly roleColor = computed(() => getRoleColor(this.role()));
   protected readonly roleLabel = computed(() => {
     const r = this.role();
@@ -61,7 +65,7 @@ export class UserMenu {
       .toUpperCase()
       .slice(0, 2);
   });
-  protected readonly themeSheetOpen = signal<'open' | 'closed'>('closed');
+  protected readonly themeSheetOpen = signal<ExpandState>(ExpandState.Closed);
 
   protected logout(): void {
     this.authStore.logout();

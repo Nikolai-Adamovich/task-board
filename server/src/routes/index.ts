@@ -7,6 +7,7 @@
 
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
+import { TenantRole } from '@task-board/shared';
 import { requireRole } from '../middleware/rbac.js';
 import { createAuthRoutes } from './auth.js';
 import { createTenantRoutes } from './tenants.js';
@@ -42,7 +43,7 @@ export const routeRegistry = {
   projects: (() => {
     const router = new Hono<AppEnv>();
 
-    router.use('/*', requireRole('owner', 'admin', 'member'));
+    router.use('/*', requireRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Member));
     router.route('/', createProjectRoutes());
     return router;
   })(),
@@ -51,7 +52,7 @@ export const routeRegistry = {
   boards: (() => {
     const router = new Hono<AppEnv>();
 
-    router.use('/*', requireRole('owner', 'admin', 'member'));
+    router.use('/*', requireRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Member));
 
     // Mount board CRUD routes
     router.route('/', createBoardRoutes());
@@ -66,7 +67,7 @@ export const routeRegistry = {
   tasks: (() => {
     const router = new Hono<AppEnv>();
 
-    router.use('/*', requireRole('owner', 'admin', 'member'));
+    router.use('/*', requireRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Member));
     router.route('/', createTaskRoutes());
     return router;
   })(),
@@ -75,7 +76,7 @@ export const routeRegistry = {
   sprints: (() => {
     const router = new Hono<AppEnv>();
 
-    router.use('/*', requireRole('owner', 'admin', 'member'));
+    router.use('/*', requireRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Member));
     router.route('/', createSprintRoutes());
     return router;
   })(),

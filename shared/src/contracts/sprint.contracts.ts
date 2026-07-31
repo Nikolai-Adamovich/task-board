@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { HttpMethod } from '../constants/http.js';
+import { SprintStatusSchema } from '../constants/roles.js';
 import { SprintSchema, CreateSprintSchema, UpdateSprintSchema } from '../schemas/sprint.js';
 import { ErrorResponseSchema } from '../schemas/common.js';
 
@@ -8,7 +10,7 @@ import { ErrorResponseSchema } from '../schemas/common.js';
 export const sprintContracts = {
   /** Create a new sprint within a project */
   create: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/sprints',
     body: CreateSprintSchema,
     response: SprintSchema,
@@ -17,13 +19,13 @@ export const sprintContracts = {
 
   /** List sprints in a project */
   list: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/sprints',
     query: z.object({
       page: z.coerce.number().int().positive().default(1),
       limit: z.coerce.number().int().min(1).max(100).default(20),
       projectId: z.uuid(),
-      status: z.enum(['planned', 'active', 'completed']).optional(),
+      status: SprintStatusSchema.optional(),
     }),
     response: z.object({
       data: z.array(SprintSchema),
@@ -36,7 +38,7 @@ export const sprintContracts = {
 
   /** Get a sprint by ID */
   getById: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/sprints/:id',
     response: SprintSchema,
     error: ErrorResponseSchema,
@@ -44,7 +46,7 @@ export const sprintContracts = {
 
   /** Update a sprint */
   update: {
-    method: 'PATCH' as const,
+    method: HttpMethod.Patch,
     path: '/sprints/:id',
     body: UpdateSprintSchema,
     response: SprintSchema,
@@ -53,7 +55,7 @@ export const sprintContracts = {
 
   /** Delete a sprint */
   remove: {
-    method: 'DELETE' as const,
+    method: HttpMethod.Delete,
     path: '/sprints/:id',
     response: z.object({ success: z.literal(true) }),
     error: ErrorResponseSchema,

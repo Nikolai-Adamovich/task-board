@@ -23,8 +23,10 @@ export {
   SubscriptionTierValues,
 } from './constants/roles.js';
 export { DefaultColumnNames } from './constants/columns.js';
-export { HttpMethod } from './constants/http.js';
+export { ExpandState } from './constants/expand-state.js';
+export { HttpMethod, HttpMethodSchema, HttpMethodValues } from './constants/http.js';
 export { API_BASE_PATH, ApiPaths } from './constants/paths.js';
+export { Theme, ThemeSchema, ThemeValues } from './constants/theme.js';
 
 // ─── Validators ─────────────────────────────────────────────────────────────
 export { uuid } from './validators/uuid.js';

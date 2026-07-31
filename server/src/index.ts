@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { HttpMethod } from '@task-board/shared';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import type { AppEnv } from './types/context.js';
@@ -34,7 +35,7 @@ app.use('*', async (c, next) => {
   const allowedOrigins = c.env?.ALLOWED_ORIGINS ?? '*';
   const corsMiddleware = cors({
     origin: allowedOrigins === '*' ? '*' : allowedOrigins.split(',').map((o: string) => o.trim()),
-    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowMethods: [...(Object.values(HttpMethod) as string[]), 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
     maxAge: 86400,
   });

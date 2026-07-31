@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Theme, ThemeSchema } from '../constants/theme.js';
 
 /**
  * User preferences schema.
@@ -7,7 +8,7 @@ import { z } from 'zod';
 export const UserPreferencesSchema = z.object({
   userId: z.uuid(),
   zoom: z.number().int().min(25).max(500).default(100),
-  theme: z.enum(['light', 'dark']).default('light'),
+  theme: ThemeSchema.default(Theme.Light),
   language: z.string().min(2).max(10).default('en'),
   updatedAt: z.iso.datetime(),
 });
@@ -21,7 +22,7 @@ export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
  */
 export const UpdateUserPreferencesSchema = z.object({
   zoom: z.number().int().min(25).max(500).optional(),
-  theme: z.enum(['light', 'dark']).optional(),
+  theme: ThemeSchema.optional(),
   language: z.string().min(2).max(10).optional(),
 });
 

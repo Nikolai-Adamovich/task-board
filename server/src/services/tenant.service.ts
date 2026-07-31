@@ -1,3 +1,4 @@
+import { MemberStatus, SubscriptionTier, TenantRole } from '@task-board/shared';
 import type {
   Tenant,
   TenantMember,
@@ -32,9 +33,9 @@ export class TenantService {
   async createTenant(userId: string, input: CreateTenant): Promise<Tenant> {
     // Check subscription limit: free plan allows only one owned workspace
     const ownedCount = await this.tenantMemberRepo.countOwnedTenants(userId);
-    const subscription = input.subscription ?? 'free';
+    const subscription = input.subscription ?? SubscriptionTier.Free;
 
-    if (ownedCount >= 1 && subscription === 'free') {
+    if (ownedCount >= 1 && subscription === SubscriptionTier.Free) {
       throw new ForbiddenError('Free plan allows only one workspace. Upgrade to premium for more.');
     }
 
@@ -51,8 +52,8 @@ export class TenantService {
     await this.tenantMemberRepo.create({
       userId,
       tenantId: tenant.id,
-      role: 'owner',
-      status: 'active',
+      role: TenantRole.Owner,
+      status: MemberStatus.Active,
     });
 
     return tenant;
@@ -66,7 +67,7 @@ export class TenantService {
     const tenants: Tenant[] = [];
 
     for (const membership of memberships) {
-      if (membership.status !== 'active') continue;
+      if (membership.status !== MemberStatus.Active) continue;
 
       const tenant = await this.tenantRepo.findById(membership.tenantId);
 
@@ -96,7 +97,7 @@ export class TenantService {
   async updateTenant(userId: string, id: string, input: UpdateTenant): Promise<Tenant> {
     const membership = await this.requireMembership(userId, id);
 
-    if (membership.role !== 'owner' && membership.role !== 'admin') {
+    if (membership.role !== TenantRole.Owner && membership.role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can update the tenant');
     }
 
@@ -124,7 +125,7 @@ export class TenantService {
   async deleteTenant(userId: string, id: string): Promise<void> {
     const membership = await this.requireMembership(userId, id);
 
-    if (membership.role !== 'owner') {
+    if (membership.role !== TenantRole.Owner) {
       throw new ForbiddenError('Only the owner can delete the tenant');
     }
 
@@ -155,7 +156,7 @@ export class TenantService {
     // 1. Check requester is owner/admin
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
+    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can invite members');
     }
 
@@ -164,7 +165,7 @@ export class TenantService {
 
     if (!tenant) throw new NotFoundError('Tenant not found');
 
-    if (tenant.subscription === 'free') {
+    if (tenant.subscription === SubscriptionTier.Free) {
       const activeCount = await this.tenantMemberRepo.countActiveByTenant(tenantId);
 
       if (activeCount >= 10) {
@@ -185,7 +186,7 @@ export class TenantService {
     if (existingUser) {
       const existingMember = await this.tenantMemberRepo.findByUserAndTenant(existingUser.id, tenantId);
 
-      if (existingMember && existingMember.status === 'active') {
+      if (existingMember && existingMember.status === MemberStatus.Active) {
         throw new ConflictError('User is already a member of this tenant');
       }
     }
@@ -198,7 +199,7 @@ export class TenantService {
       userId: existingUser?.id ?? null,
       tenantId,
       role,
-      status: 'pending',
+      status: MemberStatus.Pending,
       invitedEmail: email,
       invitationToken,
     });
@@ -228,14 +229,14 @@ export class TenantService {
   async updateMemberRole(requesterId: string, tenantId: string, userId: string, role: string): Promise<TenantMember> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
+    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can update member roles');
     }
 
     // Cannot change the owner's role
     const targetMembership = await this.requireMembership(userId, tenantId);
 
-    if (targetMembership.role === 'owner') {
+    if (targetMembership.role === TenantRole.Owner) {
       throw new ForbiddenError("Cannot change the owner's role");
     }
 
@@ -255,14 +256,14 @@ export class TenantService {
   async removeMember(requesterId: string, tenantId: string, userId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
+    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can remove members');
     }
 
     // Cannot remove the owner
     const targetMembership = await this.requireMembership(userId, tenantId);
 
-    if (targetMembership.role === 'owner') {
+    if (targetMembership.role === TenantRole.Owner) {
       throw new ForbiddenError('Cannot remove the owner from the tenant');
     }
 
@@ -284,7 +285,7 @@ export class TenantService {
     const result: TenantWithRole[] = [];
 
     for (const m of memberships) {
-      if (m.status !== 'active') continue;
+      if (m.status !== MemberStatus.Active) continue;
 
       const tenant = await this.tenantRepo.findById(m.tenantId);
 
@@ -304,7 +305,7 @@ export class TenantService {
     const result: MyInvitation[] = [];
 
     for (const m of memberships) {
-      if (m.status !== 'pending') continue;
+      if (m.status !== MemberStatus.Pending) continue;
 
       const tenant = await this.tenantRepo.findById(m.tenantId);
 
@@ -329,7 +330,7 @@ export class TenantService {
   async getPendingInvitationsByTenant(requesterId: string, tenantId: string): Promise<PendingInvitation[]> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
+    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can view pending invitations');
     }
 
@@ -357,7 +358,7 @@ export class TenantService {
       throw new NotFoundError('Invitation not found');
     }
 
-    if (membership.status !== 'pending') {
+    if (membership.status !== MemberStatus.Pending) {
       throw new ConflictError('Invitation is no longer pending');
     }
 
@@ -366,7 +367,7 @@ export class TenantService {
       throw new ForbiddenError('You can only decline your own invitations');
     }
 
-    await this.tenantMemberRepo.updateStatusById(invitationId, 'declined');
+    await this.tenantMemberRepo.updateStatusById(invitationId, MemberStatus.Declined);
   }
 
   /**
@@ -375,7 +376,7 @@ export class TenantService {
   async revokeAccess(requesterId: string, tenantId: string, memberId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
+    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can revoke access');
     }
 
@@ -386,11 +387,11 @@ export class TenantService {
     }
 
     // Cannot revoke the owner's access
-    if (membership.role === 'owner') {
+    if (membership.role === TenantRole.Owner) {
       throw new ForbiddenError("Cannot revoke the owner's access");
     }
 
-    await this.tenantMemberRepo.updateStatusById(memberId, 'access_revoked');
+    await this.tenantMemberRepo.updateStatusById(memberId, MemberStatus.AccessRevoked);
   }
 
   /**
@@ -400,7 +401,7 @@ export class TenantService {
   async resendInvitation(requesterId: string, tenantId: string, memberId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
+    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can resend invitations');
     }
 
@@ -415,7 +416,7 @@ export class TenantService {
     const invitationToken = randomUUID();
 
     // Update the membership with new token and reset to pending
-    await this.tenantMemberRepo.updateStatusById(memberId, 'pending');
+    await this.tenantMemberRepo.updateStatusById(memberId, MemberStatus.Pending);
 
     // Note: We also need to update the invitationToken — using the raw collection approach
     // For now, we'll re-create the logic inline. In a real app, you'd add an updateToken method.
@@ -446,7 +447,7 @@ export class TenantService {
   async hardDeleteMember(requesterId: string, tenantId: string, memberId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== 'owner' && requesterMembership.role !== 'admin') {
+    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can permanently remove members');
     }
 
@@ -457,7 +458,7 @@ export class TenantService {
     }
 
     // Cannot hard-delete the owner
-    if (membership.role === 'owner') {
+    if (membership.role === TenantRole.Owner) {
       throw new ForbiddenError('Cannot permanently remove the owner');
     }
 
@@ -469,7 +470,7 @@ export class TenantService {
   private async requireMembership(userId: string, tenantId: string): Promise<TenantMember> {
     const membership = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
 
-    if (!membership || membership.status !== 'active') {
+    if (!membership || membership.status !== MemberStatus.Active) {
       throw new ForbiddenError('You are not a member of this tenant');
     }
     return membership;

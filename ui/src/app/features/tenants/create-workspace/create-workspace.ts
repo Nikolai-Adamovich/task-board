@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { SubscriptionTier, TenantRole } from '@task-board/shared';
 import { form, FormField, submit, schema, required, minLength, maxLength } from '@angular/forms/signals';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
@@ -54,10 +55,10 @@ export class CreateWorkspace {
             const tenant = await this.tenantStore.createTenant({
               name: this.model().name,
               slug: this.model().slug,
-              subscription: 'free',
+              subscription: SubscriptionTier.Free,
             });
 
-            this.authStore.setTenantContext(tenant.id, 'owner');
+            this.authStore.setTenantContext(tenant.id, TenantRole.Owner);
 
             await this.router.navigateByUrl('/');
           } catch (err) {

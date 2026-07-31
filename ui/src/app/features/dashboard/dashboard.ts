@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { TenantRole } from '@task-board/shared';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
 import { TenantClient } from '@services/tenant-client';
@@ -13,7 +14,8 @@ import { InvitationView } from './invitation-view/invitation-view';
 import { MemberDashboard } from './member-dashboard/member-dashboard';
 import { OwnerDashboard } from './owner-dashboard/owner-dashboard';
 
-type DashboardState = 'visitor' | 'new-user' | 'pending-invitations' | 'member' | 'owner';
+type DashboardState =
+  'visitor' | 'new-user' | 'pending-invitations' | typeof TenantRole.Member | typeof TenantRole.Owner;
 
 @Component({
   selector: 'ui-dashboard',
@@ -21,6 +23,7 @@ type DashboardState = 'visitor' | 'new-user' | 'pending-invitations' | 'member' 
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
+  protected readonly TenantRole = TenantRole;
   private readonly authStore = inject(AuthStore);
   private readonly tenantStore = inject(TenantStore);
   private readonly tenantClient = inject(TenantClient);
@@ -33,8 +36,8 @@ export class Dashboard implements OnInit {
     if (!this.authStore.isAuthenticated()) return 'visitor';
     if (this.invitations().length > 0 && this.tenants().length === 0) return 'pending-invitations';
     if (this.tenants().length === 0) return 'new-user';
-    if (this.tenants().some((t) => t.role === 'owner')) return 'owner';
-    return 'member';
+    if (this.tenants().some((t) => t.role === TenantRole.Owner)) return TenantRole.Owner;
+    return TenantRole.Member;
   });
 
   async ngOnInit(): Promise<void> {

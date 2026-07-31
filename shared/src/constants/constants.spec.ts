@@ -7,7 +7,6 @@
 import { describe, it, expect } from 'vitest';
 import { TenantRole, ProjectRole, TaskPriority, SprintStatus, MemberStatus, SubscriptionTier } from './roles.js';
 import { DefaultColumnNames } from './columns.js';
-import { HttpMethod } from './http.js';
 import { API_BASE_PATH, ApiPaths } from './paths.js';
 
 // ─── TenantRole ──────────────────────────────────────────────────────────────
@@ -191,32 +190,6 @@ describe('DefaultColumnNames', () => {
 });
 
 // ─── HttpMethod ──────────────────────────────────────────────────────────────
-
-describe('HttpMethod', () => {
-  it('should have exactly four HTTP methods', () => {
-    expect(HttpMethod).toHaveLength(4);
-  });
-
-  it('should contain GET, POST, PATCH, DELETE', () => {
-    expect([...HttpMethod].sort()).toEqual(['DELETE', 'GET', 'PATCH', 'POST']);
-  });
-
-  it('should include GET', () => {
-    expect(HttpMethod).toContain('GET');
-  });
-
-  it('should include POST', () => {
-    expect(HttpMethod).toContain('POST');
-  });
-
-  it('should include PATCH', () => {
-    expect(HttpMethod).toContain('PATCH');
-  });
-
-  it('should include DELETE', () => {
-    expect(HttpMethod).toContain('DELETE');
-  });
-});
 
 // ─── API_BASE_PATH ───────────────────────────────────────────────────────────
 

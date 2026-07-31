@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { HttpMethod } from '../constants/http.js';
+import { TaskPrioritySchema } from '../constants/roles.js';
 import { TaskSchema, CreateTaskSchema, UpdateTaskSchema, MoveTaskSchema, AssignTaskSchema } from '../schemas/task.js';
 import { ErrorResponseSchema } from '../schemas/common.js';
 
@@ -8,7 +10,7 @@ import { ErrorResponseSchema } from '../schemas/common.js';
 export const taskContracts = {
   /** Create a new task */
   create: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/tasks',
     body: CreateTaskSchema,
     response: TaskSchema,
@@ -17,7 +19,7 @@ export const taskContracts = {
 
   /** List tasks (with optional filters) */
   list: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/tasks',
     query: z.object({
       page: z.coerce.number().int().positive().default(1),
@@ -27,7 +29,7 @@ export const taskContracts = {
       columnId: z.uuid().optional(),
       sprintId: z.uuid().optional(),
       assigneeId: z.uuid().optional(),
-      priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+      priority: TaskPrioritySchema.optional(),
       search: z.string().optional(),
     }),
     response: z.object({
@@ -41,7 +43,7 @@ export const taskContracts = {
 
   /** Get a task by ID */
   getById: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/tasks/:id',
     response: TaskSchema,
     error: ErrorResponseSchema,
@@ -49,7 +51,7 @@ export const taskContracts = {
 
   /** Update a task */
   update: {
-    method: 'PATCH' as const,
+    method: HttpMethod.Patch,
     path: '/tasks/:id',
     body: UpdateTaskSchema,
     response: TaskSchema,
@@ -58,7 +60,7 @@ export const taskContracts = {
 
   /** Delete a task */
   remove: {
-    method: 'DELETE' as const,
+    method: HttpMethod.Delete,
     path: '/tasks/:id',
     response: z.object({ success: z.literal(true) }),
     error: ErrorResponseSchema,
@@ -66,7 +68,7 @@ export const taskContracts = {
 
   /** Move a task to a different column (drag-and-drop) */
   move: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/tasks/:id/move',
     body: MoveTaskSchema,
     response: TaskSchema,
@@ -75,7 +77,7 @@ export const taskContracts = {
 
   /** Assign/unassign users to a task */
   assign: {
-    method: 'POST' as const,
+    method: HttpMethod.Post,
     path: '/tasks/:id/assign',
     body: AssignTaskSchema,
     response: TaskSchema,

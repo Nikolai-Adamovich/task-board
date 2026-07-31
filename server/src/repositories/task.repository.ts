@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
+import { TaskPriority } from '@task-board/shared';
 import type { Task } from '@task-board/shared';
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
@@ -122,7 +123,7 @@ export class TaskRepository {
       title: input.title,
       description: input.description ?? null,
       assigneeIds: input.assigneeIds ?? [],
-      priority: input.priority ?? 'medium',
+      priority: input.priority ?? TaskPriority.Medium,
       position: input.position,
       createdBy: input.createdBy,
       createdAt: now,

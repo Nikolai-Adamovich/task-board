@@ -1,4 +1,5 @@
 import { Component, inject, model } from '@angular/core';
+import { ExpandState, Theme } from '@task-board/shared';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSheetImports } from '@spartan-ng/helm/sheet';
 import { PreferencesStore } from '@stores/preferences-store';
@@ -11,10 +12,11 @@ import { PreferencesStore } from '@stores/preferences-store';
 })
 export class UserMenuThemeSheet {
   protected readonly preferencesStore = inject(PreferencesStore);
-  protected readonly open = model<'open' | 'closed'>('closed');
+  protected readonly open = model<ExpandState>(ExpandState.Closed);
+  protected readonly Theme = Theme;
 
-  protected selectTheme(theme: 'light' | 'dark'): void {
+  protected selectTheme(theme: Theme): void {
     this.preferencesStore.setTheme(theme);
-    this.open.set('closed');
+    this.open.set(ExpandState.Closed);
   }
 }

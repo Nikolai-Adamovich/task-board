@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { ForbiddenError } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';
-import type { TenantRole } from '@task-board/shared';
+import { TenantRole } from '@task-board/shared';
 
 // ─── RBAC Middleware Factory ──────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ export function requireRole(...roles: TenantRole[]) {
     }
 
     // Tenant owners bypass all restrictions
-    if (userRole === 'owner') {
+    if (userRole === TenantRole.Owner) {
       await next();
       return;
     }

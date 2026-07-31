@@ -1,3 +1,4 @@
+import { HttpMethod } from '../constants/http.js';
 import { UserPreferencesSchema, UpdateUserPreferencesSchema } from '../schemas/user-preferences.js';
 import { ErrorResponseSchema } from '../schemas/common.js';
 
@@ -7,7 +8,7 @@ import { ErrorResponseSchema } from '../schemas/common.js';
 export const userPreferencesContracts = {
   /** Get user preferences by user ID */
   get: {
-    method: 'GET' as const,
+    method: HttpMethod.Get,
     path: '/users/:id/preferences',
     response: UserPreferencesSchema,
     error: ErrorResponseSchema,
@@ -15,7 +16,7 @@ export const userPreferencesContracts = {
 
   /** Update user preferences (partial) */
   update: {
-    method: 'PUT' as const,
+    method: HttpMethod.Put,
     path: '/users/:id/preferences',
     body: UpdateUserPreferencesSchema,
     response: UserPreferencesSchema,

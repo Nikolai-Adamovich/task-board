@@ -1,4 +1,5 @@
 import type { Collection } from 'mongodb';
+import { Theme } from '@task-board/shared';
 import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -10,7 +11,7 @@ export interface UserPreferencesDocument {
   _id?: import('mongodb').ObjectId;
   userId: string;
   zoom: number;
-  theme: 'light' | 'dark';
+  theme: Theme;
   language: string;
   updatedAt: Date;
 }
@@ -53,7 +54,7 @@ export class UserPreferencesRepository {
         $setOnInsert: {
           userId,
           zoom: 100,
-          theme: 'light',
+          theme: Theme.Light,
           language: 'en',
         },
       },

@@ -1,5 +1,5 @@
+import { TenantRole, DefaultColumnNames } from '@task-board/shared';
 import type { Board, Column, CreateBoard, UpdateBoard } from '@task-board/shared';
-import { DefaultColumnNames } from '@task-board/shared';
 import { ForbiddenError, NotFoundError } from '../middleware/error-handler.js';
 import { BoardRepository } from '../repositories/board.repository.js';
 import { ColumnRepository } from '../repositories/column.repository.js';
@@ -105,7 +105,7 @@ export class BoardService {
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   private requireAdmin(role: string): void {
-    if (role !== 'owner' && role !== 'admin') {
+    if (role !== TenantRole.Owner && role !== TenantRole.Admin) {
       throw new ForbiddenError('Only owner or admin can perform this action');
     }
   }

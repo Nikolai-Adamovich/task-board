@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { MemberStatus } from '@task-board/shared';
 import { ForbiddenError, ValidationError } from './error-handler.js';
 import { getCollection } from '../db/mongo.js';
 import type { AppEnv } from '../types/context.js';
@@ -53,11 +54,11 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
   }
 
   // Check membership status
-  if (membership.status !== 'active') {
-    if (membership.status === 'pending') {
+  if (membership.status !== MemberStatus.Active) {
+    if (membership.status === MemberStatus.Pending) {
       throw new ForbiddenError('Your membership is pending. Please accept the invitation first.');
     }
-    if (membership.status === 'declined') {
+    if (membership.status === MemberStatus.Declined) {
       throw new ForbiddenError('Your membership has been declined.');
     }
     throw new ForbiddenError('Your membership is not active');
