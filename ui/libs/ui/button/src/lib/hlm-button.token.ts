@@ -10,6 +10,7 @@ const defaultConfig: BrnButtonConfig = {
   variant: 'default',
   size: 'default',
 };
+
 const BrnButtonConfigToken = new InjectionToken<BrnButtonConfig>('BrnButtonConfig');
 
 export function provideBrnButtonConfig(config: Partial<BrnButtonConfig>): ValueProvider {

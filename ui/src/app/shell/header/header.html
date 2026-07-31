@@ -1,10 +1,10 @@
-<header class="flex h-16 items-center justify-between border-b border-surface-200 bg-white px-6">
+<header class="flex h-16 items-center justify-between border-b border-border bg-background px-6">
   <div class="flex items-center gap-4">
-    <ui-tenant-switcher />
+    <button hlmSidebarTrigger aria-label="Toggle Sidebar"><!-- trigger --></button>
   </div>
   <div class="flex items-center gap-4">
     @if (authStore.currentUser(); as user) {
-      <span class="text-sm text-surface-600">{{ user.displayName }}</span>
+      <span class="text-sm text-muted-foreground">{{ user.displayName }}</span>
       <button hlmBtn variant="outline" size="sm" (click)="logout()">Logout</button>
     }
   </div>

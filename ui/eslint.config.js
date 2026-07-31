@@ -81,6 +81,7 @@ export default [
       '@angular-eslint/component-max-inline-declarations': 'off',
       '@stylistic/lines-between-class-members': 'off',
       '@stylistic/padding-line-between-statements': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
   // Config files (playwright, vitest, etc.) are not part of any Angular project.

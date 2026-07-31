@@ -1,41 +1,86 @@
-<aside class="flex h-full w-64 flex-col border-r border-surface-200 bg-surface-50">
-  <div class="flex h-16 items-center border-b border-surface-200 px-6">
-    <h1 class="text-lg font-bold text-primary-700">Task Board</h1>
-  </div>
-  <nav class="flex-1 space-y-1 px-3 py-4">
-    @if (tenantStore.activeTenant(); as tenant) {
-      <a
-        [routerLink]="['/tenants', tenant.id, 'projects']"
-        routerLinkActive="bg-primary-50 text-primary-700 font-medium"
-        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
-      >
-        <span class="i-lucide-folder h-4 w-4"></span>
-        Projects
-      </a>
-      <a
-        [routerLink]="['/tenants', tenant.id, 'sprints']"
-        routerLinkActive="bg-primary-50 text-primary-700 font-medium"
-        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
-      >
-        <span class="i-lucide-calendar h-4 w-4"></span>
-        Sprints
-      </a>
-      <a
-        [routerLink]="['/tenants', tenant.id, 'settings']"
-        routerLinkActive="bg-primary-50 text-primary-700 font-medium"
-        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
-      >
-        <span class="i-lucide-settings h-4 w-4"></span>
-        Settings
-      </a>
-      <a
-        [routerLink]="['/tenants', tenant.id, 'settings', 'members']"
-        routerLinkActive="bg-primary-50 text-primary-700 font-medium"
-        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-surface-700 transition-colors hover:bg-surface-100"
-      >
-        <span class="i-lucide-users h-4 w-4"></span>
-        Members
-      </a>
-    }
-  </nav>
-</aside>
+<div hlmSidebarWrapper>
+  <hlm-sidebar collapsible="icon">
+    <div hlmSidebarHeader>
+      <div class="flex items-center gap-2 px-2">
+        <h1 class="text-lg font-bold text-sidebar-primary group-data-[collapsible=icon]:hidden">Task Board</h1>
+        <h1 class="text-lg font-bold text-sidebar-primary hidden group-data-[collapsible=icon]:block">TB</h1>
+      </div>
+    </div>
+
+    <div hlmSidebarContent>
+      @if (tenantStore.activeTenant(); as tenant) {
+        <div hlmSidebarGroup>
+          <div hlmSidebarGroupContent>
+            <ul hlmSidebarMenu>
+              <li hlmSidebarMenuItem class="group-data-[collapsible=icon]:hidden">
+                <ui-tenant-switcher />
+              </li>
+              <li hlmSidebarMenuItem>
+                <a
+                  hlmSidebarMenuButton
+                  [routerLink]="['/tenants', tenant.id, 'projects']"
+                  routerLinkActive
+                  #rlaProjects="routerLinkActive"
+                  [isActive]="rlaProjects.isActive"
+                  tooltip="Projects"
+                  size="lg"
+                >
+                  <ng-icon name="lucideFolder" />
+                  <span class="group-data-[collapsible=icon]:hidden">Projects</span>
+                </a>
+              </li>
+              <li hlmSidebarMenuItem>
+                <a
+                  hlmSidebarMenuButton
+                  [routerLink]="['/tenants', tenant.id, 'sprints']"
+                  routerLinkActive
+                  #rlaSprints="routerLinkActive"
+                  [isActive]="rlaSprints.isActive"
+                  tooltip="Sprints"
+                  size="lg"
+                >
+                  <ng-icon name="lucideCalendar" />
+                  <span class="group-data-[collapsible=icon]:hidden">Sprints</span>
+                </a>
+              </li>
+              <li hlmSidebarMenuItem>
+                <a
+                  hlmSidebarMenuButton
+                  [routerLink]="['/tenants', tenant.id, 'settings']"
+                  routerLinkActive
+                  #rlaSettings="routerLinkActive"
+                  [isActive]="rlaSettings.isActive"
+                  tooltip="Settings"
+                  size="lg"
+                >
+                  <ng-icon name="lucideSettings" />
+                  <span class="group-data-[collapsible=icon]:hidden">Settings</span>
+                </a>
+              </li>
+              <li hlmSidebarMenuItem>
+                <a
+                  hlmSidebarMenuButton
+                  [routerLink]="['/tenants', tenant.id, 'settings', 'members']"
+                  routerLinkActive
+                  #rlaMembers="routerLinkActive"
+                  [isActive]="rlaMembers.isActive"
+                  tooltip="Members"
+                  size="lg"
+                >
+                  <ng-icon name="lucideUsers" />
+                  <span class="group-data-[collapsible=icon]:hidden">Members</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div hlmSidebarFooter>
+      <button hlmSidebarRail aria-label="Toggle Sidebar"></button>
+    </div>
+  </hlm-sidebar>
+
+  <ng-content />
+</div>

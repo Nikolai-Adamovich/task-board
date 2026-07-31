@@ -54,9 +54,12 @@ export function classes(computed: () => ClassValue[] | string, options: ClassesO
     const platformId = inject(PLATFORM_ID);
     const destroyRef = inject(DestroyRef);
     const baseClasses = inject(new HostAttributeToken('class'), { optional: true });
+
     const element = elementRef.nativeElement;
+
     // Create unique identifier for this source
     const sourceId = sourceCounter++;
+
     // Get or create the class manager for this element
     let manager = elementClassManagers.get(element);
 
@@ -99,55 +102,53 @@ export function classes(computed: () => ClassValue[] | string, options: ClassesO
 
     // Assign order once at registration time
     const sourceOrder = manager.nextOrder++;
-    // Capture manager in a const so TypeScript knows it's defined in closures
-    const mgr = manager;
 
     function updateClasses(): void {
       // Get the new classes from the computed function
       const newClasses = toClassList(computed());
 
       // Update this source's classes, keeping the original order
-      mgr.sources.set(sourceId, {
+      manager!.sources.set(sourceId, {
         classes: new Set(newClasses),
         order: sourceOrder,
       });
 
       // Update the element
-      updateElement(mgr);
+      updateElement(manager!);
 
       // Re-enable transitions after the first effect writes correct classes.
       // Deferred to next animation frame so the browser paints the class change
       // with transitions disabled first, then re-enables them.
-      if (mgr.transitionsSuppressed) {
-        mgr.transitionsSuppressed = false;
-        mgr.restoreRafId = requestAnimationFrame(() => {
-          mgr.restoreRafId = null;
-          restoreTransitionSuppression(mgr);
+      if (manager!.transitionsSuppressed) {
+        manager!.transitionsSuppressed = false;
+        manager!.restoreRafId = requestAnimationFrame(() => {
+          manager!.restoreRafId = null;
+          restoreTransitionSuppression(manager!);
         });
       }
     }
 
     // Register cleanup with DestroyRef
     destroyRef.onDestroy(() => {
-      if (mgr.restoreRafId !== null) {
-        cancelAnimationFrame(mgr.restoreRafId);
-        mgr.restoreRafId = null;
+      if (manager!.restoreRafId !== null) {
+        cancelAnimationFrame(manager!.restoreRafId);
+        manager!.restoreRafId = null;
       }
 
-      if (mgr.transitionsSuppressed) {
-        mgr.transitionsSuppressed = false;
-        restoreTransitionSuppression(mgr);
+      if (manager!.transitionsSuppressed) {
+        manager!.transitionsSuppressed = false;
+        restoreTransitionSuppression(manager!);
       }
 
       // Remove this source from the manager
-      mgr.sources.delete(sourceId);
+      manager!.sources.delete(sourceId);
 
       // If no more sources, clean up the manager
-      if (mgr.sources.size === 0) {
+      if (manager!.sources.size === 0) {
         cleanupManager(element);
       } else {
         // Update element without this source's classes
-        updateElement(mgr);
+        updateElement(manager!);
       }
     });
 
@@ -162,7 +163,6 @@ export function classes(computed: () => ClassValue[] | string, options: ClassesO
 
 function restoreTransitionSuppression(manager: ElementClassManager): void {
   const prev = manager.previousTransition;
-
   if (prev) {
     manager.element.style.setProperty('transition', prev, manager.previousTransitionPriority || undefined);
   } else {
@@ -228,9 +228,9 @@ function updateElement(manager: ElementClassManager): void {
   if (!manager.hasInitialized && manager.sources.size > 0) {
     // Get current classes on element (may include SSR classes)
     const currentClasses = toClassList(manager.element.className);
+
     // Get all classes that will be applied by sources
     const allSourceClasses = new Set<string>();
-
     for (const source of manager.sources.values()) {
       source.classes.forEach((className) => allSourceClasses.add(className));
     }
@@ -248,8 +248,8 @@ function updateElement(manager: ElementClassManager): void {
 
   // Get classes from all sources, sorted by registration order (later takes precedence)
   const sortedSources = Array.from(manager.sources.entries()).sort(([, a], [, b]) => a.order - b.order);
-  const allSourceClasses: string[] = [];
 
+  const allSourceClasses: string[] = [];
   for (const [, source] of sortedSources) {
     allSourceClasses.push(...source.classes);
   }
@@ -291,11 +291,7 @@ const classListCache = new Map<string, string[]>();
 function toClassList(className: string | ClassValue[]): string[] {
   // For simple string inputs, use cache to avoid repeated parsing
   if (typeof className === 'string' && classListCache.has(className)) {
-    const cached = classListCache.get(className);
-
-    if (cached) {
-      return cached;
-    }
+    return classListCache.get(className)!;
   }
 
   const result = clsx(className)

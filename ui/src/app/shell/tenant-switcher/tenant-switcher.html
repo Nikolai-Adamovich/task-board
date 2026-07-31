@@ -1,6 +1,6 @@
 <div class="relative">
   @if (authStore.needsWorkspace()) {
-    <button hlmBtn variant="outline" size="sm" (click)="navigateToCreate()">
+    <button hlmBtn variant="outline" size="lg" class="w-full" (click)="navigateToCreate()">
       <ng-icon name="lucidePlus" class="mr-1" />
       Create Workspace
     </button>
@@ -8,7 +8,8 @@
     <button
       hlmBtn
       variant="outline"
-      size="sm"
+      size="lg"
+      class="w-full"
       (click)="toggleDropdown()"
       aria-haspopup="listbox"
       [attr.aria-expanded]="isOpen()"
@@ -23,7 +24,7 @@
 
     @if (isOpen()) {
       <div
-        class="absolute left-0 z-50 mt-1 w-56 rounded-md border border-border bg-popover py-1 shadow-lg"
+        class="absolute left-0 z-50 mt-1 w-full rounded-md border border-border bg-popover py-1 shadow-lg"
         role="listbox"
       >
         @for (tenant of tenantStore.tenants(); track tenant.id) {
