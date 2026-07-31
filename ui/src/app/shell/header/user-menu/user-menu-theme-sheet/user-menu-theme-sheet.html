@@ -1,6 +1,6 @@
 <hlm-sheet [state]="open()" (stateChanged)="open.set($event)">
   <button hlmSheetTrigger side="bottom" class="hidden" aria-label="Open theme picker"></button>
-  <hlm-sheet-content side="bottom" role="dialog" aria-label="Choose theme">
+  <hlm-sheet-content *hlmSheetPortal="let ctx" side="bottom" role="dialog" aria-label="Choose theme">
     <hlm-sheet-header>
       <h3 hlm-sheet-title>Themes</h3>
     </hlm-sheet-header>

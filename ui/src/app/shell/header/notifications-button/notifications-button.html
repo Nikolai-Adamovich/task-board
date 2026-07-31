@@ -11,7 +11,11 @@
   >
     <ng-icon name="lucideBell" />
   </button>
-  <hlm-sheet-content side="right" class="top-(--header-height) h-[calc(100vh-var(--header-height))]">
+  <hlm-sheet-content
+    *hlmSheetPortal="let ctx"
+    side="right"
+    class="top-(--header-height) h-[calc(100vh-var(--header-height))]"
+  >
     <hlm-sheet-header>
       <h3 hlm-sheet-title>Notifications</h3>
     </hlm-sheet-header>
