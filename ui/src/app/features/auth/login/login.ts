@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { form, FormField, submit, schema, required, email } from '@angular/forms/signals';
+import { form, FormField, FormRoot, submit, schema, required, email } from '@angular/forms/signals';
 import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -18,6 +18,7 @@ interface LoginModel {
   imports: [
     RouterLink,
     FormField,
+    FormRoot,
     HlmCardImports,
     HlmFieldImports,
     HlmInputImports,

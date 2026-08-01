@@ -1,7 +1,8 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { form, FormField, submit, schema, required, minLength, maxLength } from '@angular/forms/signals';
+import { finalize } from 'rxjs';
+import { form, FormField, FormRoot, schema, required, minLength, maxLength } from '@angular/forms/signals';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -22,6 +23,7 @@ interface InvitationFormModel {
   imports: [
     RouterLink,
     FormField,
+    FormRoot,
     HlmCardImports,
     HlmFieldImports,
     HlmInputImports,
@@ -38,7 +40,6 @@ export class AcceptInvitation implements OnInit {
   private readonly tenantClient = inject(TenantClient);
   private readonly authStore = inject(AuthStore);
   protected readonly loading = signal(true);
-  protected readonly submitting = signal(false);
   protected readonly error = signal('');
   protected readonly invitation = signal<InvitationDetails | null>(null);
   private readonly token = signal('');
@@ -73,16 +74,17 @@ export class AcceptInvitation implements OnInit {
 
     this.token.set(token);
 
-    this.tenantClient.getInvitationDetails(token).subscribe({
-      next: (details) => {
-        this.invitation.set(details);
-        this.loading.set(false);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.error.set(err.error?.message ?? 'Invalid or expired invitation.');
-        this.loading.set(false);
-      },
-    });
+    this.tenantClient
+      .getInvitationDetails(token)
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (details) => {
+          this.invitation.set(details);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.error.set(err.error?.message ?? 'Invalid or expired invitation.');
+        },
+      });
   }
 
   protected async acceptAsNewUser(): Promise<void> {
@@ -98,7 +100,6 @@ export class AcceptInvitation implements OnInit {
     }
 
     this.error.set('');
-    this.submitting.set(true);
 
     this.tenantClient
       .acceptInvitation({
@@ -113,14 +114,12 @@ export class AcceptInvitation implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.error.set(err.error?.message ?? 'Failed to accept invitation.');
-          this.submitting.set(false);
         },
       });
   }
 
-  protected acceptAsExistingUser(): void {
+  protected async acceptAsExistingUser(): Promise<void> {
     this.error.set('');
-    this.submitting.set(true);
 
     this.tenantClient
       .acceptInvitation({
@@ -133,12 +132,7 @@ export class AcceptInvitation implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.error.set(err.error?.message ?? 'Failed to accept invitation.');
-          this.submitting.set(false);
         },
       });
-  }
-
-  protected onSubmit(): void {
-    submit(this.invitationForm);
   }
 }

@@ -149,34 +149,50 @@
       <hlm-dialog-header>
         <h3 hlmDialogTitle>Invite Member</h3>
       </hlm-dialog-header>
-      <form (ngSubmit)="inviteMember()" class="space-y-4">
+
+      @if (error()) {
+        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() }}
+        </div>
+      }
+
+      <form id="invite-form" [formRoot]="inviteForm" class="space-y-4">
         <hlm-field>
           <label hlmFieldLabel for="invite-email">Email</label>
           <input
             hlmInput
             id="invite-email"
             type="email"
-            [(ngModel)]="inviteEmail"
-            name="email"
-            required
+            [formField]="inviteForm.email"
             placeholder="user@example.com"
           />
+          @if (inviteForm.email().touched() && inviteForm.email().errors().length) {
+            <p hlm-field-error>{{ inviteForm.email().errors()[0].message }}</p>
+          }
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="invite-role">Role</label>
-          <hlm-native-select id="invite-role" [(ngModel)]="inviteRole" name="role">
+          <hlm-native-select id="invite-role" [formField]="inviteForm.role">
             @for (role of roles; track role) {
               @if (role !== TenantRole.Owner) {
                 <option hlmNativeSelectOption [value]="role">{{ role }}</option>
               }
             }
           </hlm-native-select>
+          @if (inviteForm.role().touched() && inviteForm.role().errors().length) {
+            <p hlm-field-error>{{ inviteForm.role().errors()[0].message }}</p>
+          }
         </hlm-field>
       </form>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-        <button hlmBtn (click)="inviteMember()" [disabled]="inviting() || !inviteEmail">
-          @if (inviting()) {
+        <button
+          hlmBtn
+          type="submit"
+          form="invite-form"
+          [disabled]="inviteForm().invalid() || inviteForm().submitting()"
+        >
+          @if (inviteForm().submitting()) {
             <hlm-spinner /> Inviting...
           } @else {
             <ng-icon name="lucideUserPlus" class="mr-1" />

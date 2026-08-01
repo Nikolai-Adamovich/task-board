@@ -12,7 +12,7 @@ export class App {
   constructor() {
     // Eagerly inject the store to trigger its constructor,
     // which restores the theme from localStorage before first paint.
-    // TODO: проверить. якобы нужно для быстрого применения темы (иначе будет мигать)
+    // TODO: check if this is needed to prevent blinking when changing theme
     inject(PreferencesStore);
   }
 }

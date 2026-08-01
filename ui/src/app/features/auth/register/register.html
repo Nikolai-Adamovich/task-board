@@ -12,7 +12,7 @@
         </div>
       }
 
-      <form id="register-form" (submit)="onSubmit(); $event.preventDefault()">
+      <form id="register-form" [formRoot]="registerForm">
         <hlm-field-group>
           <hlm-field>
             <label hlmFieldLabel for="displayName">Name</label>

@@ -21,6 +21,7 @@ import { TenantMemberList } from './tenant-member-list';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
+import { NeutralColor } from '@app/constants/priority';
 import type { TenantMember } from '@task-board/shared';
 
 const mockMembers: TenantMember[] = [
@@ -100,7 +101,7 @@ describe('TenantMemberList', () => {
     fixture.detectChanges();
   }
 
-  // ── Loading ─────────────────────────────────────────────────────────────
+  // ── Loading ─────────────────────────────────────────────────────
 
   describe('ngOnInit', () => {
     beforeEach(() => setup());
@@ -118,7 +119,7 @@ describe('TenantMemberList', () => {
     });
   });
 
-  // ── inviteMember ───────────────────────────────────────────────────────
+  // ── inviteMember ───────────────────────────────────────────────
 
   describe('inviteMember', () => {
     beforeEach(() => setup());
@@ -155,7 +156,7 @@ describe('TenantMemberList', () => {
     });
   });
 
-  // ── changeRole ─────────────────────────────────────────────────────────
+  // ── changeRole ─────────────────────────────────────────────────
 
   describe('changeRole', () => {
     beforeEach(() => setup());
@@ -176,7 +177,7 @@ describe('TenantMemberList', () => {
     });
   });
 
-  // ── removeMember ───────────────────────────────────────────────────────
+  // ── removeMember ───────────────────────────────────────────────
 
   describe('removeMember', () => {
     beforeEach(() => setup());
@@ -193,7 +194,7 @@ describe('TenantMemberList', () => {
     });
   });
 
-  // ── revokeAccess ───────────────────────────────────────────────────────
+  // ── revokeAccess ───────────────────────────────────────────────
 
   describe('revokeAccess', () => {
     beforeEach(() => setup());
@@ -225,7 +226,7 @@ describe('TenantMemberList', () => {
     });
   });
 
-  // ── Helper methods ─────────────────────────────────────────────────────
+  // ── Helper methods ─────────────────────────────────────────────
 
   describe('helpers', () => {
     beforeEach(() => setup());
@@ -250,7 +251,7 @@ describe('TenantMemberList', () => {
       expect(component.getRoleColor('owner')).toBe('bg-purple-100 text-purple-700');
       expect(component.getRoleColor('admin')).toBe('bg-blue-100 text-blue-700');
       expect(component.getRoleColor('member')).toBe('bg-gray-100 text-gray-600');
-      expect(component.getRoleColor('unknown')).toBe('bg-gray-100 text-gray-600');
+      expect(component.getRoleColor('unknown')).toBe(NeutralColor);
     });
 
     it('getStatusColor should return correct colors', () => {
@@ -258,11 +259,11 @@ describe('TenantMemberList', () => {
       expect(component.getStatusColor('pending')).toBe('bg-amber-100 text-amber-700');
       expect(component.getStatusColor('declined')).toBe('bg-red-100 text-red-700');
       expect(component.getStatusColor('access_revoked')).toBe('bg-red-100 text-red-700');
-      expect(component.getStatusColor('unknown')).toBe('bg-gray-100 text-gray-600');
+      expect(component.getStatusColor('unknown')).toBe(NeutralColor);
     });
   });
 
-  // ── canManage ──────────────────────────────────────────────────────────
+  // ── canManage ──────────────────────────────────────────────────
 
   describe('canManage', () => {
     it('should be true for owner', () => {
@@ -281,7 +282,7 @@ describe('TenantMemberList', () => {
     });
   });
 
-  // ── onDialogStateChange ───────────────────────────────────────────────
+  // ── onDialogStateChange ───────────────────────────────────────
 
   describe('onDialogStateChange', () => {
     beforeEach(() => setup());

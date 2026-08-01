@@ -15,28 +15,20 @@
     </div>
   } @else if (projects().length === 0) {
     <div class="rounded-lg border border-dashed border-border py-12 text-center">
-      <ng-icon name="lucideFolderOpen" class="mx-auto h-12 w-12 text-muted-foreground" />
-      <p class="mt-4 text-sm text-muted-foreground">No projects yet.</p>
-      @if (canCreate()) {
-        <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">Create your first project</button>
-      }
+      <p class="text-sm text-muted-foreground">No projects found. Create your first project to get started.</p>
     </div>
   } @else {
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       @for (project of projects(); track project.id) {
         <a
-          [routerLink]="['/tenants', tenantId(), 'projects', project.id]"
-          class="group rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+          [routerLink]="['/tenants', project.tenantId, 'projects', project.id]"
+          class="block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-md"
         >
-          <h3 class="text-base font-semibold text-foreground group-hover:text-primary">
-            {{ project.name }}
-          </h3>
+          <h3 class="text-lg font-semibold text-foreground">{{ project.name }}</h3>
           @if (project.description) {
-            <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">
-              {{ project.description }}
-            </p>
+            <p class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
           }
-          <p class="mt-3 text-xs text-muted-foreground">Created {{ project.createdAt | date: 'mediumDate' }}</p>
+          <p class="mt-2 text-xs text-muted-foreground">Slug: {{ project.slug }}</p>
         </a>
       }
     </div>
@@ -48,38 +40,34 @@
       <hlm-dialog-header>
         <h3 hlmDialogTitle>Create Project</h3>
       </hlm-dialog-header>
-      <form (ngSubmit)="createProject()" class="space-y-4">
+
+      @if (error()) {
+        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() }}
+        </div>
+      }
+
+      <form id="create-project-form" [formRoot]="newProjectForm" class="space-y-4">
         <hlm-field>
           <label hlmFieldLabel for="project-name">Name</label>
-          <input
-            hlmInput
-            id="project-name"
-            type="text"
-            [(ngModel)]="newProject.name"
-            name="name"
-            required
-            placeholder="My Project"
-          />
+          <input hlmInput id="project-name" type="text" [formField]="newProjectForm.name" placeholder="Project name" />
+          @if (newProjectForm.name().touched() && newProjectForm.name().errors().length) {
+            <p hlm-field-error>{{ newProjectForm.name().errors()[0].message }}</p>
+          }
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="project-slug">Slug</label>
-          <input
-            hlmInput
-            id="project-slug"
-            type="text"
-            [(ngModel)]="newProject.slug"
-            name="slug"
-            required
-            placeholder="my-project"
-          />
+          <input hlmInput id="project-slug" type="text" [formField]="newProjectForm.slug" placeholder="project-slug" />
+          @if (newProjectForm.slug().touched() && newProjectForm.slug().errors().length) {
+            <p hlm-field-error>{{ newProjectForm.slug().errors()[0].message }}</p>
+          }
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="project-desc">Description</label>
           <textarea
             hlmTextarea
             id="project-desc"
-            [(ngModel)]="newProject.description"
-            name="description"
+            [formField]="newProjectForm.description"
             rows="3"
             placeholder="Optional description..."
           ></textarea>
@@ -87,8 +75,13 @@
       </form>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-        <button hlmBtn (click)="createProject()" [disabled]="creating()">
-          @if (creating()) {
+        <button
+          hlmBtn
+          type="submit"
+          form="create-project-form"
+          [disabled]="newProjectForm().invalid() || newProjectForm().submitting()"
+        >
+          @if (newProjectForm().submitting()) {
             <hlm-spinner /> Creating...
           } @else {
             Create Project

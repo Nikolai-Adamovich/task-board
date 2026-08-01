@@ -54,7 +54,7 @@
           </p>
         } @else {
           <!-- New user: show registration form -->
-          <form id="invitation-form" (submit)="onSubmit(); $event.preventDefault()">
+          <form id="invitation-form" [formRoot]="invitationForm">
             <hlm-field-group>
               <hlm-field>
                 <label hlmFieldLabel for="displayName">Display Name</label>
@@ -107,8 +107,8 @@
 
       <hlm-card-footer class="flex-col gap-2">
         @if (inv.isRegistered) {
-          <button hlmBtn class="w-full" [disabled]="submitting()" (click)="acceptAsExistingUser()">
-            @if (submitting()) {
+          <button hlmBtn class="w-full" (click)="acceptAsExistingUser()" [disabled]="loading()">
+            @if (loading()) {
               <hlm-spinner /> Accepting...
             } @else {
               Accept Invitation
@@ -120,9 +120,9 @@
             type="submit"
             form="invitation-form"
             class="w-full"
-            [disabled]="invitationForm().invalid() || invitationForm().submitting() || submitting()"
+            [disabled]="invitationForm().invalid() || invitationForm().submitting()"
           >
-            @if (invitationForm().submitting() || submitting()) {
+            @if (invitationForm().submitting()) {
               <hlm-spinner /> Creating account...
             } @else {
               Create Account & Accept

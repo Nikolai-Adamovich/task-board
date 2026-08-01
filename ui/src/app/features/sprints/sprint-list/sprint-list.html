@@ -115,27 +115,26 @@
       <hlm-dialog-header>
         <h3 hlmDialogTitle>Create Sprint</h3>
       </hlm-dialog-header>
-      <form (ngSubmit)="createSprint()" class="space-y-4">
+
+      @if (error()) {
+        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() }}
+        </div>
+      }
+
+      <form id="create-sprint-form" [formRoot]="newSprintForm" class="space-y-4">
         <hlm-field>
           <label hlmFieldLabel for="sprint-name">Name</label>
-          <input
-            hlmInput
-            id="sprint-name"
-            type="text"
-            [(ngModel)]="newSprint.name"
-            name="name"
-            required
-            placeholder="Sprint 1"
-          />
+          <input hlmInput id="sprint-name" type="text" [formField]="newSprintForm.name" placeholder="Sprint 1" />
         </hlm-field>
         <div class="grid grid-cols-2 gap-4">
           <hlm-field>
             <label hlmFieldLabel for="sprint-start">Start Date</label>
-            <input hlmInput id="sprint-start" type="date" [(ngModel)]="startDateStr" name="startDate" required />
+            <input hlmInput id="sprint-start" type="date" [formField]="newSprintForm.startDate" />
           </hlm-field>
           <hlm-field>
             <label hlmFieldLabel for="sprint-end">End Date</label>
-            <input hlmInput id="sprint-end" type="date" [(ngModel)]="endDateStr" name="endDate" required />
+            <input hlmInput id="sprint-end" type="date" [formField]="newSprintForm.endDate" />
           </hlm-field>
         </div>
         <hlm-field>
@@ -143,8 +142,7 @@
           <textarea
             hlmTextarea
             id="sprint-goal"
-            [(ngModel)]="newSprint.goal"
-            name="goal"
+            [formField]="newSprintForm.goal"
             rows="2"
             placeholder="Optional sprint goal..."
           ></textarea>
@@ -152,8 +150,13 @@
       </form>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-        <button hlmBtn (click)="createSprint()" [disabled]="creating()">
-          @if (creating()) {
+        <button
+          hlmBtn
+          type="submit"
+          form="create-sprint-form"
+          [disabled]="newSprintForm().invalid() || newSprintForm().submitting()"
+        >
+          @if (newSprintForm().submitting()) {
             <hlm-spinner /> Creating...
           } @else {
             Create Sprint

@@ -5,22 +5,63 @@
     Have a question or need help? Fill out the form below and our support team will get back to you.
   </p>
 
-  <form class="max-w-lg space-y-4" (submit)="$event.preventDefault()">
+  @if (error()) {
+    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+      {{ error() }}
+    </div>
+  }
+
+  <form id="support-form" [formRoot]="supportForm" class="max-w-lg space-y-4">
     <hlm-field>
       <label hlmFieldLabel for="support-name">Name</label>
-      <input hlmInput id="support-name" type="text" placeholder="Your name" autocomplete="name" />
+      <input
+        hlmInput
+        id="support-name"
+        type="text"
+        [formField]="supportForm.name"
+        autocomplete="name"
+        placeholder="Your name"
+      />
+      @if (supportForm.name().touched() && supportForm.name().errors().length) {
+        <p hlm-field-error>{{ supportForm.name().errors()[0].message }}</p>
+      }
     </hlm-field>
 
     <hlm-field>
       <label hlmFieldLabel for="support-email">Email</label>
-      <input hlmInput id="support-email" type="email" placeholder="you&#64;example.com" autocomplete="email" />
+      <input
+        hlmInput
+        id="support-email"
+        type="email"
+        [formField]="supportForm.email"
+        autocomplete="email"
+        placeholder="you&#64;example.com"
+      />
+      @if (supportForm.email().touched() && supportForm.email().errors().length) {
+        <p hlm-field-error>{{ supportForm.email().errors()[0].message }}</p>
+      }
     </hlm-field>
 
     <hlm-field>
       <label hlmFieldLabel for="support-message">Message</label>
-      <textarea hlmTextarea id="support-message" rows="5" placeholder="Describe your issue or question..."></textarea>
+      <textarea
+        hlmTextarea
+        id="support-message"
+        rows="5"
+        [formField]="supportForm.message"
+        placeholder="Describe your issue or question..."
+      ></textarea>
+      @if (supportForm.message().touched() && supportForm.message().errors().length) {
+        <p hlm-field-error>{{ supportForm.message().errors()[0].message }}</p>
+      }
     </hlm-field>
 
-    <button hlmBtn type="submit">Submit</button>
+    <button hlmBtn type="submit" form="support-form" [disabled]="supportForm().invalid() || supportForm().submitting()">
+      @if (supportForm().submitting()) {
+        <hlm-spinner /> Sending...
+      } @else {
+        Submit
+      }
+    </button>
   </form>
 </div>

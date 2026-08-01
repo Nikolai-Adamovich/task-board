@@ -1,4 +1,4 @@
-import { Service, signal, inject } from '@angular/core';
+import { Service, signal, inject, DestroyRef } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Theme } from '@task-board/shared';
 import { UserPreferencesClient } from '@services/user-preferences-client';
@@ -17,6 +17,7 @@ const ZOOM_SAVE_DELAY_MS = 5_000;
 export class PreferencesStore {
   private readonly client = inject(UserPreferencesClient);
   private readonly authStore = inject(AuthStore);
+  private readonly destroyRef = inject(DestroyRef);
   readonly zoom = signal<number>(100);
   readonly theme = signal<Theme>(Theme.Light);
   readonly language = signal<string>('en');
@@ -24,6 +25,15 @@ export class PreferencesStore {
 
   constructor() {
     this.restoreThemeFromLocalStorage();
+    this.destroyRef.onDestroy(() => this.cleanup());
+  }
+
+  /** Clean up the zoom debounce timer. */
+  private cleanup(): void {
+    if (this.zoomDebounceTimer !== null) {
+      clearTimeout(this.zoomDebounceTimer);
+      this.zoomDebounceTimer = null;
+    }
   }
 
   /** Restore theme preference from localStorage and apply the CSS class immediately. */

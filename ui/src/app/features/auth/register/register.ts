@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { form, FormField, submit, schema, required, email, minLength, maxLength } from '@angular/forms/signals';
+import { form, FormField, FormRoot, schema, required, email, minLength, maxLength } from '@angular/forms/signals';
 import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -19,6 +19,7 @@ interface RegisterModel {
   imports: [
     RouterLink,
     FormField,
+    FormRoot,
     HlmCardImports,
     HlmFieldImports,
     HlmInputImports,
@@ -66,9 +67,5 @@ export class Register {
     }
 
     return 'Registration failed. Please try again.';
-  }
-
-  protected onSubmit(): void {
-    submit(this.registerForm);
   }
 }

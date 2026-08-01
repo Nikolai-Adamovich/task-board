@@ -1,9 +1,11 @@
 import { Component, inject, input, signal, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
+import { PriorityColorMap, NeutralColor } from '@app/constants/priority';
+import { TaskPriority } from '@task-board/shared';
+import { HttpErrorResponse } from '@angular/common/http';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -13,20 +15,24 @@ import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
-import type { Task, UpdateTask } from '@task-board/shared';
+import { HlmDialogImports } from '@spartan-ng/helm/dialog';
+import { finalize } from 'rxjs';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
+import type { Task } from '@task-board/shared';
 
-const priorityColorMap: Record<string, string> = {
-  low: 'bg-blue-100 text-blue-700',
-  medium: 'bg-yellow-100 text-yellow-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700',
-};
+export interface EditTaskForm {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+}
 
 @Component({
   selector: 'ui-task-detail',
   imports: [
     DatePipe,
-    FormsModule,
+    FormField,
+    FormRoot,
     HlmButtonImports,
     HlmSpinnerImports,
     HlmCardImports,
@@ -36,6 +42,7 @@ const priorityColorMap: Record<string, string> = {
     HlmBadgeImports,
     HlmAvatarImports,
     HlmNativeSelectImports,
+    HlmDialogImports,
   ],
   templateUrl: './task-detail.html',
 })
@@ -48,8 +55,42 @@ export class TaskDetail implements OnInit {
   protected readonly task = signal<Task | null>(null);
   protected readonly loading = signal(true);
   protected readonly isEditing = signal(false);
-  protected readonly saving = signal(false);
-  protected editForm: UpdateTask = {};
+  protected readonly error = signal('');
+  protected readonly showDeleteConfirm = signal(false);
+  private readonly taskToDelete = signal<Task | null>(null);
+  private readonly model = signal<EditTaskForm>({
+    title: '',
+    description: '',
+    priority: TaskPriority.Medium,
+  });
+  protected readonly editForm = form(
+    this.model,
+    schema<EditTaskForm>((field) => {
+      required(field.title, { message: 'Title is required' });
+    }),
+    {
+      submission: {
+        action: async () => {
+          this.error.set('');
+          this.taskClient
+            .update(this.taskId(), {
+              title: this.model().title,
+              description: this.model().description,
+              priority: this.model().priority,
+            })
+            .subscribe({
+              next: (updated) => {
+                this.task.set(updated);
+                this.isEditing.set(false);
+              },
+              error: (err) => {
+                this.error.set(this.getErrorMessage(err));
+              },
+            });
+        },
+      },
+    },
+  );
 
   ngOnInit(): void {
     this.loadTask();
@@ -57,17 +98,18 @@ export class TaskDetail implements OnInit {
 
   private loadTask(): void {
     this.loading.set(true);
-    this.taskClient.getById(this.taskId()).subscribe({
-      next: (task) => {
-        this.task.set(task);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.taskClient
+      .getById(this.taskId())
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (task) => {
+          this.task.set(task);
+        },
+      });
   }
 
   protected getPriorityColor(priority: string): string {
-    return priorityColorMap[priority] ?? 'bg-gray-100 text-gray-700';
+    return (PriorityColorMap as Record<string, string>)[priority] ?? NeutralColor;
   }
 
   protected canDelete(): boolean {
@@ -78,41 +120,53 @@ export class TaskDetail implements OnInit {
     const t = this.task();
 
     if (t) {
-      this.editForm = {
+      this.model.set({
         title: t.title,
         description: t.description ?? '',
-        priority: t.priority,
-      };
+        priority: t.priority as TaskPriority,
+      });
       this.isEditing.set(true);
     }
   }
 
   protected cancelEdit(): void {
-    this.editForm = {};
+    this.model.set({
+      title: '',
+      description: '',
+      priority: TaskPriority.Medium,
+    });
     this.isEditing.set(false);
   }
 
-  protected saveTask(): void {
-    const t = this.task();
-
-    if (!t) return;
-    this.saving.set(true);
-    this.taskClient.update(t.id, this.editForm).subscribe({
-      next: (updated) => {
-        this.task.set(updated);
-        this.isEditing.set(false);
-        this.saving.set(false);
-      },
-      error: () => this.saving.set(false),
-    });
+  protected confirmDeleteTask(task: Task): void {
+    this.taskToDelete.set(task);
+    this.showDeleteConfirm.set(true);
   }
 
-  protected deleteTask(task: Task): void {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+  protected onDeleteDialogStateChange(state: BrnDialogState): void {
+    if (state === 'closed') {
+      this.showDeleteConfirm.set(false);
+      this.taskToDelete.set(null);
+    }
+  }
+
+  protected deleteTask(): void {
+    const task = this.taskToDelete();
+
+    if (!task) return;
+
     this.taskClient.delete(task.id).subscribe({
       next: () => {
         this.router.navigate(['/tenants', task.tenantId, 'projects', task.projectId]);
       },
     });
+  }
+
+  private getErrorMessage(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      return err.error?.message ?? err.message;
+    }
+
+    return 'An unexpected error occurred. Please try again.';
   }
 }

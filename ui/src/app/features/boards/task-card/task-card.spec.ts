@@ -12,6 +12,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { TaskCard } from './task-card';
 import { API_BASE_URL } from '@app/api-url.token';
+import { NeutralColor } from '@app/constants/priority';
 import type { Task } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -83,7 +84,7 @@ describe('TaskCard', () => {
 
     it('should return fallback for unknown priority', () => {
       setup({ priority: 'unknown' as Task['priority'] });
-      expect(component.priorityColor()).toBe('bg-gray-100 text-gray-700');
+      expect(component.priorityColor()).toBe(NeutralColor);
     });
   });
 

@@ -3,20 +3,22 @@ import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { provideIcons } from '@ng-icons/core';
 import { lucideX } from '@ng-icons/lucide';
+import { finalize } from 'rxjs';
 import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
+import {
+  PriorityColorMap,
+  StatusColorMap,
+  NeutralColor,
+  PriorityDotColorMap,
+  NeutralDotColor,
+} from '@app/constants/priority';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { NgIcon } from '@ng-icons/core';
 import type { Sprint, Task } from '@task-board/shared';
-
-const statusColorMap: Record<string, string> = {
-  planned: 'bg-blue-100 text-blue-700',
-  active: 'bg-green-100 text-green-700',
-  completed: 'bg-gray-100 text-gray-600',
-};
 
 @Component({
   selector: 'ui-sprint-detail',
@@ -39,29 +41,15 @@ export class SprintDetail implements OnInit {
   }
 
   protected getStatusColor(status: string): string {
-    return statusColorMap[status] ?? 'bg-gray-100 text-gray-700';
+    return (StatusColorMap as Record<string, string>)[status] ?? NeutralColor;
   }
 
   protected getPriorityDot(priority: string): string {
-    const map: Record<string, string> = {
-      low: 'bg-blue-500',
-      medium: 'bg-yellow-500',
-      high: 'bg-orange-500',
-      critical: 'bg-red-500',
-    };
-
-    return map[priority] ?? 'bg-gray-500';
+    return (PriorityDotColorMap as Record<string, string>)[priority] ?? NeutralDotColor;
   }
 
   protected getPriorityBadge(priority: string): string {
-    const map: Record<string, string> = {
-      low: 'bg-blue-100 text-blue-700',
-      medium: 'bg-yellow-100 text-yellow-700',
-      high: 'bg-orange-100 text-orange-700',
-      critical: 'bg-red-100 text-red-700',
-    };
-
-    return map[priority] ?? 'bg-gray-100 text-gray-700';
+    return (PriorityColorMap as Record<string, string>)[priority] ?? NeutralColor;
   }
 
   ngOnInit(): void {
@@ -70,14 +58,15 @@ export class SprintDetail implements OnInit {
 
   private loadSprint(): void {
     this.loading.set(true);
-    this.sprintClient.getById(this.sprintId()).subscribe({
-      next: (sprint) => {
-        this.sprint.set(sprint);
-        this.loadSprintTasks(sprint);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.sprintClient
+      .getById(this.sprintId())
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (sprint) => {
+          this.sprint.set(sprint);
+          this.loadSprintTasks(sprint);
+        },
+      });
   }
 
   private loadSprintTasks(sprint: Sprint): void {

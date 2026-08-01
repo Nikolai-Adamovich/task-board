@@ -1,6 +1,8 @@
 import { Component, inject, input, signal, OnInit, output } from '@angular/core';
 import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
+import { PriorityDotColorMap, NeutralDotColor } from '@app/constants/priority';
+import { finalize } from 'rxjs';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -22,14 +24,7 @@ export class SprintBacklog implements OnInit {
   protected readonly loading = signal(true);
 
   protected getPriorityDot(priority: string): string {
-    const map: Record<string, string> = {
-      low: 'bg-blue-500',
-      medium: 'bg-yellow-500',
-      high: 'bg-orange-500',
-      critical: 'bg-red-500',
-    };
-
-    return map[priority] ?? 'bg-gray-500';
+    return (PriorityDotColorMap as Record<string, string>)[priority] ?? NeutralDotColor;
   }
 
   ngOnInit(): void {
@@ -39,13 +34,14 @@ export class SprintBacklog implements OnInit {
   private loadBacklog(): void {
     this.loading.set(true);
     // Load tasks with no sprint (backlog)
-    this.taskClient.list({ projectId: this.projectId(), sprintId: null, limit: 200 }).subscribe({
-      next: (res) => {
-        this.backlogTasks.set(res.data);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.taskClient
+      .list({ projectId: this.projectId(), sprintId: null, limit: 200 })
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (res) => {
+          this.backlogTasks.set(res.data);
+        },
+      });
   }
 
   protected addTaskToSprint(taskId: string): void {

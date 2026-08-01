@@ -17,6 +17,7 @@ import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
+import { NeutralColor, NeutralDotColor } from '@app/constants/priority';
 import type { Sprint, Task, User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -112,7 +113,7 @@ describe('SprintDetail', () => {
     fixture.detectChanges();
   }
 
-  // ── Loading ─────────────────────────────────────────────────────────────
+  // ── Loading ─────────────────────────────────────────────────────
 
   describe('ngOnInit', () => {
     beforeEach(() => setup());
@@ -198,7 +199,7 @@ describe('SprintDetail', () => {
     });
   });
 
-  // ── Helper methods ─────────────────────────────────────────────────────
+  // ── Helper methods ─────────────────────────────────────────────
 
   describe('getStatusColor', () => {
     beforeEach(() => setup());
@@ -216,7 +217,7 @@ describe('SprintDetail', () => {
     });
 
     it('should return fallback for unknown', () => {
-      expect(component.getStatusColor('unknown')).toBe('bg-gray-100 text-gray-700');
+      expect(component.getStatusColor('unknown')).toBe(NeutralColor);
     });
   });
 
@@ -228,7 +229,7 @@ describe('SprintDetail', () => {
       expect(component.getPriorityDot('medium')).toBe('bg-yellow-500');
       expect(component.getPriorityDot('high')).toBe('bg-orange-500');
       expect(component.getPriorityDot('critical')).toBe('bg-red-500');
-      expect(component.getPriorityDot('unknown')).toBe('bg-gray-500');
+      expect(component.getPriorityDot('unknown')).toBe(NeutralDotColor);
     });
   });
 
@@ -240,7 +241,7 @@ describe('SprintDetail', () => {
       expect(component.getPriorityBadge('medium')).toBe('bg-yellow-100 text-yellow-700');
       expect(component.getPriorityBadge('high')).toBe('bg-orange-100 text-orange-700');
       expect(component.getPriorityBadge('critical')).toBe('bg-red-100 text-red-700');
-      expect(component.getPriorityBadge('unknown')).toBe('bg-gray-100 text-gray-700');
+      expect(component.getPriorityBadge('unknown')).toBe(NeutralColor);
     });
   });
 

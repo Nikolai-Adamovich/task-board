@@ -14,10 +14,11 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { TaskDetail } from './task-detail';
+import { TaskDetail, EditTaskForm } from './task-detail';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
+import { NeutralColor } from '@app/constants/priority';
 import type { Task, User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -79,7 +80,7 @@ describe('TaskDetail', () => {
     fixture.detectChanges();
   }
 
-  // ── Loading ─────────────────────────────────────────────────────────────
+  // ── Loading ─────────────────────────────────────────────────────
 
   describe('loading', () => {
     it('should call taskClient.getById on init', () => {
@@ -129,7 +130,7 @@ describe('TaskDetail', () => {
     });
   });
 
-  // ── getPriorityColor ───────────────────────────────────────────────────
+  // ── getPriorityColor ───────────────────────────────────
 
   describe('getPriorityColor', () => {
     beforeEach(() => setup());
@@ -151,22 +152,22 @@ describe('TaskDetail', () => {
     });
 
     it('should return fallback color for unknown priority', () => {
-      expect(component.getPriorityColor('unknown')).toBe('bg-gray-100 text-gray-700');
+      expect(component.getPriorityColor('unknown')).toBe(NeutralColor);
     });
   });
 
-  // ── Edit flow ──────────────────────────────────────────────────────────
+  // ── Edit flow ──────────────────────────────────────────────────
 
   describe('edit flow', () => {
     beforeEach(() => setup());
 
-    it('should populate editForm when startEdit is called', () => {
+    it('should populate edit form when startEdit is called', () => {
       component.startEdit();
 
       expect(component.isEditing()).toBe(true);
-      expect(component.editForm.title).toBe('Test Task');
-      expect(component.editForm.description).toBe('Task description');
-      expect(component.editForm.priority).toBe('high');
+      expect(component.model().title).toBe('Test Task');
+      expect(component.model().description).toBe('Task description');
+      expect(component.model().priority).toBe('high');
     });
 
     it('should reset form when cancelEdit is called', () => {
@@ -174,12 +175,14 @@ describe('TaskDetail', () => {
       component.cancelEdit();
 
       expect(component.isEditing()).toBe(false);
-      expect(component.editForm).toEqual({});
+      expect(component.model().title).toBe('');
+      expect(component.model().description).toBe('');
+      expect(component.model().priority).toBe('medium');
     });
 
     it('should call taskClient.update on saveTask', () => {
       component.startEdit();
-      component.editForm.title = 'Updated Title';
+      component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
       component.saveTask();
 
       expect(taskClientMock.update).toHaveBeenCalledWith(
@@ -190,7 +193,7 @@ describe('TaskDetail', () => {
 
     it('should update task signal after successful save', () => {
       component.startEdit();
-      component.editForm.title = 'Updated Title';
+      component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
       component.saveTask();
 
       expect(component.task().title).toBe('Updated Title');
@@ -207,7 +210,7 @@ describe('TaskDetail', () => {
     });
   });
 
-  // ── canDelete ──────────────────────────────────────────────────────────
+  // ── canDelete ──────────────────────────────────────────────────
 
   describe('canDelete', () => {
     it('should return true when user is authenticated', () => {

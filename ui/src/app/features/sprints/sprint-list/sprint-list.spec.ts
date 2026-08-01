@@ -13,11 +13,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { SprintList } from './sprint-list';
+import { SprintList, CreateSprintForm } from './sprint-list';
 import { SprintClient } from '@services/sprint-client';
 import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
+import { NeutralColor } from '@app/constants/priority';
 import type { Sprint, Project, User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -100,7 +101,7 @@ describe('SprintList', () => {
     fixture.detectChanges();
   }
 
-  // ── Loading ─────────────────────────────────────────────────────────────
+  // ── Loading ─────────────────────────────────────────────
 
   describe('ngOnInit - project-level', () => {
     beforeEach(() => setup('p1'));
@@ -168,7 +169,7 @@ describe('SprintList', () => {
     });
   });
 
-  // ── getStatusColor ────────────────────────────────────────────────────
+  // ── getStatusColor ──────────────────────────────────────
 
   describe('getStatusColor', () => {
     beforeEach(() => setup());
@@ -180,11 +181,11 @@ describe('SprintList', () => {
     });
 
     it('should return fallback for unknown', () => {
-      expect(component.getStatusColor('unknown')).toBe('bg-gray-100 text-gray-700');
+      expect(component.getStatusColor('unknown')).toBe(NeutralColor);
     });
   });
 
-  // ── toggleGroup ────────────────────────────────────────────────────────
+  // ── toggleGroup ──────────────────────────────────────
 
   describe('isGroupExpanded / toggleGroup', () => {
     beforeEach(() => setup());
@@ -205,31 +206,39 @@ describe('SprintList', () => {
     });
   });
 
-  // ── createSprint ───────────────────────────────────────────────────────
+  // ── createSprint ────────────────────────────────────────
 
   describe('createSprint', () => {
     beforeEach(() => setup('p1'));
 
     it('should not create when name is empty', () => {
-      component.newSprint.name = '';
-      component.startDateStr = '2025-01-01';
-      component.endDateStr = '2025-02-01';
+      component.model.update((m: CreateSprintForm) => ({ ...m, name: '' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
       component.createSprint();
       expect(sprintClientMock.create).not.toHaveBeenCalled();
     });
 
-    it('should not create when startDateStr is empty', () => {
-      component.newSprint.name = 'Sprint';
-      component.startDateStr = '';
-      component.endDateStr = '2025-02-01';
+    it('should not create when startDate is empty', () => {
+      component.model.update((m: CreateSprintForm) => ({ ...m, name: 'Sprint' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
+      component.createSprint();
+      expect(sprintClientMock.create).not.toHaveBeenCalled();
+    });
+
+    it('should not create when endDate is empty', () => {
+      component.model.update((m: CreateSprintForm) => ({ ...m, name: 'Sprint' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '' }));
       component.createSprint();
       expect(sprintClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should create sprint and add to list', () => {
-      component.newSprint.name = 'New Sprint';
-      component.startDateStr = '2025-01-01';
-      component.endDateStr = '2025-02-01';
+      component.model.update((m: CreateSprintForm) => ({ ...m, name: 'New Sprint' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
       component.createSprint();
 
       expect(sprintClientMock.create).toHaveBeenCalled();
@@ -238,28 +247,28 @@ describe('SprintList', () => {
     });
 
     it('should reset form after creation', () => {
-      component.newSprint.name = 'New Sprint';
-      component.startDateStr = '2025-01-01';
-      component.endDateStr = '2025-02-01';
+      component.model.update((m: CreateSprintForm) => ({ ...m, name: 'New Sprint' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
       component.createSprint();
 
-      expect(component.newSprint.name).toBe('');
-      expect(component.startDateStr).toBe('');
-      expect(component.endDateStr).toBe('');
+      expect(component.model().name).toBe('');
+      expect(component.model().startDate).toBe('');
+      expect(component.model().endDate).toBe('');
     });
 
     it('should set creating to false on error', () => {
       sprintClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.newSprint.name = 'Fail Sprint';
-      component.startDateStr = '2025-01-01';
-      component.endDateStr = '2025-02-01';
+      component.model.update((m: CreateSprintForm) => ({ ...m, name: 'Fail Sprint' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
+      component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
       component.createSprint();
 
       expect(component.creating()).toBe(false);
     });
   });
 
-  // ── onDialogStateChange ───────────────────────────────────────────────
+  // ── onDialogStateChange ──────────────────────────────────
 
   describe('onDialogStateChange', () => {
     beforeEach(() => setup());

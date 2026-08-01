@@ -8,6 +8,7 @@ import { AuthStore } from '@stores/auth-store';
 import { TenantClient } from '@services/tenant-client';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideBuilding2, lucideCheck, lucideMail } from '@ng-icons/lucide';
+import { finalize } from 'rxjs';
 import type { MyInvitation } from '@task-board/shared';
 
 @Component({
@@ -25,12 +26,13 @@ export class WelcomeView {
 
   protected acceptInvitation(invitation: MyInvitation): void {
     this.acceptingId.set(invitation.id);
-    this.tenantClient.acceptInvitationById(invitation.id).subscribe({
-      next: () => {
-        this.acceptingId.set(null);
-        this.invitationHandled.emit();
-      },
-      error: () => this.acceptingId.set(null),
-    });
+    this.tenantClient
+      .acceptInvitationById(invitation.id)
+      .pipe(finalize(() => this.acceptingId.set(null)))
+      .subscribe({
+        next: () => {
+          this.invitationHandled.emit();
+        },
+      });
   }
 }

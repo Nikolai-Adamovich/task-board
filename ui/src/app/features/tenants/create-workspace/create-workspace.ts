@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SubscriptionTier, TenantRole } from '@task-board/shared';
-import { form, FormField, submit, schema, required, minLength, maxLength } from '@angular/forms/signals';
+import { form, FormField, FormRoot, schema, required, minLength, maxLength } from '@angular/forms/signals';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -27,7 +27,7 @@ function slugify(value: string): string {
 }
 
 @Component({
-  imports: [FormField, HlmCardImports, HlmFieldImports, HlmInputImports, HlmButtonImports, HlmSpinnerImports],
+  imports: [FormField, FormRoot, HlmCardImports, HlmFieldImports, HlmInputImports, HlmButtonImports, HlmSpinnerImports],
   selector: 'ui-create-workspace',
   templateUrl: './create-workspace.html',
 })
@@ -77,9 +77,5 @@ export class CreateWorkspace {
     const name = this.model().name;
 
     this.model.update((m) => ({ ...m, slug: slugify(name) }));
-  }
-
-  protected onSubmit(): void {
-    submit(this.workspaceForm);
   }
 }

@@ -12,6 +12,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { OwnerDashboard } from './owner-dashboard';
 import { API_BASE_URL } from '@app/api-url.token';
+import { NeutralColor } from '@app/constants/priority';
 import type { MyTask } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -107,11 +108,11 @@ describe('OwnerDashboard', () => {
     });
 
     it('should return correct color for low', () => {
-      expect(component.getPriorityColor('low')).toBe('bg-gray-100 text-gray-600');
+      expect(component.getPriorityColor('low')).toBe('bg-blue-100 text-blue-700');
     });
 
     it('should return fallback for unknown priority', () => {
-      expect(component.getPriorityColor('unknown')).toBe('bg-gray-100 text-gray-600');
+      expect(component.getPriorityColor('unknown')).toBe(NeutralColor);
     });
   });
 

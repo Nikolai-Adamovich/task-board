@@ -12,7 +12,7 @@
         </div>
       }
 
-      <form id="workspace-form" (submit)="onSubmit(); $event.preventDefault()">
+      <form id="workspace-form" [formRoot]="workspaceForm">
         <hlm-field-group>
           <hlm-field>
             <label hlmFieldLabel for="workspace-name">Workspace Name</label>

@@ -1,11 +1,11 @@
 import { Component, inject, input, signal, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
 import { TaskPriority } from '@task-board/shared';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ColumnView } from '../column-view/column-view';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -15,15 +15,24 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { NgIcon } from '@ng-icons/core';
-import type { Board, Column, Task, CreateTask } from '@task-board/shared';
+import { finalize } from 'rxjs';
+import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
+import type { Board, Column, Task } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+
+interface CreateTaskForm {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  columnId: string;
+}
 
 @Component({
   selector: 'ui-board-view',
   imports: [
+    FormField,
     ColumnView,
-    FormsModule,
     NgIcon,
     HlmButtonImports,
     HlmDialogImports,
@@ -32,6 +41,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmInputImports,
     HlmTextareaImports,
     HlmNativeSelectImports,
+    FormRoot,
   ],
   providers: [provideIcons({ lucidePlus })],
   templateUrl: './board-view.html',
@@ -47,21 +57,59 @@ export class BoardView implements OnInit {
   protected readonly columns = signal<Column[]>([]);
   protected readonly tasks = signal<Task[]>([]);
   protected readonly loading = signal(true);
+  protected readonly error = signal('');
   protected readonly showCreateTask = signal(false);
-  protected readonly creatingTask = signal(false);
-  protected newTask: CreateTask = {
+  private readonly model = signal<CreateTaskForm>({
     title: '',
     description: '',
-    projectId: '',
-    boardId: '',
-    columnId: '',
     priority: TaskPriority.Medium,
-    assigneeIds: [],
-  };
+    columnId: '',
+  });
+  protected readonly newTaskForm = form(
+    this.model,
+    schema<CreateTaskForm>((field) => {
+      required(field.title, { message: 'Title is required' });
+      required(field.columnId, { message: 'Column is required' });
+    }),
+    {
+      submission: {
+        action: async () => {
+          this.error.set('');
+
+          const title = this.model().title;
+          const columnId = this.model().columnId;
+
+          if (!title || !columnId) return;
+
+          this.taskClient
+            .create({
+              title,
+              description: this.model().description,
+              projectId: this.board()?.projectId ?? '',
+              boardId: this.boardId(),
+              columnId,
+              priority: this.model().priority,
+              assigneeIds: [],
+            })
+            .subscribe({
+              next: (task) => {
+                this.tasks.update((list) => [...list, task]);
+                this.showCreateTask.set(false);
+                this.resetForm();
+              },
+              error: (err) => {
+                this.error.set(this.getErrorMessage(err));
+              },
+            });
+        },
+      },
+    },
+  );
 
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showCreateTask.set(false);
+      this.resetForm();
     }
   }
 
@@ -71,17 +119,16 @@ export class BoardView implements OnInit {
 
   private loadBoard(): void {
     this.loading.set(true);
-    this.boardClient.getById(this.boardId()).subscribe({
-      next: (board) => {
-        this.board.set(board);
-        this.newTask.projectId = board.projectId;
-        this.newTask.boardId = board.id;
-        this.loadColumns();
-        this.loadTasks();
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.boardClient
+      .getById(this.boardId())
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (board) => {
+          this.board.set(board);
+          this.loadColumns();
+          this.loadTasks();
+        },
+      });
   }
 
   private loadColumns(): void {
@@ -90,8 +137,8 @@ export class BoardView implements OnInit {
         const sorted = res.data.sort((a, b) => a.position - b.position);
 
         this.columns.set(sorted);
-        if (sorted.length > 0 && !this.newTask.columnId) {
-          this.newTask.columnId = sorted[0].id;
+        if (sorted.length > 0 && !this.model().columnId) {
+          this.model.update((m) => ({ ...m, columnId: sorted[0].id }));
         }
       },
     });
@@ -130,25 +177,20 @@ export class BoardView implements OnInit {
     this.router.navigate(['/tenants', task.tenantId, 'projects', task.projectId, 'tasks', task.id]);
   }
 
-  protected createTask(): void {
-    if (!this.newTask.title || !this.newTask.columnId) return;
-    this.creatingTask.set(true);
-    this.taskClient.create(this.newTask).subscribe({
-      next: (task) => {
-        this.tasks.update((list) => [...list, task]);
-        this.showCreateTask.set(false);
-        this.newTask = {
-          title: '',
-          description: '',
-          projectId: this.board()?.projectId ?? '',
-          boardId: this.boardId(),
-          columnId: this.columns()[0]?.id ?? '',
-          priority: TaskPriority.Medium,
-          assigneeIds: [],
-        };
-        this.creatingTask.set(false);
-      },
-      error: () => this.creatingTask.set(false),
+  private resetForm(): void {
+    this.model.set({
+      title: '',
+      description: '',
+      priority: TaskPriority.Medium,
+      columnId: this.columns()[0]?.id ?? '',
     });
+  }
+
+  private getErrorMessage(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      return err.error?.message ?? err.message;
+    }
+
+    return 'An unexpected error occurred. Please try again.';
   }
 }

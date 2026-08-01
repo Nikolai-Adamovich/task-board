@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { TenantRole } from '@task-board/shared';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
@@ -68,27 +69,26 @@ export class Dashboard implements OnInit {
     );
   }
 
-  private loadData(): void {
-    let pending = 2;
-    const done = () => {
-      if (--pending === 0) this.loading.set(false);
-    };
+  private async loadData(): Promise<void> {
+    this.loading.set(true);
+    try {
+      const [invitationsRes, tasksRes] = await Promise.all([
+        firstValueFrom(this.tenantClient.getMyInvitations()),
+        firstValueFrom(this.taskClient.getMyTasks()),
+      ]);
 
-    this.tenantClient.getMyInvitations().subscribe({
-      next: (res) => {
-        this.invitations.set(res.data);
-        done();
-      },
-      error: () => done(),
-    });
+      if (invitationsRes) {
+        this.invitations.set(invitationsRes.data);
+      }
 
-    this.taskClient.getMyTasks().subscribe({
-      next: (res) => {
-        this.tasks.set(res.data);
-        done();
-      },
-      error: () => done(),
-    });
+      if (tasksRes) {
+        this.tasks.set(tasksRes.data);
+      }
+    } catch {
+      // Silently handle errors
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   protected onInvitationHandled(): void {

@@ -2,6 +2,12 @@
   <div class="flex items-center justify-center py-12">
     <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading task...</span>
   </div>
+} @else if (error()) {
+  <div class="mx-auto max-w-3xl px-4 py-8">
+    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+      {{ error() }}
+    </div>
+  </div>
 } @else if (task(); as t) {
   <div class="mx-auto max-w-3xl">
     <!-- Header -->
@@ -25,8 +31,14 @@
       @if (isEditing()) {
         <div class="flex gap-2">
           <button hlmBtn variant="outline" size="sm" (click)="cancelEdit()">Cancel</button>
-          <button hlmBtn size="sm" (click)="saveTask()" [disabled]="saving()">
-            @if (saving()) {
+          <button
+            hlmBtn
+            size="sm"
+            type="submit"
+            form="edit-task-form"
+            [disabled]="editForm().invalid() || editForm().submitting()"
+          >
+            @if (editForm().submitting()) {
               <hlm-spinner /> Saving...
             } @else {
               Save
@@ -45,22 +57,22 @@
         <hlm-card>
           <div hlmCardContent>
             @if (isEditing()) {
-              <div class="space-y-4">
+              <form id="edit-task-form" [formRoot]="editForm" class="space-y-4">
                 <hlm-field>
                   <label hlmFieldLabel for="edit-title">Title</label>
-                  <input hlmInput id="edit-title" type="text" [(ngModel)]="editForm.title" />
+                  <input hlmInput id="edit-title" type="text" [formField]="editForm.title" />
                 </hlm-field>
                 <hlm-field>
                   <label hlmFieldLabel for="edit-description">Description</label>
                   <textarea
                     hlmTextarea
                     id="edit-description"
-                    [(ngModel)]="editForm.description"
+                    [formField]="editForm.description"
                     rows="6"
                     placeholder="Task description (supports markdown)"
                   ></textarea>
                 </hlm-field>
-              </div>
+              </form>
             } @else {
               <h3 class="text-sm font-medium text-foreground">Description</h3>
               @if (t.description) {
@@ -80,7 +92,7 @@
           <div hlmCardContent>
             <h4 class="text-xs font-medium uppercase text-muted-foreground">Priority</h4>
             @if (isEditing()) {
-              <select hlmNativeSelect [(ngModel)]="editForm.priority" class="mt-2">
+              <select hlmNativeSelect class="mt-2" [formField]="editForm.priority">
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
@@ -119,7 +131,7 @@
           <hlm-card>
             <div hlmCardContent>
               <h4 class="text-xs font-medium uppercase text-muted-foreground">Actions</h4>
-              <button hlmBtn variant="destructive" size="sm" class="mt-2 w-full" (click)="deleteTask(t)">
+              <button hlmBtn variant="destructive" size="sm" class="mt-2 w-full" (click)="confirmDeleteTask(t)">
                 Delete Task
               </button>
             </div>
@@ -127,5 +139,21 @@
         }
       </div>
     </div>
+
+    <!-- Delete Confirmation Dialog -->
+    <hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
+      <hlm-dialog-content *hlmDialogPortal>
+        <div class="space-y-4">
+          <h3 hlmDialogTitle>Delete Task</h3>
+          <p class="text-sm text-muted-foreground">
+            Are you sure you want to delete this task? This action cannot be undone.
+          </p>
+          <hlm-dialog-footer>
+            <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">Cancel</button>
+            <button hlmBtn variant="destructive" (click)="deleteTask()">Delete</button>
+          </hlm-dialog-footer>
+        </div>
+      </hlm-dialog-content>
+    </hlm-dialog>
   </div>
 }

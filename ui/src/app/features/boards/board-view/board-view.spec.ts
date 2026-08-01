@@ -21,7 +21,7 @@ import { TaskClient } from '@services/task-client';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Board, Column, Task } from '@task-board/shared';
 
-// ── Test fixtures ───────────────────────────────────────────────────────────
+// ── Test fixtures ───────────────────────────────────────────
 
 const NOW = new Date().toISOString();
 const mockBoard: Board = {
@@ -89,7 +89,7 @@ const mockTasks: Task[] = [
   makeTask({ id: 'tk000000-0000-0000-0000-000000000003', columnId: mockColumns[1].id, title: 'Task C', position: 0 }),
 ];
 
-// ── Mock factories ──────────────────────────────────────────────────────────
+// ── Mock factories ──────────────────────────────────────────
 
 function createBoardClientMock() {
   return {
@@ -110,7 +110,7 @@ function createTaskClientMock() {
   };
 }
 
-// ── Test suite ──────────────────────────────────────────────────────────────
+// ── Test suite ──────────────────────────────────────────────
 
 describe('BoardView', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,7 +148,7 @@ describe('BoardView', () => {
     fixture.detectChanges();
   }
 
-  // ── Loading state ───────────────────────────────────────────────────────
+  // ── Loading state ───────────────────────────────────────
 
   describe('loading state', () => {
     it('should show loading spinner while data is being fetched', () => {
@@ -212,7 +212,7 @@ describe('BoardView', () => {
     });
   });
 
-  // ── Data fetching on init ──────────────────────────────────────────────
+  // ── Data fetching on init ──────────────────────────────────────
 
   describe('ngOnInit', () => {
     beforeEach(() => setup());
@@ -246,17 +246,20 @@ describe('BoardView', () => {
       expect(component.tasks()).toHaveLength(3);
     });
 
-    it('should initialize newTask with board projectId and boardId', () => {
-      expect(component.newTask.projectId).toBe(mockBoard.projectId);
-      expect(component.newTask.boardId).toBe(mockBoard.id);
+    it('should initialize model title with empty string', () => {
+      expect(component.model().title).toBe('');
     });
 
-    it('should set default columnId to first column', () => {
-      expect(component.newTask.columnId).toBe(mockColumns[0].id);
+    it('should initialize model priority to Medium', () => {
+      expect(component.model().priority).toBe('medium');
+    });
+
+    it('should set default model columnId to first column', () => {
+      expect(component.model().columnId).toBe(mockColumns[0].id);
     });
   });
 
-  // ── getTasksForColumn ─────────────────────────────────────────────────
+  // ── getTasksForColumn ──────────────────────────────────────────
 
   describe('getTasksForColumn', () => {
     beforeEach(() => setup());
@@ -280,7 +283,7 @@ describe('BoardView', () => {
     });
   });
 
-  // ── onTaskDrop ────────────────────────────────────────────────────────
+  // ── onTaskDrop ──────────────────────────────────────────
 
   describe('onTaskDrop', () => {
     beforeEach(() => setup());
@@ -315,7 +318,7 @@ describe('BoardView', () => {
     });
   });
 
-  // ── goToTask ──────────────────────────────────────────────────────────
+  // ── goToTask ────────────────────────────────────────────
 
   describe('goToTask', () => {
     beforeEach(() => setup());
@@ -336,32 +339,32 @@ describe('BoardView', () => {
     });
   });
 
-  // ── createTask ────────────────────────────────────────────────────────
+  // ── createTask ──────────────────────────────────────────
 
   describe('createTask', () => {
     beforeEach(() => setup());
 
     it('should not call taskClient.create when title is empty', () => {
-      component.newTask.title = '';
-      component.newTask.columnId = mockColumns[0].id;
+      component.model.update((m) => ({ ...m, title: '' }));
+      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
       component.createTask();
 
       expect(taskClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should not call taskClient.create when columnId is empty', () => {
-      component.newTask.title = 'Some title';
-      component.newTask.columnId = '';
+      component.model.update((m) => ({ ...m, title: 'Some title' }));
+      component.model.update((m) => ({ ...m, columnId: '' }));
       component.createTask();
 
       expect(taskClientMock.create).not.toHaveBeenCalled();
     });
 
-    it('should call taskClient.create with the newTask data', () => {
-      component.newTask.title = 'New Task';
-      component.newTask.columnId = mockColumns[0].id;
-      component.newTask.description = 'A description';
-      component.newTask.priority = 'high';
+    it('should call taskClient.create with the model data', () => {
+      component.model.update((m) => ({ ...m, title: 'New Task' }));
+      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
+      component.model.update((m) => ({ ...m, description: 'A description' }));
+      component.model.update((m) => ({ ...m, priority: 'high' }));
       component.createTask();
 
       expect(taskClientMock.create).toHaveBeenCalledWith(
@@ -375,8 +378,8 @@ describe('BoardView', () => {
     });
 
     it('should add the created task to the tasks signal', () => {
-      component.newTask.title = 'New Task';
-      component.newTask.columnId = mockColumns[0].id;
+      component.model.update((m) => ({ ...m, title: 'New Task' }));
+      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
       component.createTask();
 
       const tasks = component.tasks() as Task[];
@@ -386,24 +389,24 @@ describe('BoardView', () => {
 
     it('should close the dialog after successful creation', () => {
       component.showCreateTask.set(true);
-      component.newTask.title = 'New Task';
-      component.newTask.columnId = mockColumns[0].id;
+      component.model.update((m) => ({ ...m, title: 'New Task' }));
+      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
       component.createTask();
 
       expect(component.showCreateTask()).toBe(false);
     });
 
-    it('should reset newTask title after successful creation', () => {
-      component.newTask.title = 'New Task';
-      component.newTask.columnId = mockColumns[0].id;
+    it('should reset model title after successful creation', () => {
+      component.model.update((m) => ({ ...m, title: 'New Task' }));
+      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
       component.createTask();
 
-      expect(component.newTask.title).toBe('');
+      expect(component.model().title).toBe('');
     });
 
     it('should set creatingTask to true during submission', () => {
-      component.newTask.title = 'New Task';
-      component.newTask.columnId = mockColumns[0].id;
+      component.model.update((m) => ({ ...m, title: 'New Task' }));
+      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
       component.createTask();
 
       // After synchronous observable completes, it should be back to false
@@ -412,8 +415,8 @@ describe('BoardView', () => {
 
     it('should set creatingTask to false on error', () => {
       taskClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.newTask.title = 'New Task';
-      component.newTask.columnId = mockColumns[0].id;
+      component.model.update((m) => ({ ...m, title: 'New Task' }));
+      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
       component.createTask();
 
       expect(component.creatingTask()).toBe(false);
@@ -422,15 +425,15 @@ describe('BoardView', () => {
     it('should not close dialog on error', () => {
       taskClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
       component.showCreateTask.set(true);
-      component.newTask.title = 'New Task';
-      component.newTask.columnId = mockColumns[0].id;
+      component.model.update((m) => ({ ...m, title: 'New Task' }));
+      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
       component.createTask();
 
       expect(component.showCreateTask()).toBe(true);
     });
   });
 
-  // ── onDialogStateChange ───────────────────────────────────────────────
+  // ── onDialogStateChange ────────────────────────────────
 
   describe('onDialogStateChange', () => {
     beforeEach(() => setup());

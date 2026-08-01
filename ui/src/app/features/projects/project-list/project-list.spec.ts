@@ -12,7 +12,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { ProjectList } from './project-list';
+import { ProjectList, CreateProjectForm } from './project-list';
 import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
@@ -83,7 +83,7 @@ describe('ProjectList', () => {
     fixture.detectChanges();
   }
 
-  // ── Loading ─────────────────────────────────────────────────────────────
+  // ── Loading ─────────────────────────────────────────────
 
   describe('ngOnInit', () => {
     beforeEach(() => setup());
@@ -128,28 +128,28 @@ describe('ProjectList', () => {
     });
   });
 
-  // ── createProject ──────────────────────────────────────────────────────
+  // ── createProject ────────────────────────────────────────
 
   describe('createProject', () => {
     beforeEach(() => setup());
 
     it('should not create when name is empty', () => {
-      component.newProject.name = '';
-      component.newProject.slug = 'slug';
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: '' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'slug' }));
       component.createProject();
       expect(projectClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should not create when slug is empty', () => {
-      component.newProject.name = 'Name';
-      component.newProject.slug = '';
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'Name' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, slug: '' }));
       component.createProject();
       expect(projectClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should create project and add to list', () => {
-      component.newProject.name = 'New Project';
-      component.newProject.slug = 'new-project';
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'New Project' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'new-project' }));
       component.createProject();
 
       expect(projectClientMock.create).toHaveBeenCalled();
@@ -158,25 +158,25 @@ describe('ProjectList', () => {
     });
 
     it('should reset form after creation', () => {
-      component.newProject.name = 'New Project';
-      component.newProject.slug = 'new-project';
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'New Project' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'new-project' }));
       component.createProject();
 
-      expect(component.newProject.name).toBe('');
-      expect(component.newProject.slug).toBe('');
+      expect(component.model().name).toBe('');
+      expect(component.model().slug).toBe('');
     });
 
     it('should set creating to false on error', () => {
       projectClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.newProject.name = 'Fail';
-      component.newProject.slug = 'fail';
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'Fail' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'fail' }));
       component.createProject();
 
       expect(component.creating()).toBe(false);
     });
   });
 
-  // ── canCreate ──────────────────────────────────────────────────────────
+  // ── canCreate ────────────────────────────────────────────
 
   describe('canCreate', () => {
     it('should return true when user is authenticated', () => {
@@ -190,7 +190,7 @@ describe('ProjectList', () => {
     });
   });
 
-  // ── onDialogStateChange ───────────────────────────────────────────────
+  // ── onDialogStateChange ──────────────────────────────────
 
   describe('onDialogStateChange', () => {
     beforeEach(() => setup());

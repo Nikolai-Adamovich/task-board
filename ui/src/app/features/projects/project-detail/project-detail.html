@@ -78,8 +78,8 @@
               <div class="flex items-center gap-2">
                 @if (isAdmin()) {
                   <hlm-native-select
-                    [ngModel]="member.role"
-                    (ngModelChange)="onRoleChange(member, $event)"
+                    [value]="member.role"
+                    (valueChange)="onRoleChange(member, $event)"
                     class="h-8 w-28 text-xs"
                     aria-label="Change role"
                   >
@@ -116,26 +116,24 @@
       <hlm-dialog-header>
         <h3 hlmDialogTitle>Create Board</h3>
       </hlm-dialog-header>
-      <form (ngSubmit)="createBoard()" class="space-y-4">
+
+      @if (error()) {
+        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() }}
+        </div>
+      }
+
+      <form id="create-board-form" [formRoot]="createBoardForm" class="space-y-4">
         <hlm-field>
           <label hlmFieldLabel for="board-name">Name</label>
-          <input
-            hlmInput
-            id="board-name"
-            type="text"
-            [(ngModel)]="newBoard.name"
-            name="name"
-            required
-            placeholder="Sprint Board"
-          />
+          <input hlmInput id="board-name" type="text" [formField]="createBoardForm.name" placeholder="Sprint Board" />
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="board-desc">Description</label>
           <textarea
             hlmTextarea
             id="board-desc"
-            [(ngModel)]="newBoard.description"
-            name="description"
+            [formField]="createBoardForm.description"
             rows="3"
             placeholder="Optional description..."
           ></textarea>
@@ -143,8 +141,13 @@
       </form>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-        <button hlmBtn (click)="createBoard()" [disabled]="creatingBoard()">
-          @if (creatingBoard()) {
+        <button
+          hlmBtn
+          type="submit"
+          form="create-board-form"
+          [disabled]="createBoardForm().invalid() || createBoardForm().submitting()"
+        >
+          @if (createBoardForm().submitting()) {
             <hlm-spinner /> Creating...
           } @else {
             Create Board
@@ -160,34 +163,45 @@
       <hlm-dialog-header>
         <h3 hlmDialogTitle>Add Member</h3>
       </hlm-dialog-header>
-      <form (ngSubmit)="addMember()" class="space-y-4">
+
+      @if (error()) {
+        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() }}
+        </div>
+      }
+
+      <form id="add-member-form" [formRoot]="addMemberForm" class="space-y-4">
         <hlm-field>
           <label hlmFieldLabel for="member-userid">User ID</label>
           <input
             hlmInput
             id="member-userid"
             type="text"
-            [(ngModel)]="newMemberUserId"
-            name="userId"
-            required
+            [formField]="addMemberForm.userId"
             placeholder="Enter user ID"
           />
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="member-role">Role</label>
-          <hlm-native-select id="member-role" [(ngModel)]="newMemberRole" name="role">
+          <hlm-native-select id="member-role" [formField]="addMemberForm.role">
             @for (role of projectRoles; track role) {
-              <option [value]="role">{{ role }}</option>
+              <option hlmNativeSelectOption [value]="role">{{ role }}</option>
             }
           </hlm-native-select>
         </hlm-field>
       </form>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-        <button hlmBtn (click)="addMember()" [disabled]="addingMember()">
-          @if (addingMember()) {
+        <button
+          hlmBtn
+          type="submit"
+          form="add-member-form"
+          [disabled]="addMemberForm().invalid() || addMemberForm().submitting()"
+        >
+          @if (addMemberForm().submitting()) {
             <hlm-spinner /> Adding...
           } @else {
+            <ng-icon name="lucideUserPlus" class="mr-1" />
             Add Member
           }
         </button>
@@ -202,17 +216,14 @@
         <h3 hlmDialogTitle>Remove Member</h3>
       </hlm-dialog-header>
       <p class="text-sm text-muted-foreground">
-        Are you sure you want to remove <strong>{{ memberToRemove?.userId }}</strong> from this project? This action
+        Are you sure you want to remove <strong>{{ memberToRemove()?.userId }}</strong> from this project? This action
         cannot be undone.
       </p>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-        <button hlmBtn variant="destructive" (click)="removeMember()" [disabled]="removingMember()">
-          @if (removingMember()) {
-            <hlm-spinner /> Removing...
-          } @else {
-            Remove
-          }
+        <button hlmBtn variant="destructive" (click)="removeMember()">
+          <ng-icon name="lucideTrash2" class="mr-1" />
+          Remove
         </button>
       </hlm-dialog-footer>
     </hlm-dialog-content>

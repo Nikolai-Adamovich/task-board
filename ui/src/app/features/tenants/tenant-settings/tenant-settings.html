@@ -16,46 +16,32 @@
         <h3 hlmCardTitle>General Settings</h3>
       </hlm-card-header>
       <div hlmCardContent>
-        <form (ngSubmit)="save()" class="space-y-4">
+        @if (error()) {
+          <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+            {{ error() }}
+          </div>
+        }
+
+        <form id="settings-form" [formRoot]="settingsForm" class="space-y-4">
           <hlm-field>
             <label hlmFieldLabel for="tenant-name">Name</label>
-            <input
-              hlmInput
-              id="tenant-name"
-              type="text"
-              [(ngModel)]="name"
-              name="name"
-              required
-              placeholder="Tenant Name"
-              [disabled]="!canEdit()"
-            />
+            <input hlmInput id="tenant-name" type="text" [formField]="settingsForm.name" placeholder="Tenant Name" />
           </hlm-field>
           <hlm-field>
             <label hlmFieldLabel for="tenant-slug">Slug</label>
-            <input
-              hlmInput
-              id="tenant-slug"
-              type="text"
-              [(ngModel)]="slug"
-              name="slug"
-              required
-              placeholder="tenant-slug"
-              [disabled]="!canEdit()"
-            />
+            <input hlmInput id="tenant-slug" type="text" [formField]="settingsForm.slug" placeholder="tenant-slug" />
           </hlm-field>
         </form>
-
-        @if (successMessage()) {
-          <p class="mt-3 text-sm text-green-600">{{ successMessage() }}</p>
-        }
-        @if (errorMessage()) {
-          <p class="mt-3 text-sm text-destructive">{{ errorMessage() }}</p>
-        }
       </div>
       @if (canEdit()) {
         <hlm-card-footer>
-          <button hlmBtn (click)="save()" [disabled]="saving()">
-            @if (saving()) {
+          <button
+            hlmBtn
+            type="submit"
+            form="settings-form"
+            [disabled]="settingsForm().invalid() || settingsForm().submitting()"
+          >
+            @if (settingsForm().submitting()) {
               <hlm-spinner /> Saving...
             } @else {
               <ng-icon name="lucideSave" class="mr-1" />
@@ -104,10 +90,8 @@
             hlmInput
             id="delete-confirm"
             type="text"
-            [ngModel]="deleteConfirmName()"
-            (ngModelChange)="deleteConfirmName.set($event)"
-            name="deleteConfirm"
-            required
+            [value]="deleteConfirmName()"
+            (input)="deleteConfirmName.set($any($event.target).value)"
             placeholder="Type tenant name to confirm"
           />
         </hlm-field>
@@ -118,14 +102,10 @@
           hlmBtn
           variant="destructive"
           (click)="deleteTenant()"
-          [disabled]="deleting() || deleteConfirmName() !== currentTenantName()"
+          [disabled]="deleteConfirmName() !== currentTenantName()"
         >
-          @if (deleting()) {
-            <hlm-spinner /> Deleting...
-          } @else {
-            <ng-icon name="lucideTrash2" class="mr-1" />
-            Delete Tenant
-          }
+          <ng-icon name="lucideTrash2" class="mr-1" />
+          Delete Tenant
         </button>
       </hlm-dialog-footer>
     </hlm-dialog-content>

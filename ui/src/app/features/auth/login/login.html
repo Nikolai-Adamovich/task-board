@@ -12,7 +12,7 @@
         </div>
       }
 
-      <form id="login-form" (submit)="onSubmit(); $event.preventDefault()">
+      <form id="login-form" [formRoot]="loginForm">
         <hlm-field-group>
           <hlm-field>
             <label hlmFieldLabel for="email">Email</label>

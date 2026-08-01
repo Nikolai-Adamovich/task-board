@@ -1,12 +1,12 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideFolderOpen } from '@ng-icons/lucide';
+import { finalize } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
+import { HttpErrorResponse } from '@angular/common/http';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -14,15 +14,22 @@ import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { NgIcon } from '@ng-icons/core';
-import type { Project, CreateProject } from '@task-board/shared';
+import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
+import type { Project } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+
+export interface CreateProjectForm {
+  name: string;
+  slug: string;
+  description: string;
+}
 
 @Component({
   selector: 'ui-project-list',
   imports: [
     RouterLink,
-    DatePipe,
-    FormsModule,
+    FormField,
+    FormRoot,
     NgIcon,
     HlmButtonImports,
     HlmDialogImports,
@@ -40,10 +47,44 @@ export class ProjectList implements OnInit {
   private readonly authStore = inject(AuthStore);
   protected readonly projects = signal<Project[]>([]);
   protected readonly loading = signal(true);
-  protected readonly creating = signal(false);
+  protected readonly error = signal('');
   protected readonly showCreateModal = signal(false);
-  protected newProject: CreateProject = { name: '', slug: '', description: '' };
-  protected tenantId = signal('');
+  protected readonly tenantId = signal('');
+  private readonly model = signal<CreateProjectForm>({
+    name: '',
+    slug: '',
+    description: '',
+  });
+  protected readonly newProjectForm = form(
+    this.model,
+    schema<CreateProjectForm>((field) => {
+      required(field.name, { message: 'Name is required' });
+      required(field.slug, { message: 'Slug is required' });
+    }),
+    {
+      submission: {
+        action: async () => {
+          this.error.set('');
+          this.projectClient
+            .create({
+              name: this.model().name,
+              slug: this.model().slug,
+              description: this.model().description,
+            })
+            .subscribe({
+              next: (project) => {
+                this.projects.update((list) => [...list, project]);
+                this.showCreateModal.set(false);
+                this.resetForm();
+              },
+              error: (err) => {
+                this.error.set(this.getErrorMessage(err));
+              },
+            });
+        },
+      },
+    },
+  );
 
   protected canCreate(): boolean {
     return !!this.authStore.currentUser();
@@ -52,6 +93,7 @@ export class ProjectList implements OnInit {
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showCreateModal.set(false);
+      this.resetForm();
     }
   }
 
@@ -66,26 +108,25 @@ export class ProjectList implements OnInit {
 
   private loadProjects(): void {
     this.loading.set(true);
-    this.projectClient.list().subscribe({
-      next: (res) => {
-        this.projects.set(res.data);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.projectClient
+      .list()
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (res) => {
+          this.projects.set(res.data);
+        },
+      });
   }
 
-  protected createProject(): void {
-    if (!this.newProject.name || !this.newProject.slug) return;
-    this.creating.set(true);
-    this.projectClient.create(this.newProject).subscribe({
-      next: (project) => {
-        this.projects.update((list) => [...list, project]);
-        this.showCreateModal.set(false);
-        this.newProject = { name: '', slug: '', description: '' };
-        this.creating.set(false);
-      },
-      error: () => this.creating.set(false),
-    });
+  private resetForm(): void {
+    this.model.set({ name: '', slug: '', description: '' });
+  }
+
+  private getErrorMessage(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      return err.error?.message ?? err.message;
+    }
+
+    return 'An unexpected error occurred. Please try again.';
   }
 }
