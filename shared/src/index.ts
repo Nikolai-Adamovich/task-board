@@ -109,6 +109,9 @@ export type { Sprint, CreateSprint, UpdateSprint } from './schemas/sprint.js';
 export { UserPreferencesSchema, UpdateUserPreferencesSchema } from './schemas/user-preferences.js';
 export type { UserPreferences, UpdateUserPreferences } from './schemas/user-preferences.js';
 
+export { SupportRequestSchema } from './schemas/support.js';
+export type { SupportRequest } from './schemas/support.js';
+
 // ─── Contracts ──────────────────────────────────────────────────────────────
 export type { ApiContract } from './contracts/common.contracts.js';
 export { authContracts } from './contracts/auth.contracts.js';

@@ -61,6 +61,9 @@ app.get('/api/v1/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ── Support route (no auth, no tenant context required) ──────────────────────
+app.route('/api/v1/support', routeRegistry.support);
+
 // ── Auth routes (no tenant context or RBAC required) ──────────────────────────
 app.route('/api/v1/auth', routeRegistry.auth);
 

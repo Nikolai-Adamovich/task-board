@@ -11,6 +11,12 @@
     </div>
   }
 
+  @if (success()) {
+    <div class="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-700" role="alert">
+      Your message has been sent successfully. We'll get back to you soon.
+    </div>
+  }
+
   <form id="support-form" [formRoot]="supportForm" class="max-w-lg space-y-4">
     <hlm-field>
       <label hlmFieldLabel for="support-name">Name</label>
@@ -55,6 +61,12 @@
         <p hlm-field-error>{{ supportForm.message().errors()[0].message }}</p>
       }
     </hlm-field>
+
+    <!-- Honeypot field — hidden from real users, bots will fill it -->
+    <div style="position: absolute; left: -9999px" aria-hidden="true">
+      <label for="support-website">Website</label>
+      <input id="support-website" type="text" name="website" tabindex="-1" autocomplete="off" />
+    </div>
 
     <button hlmBtn type="submit" form="support-form" [disabled]="supportForm().invalid() || supportForm().submitting()">
       @if (supportForm().submitting()) {

@@ -16,6 +16,7 @@ import { createBoardRoutes } from './boards.js';
 import { createColumnRoutes } from './columns.js';
 import { createTaskRoutes } from './tasks.js';
 import { createSprintRoutes } from './sprints.js';
+import { createSupportRoutes } from './support.js';
 
 // ─── Route Registry ───────────────────────────────────────────────────────────
 
@@ -80,4 +81,7 @@ export const routeRegistry = {
     router.route('/', createSprintRoutes());
     return router;
   })(),
+
+  /** Support routes — no tenant context, no RBAC, no auth required */
+  support: createSupportRoutes(),
 } as const;
