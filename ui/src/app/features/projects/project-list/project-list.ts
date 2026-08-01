@@ -63,7 +63,7 @@ export class ProjectList implements OnInit {
     }),
     {
       submission: {
-        action: async () => {
+        action: async (f) => {
           this.error.set('');
           this.projectClient
             .create({
@@ -75,7 +75,7 @@ export class ProjectList implements OnInit {
               next: (project) => {
                 this.projects.update((list) => [...list, project]);
                 this.showCreateModal.set(false);
-                this.resetForm();
+                f().reset({ name: '', slug: '', description: '' });
               },
               error: (err) => {
                 this.error.set(this.getErrorMessage(err));
@@ -93,7 +93,6 @@ export class ProjectList implements OnInit {
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showCreateModal.set(false);
-      this.resetForm();
     }
   }
 
@@ -116,10 +115,6 @@ export class ProjectList implements OnInit {
           this.projects.set(res.data);
         },
       });
-  }
-
-  private resetForm(): void {
-    this.model.set({ name: '', slug: '', description: '' });
   }
 
   private getErrorMessage(err: unknown): string {

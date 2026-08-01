@@ -73,7 +73,7 @@ export class BoardView implements OnInit {
     }),
     {
       submission: {
-        action: async () => {
+        action: async (f) => {
           this.error.set('');
 
           const title = this.model().title;
@@ -95,7 +95,12 @@ export class BoardView implements OnInit {
               next: (task) => {
                 this.tasks.update((list) => [...list, task]);
                 this.showCreateTask.set(false);
-                this.resetForm();
+                f().reset({
+                  title: '',
+                  description: '',
+                  priority: TaskPriority.Medium,
+                  columnId: this.columns()[0]?.id ?? '',
+                });
               },
               error: (err) => {
                 this.error.set(this.getErrorMessage(err));
@@ -109,7 +114,6 @@ export class BoardView implements OnInit {
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showCreateTask.set(false);
-      this.resetForm();
     }
   }
 
@@ -176,15 +180,6 @@ export class BoardView implements OnInit {
 
   protected goToTask(task: Task): void {
     this.router.navigate(['/tenants', task.tenantId, 'projects', task.projectId, 'tasks', task.id]);
-  }
-
-  private resetForm(): void {
-    this.model.set({
-      title: '',
-      description: '',
-      priority: TaskPriority.Medium,
-      columnId: this.columns()[0]?.id ?? '',
-    });
   }
 
   private getErrorMessage(err: unknown): string {

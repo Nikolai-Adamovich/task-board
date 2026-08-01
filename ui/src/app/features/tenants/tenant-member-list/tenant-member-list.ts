@@ -65,7 +65,7 @@ export class TenantMemberList implements OnInit {
     }),
     {
       submission: {
-        action: async () => {
+        action: async (f) => {
           this.error.set('');
 
           const modelValue = this.model();
@@ -73,7 +73,7 @@ export class TenantMemberList implements OnInit {
           this.tenantClient.inviteMember(this.tenantId(), modelValue.email, modelValue.role).subscribe({
             next: () => {
               this.showInviteDialog.set(false);
-              this.model.set({ email: '', role: TenantRole.Member });
+              f().reset({ email: '', role: TenantRole.Member });
               this.loadMembers();
             },
             error: (err) => {
@@ -103,7 +103,6 @@ export class TenantMemberList implements OnInit {
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showInviteDialog.set(false);
-      this.model.set({ email: '', role: TenantRole.Member });
     }
   }
 

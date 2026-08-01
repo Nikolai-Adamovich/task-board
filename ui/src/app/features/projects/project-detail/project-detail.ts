@@ -76,14 +76,14 @@ export class ProjectDetail implements OnInit {
     }),
     {
       submission: {
-        action: async () => {
+        action: async (f) => {
           this.error.set('');
 
           this.boardClient.create(this.projectId(), this.boardModel()).subscribe({
             next: (board) => {
               this.boards.update((list) => [...list, board]);
               this.showCreateBoard.set(false);
-              this.boardModel.set({ name: '', description: '' });
+              f().reset({ name: '', description: '' });
             },
             error: (err) => {
               this.error.set(this.getErrorMessage(err));
@@ -104,7 +104,7 @@ export class ProjectDetail implements OnInit {
     }),
     {
       submission: {
-        action: async () => {
+        action: async (f) => {
           this.error.set('');
 
           this.projectClient
@@ -113,7 +113,7 @@ export class ProjectDetail implements OnInit {
               next: () => {
                 this.loadMembers();
                 this.showAddMember.set(false);
-                this.memberModel.set({ userId: '', role: ProjectRole.Developer });
+                f().reset({ userId: '', role: ProjectRole.Developer });
               },
               error: (err) => {
                 this.error.set(this.getErrorMessage(err));

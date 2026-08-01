@@ -288,14 +288,11 @@ describe('TenantMemberList', () => {
   describe('onDialogStateChange', () => {
     beforeEach(() => setup());
 
-    it('should close dialog and reset form on closed state', () => {
+    it('should close dialog on closed state', () => {
       component.showInviteDialog.set(true);
-      component.model.update((m: { email: string; role: string }) => ({ ...m, email: 'test@example.com' }));
       component.onDialogStateChange('closed');
 
       expect(component.showInviteDialog()).toBe(false);
-      expect(component.model().email).toBe('');
-      expect(component.model().role).toBe('member');
     });
   });
 });

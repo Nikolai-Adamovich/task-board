@@ -80,7 +80,7 @@ export class SprintList implements OnInit {
     }),
     {
       submission: {
-        action: async () => {
+        action: async (f) => {
           this.error.set('');
 
           this.sprintClient
@@ -94,7 +94,7 @@ export class SprintList implements OnInit {
               next: (sprint) => {
                 this.sprints.update((list) => [...list, sprint]);
                 this.showCreateModal.set(false);
-                this.resetForm();
+                f().reset({ name: '', startDate: '', endDate: '', goal: '' });
               },
               error: (err) => {
                 this.error.set(this.getErrorMessage(err));
@@ -143,7 +143,6 @@ export class SprintList implements OnInit {
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showCreateModal.set(false);
-      this.resetForm();
     }
   }
 
@@ -164,10 +163,6 @@ export class SprintList implements OnInit {
           this.error.set(this.getErrorMessage(err));
         },
       });
-  }
-
-  private resetForm(): void {
-    this.model.set({ name: '', startDate: '', endDate: '', goal: '' });
   }
 
   protected getStatusColor(status: string): string {
