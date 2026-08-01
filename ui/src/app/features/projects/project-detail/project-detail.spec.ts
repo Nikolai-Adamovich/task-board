@@ -15,6 +15,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { submit } from '@angular/forms/signals';
 import { ProjectDetail } from './project-detail';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
@@ -143,14 +144,14 @@ describe('ProjectDetail', () => {
     beforeEach(() => setup());
 
     it('should not create board when name is empty', () => {
-      component.newBoard.name = '';
-      component.createBoard();
+      component.boardModel.update((m: { name: string; description: string }) => ({ ...m, name: '' }));
+      submit(component.createBoardForm);
       expect(boardClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should create board and add to list', () => {
-      component.newBoard.name = 'New Board';
-      component.createBoard();
+      component.boardModel.update((m: { name: string; description: string }) => ({ ...m, name: 'New Board' }));
+      submit(component.createBoardForm);
 
       expect(boardClientMock.create).toHaveBeenCalledWith(mockProject.id, { name: 'New Board', description: '' });
       expect(component.boards()).toHaveLength(3);
@@ -158,18 +159,18 @@ describe('ProjectDetail', () => {
     });
 
     it('should reset newBoard after creation', () => {
-      component.newBoard.name = 'New Board';
-      component.createBoard();
+      component.boardModel.update((m: { name: string; description: string }) => ({ ...m, name: 'New Board' }));
+      submit(component.createBoardForm);
 
-      expect(component.newBoard.name).toBe('');
+      expect(component.boardModel().name).toBe('');
     });
 
     it('should set creatingBoard to false on error', () => {
       boardClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.newBoard.name = 'Fail Board';
-      component.createBoard();
+      component.boardModel.update((m: { name: string; description: string }) => ({ ...m, name: 'Fail Board' }));
+      submit(component.createBoardForm);
 
-      expect(component.creatingBoard()).toBe(false);
+      expect(component.loading()).toBe(false);
     });
   });
 
@@ -179,34 +180,34 @@ describe('ProjectDetail', () => {
     beforeEach(() => setup());
 
     it('should not add member when userId is empty', () => {
-      component.newMemberUserId = '';
-      component.addMember();
+      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: '' }));
+      submit(component.addMemberForm);
       expect(projectClientMock.addMember).not.toHaveBeenCalled();
     });
 
     it('should call projectClient.addMember with correct params', () => {
-      component.newMemberUserId = 'user-new';
-      component.newMemberRole = 'developer';
-      component.addMember();
+      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: 'user-new' }));
+      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, role: 'developer' }));
+      submit(component.addMemberForm);
 
       expect(projectClientMock.addMember).toHaveBeenCalledWith(mockProject.id, 'user-new', 'developer');
     });
 
     it('should reset member form after success', () => {
-      component.newMemberUserId = 'user-new';
-      component.addMember();
+      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: 'user-new' }));
+      submit(component.addMemberForm);
 
-      expect(component.newMemberUserId).toBe('');
-      expect(component.newMemberRole).toBe('developer');
+      expect(component.memberModel().userId).toBe('');
+      expect(component.memberModel().role).toBe('developer');
       expect(component.showAddMember()).toBe(false);
     });
 
     it('should set addingMember to false on error', () => {
       projectClientMock.addMember.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.newMemberUserId = 'user-new';
-      component.addMember();
+      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: 'user-new' }));
+      submit(component.addMemberForm);
 
-      expect(component.addingMember()).toBe(false);
+      expect(component.loading()).toBe(false);
     });
   });
 
@@ -233,7 +234,7 @@ describe('ProjectDetail', () => {
 
     it('should set memberToRemove on confirmRemoveMember', () => {
       component.confirmRemoveMember(mockMembers[0]);
-      expect(component.memberToRemove).toEqual(mockMembers[0]);
+      expect(component.memberToRemove()).toEqual(mockMembers[0]);
       expect(component.showRemoveConfirm()).toBe(true);
     });
 
@@ -243,7 +244,7 @@ describe('ProjectDetail', () => {
 
       expect(projectClientMock.removeMember).toHaveBeenCalledWith(mockProject.id, 'u1');
       expect(component.showRemoveConfirm()).toBe(false);
-      expect(component.memberToRemove).toBeNull();
+      expect(component.memberToRemove()).toBeNull();
     });
 
     it('should set removingMember to false on error', () => {
@@ -251,7 +252,7 @@ describe('ProjectDetail', () => {
       component.confirmRemoveMember(mockMembers[0]);
       component.removeMember();
 
-      expect(component.removingMember()).toBe(false);
+      expect(component.loading()).toBe(false);
     });
   });
 
@@ -273,12 +274,12 @@ describe('ProjectDetail', () => {
     });
 
     it('should close remove confirm dialog and clear memberToRemove', () => {
-      component.memberToRemove = mockMembers[0];
+      component.memberToRemove.set(mockMembers[0]);
       component.showRemoveConfirm.set(true);
       component.onRemoveDialogStateChange('closed');
 
       expect(component.showRemoveConfirm()).toBe(false);
-      expect(component.memberToRemove).toBeNull();
+      expect(component.memberToRemove()).toBeNull();
     });
   });
 

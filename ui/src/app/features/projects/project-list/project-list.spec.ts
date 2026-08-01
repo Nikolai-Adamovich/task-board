@@ -12,6 +12,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { submit } from '@angular/forms/signals';
 import { ProjectList, CreateProjectForm } from './project-list';
 import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
@@ -136,21 +137,21 @@ describe('ProjectList', () => {
     it('should not create when name is empty', () => {
       component.model.update((m: CreateProjectForm) => ({ ...m, name: '' }));
       component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'slug' }));
-      component.createProject();
+      submit(component.newProjectForm);
       expect(projectClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should not create when slug is empty', () => {
       component.model.update((m: CreateProjectForm) => ({ ...m, name: 'Name' }));
       component.model.update((m: CreateProjectForm) => ({ ...m, slug: '' }));
-      component.createProject();
+      submit(component.newProjectForm);
       expect(projectClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should create project and add to list', () => {
       component.model.update((m: CreateProjectForm) => ({ ...m, name: 'New Project' }));
       component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'new-project' }));
-      component.createProject();
+      submit(component.newProjectForm);
 
       expect(projectClientMock.create).toHaveBeenCalled();
       expect(component.projects()).toHaveLength(3);
@@ -160,7 +161,7 @@ describe('ProjectList', () => {
     it('should reset form after creation', () => {
       component.model.update((m: CreateProjectForm) => ({ ...m, name: 'New Project' }));
       component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'new-project' }));
-      component.createProject();
+      submit(component.newProjectForm);
 
       expect(component.model().name).toBe('');
       expect(component.model().slug).toBe('');
@@ -170,9 +171,9 @@ describe('ProjectList', () => {
       projectClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
       component.model.update((m: CreateProjectForm) => ({ ...m, name: 'Fail' }));
       component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'fail' }));
-      component.createProject();
+      submit(component.newProjectForm);
 
-      expect(component.creating()).toBe(false);
+      expect(component.loading()).toBe(false);
     });
   });
 

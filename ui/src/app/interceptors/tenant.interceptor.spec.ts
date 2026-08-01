@@ -2,26 +2,28 @@
  * Tests for the tenantInterceptor.
  *
  * Covers:
- * - Attaches X-Tenant-Id header when tenant ID exists in localStorage
+ * - Attaches X-Tenant-Id header when tenant ID exists in TenantStore
  * - Skips header for /auth/* requests
- * - Passes through unchanged when no tenant ID in localStorage
+ * - Passes through unchanged when no tenant ID in TenantStore
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { tenantInterceptor } from './tenant.interceptor';
-
-const TENANT_KEY = 'taskboard_tenant_id';
+import { TenantStore } from '@stores/tenant-store';
 
 describe('tenantInterceptor', () => {
   let httpMock: HttpTestingController;
   let http: HttpClient;
 
   beforeEach(() => {
-    localStorage.clear();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(withInterceptors([tenantInterceptor])), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(withInterceptors([tenantInterceptor])),
+        provideHttpClientTesting(),
+        { provide: TenantStore, useValue: { activeTenant: () => ({ id: 'tenant-123' }) } },
+      ],
     });
     httpMock = TestBed.inject(HttpTestingController);
     http = TestBed.inject(HttpClient);
@@ -29,12 +31,9 @@ describe('tenantInterceptor', () => {
 
   afterEach(() => {
     httpMock.verify();
-    localStorage.clear();
   });
 
-  it('should attach X-Tenant-Id header when tenant ID exists in localStorage', () => {
-    localStorage.setItem(TENANT_KEY, 'tenant-123');
-
+  it('should attach X-Tenant-Id header when tenant ID exists in TenantStore', () => {
     http.get('/api/projects').subscribe();
 
     const req = httpMock.expectOne('/api/projects');
@@ -43,7 +42,18 @@ describe('tenantInterceptor', () => {
     req.flush({});
   });
 
-  it('should not attach X-Tenant-Id header when localStorage is empty', () => {
+  it('should not attach X-Tenant-Id header when no tenant in TenantStore', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([tenantInterceptor])),
+        provideHttpClientTesting(),
+        { provide: TenantStore, useValue: { activeTenant: () => null } },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    http = TestBed.inject(HttpClient);
+
     http.get('/api/projects').subscribe();
 
     const req = httpMock.expectOne('/api/projects');
@@ -53,8 +63,6 @@ describe('tenantInterceptor', () => {
   });
 
   it('should skip X-Tenant-Id header for /auth/* requests', () => {
-    localStorage.setItem(TENANT_KEY, 'tenant-123');
-
     http.post('/api/auth/login', { email: 'a@b.com', password: 'x' }).subscribe();
 
     const req = httpMock.expectOne('/api/auth/login');
@@ -64,8 +72,6 @@ describe('tenantInterceptor', () => {
   });
 
   it('should skip X-Tenant-Id header for requests containing /auth/ in URL', () => {
-    localStorage.setItem(TENANT_KEY, 'tenant-123');
-
     http.get('/api/auth/me').subscribe();
 
     const req = httpMock.expectOne('/api/auth/me');

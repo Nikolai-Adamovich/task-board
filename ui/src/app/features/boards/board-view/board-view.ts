@@ -128,6 +128,7 @@ export class BoardView implements OnInit {
           this.loadColumns();
           this.loadTasks();
         },
+        error: (err) => console.error(err),
       });
   }
 

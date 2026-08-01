@@ -12,6 +12,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
+import { submit } from '@angular/forms/signals';
 import { TenantSettings } from './tenant-settings';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
@@ -76,8 +77,8 @@ describe('TenantSettings', () => {
     beforeEach(() => setup());
 
     it('should populate name and slug from active tenant', () => {
-      expect(component.name).toBe('Acme');
-      expect(component.slug).toBe('acme');
+      expect(component.model().name).toBe('Acme');
+      expect(component.model().slug).toBe('acme');
     });
 
     it('should set loading to false', () => {
@@ -110,47 +111,47 @@ describe('TenantSettings', () => {
     beforeEach(() => setup());
 
     it('should call tenantStore.updateTenant', () => {
-      component.name = 'New Name';
-      component.slug = 'new-slug';
-      component.save();
+      component.model.update((m: { name: string; slug: string }) => ({ ...m, name: 'New Name' }));
+      component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: 'new-slug' }));
+      submit(component.settingsForm);
 
       expect(tenantStoreMock.updateTenant).toHaveBeenCalledWith('t1', { name: 'New Name', slug: 'new-slug' });
     });
 
     it('should not save when name is empty', () => {
-      component.name = '';
-      component.save();
+      component.model.update((m: { name: string; slug: string }) => ({ ...m, name: '' }));
+      submit(component.settingsForm);
 
       expect(tenantStoreMock.updateTenant).not.toHaveBeenCalled();
     });
 
     it('should not save when slug is empty', () => {
-      component.slug = '';
-      component.save();
+      component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: '' }));
+      submit(component.settingsForm);
 
       expect(tenantStoreMock.updateTenant).not.toHaveBeenCalled();
     });
 
-    it('should set success message on success', async () => {
-      component.name = 'New Name';
-      component.slug = 'new-slug';
-      component.save();
+    it('should navigate to home on success', async () => {
+      component.model.update((m: { name: string; slug: string }) => ({ ...m, name: 'New Name' }));
+      component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: 'new-slug' }));
+      submit(component.settingsForm);
 
       // Wait for async resolution
       await new Promise((r) => setTimeout(r, 0));
-      expect(component.successMessage()).toBe('Tenant settings updated successfully.');
-      expect(component.saving()).toBe(false);
+      expect(component.error()).toBe('');
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/']);
     });
 
     it('should set error message on failure', async () => {
       tenantStoreMock.updateTenant.mockRejectedValueOnce(new Error('fail'));
-      component.name = 'New Name';
-      component.slug = 'new-slug';
-      component.save();
+      component.model.update((m: { name: string; slug: string }) => ({ ...m, name: 'New Name' }));
+      component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: 'new-slug' }));
+      submit(component.settingsForm);
 
       await new Promise((r) => setTimeout(r, 0));
-      expect(component.errorMessage()).toBe('Failed to update tenant settings.');
-      expect(component.saving()).toBe(false);
+      expect(component.error()).toBe('An unexpected error occurred. Please try again.');
+      expect(component.loading()).toBe(false);
     });
   });
 
@@ -182,8 +183,8 @@ describe('TenantSettings', () => {
       component.deleteTenant();
 
       await new Promise((r) => setTimeout(r, 0));
-      expect(component.errorMessage()).toBe('Failed to delete tenant.');
-      expect(component.deleting()).toBe(false);
+      expect(component.error()).toBe('An unexpected error occurred. Please try again.');
+      expect(component.loading()).toBe(false);
     });
   });
 

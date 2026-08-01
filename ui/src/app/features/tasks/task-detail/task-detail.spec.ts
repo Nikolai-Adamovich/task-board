@@ -14,6 +14,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { submit } from '@angular/forms/signals';
 import { TaskDetail, EditTaskForm } from './task-detail';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
@@ -183,7 +184,7 @@ describe('TaskDetail', () => {
     it('should call taskClient.update on saveTask', () => {
       component.startEdit();
       component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
-      component.saveTask();
+      submit(component.editForm);
 
       expect(taskClientMock.update).toHaveBeenCalledWith(
         mockTask.id,
@@ -194,19 +195,19 @@ describe('TaskDetail', () => {
     it('should update task signal after successful save', () => {
       component.startEdit();
       component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
-      component.saveTask();
+      submit(component.editForm);
 
       expect(component.task().title).toBe('Updated Title');
       expect(component.isEditing()).toBe(false);
-      expect(component.saving()).toBe(false);
+      expect(component.loading()).toBe(false);
     });
 
     it('should set saving to false on error', () => {
       taskClientMock.update.mockReturnValueOnce(throwError(() => new Error('fail')));
       component.startEdit();
-      component.saveTask();
+      submit(component.editForm);
 
-      expect(component.saving()).toBe(false);
+      expect(component.loading()).toBe(false);
     });
   });
 

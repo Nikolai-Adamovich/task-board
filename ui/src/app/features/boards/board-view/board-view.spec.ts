@@ -15,11 +15,19 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { submit } from '@angular/forms/signals';
 import { BoardView } from './board-view';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Board, Column, Task } from '@task-board/shared';
+import type { Board, Column, Task, TaskPriority } from '@task-board/shared';
+
+interface CreateTaskForm {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  columnId: string;
+}
 
 // ── Test fixtures ───────────────────────────────────────────
 
@@ -345,27 +353,27 @@ describe('BoardView', () => {
     beforeEach(() => setup());
 
     it('should not call taskClient.create when title is empty', () => {
-      component.model.update((m) => ({ ...m, title: '' }));
-      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
-      component.createTask();
+      component.model.update((m: CreateTaskForm) => ({ ...m, title: '' }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, columnId: mockColumns[0].id }));
+      submit(component.newTaskForm);
 
       expect(taskClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should not call taskClient.create when columnId is empty', () => {
-      component.model.update((m) => ({ ...m, title: 'Some title' }));
-      component.model.update((m) => ({ ...m, columnId: '' }));
-      component.createTask();
+      component.model.update((m: CreateTaskForm) => ({ ...m, title: 'Some title' }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, columnId: '' }));
+      submit(component.newTaskForm);
 
       expect(taskClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should call taskClient.create with the model data', () => {
-      component.model.update((m) => ({ ...m, title: 'New Task' }));
-      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
-      component.model.update((m) => ({ ...m, description: 'A description' }));
-      component.model.update((m) => ({ ...m, priority: 'high' }));
-      component.createTask();
+      component.model.update((m: CreateTaskForm) => ({ ...m, title: 'New Task' }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, columnId: mockColumns[0].id }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, description: 'A description' }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, priority: 'high' }));
+      submit(component.newTaskForm);
 
       expect(taskClientMock.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -378,9 +386,9 @@ describe('BoardView', () => {
     });
 
     it('should add the created task to the tasks signal', () => {
-      component.model.update((m) => ({ ...m, title: 'New Task' }));
-      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
-      component.createTask();
+      component.model.update((m: CreateTaskForm) => ({ ...m, title: 'New Task' }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, columnId: mockColumns[0].id }));
+      submit(component.newTaskForm);
 
       const tasks = component.tasks() as Task[];
 
@@ -389,45 +397,27 @@ describe('BoardView', () => {
 
     it('should close the dialog after successful creation', () => {
       component.showCreateTask.set(true);
-      component.model.update((m) => ({ ...m, title: 'New Task' }));
-      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
-      component.createTask();
+      component.model.update((m: CreateTaskForm) => ({ ...m, title: 'New Task' }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, columnId: mockColumns[0].id }));
+      submit(component.newTaskForm);
 
       expect(component.showCreateTask()).toBe(false);
     });
 
     it('should reset model title after successful creation', () => {
-      component.model.update((m) => ({ ...m, title: 'New Task' }));
-      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
-      component.createTask();
+      component.model.update((m: CreateTaskForm) => ({ ...m, title: 'New Task' }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, columnId: mockColumns[0].id }));
+      submit(component.newTaskForm);
 
       expect(component.model().title).toBe('');
-    });
-
-    it('should set creatingTask to true during submission', () => {
-      component.model.update((m) => ({ ...m, title: 'New Task' }));
-      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
-      component.createTask();
-
-      // After synchronous observable completes, it should be back to false
-      expect(component.creatingTask()).toBe(false);
-    });
-
-    it('should set creatingTask to false on error', () => {
-      taskClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.model.update((m) => ({ ...m, title: 'New Task' }));
-      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
-      component.createTask();
-
-      expect(component.creatingTask()).toBe(false);
     });
 
     it('should not close dialog on error', () => {
       taskClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
       component.showCreateTask.set(true);
-      component.model.update((m) => ({ ...m, title: 'New Task' }));
-      component.model.update((m) => ({ ...m, columnId: mockColumns[0].id }));
-      component.createTask();
+      component.model.update((m: CreateTaskForm) => ({ ...m, title: 'New Task' }));
+      component.model.update((m: CreateTaskForm) => ({ ...m, columnId: mockColumns[0].id }));
+      submit(component.newTaskForm);
 
       expect(component.showCreateTask()).toBe(true);
     });

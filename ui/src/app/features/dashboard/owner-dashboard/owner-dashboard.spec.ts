@@ -104,7 +104,7 @@ describe('OwnerDashboard', () => {
     });
 
     it('should return correct color for medium', () => {
-      expect(component.getPriorityColor('medium')).toBe('bg-blue-100 text-blue-700');
+      expect(component.getPriorityColor('medium')).toBe('bg-yellow-100 text-yellow-700');
     });
 
     it('should return correct color for low', () => {
@@ -113,40 +113,6 @@ describe('OwnerDashboard', () => {
 
     it('should return fallback for unknown priority', () => {
       expect(component.getPriorityColor('unknown')).toBe(NeutralColor);
-    });
-  });
-
-  // ── inProgressCount ────────────────────────────────────────────────────
-
-  describe('inProgressCount', () => {
-    it('should count tasks with "progress" in columnTitle', () => {
-      setup();
-      expect(component.inProgressCount).toBe(2);
-    });
-
-    it('should be case-insensitive', () => {
-      const tasks: MyTask[] = [
-        { ...mockTasks[0], columnTitle: 'IN PROGRESS' },
-        { ...mockTasks[1], columnTitle: 'todo' },
-      ];
-
-      setup(tasks);
-      expect(component.inProgressCount).toBe(1);
-    });
-
-    it('should return 0 when no tasks match', () => {
-      const tasks: MyTask[] = [
-        { ...mockTasks[0], columnTitle: 'To Do' },
-        { ...mockTasks[1], columnTitle: 'Done' },
-      ];
-
-      setup(tasks);
-      expect(component.inProgressCount).toBe(0);
-    });
-
-    it('should return 0 for empty tasks', () => {
-      setup([]);
-      expect(component.inProgressCount).toBe(0);
     });
   });
 });

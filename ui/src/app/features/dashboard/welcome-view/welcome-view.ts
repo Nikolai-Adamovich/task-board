@@ -33,6 +33,7 @@ export class WelcomeView {
         next: () => {
           this.invitationHandled.emit();
         },
+        error: (err) => console.error(err),
       });
   }
 }

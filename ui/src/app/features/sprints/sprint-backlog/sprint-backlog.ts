@@ -41,6 +41,7 @@ export class SprintBacklog implements OnInit {
         next: (res) => {
           this.backlogTasks.set(res.data);
         },
+        error: (err) => console.error(err),
       });
   }
 

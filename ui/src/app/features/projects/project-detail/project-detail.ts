@@ -200,6 +200,7 @@ export class ProjectDetail implements OnInit {
         this.showRemoveConfirm.set(false);
         this.memberToRemove.set(null);
       },
+      error: (err) => console.error(err),
     });
   }
 

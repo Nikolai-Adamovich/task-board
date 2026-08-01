@@ -66,6 +66,7 @@ export class SprintDetail implements OnInit {
           this.sprint.set(sprint);
           this.loadSprintTasks(sprint);
         },
+        error: (err) => console.error(err),
       });
   }
 
@@ -73,6 +74,7 @@ export class SprintDetail implements OnInit {
     if (sprint.taskIds.length === 0) return;
     this.taskClient.list({ sprintId: sprint.id, limit: 200 }).subscribe({
       next: (res) => this.sprintTasks.set(res.data),
+      error: (err) => console.error(err),
     });
   }
 

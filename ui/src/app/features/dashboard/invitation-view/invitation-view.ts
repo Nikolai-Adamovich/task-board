@@ -33,6 +33,7 @@ export class InvitationView {
         next: () => {
           this.invitationHandled.emit();
         },
+        error: (err) => console.error(err),
       });
   }
 
@@ -45,6 +46,7 @@ export class InvitationView {
         next: () => {
           this.invitationHandled.emit();
         },
+        error: (err) => console.error(err),
       });
   }
 }

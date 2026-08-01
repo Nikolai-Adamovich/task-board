@@ -254,7 +254,7 @@ describe('AcceptInvitation', () => {
       component.acceptAsExistingUser();
 
       expect(component.error()).toBe('Already a member');
-      expect(component.submitting()).toBe(false);
+      expect(component.loading()).toBe(false);
     });
   });
 });

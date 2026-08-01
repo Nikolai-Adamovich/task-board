@@ -105,6 +105,7 @@ export class TaskDetail implements OnInit {
         next: (task) => {
           this.task.set(task);
         },
+        error: (err) => this.error.set(this.getErrorMessage(err)),
       });
   }
 

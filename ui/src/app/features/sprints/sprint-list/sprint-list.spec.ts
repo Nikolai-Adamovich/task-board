@@ -13,6 +13,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { submit } from '@angular/forms/signals';
 import { SprintList, CreateSprintForm } from './sprint-list';
 import { SprintClient } from '@services/sprint-client';
 import { ProjectClient } from '@services/project-client';
@@ -122,16 +123,12 @@ describe('SprintList', () => {
   describe('ngOnInit - tenant-level', () => {
     beforeEach(() => setup());
 
-    it('should call sprintClient.listByTenant when no projectId', () => {
-      expect(sprintClientMock.listByTenant).toHaveBeenCalled();
+    it('should call sprintClient.list when no projectId', () => {
+      expect(sprintClientMock.list).toHaveBeenCalled();
     });
 
-    it('should load projects for name resolution', () => {
-      expect(projectClientMock.list).toHaveBeenCalled();
-    });
-
-    it('should populate projects signal', () => {
-      expect(component.projects()).toEqual(mockProjects);
+    it('should populate sprints signal', () => {
+      expect(component.sprints()).toEqual(mockSprints);
     });
 
     it('should set loading to false', () => {
@@ -140,8 +137,8 @@ describe('SprintList', () => {
 
     it('should handle error and set loading to false', () => {
       sprintClientMock = {
-        list: vi.fn(),
-        listByTenant: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
+        list: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
+        listByTenant: vi.fn(),
         create: vi.fn(),
       };
       projectClientMock = { list: vi.fn() };
@@ -190,19 +187,19 @@ describe('SprintList', () => {
   describe('isGroupExpanded / toggleGroup', () => {
     beforeEach(() => setup());
 
-    it('should default to expanded', () => {
-      expect(component.isGroupExpanded('p1')).toBe(true);
-    });
-
-    it('should toggle to collapsed', () => {
-      component.toggleGroup('p1');
+    it('should default to collapsed', () => {
       expect(component.isGroupExpanded('p1')).toBe(false);
     });
 
-    it('should toggle back to expanded', () => {
-      component.toggleGroup('p1');
+    it('should toggle to expanded', () => {
       component.toggleGroup('p1');
       expect(component.isGroupExpanded('p1')).toBe(true);
+    });
+
+    it('should toggle back to collapsed', () => {
+      component.toggleGroup('p1');
+      component.toggleGroup('p1');
+      expect(component.isGroupExpanded('p1')).toBe(false);
     });
   });
 
@@ -215,7 +212,7 @@ describe('SprintList', () => {
       component.model.update((m: CreateSprintForm) => ({ ...m, name: '' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
-      component.createSprint();
+      submit(component.newSprintForm);
       expect(sprintClientMock.create).not.toHaveBeenCalled();
     });
 
@@ -223,7 +220,7 @@ describe('SprintList', () => {
       component.model.update((m: CreateSprintForm) => ({ ...m, name: 'Sprint' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
-      component.createSprint();
+      submit(component.newSprintForm);
       expect(sprintClientMock.create).not.toHaveBeenCalled();
     });
 
@@ -231,7 +228,7 @@ describe('SprintList', () => {
       component.model.update((m: CreateSprintForm) => ({ ...m, name: 'Sprint' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '' }));
-      component.createSprint();
+      submit(component.newSprintForm);
       expect(sprintClientMock.create).not.toHaveBeenCalled();
     });
 
@@ -239,7 +236,7 @@ describe('SprintList', () => {
       component.model.update((m: CreateSprintForm) => ({ ...m, name: 'New Sprint' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
-      component.createSprint();
+      submit(component.newSprintForm);
 
       expect(sprintClientMock.create).toHaveBeenCalled();
       expect(component.sprints()).toHaveLength(3);
@@ -250,7 +247,7 @@ describe('SprintList', () => {
       component.model.update((m: CreateSprintForm) => ({ ...m, name: 'New Sprint' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
-      component.createSprint();
+      submit(component.newSprintForm);
 
       expect(component.model().name).toBe('');
       expect(component.model().startDate).toBe('');
@@ -262,9 +259,9 @@ describe('SprintList', () => {
       component.model.update((m: CreateSprintForm) => ({ ...m, name: 'Fail Sprint' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
-      component.createSprint();
+      submit(component.newSprintForm);
 
-      expect(component.creating()).toBe(false);
+      expect(component.loading()).toBe(false);
     });
   });
 

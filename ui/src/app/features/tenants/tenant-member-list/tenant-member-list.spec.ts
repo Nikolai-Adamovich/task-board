@@ -17,6 +17,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { submit } from '@angular/forms/signals';
 import { TenantMemberList } from './tenant-member-list';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
@@ -125,34 +126,34 @@ describe('TenantMemberList', () => {
     beforeEach(() => setup());
 
     it('should not invite when email is empty', () => {
-      component.inviteEmail = '';
-      component.inviteMember();
+      component.model.update((m: { email: string; role: string }) => ({ ...m, email: '' }));
+      submit(component.inviteForm);
       expect(tenantClientMock.inviteMember).not.toHaveBeenCalled();
     });
 
     it('should call tenantClient.inviteMember', () => {
-      component.inviteEmail = 'new@example.com';
-      component.inviteRole = 'admin';
-      component.inviteMember();
+      component.model.update((m: { email: string; role: string }) => ({ ...m, email: 'new@example.com' }));
+      component.model.update((m: { email: string; role: string }) => ({ ...m, role: 'admin' }));
+      submit(component.inviteForm);
 
       expect(tenantClientMock.inviteMember).toHaveBeenCalledWith('t1', 'new@example.com', 'admin');
     });
 
     it('should reset form and close dialog on success', () => {
-      component.inviteEmail = 'new@example.com';
-      component.inviteMember();
+      component.model.update((m: { email: string; role: string }) => ({ ...m, email: 'new@example.com' }));
+      submit(component.inviteForm);
 
       expect(component.showInviteDialog()).toBe(false);
-      expect(component.inviteEmail).toBe('');
-      expect(component.inviteRole).toBe('member');
+      expect(component.model().email).toBe('');
+      expect(component.model().role).toBe('member');
     });
 
-    it('should set inviting to false on error', () => {
+    it('should set actioningUserId to null on error', () => {
       tenantClientMock.inviteMember.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.inviteEmail = 'fail@example.com';
-      component.inviteMember();
+      component.model.update((m: { email: string; role: string }) => ({ ...m, email: 'fail@example.com' }));
+      submit(component.inviteForm);
 
-      expect(component.inviting()).toBe(false);
+      expect(component.actioningUserId()).toBe(null);
     });
   });
 
@@ -289,12 +290,12 @@ describe('TenantMemberList', () => {
 
     it('should close dialog and reset form on closed state', () => {
       component.showInviteDialog.set(true);
-      component.inviteEmail = 'test@example.com';
+      component.model.update((m: { email: string; role: string }) => ({ ...m, email: 'test@example.com' }));
       component.onDialogStateChange('closed');
 
       expect(component.showInviteDialog()).toBe(false);
-      expect(component.inviteEmail).toBe('');
-      expect(component.inviteRole).toBe('member');
+      expect(component.model().email).toBe('');
+      expect(component.model().role).toBe('member');
     });
   });
 });
