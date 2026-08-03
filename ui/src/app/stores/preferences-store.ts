@@ -7,7 +7,7 @@ import { AuthStore } from '@stores/auth-store';
 import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
 
 const THEME_KEY = 'taskboard_theme';
-const ZOOM_SAVE_DELAY_MS = 5_000;
+const ZOOM_SAVE_DELAY_MS = 3_000;
 
 /**
  * Signal-based preferences store.
@@ -69,7 +69,7 @@ export class PreferencesStore {
   /** Set zoom level, apply CSS, and schedule a debounced backend save. */
   setZoom(value: number): void {
     this.zoom.set(value);
-    document.documentElement.style.setProperty('--zoom', String(value / 100));
+    document.documentElement.style.setProperty('font-size', `${value}%`);
     this.scheduleZoomSave();
   }
 
@@ -101,7 +101,7 @@ export class PreferencesStore {
     this.language.set(prefs.language);
     this.transloco.setActiveLang(prefs.language);
 
-    document.documentElement.style.setProperty('--zoom', String(prefs.zoom / 100));
+    document.documentElement.style.setProperty('font-size', `${prefs.zoom}%`);
 
     if (prefs.theme === Theme.Dark) {
       document.documentElement.classList.add(Theme.Dark);

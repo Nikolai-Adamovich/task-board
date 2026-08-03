@@ -35,14 +35,14 @@ describe('PreferencesStore', () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.classList.remove('dark');
-    document.documentElement.style.removeProperty('--zoom');
+    document.documentElement.style.removeProperty('font-size');
   });
 
   afterEach(() => {
     httpMock?.verify();
     localStorage.clear();
     document.documentElement.classList.remove('dark');
-    document.documentElement.style.removeProperty('--zoom');
+    document.documentElement.style.removeProperty('font-size');
   });
 
   function seedAuthUser(store: AuthStore): void {
@@ -108,7 +108,7 @@ describe('PreferencesStore', () => {
     expect(store.theme()).toBe('dark');
     expect(store.language()).toBe('pl');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(document.documentElement.style.getPropertyValue('--zoom')).toBe('1.25');
+    expect(document.documentElement.style.getPropertyValue('font-size')).toBe('125%');
     expect(localStorage.getItem('taskboard_theme')).toBe('dark');
   });
 
@@ -120,7 +120,7 @@ describe('PreferencesStore', () => {
     store.setZoom(150);
 
     expect(store.zoom()).toBe(150);
-    expect(document.documentElement.style.getPropertyValue('--zoom')).toBe('1.5');
+    expect(document.documentElement.style.getPropertyValue('font-size')).toBe('150%');
   });
 
   it('should set theme and toggle dark class', () => {
