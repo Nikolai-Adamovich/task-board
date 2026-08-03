@@ -1,7 +1,9 @@
 import { TestBed } from '@angular/core/testing';
+import { importProvidersFrom } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { PreferencesStore } from './preferences-store';
 import { AuthStore } from './auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
@@ -18,6 +20,12 @@ describe('PreferencesStore', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        importProvidersFrom(
+          TranslocoTestingModule.forRoot({
+            langs: { en: {}, pl: {}, de: {} },
+            translocoConfig: { availableLangs: ['en', 'pl', 'de'], defaultLang: 'en' },
+          }),
+        ),
       ],
     });
 
@@ -150,13 +158,23 @@ describe('PreferencesStore', () => {
     req2.flush({} as UserPreferences);
   });
 
-  it('should set language without backend call', () => {
+  it('should set language and persist to backend', () => {
     createModule();
+
+    const authStore = TestBed.inject(AuthStore);
+
+    seedAuthUser(authStore);
 
     const store = TestBed.inject(PreferencesStore);
 
     store.setLanguage('de');
 
     expect(store.language()).toBe('de');
+
+    const req = httpMock.expectOne('http://localhost/api/users/user-1/preferences');
+
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ language: 'de' });
+    req.flush({} as UserPreferences);
   });
 });
