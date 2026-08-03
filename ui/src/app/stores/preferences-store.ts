@@ -1,4 +1,5 @@
-import { Service, signal, inject, DestroyRef } from '@angular/core';
+import { Service, signal, inject, DestroyRef, effect } from '@angular/core';
+import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { Theme } from '@task-board/shared';
 import { UserPreferencesClient } from '@services/user-preferences-client';
@@ -18,6 +19,7 @@ export class PreferencesStore {
   private readonly client = inject(UserPreferencesClient);
   private readonly authStore = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly transloco = inject(TranslocoService);
   readonly zoom = signal<number>(100);
   readonly theme = signal<Theme>(Theme.Light);
   readonly language = signal<string>('en');
@@ -26,6 +28,13 @@ export class PreferencesStore {
   constructor() {
     this.restoreThemeFromLocalStorage();
     this.destroyRef.onDestroy(() => this.cleanup());
+
+    // Load preferences from backend once the user is authenticated.
+    effect(() => {
+      if (this.authStore.isAuthenticated()) {
+        this.loadPreferences();
+      }
+    });
   }
 
   /** Clean up the zoom debounce timer. */
@@ -78,9 +87,11 @@ export class PreferencesStore {
     this.saveToBackend({ theme });
   }
 
-  /** Set language (UI-only, no backend persistence). */
+  /** Set language, switch Transloco active lang, and persist to backend. */
   setLanguage(language: string): void {
     this.language.set(language);
+    this.transloco.setActiveLang(language);
+    this.saveToBackend({ language });
   }
 
   /** Apply all preference values from a backend response. */
@@ -88,6 +99,7 @@ export class PreferencesStore {
     this.zoom.set(prefs.zoom);
     this.theme.set(prefs.theme);
     this.language.set(prefs.language);
+    this.transloco.setActiveLang(prefs.language);
 
     document.documentElement.style.setProperty('--zoom', String(prefs.zoom / 100));
 

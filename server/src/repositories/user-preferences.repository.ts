@@ -47,17 +47,15 @@ export class UserPreferencesRepository {
     if (data.theme !== undefined) $set.theme = data.theme;
     if (data.language !== undefined) $set.language = data.language;
 
+    const $setOnInsert: Record<string, unknown> = { userId };
+
+    if (data.zoom === undefined) $setOnInsert.zoom = 100;
+    if (data.theme === undefined) $setOnInsert.theme = Theme.Light;
+    if (data.language === undefined) $setOnInsert.language = 'en';
+
     const result = await this.collection.findOneAndUpdate(
       { userId },
-      {
-        $set,
-        $setOnInsert: {
-          userId,
-          zoom: 100,
-          theme: Theme.Light,
-          language: 'en',
-        },
-      },
+      { $set, $setOnInsert },
       { upsert: true, returnDocument: 'after' },
     );
 

@@ -1,0 +1,12 @@
+{
+  "header": {
+    "search": "Szukaj...",
+    "notifications": "Powiadomienia"
+  },
+  "userMenu": {
+    "language": "Język",
+    "themes": "Motywy",
+    "preferences": "Preferencje",
+    "signOut": "Wyloguj się"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "header": {
+    "search": "Поиск...",
+    "notifications": "Уведомления"
+  },
+  "userMenu": {
+    "language": "Язык",
+    "themes": "Темы",
+    "preferences": "Настройки",
+    "signOut": "Выйти"
+  }
+}

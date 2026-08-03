@@ -21,6 +21,7 @@ export class HlmDropdownMenuTrigger {
 
   public readonly align = input<MenuAlign>(this._config.align);
   public readonly side = input<MenuSide>(this._config.side);
+  public readonly disableHoverOpen = input(false);
 
   private readonly _menuPosition = computed(() => createMenuPosition(this.align(), this.side()));
 
@@ -32,6 +33,7 @@ export class HlmDropdownMenuTrigger {
 
     effect(() => {
       this._cdkTrigger.menuPosition = this._menuPosition();
+      this.disableHoverOpen() && (this._cdkTrigger as any)._cleanupMouseenter?.();
     });
   }
 }

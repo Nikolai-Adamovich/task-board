@@ -15,7 +15,7 @@
 </button>
 
 <ng-template #userMenu>
-  <hlm-dropdown-menu>
+  <hlm-dropdown-menu class="w-40">
     <!-- User info -->
     <div class="px-2 py-1.5">
       <p class="text-sm font-medium text-foreground">{{ user()?.email }}</p>
@@ -25,44 +25,38 @@
 
     <hlm-dropdown-menu-separator />
 
-    <!-- Language (display-only) -->
-    <span hlmDropdownMenuLabel class="flex items-center gap-1.5">
-      <ng-icon name="lucideGlobe" />
-      <span>Language</span>
-    </span>
-    <button hlmDropdownMenuItem disabled inset>English</button>
-    <button hlmDropdownMenuItem disabled inset>Deutsch</button>
-    <button hlmDropdownMenuItem disabled inset>Français</button>
-    <button hlmDropdownMenuItem disabled inset>Polski</button>
-    <button hlmDropdownMenuItem disabled inset>Русский</button>
+    <!-- Zoom controls -->
+    <ui-user-menu-zoom-controls />
 
     <hlm-dropdown-menu-separator />
+
+    <!-- Language switcher -->
+    <button hlmDropdownMenuItem [hlmDropdownMenuTrigger]="languageMenu" [disableHoverOpen]="true">
+      <ng-icon name="lucideGlobe" />
+      <span>{{ 'userMenu.language' | transloco }}</span>
+    </button>
 
     <!-- Themes -->
     <button hlmDropdownMenuItem (click)="themeSheetOpen.set('open')">
       <ng-icon name="lucidePalette" />
-      <span>Themes</span>
+      <span>{{ 'userMenu.themes' | transloco }}</span>
     </button>
-
-    <!-- Zoom controls -->
-    <div class="px-2 py-1">
-      <ui-user-menu-zoom-controls />
-    </div>
-
-    <hlm-dropdown-menu-separator />
 
     <!-- Preferences -->
     <a hlmDropdownMenuItem routerLink="/settings">
       <ng-icon name="lucideSettings" />
-      <span>Preferences</span>
+      <span>{{ 'userMenu.preferences' | transloco }}</span>
     </a>
 
     <!-- Sign out -->
     <button hlmDropdownMenuItem variant="destructive" (click)="logout()">
       <ng-icon name="lucideLogOut" />
-      <span>Sign out</span>
+      <span>{{ 'userMenu.signOut' | transloco }}</span>
     </button>
   </hlm-dropdown-menu>
 </ng-template>
 
+<ng-template #languageMenu>
+  <ui-language-switcher />
+</ng-template>
 <ui-user-menu-theme-sheet [open]="themeSheetOpen()" (openChange)="themeSheetOpen.set($event)" />

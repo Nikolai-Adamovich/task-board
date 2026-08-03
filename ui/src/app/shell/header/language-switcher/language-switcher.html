@@ -1,0 +1,15 @@
+<hlm-dropdown-menu class="w-40">
+  @for (lang of availableLangs(); track lang.id) {
+    <button
+      hlmDropdownMenuItem
+      [attr.aria-current]="activeLang() === lang.id ? 'true' : null"
+      (click)="switchLanguage(lang.id)"
+      class="justify-between"
+    >
+      <span>{{ lang.label }}</span>
+      @if (activeLang() === lang.id) {
+        <ng-icon name="lucideCheck" class="text-primary" />
+      }
+    </button>
+  }
+</hlm-dropdown-menu>

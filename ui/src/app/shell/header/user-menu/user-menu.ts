@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ExpandState, SubscriptionTier } from '@task-board/shared';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideGlobe, lucideLogOut, lucidePalette, lucideSettings } from '@ng-icons/lucide';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
@@ -9,12 +10,12 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import {
   HlmDropdownMenu,
   HlmDropdownMenuItem,
-  HlmDropdownMenuLabel,
   HlmDropdownMenuSeparator,
   HlmDropdownMenuTrigger,
 } from '@spartan-ng/helm/dropdown-menu';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
+import { LanguageSwitcher } from '../language-switcher/language-switcher';
 import { getRoleColor } from '../role-color.util';
 import { UserMenuThemeSheet } from './user-menu-theme-sheet/user-menu-theme-sheet';
 import { UserMenuZoomControls } from './user-menu-zoom-controls/user-menu-zoom-controls';
@@ -23,15 +24,16 @@ import { UserMenuZoomControls } from './user-menu-zoom-controls/user-menu-zoom-c
   selector: 'ui-user-menu',
   imports: [
     RouterLink,
+    TranslocoPipe,
     NgIcon,
     HlmAvatarImports,
     HlmBadgeImports,
     HlmButtonImports,
     HlmDropdownMenu,
     HlmDropdownMenuItem,
-    HlmDropdownMenuLabel,
     HlmDropdownMenuSeparator,
     HlmDropdownMenuTrigger,
+    LanguageSwitcher,
     UserMenuThemeSheet,
     UserMenuZoomControls,
   ],

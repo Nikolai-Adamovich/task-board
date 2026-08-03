@@ -1,5 +1,5 @@
-<div class="flex items-center justify-between">
-  <span class="text-sm">Zoom</span>
+<div class="flex items-center justify-between gap-1">
+  <span class="text-sm pl-1">Zoom</span>
   <div class="flex items-center gap-1">
     <button
       hlmBtn
@@ -11,7 +11,7 @@
     >
       −
     </button>
-    <span class="min-w-12 text-center text-sm tabular-nums" aria-live="polite"> {{ preferencesStore.zoom() }}% </span>
+    <span class="min-w-10 text-center text-sm tabular-nums" aria-live="polite">{{ preferencesStore.zoom() }}%</span>
     <button
       hlmBtn
       variant="ghost"

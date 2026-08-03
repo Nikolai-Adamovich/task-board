@@ -1,0 +1,12 @@
+{
+  "header": {
+    "search": "Rechercher...",
+    "notifications": "Notifications"
+  },
+  "userMenu": {
+    "language": "Langue",
+    "themes": "Thèmes",
+    "preferences": "Préférences",
+    "signOut": "Se déconnecter"
+  }
+}

@@ -76,7 +76,7 @@ describe('UserPreferencesRepository', () => {
         { userId: 'user-123' },
         {
           $set: { updatedAt: expect.any(Date), zoom: 150, theme: 'dark', language: 'pl' },
-          $setOnInsert: { userId: 'user-123', zoom: 100, theme: 'light', language: 'en' },
+          $setOnInsert: { userId: 'user-123' },
         },
         { upsert: true, returnDocument: 'after' },
       );
@@ -100,7 +100,7 @@ describe('UserPreferencesRepository', () => {
         { userId: 'user-123' },
         {
           $set: { updatedAt: expect.any(Date), zoom: 200 },
-          $setOnInsert: { userId: 'user-123', zoom: 100, theme: 'light', language: 'en' },
+          $setOnInsert: { userId: 'user-123', theme: 'light', language: 'en' },
         },
         { upsert: true, returnDocument: 'after' },
       );
