@@ -1,6 +1,6 @@
 # Task Board MVP — Architecture
 
-> **Version:** 4.0.0 **Date:** 2026-07-29 **Status:** Approved **Reference:**
+> **Version:** 4.1.0 **Date:** 2026-08-04 **Status:** Approved **Reference:**
 > [Technical Specification v4.0.0](../implementation/technical_specification.md) ·
 > [Project Description](../project_description.md)
 
@@ -67,22 +67,21 @@
 
 ### 1.2 Component boundaries
 
-| Boundary           | Responsibility                                                                   | Technology                        |
-| ------------------ | -------------------------------------------------------------------------------- | --------------------------------- |
-| **Client**         | SPA rendering, user interaction, local state, API calls                          | Angular 22+ standalone components |
-| **Edge (Pages)**   | Static asset serving, SPA routing fallback                                       | Cloudflare Pages                  |
-| **Edge (Workers)** | API request handling, middleware pipeline, auth, validation, subscription limits | Hono on Cloudflare Workers        |
-| **Data**           | Document storage, tenant-scoped queries, indexes                                 | MongoDB Atlas                     |
-| **Email**          | Transactional email delivery (invitation emails)                                 | Resend (REST API)                 |
-| **Shared**         | Types, Zod schemas, API contracts — consumed by both client and server           | npm workspace package             |
+| Boundary           | Responsibility                                                                                | Technology                        |
+| ------------------ | --------------------------------------------------------------------------------------------- | --------------------------------- |
+| **Client**         | SPA rendering, user interaction, local state, API calls                                       | Angular 22+ standalone components |
+| **Edge (Pages)**   | Static asset serving, SPA routing fallback                                                    | Cloudflare Pages                  |
+| **Edge (Workers)** | API request handling, middleware pipeline, auth, validation, subscription limits              | Hono on Cloudflare Workers        |
+| **Data**           | Document storage, tenant-scoped queries, indexes                                              | MongoDB Atlas                     |
+| **Email**          | Transactional email delivery (invitation emails)                                              | Resend (REST API)                 |
+| **Shared**         | Types, constants, utility helpers — consumed by both client and server (runtime-library free) | npm workspace package             |
 
 ### 1.3 Data flow
 
 **Standard CRUD flow:**
 
 1. **User interacts with UI** → Angular component emits an action (e.g., creates a task).
-2. **Component calls a service** → `TaskService` in the Angular app builds a typed request using shared Zod-derived
-   types.
+2. **Component calls a service** → `TaskService` in the Angular app builds a typed request using shared types.
 3. **HTTP interceptor** attaches `Authorization: Bearer <jwt>` and `X-Tenant-Id` headers.
 4. **Request reaches Hono Worker** → passes through the middleware pipeline (auth → tenant context → RBAC → validation).
 5. **Route handler** delegates to the appropriate service (e.g., `TaskService.createTask()`).
@@ -142,16 +141,20 @@ task-board/
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── shared/                    # Shared npm workspace package
+├── shared/                    # Shared npm workspace package (runtime-library free)
 │   ├── src/
-│   │   ├── schemas/           # Zod validation schemas (one file per domain)
-│   │   ├── types/             # TypeScript types derived from Zod schemas
-│   │   ├── contracts/         # API contract definitions (method, path, types)
-│   │   ├── constants/         # Enums, default values, shared constants
-│   │   ├── validators/        # Reusable Zod validator helpers
-│   │   └── index.ts           # Barrel exports
-│   ├── package.json
+│   │   ├── types/             # Plain TypeScript interfaces (no Zod dependency)
+│   │   ├── constants/         # Enums, default values, shared constants (valuesOf helper)
+│   │   ├── utils/             # Utility helpers (valuesOf)
+│   │   └── index.ts           # Barrel exports — constants, types, valuesOf
+│   ├── package.json           # Zero dependencies
 │   └── tsconfig.json
+│
+├── server/ (schemas/, contracts/, validators/)
+│   ├── src/
+│   │   ├── schemas/           # Zod v4 validation schemas (one file per domain)
+│   │   ├── contracts/         # API contract definitions (method, path, types)
+│   │   └── validators/        # Reusable Zod validator helpers (uuid, slug, pagination)
 │
 ├── ui/                        # Angular frontend
 │   ├── src/
@@ -207,7 +210,8 @@ The root `package.json` defines the workspaces:
 
 Each feature (auth, tenants, projects, boards, tasks, sprints) has its own files in every package:
 
-- **shared:** `schemas/<feature>.ts`, `types/<feature>.ts`, `contracts/<feature>.contracts.ts`
+- **shared:** `types/<feature>.ts`, `constants/`
+- **server:** `schemas/<feature>.ts`, `contracts/<feature>.contracts.ts`, `validators/`
 - **server:** `routes/<feature>.ts`, `services/<feature>.service.ts`, `repositories/<feature>.repository.ts`
 - **ui:** `feature/<feature>/` directory with components, services, and guards grouped together
 
@@ -219,80 +223,101 @@ This keeps related code co-located and makes vertical slices easy to identify an
 
 ### 3.1 Purpose
 
-The shared package is the **single source of truth** for types, validation, and API contracts. It is consumed by both
-the Angular frontend and the Hono backend, ensuring end-to-end type safety from the database to the UI.
+The shared package is the **single source of truth** for types and constants. It is a runtime-library-free package (zero
+dependencies) consumed by both the Angular frontend and the Hono backend, ensuring end-to-end type safety. Zod
+validation schemas, API contracts, and validators live in the server package.
 
 ### 3.2 Directory layout
 
 ```
 shared/src/
-├── schemas/
-│   ├── auth.ts                # LoginRequestSchema, RegisterRequestSchema, AuthResponseSchema,
-│   │                          # AcceptInvitationSchema, InvitationDetailsSchema
-│   ├── tenant.ts              # CreateTenantSchema, TenantSchema, UpdateTenantSchema, TenantMemberSchema,
-│   │                          # InviteMemberSchema
-│   ├── user.ts                # UserSchema, CreateUserSchema
-│   ├── project.ts             # CreateProjectSchema, ProjectSchema, UpdateProjectSchema, ProjectMemberSchema
-│   ├── board.ts               # CreateBoardSchema, BoardSchema, UpdateBoardSchema, ColumnSchema
-│   ├── task.ts                # CreateTaskSchema, TaskSchema, UpdateTaskSchema, MoveTaskSchema, AssignTaskSchema
-│   ├── sprint.ts              # CreateSprintSchema, SprintSchema, UpdateSprintSchema
-│   └── common.ts              # ErrorResponseSchema, PaginationSchema, PaginatedResponseSchema
 ├── types/
-│   ├── auth.ts                # Type aliases derived from Zod schemas
-│   ├── tenant.ts
-│   ├── user.ts
-│   ├── project.ts
-│   ├── board.ts
-│   ├── task.ts
-│   ├── sprint.ts
-│   └── common.ts
-├── contracts/
-│   ├── auth.contracts.ts
-│   ├── tenant.contracts.ts
-│   ├── project.contracts.ts
-│   ├── board.contracts.ts
-│   ├── task.contracts.ts
-│   └── sprint.contracts.ts
+│   ├── auth.ts                # LoginRequest, RegisterRequest, AuthResponse, etc.
+│   ├── tenant.ts              # Tenant, CreateTenant, UpdateTenant, TenantMember, etc.
+│   ├── user.ts                # User, CreateUser
+│   ├── project.ts             # Project, CreateProject, UpdateProject, ProjectMember
+│   ├── board.ts               # Board, CreateBoard, UpdateBoard, Column, CreateColumn
+│   ├── task.ts                # Task, CreateTask, UpdateTask, MoveTask, AssignTask, MyTask
+│   ├── sprint.ts              # Sprint, CreateSprint, UpdateSprint
+│   └── common.ts              # ThemeManifestItem, ErrorResponse, Pagination, ListQuery,
+│                              # UserPreferences, UpdateUserPreferences, SupportRequest
 ├── constants/
 │   ├── roles.ts               # TenantRole, ProjectRole, TaskPriority, SprintStatus, MemberStatus, SubscriptionTier
+│   │                          # (uses valuesOf() helper for strongly-typed value tuples)
 │   ├── columns.ts             # DefaultColumnNames
-│   ├── http.ts                # HttpMethod enum
-│   └── paths.ts               # API path constants
-├── validators/
-│   ├── uuid.ts                # UUID string validator
-│   ├── slug.ts                # Slug validator (lowercase, hyphens)
-│   └── pagination.ts          # Pagination query validator
-└── index.ts                   # Barrel exports for all shared types, schemas, contracts
+│   ├── http.ts                # HttpMethod (uses valuesOf() helper)
+│   ├── paths.ts               # API path constants
+│   ├── theme.ts               # DEFAULT_THEME_ID = 'light'
+│   └── expand-state.ts        # ExpandState constants
+├── utils/
+│   └── values-of.ts           # valuesOf(obj) — extracts values from `as const` objects as typed tuples
+└── index.ts                   # Barrel exports — constants, types, valuesOf, DEFAULT_THEME_ID
 ```
 
-### 3.3 Type derivation pattern (Zod v4)
+> **Note:** Zod validation schemas, API contracts, and validator helpers are in the **server package**:
+>
+> ```
+> server/src/
+> ├── schemas/                  # Zod v4 validation schemas (one file per domain)
+> ├── contracts/                # API contract definitions (method, path, types)
+> └── validators/               # Reusable Zod validator helpers (uuid, slug, pagination)
+> ```
 
-All TypeScript types are derived from Zod v4 schemas using `z.infer<>` (API unchanged from v3), ensuring types and
-validation are always in sync:
+### 3.3 Type definition pattern (plain TypeScript interfaces)
+
+All TypeScript types in the shared package are plain interfaces with no runtime dependency:
 
 ```typescript
 // shared/src/types/project.ts
-import { z } from 'zod';
-import { ProjectSchema, CreateProjectSchema, UpdateProjectSchema } from '../schemas/project';
+export interface Project {
+  id: string;
+  tenantId: string;
+  name: string;
+  slug: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export type Project = z.infer<typeof ProjectSchema>;
-export type CreateProjectInput = z.infer<typeof CreateProjectSchema>;
-export type UpdateProjectInput = z.infer<typeof UpdateProjectSchema>;
+export interface CreateProject {
+  name: string;
+  slug: string;
+  description?: string;
+}
+
+export interface UpdateProject {
+  name?: string;
+  slug?: string;
+  description?: string;
+}
 ```
 
-> **Zod v4 note:** Use `z.interface({...})` instead of `z.object({...})` for all object schemas — it has better
-> performance and type inference. The `z.object()` API still works but `z.interface()` is preferred. For frontend
-> tree-shaking, import from `"zod/mini"` instead of `"zod"` when only parsing/validation is needed (no full `ZodError`
-> details). The backend can use the full `"zod"` bundle without concern.
+The server package defines Zod schemas that validate against these types:
+
+```typescript
+// server/src/schemas/project.ts
+import { z } from 'zod';
+import { TenantRoleValues } from '@task-board/shared';
+
+export const CreateProjectSchema = z.interface({
+  name: z.string().min(1).max(200),
+  slug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/),
+  description: z.string().max(1000).optional(),
+});
+```
 
 ### 3.4 Contract definitions
 
-API contracts define the method, path, request/response types, and error codes for each endpoint. They serve as the
-contract between frontend and backend:
+API contracts define the method, path, request/response types, and error codes for each endpoint. They live in the
+server package and serve as the contract between frontend and backend:
 
 ```typescript
-// shared/src/contracts/task.contracts.ts
-import { HttpMethod } from '../constants';
+// server/src/contracts/task.contracts.ts
+import { HttpMethod } from '@task-board/shared';
 
 export const TaskContracts = {
   list: {
@@ -326,13 +351,12 @@ export const TaskContracts = {
 
 ### 3.5 How end-to-end type safety is achieved
 
-1. **Zod schemas** define runtime validation for all request/response shapes.
-2. **TypeScript types** are derived from Zod schemas via `z.infer<>` — no separate type definitions that can drift.
-3. **API contracts** reference the same Zod schemas for request bodies and response shapes.
-4. **Frontend** imports types and schemas from `shared` — API responses are validated against schemas before use (or
-   trusted after server-side validation).
-5. **Backend** imports schemas from `shared` for request validation and returns typed results that conform to the same
-   schemas.
+1. **Plain TypeScript interfaces** in the shared package define the shape of all domain objects.
+2. **Zod schemas** in the server package define runtime validation for all request/response shapes, importing constants
+   from `shared` (e.g., `z.enum(TenantRoleValues)`).
+3. **API contracts** in the server package reference Zod schemas for request bodies and response shapes.
+4. **Frontend** imports types from `shared` — API responses are typed without runtime validation (server validates).
+5. **Backend** imports schemas from local `../schemas/` for request validation and returns typed results.
 6. **`tsc --noEmit`** across the monorepo catches any type mismatch between frontend and backend.
 
 ### 3.6 Key enums and constants
@@ -442,7 +466,7 @@ Request → ErrorHandler → AuthMiddleware → TenantContextMiddleware → RBAC
 | **AuthMiddleware**          | 2          | Verifies JWT from `Authorization: Bearer <token>` header; sets `c.get('userId')` and `c.get('user')`                                                                                                                                                                  |
 | **TenantContextMiddleware** | 3          | Resolves active tenant from `X-Tenant-Id` header + user's `TenantMember` record with `status: 'active'`; rejects pending/declined/access_revoked members with 403; sets `c.get('tenantId')`. Skipped for auth routes and cross-tenant routes (invitations, tasks/my). |
 | **RBACMiddleware**          | 4          | Checks user's role against required permission for the route. Uses `rbac.service`. Sets `c.get('userRole')`.                                                                                                                                                          |
-| **ValidationMiddleware**    | 5          | Validates request body, query params, and path params against Zod v4 schemas from shared package. Uses `z.interface().parse()` / `.safeParse()`. Returns 422 with structured validation errors on failure.                                                            |
+| **ValidationMiddleware**    | 5          | Validates request body, query params, and path params against Zod v4 schemas from server's `src/schemas/`. Uses `z.interface().parse()` / `.safeParse()`. Returns 422 with structured validation errors on failure.                                                   |
 | **RouteHandler**            | 6          | Delegates to the appropriate service method                                                                                                                                                                                                                           |
 
 ### 4.4 Service layer design
@@ -454,7 +478,7 @@ Each service is a **plain TypeScript class** with no framework dependency:
 - **Enforces business rules** — e.g., only project admin can delete a board, only members can create tasks.
 - **Enforces subscription limits** — project creation (max 3 for free), member addition (max 10 for free), workspace
   creation (max 1 free workspace per user).
-- **Returns typed results** that map directly to shared package response schemas.
+- **Returns typed results** that map directly to shared package types.
 - **Throws typed errors** that the error handler middleware converts to standardized HTTP responses.
 
 **Service inventory:**
@@ -862,13 +886,12 @@ switchTenant(tenant: Tenant) {
 }
 ```
 
-**`httpResource()` pattern** — for simple typed HTTP GET resources with Zod runtime validation:
+**`httpResource()` pattern** — for simple typed HTTP GET resources with signal integration:
 
 ```typescript
 // Example: fetch a single project by ID
 projectResource = httpResource(() => `/api/v1/projects/${this.projectId()}`, {
   defaultValue: null as Project | null,
-  parse: (data) => ProjectSchema.parse(data), // Zod v4 runtime validation
 });
 ```
 
@@ -1325,9 +1348,7 @@ jobs:
       - run: npm run build --workspace=server
       - run: npm run build --workspace=ui
 
-      - run: npm run test --workspace=shared
       - run: npm run test --workspace=server
-      - run: npm run lint --workspace=shared
       - run: npm run lint --workspace=server
 
   deploy:
@@ -1395,14 +1416,16 @@ Tenant isolation is enforced at **three layers**:
 This three-layer defense ensures that even if one layer is bypassed, the other layers still prevent cross-tenant data
 leakage.
 
-### 9.4 Why a shared package for types and schemas?
+### 9.4 Why a shared package for types and constants?
 
-- **Single source of truth:** Types, validation schemas, and API contracts are defined once in `shared/` and consumed by
-  both frontend and backend. This eliminates type drift between client and server.
-- **End-to-end type safety:** `z.infer<>` derives TypeScript types from Zod schemas, so the same validation logic that
-  runs at runtime also defines the compile-time types.
-- **Contract-first API design:** API contracts in `shared/contracts/` define the exact shape of every request and
+- **Single source of truth:** Types and constants are defined once in `shared/` and consumed by both frontend and
+  backend. This eliminates type drift between client and server. The shared package has zero runtime dependencies.
+- **End-to-end type safety:** Plain TypeScript interfaces define domain shapes. The server package adds Zod schemas for
+  runtime validation, importing constants from shared (e.g., `z.enum(TenantRoleValues)`).
+- **Contract-first API design:** API contracts in the server package define the exact shape of every request and
   response, making it impossible for the frontend and backend to disagree on the API surface.
+- **Separation of concerns:** Runtime validation (Zod) lives only in the server package. The shared package remains
+  lightweight and dependency-free, ideal for the frontend bundle.
 - **Educational value:** This pattern demonstrates how to achieve strong type safety across a full-stack TypeScript
   application, which is a key architectural principle of the project.
 
@@ -1473,24 +1496,24 @@ leakage.
 
 ### 10.1 Where future features would plug in
 
-| Future Feature                                | Where It Plugs In                                                                                             | What Changes                                                                                                                                                                          |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Real Billing / Subscriptions**              | `server/src/routes/billing.ts`, `shared/schemas/billing.ts`, `shared/contracts/billing.contracts.ts`          | Replace mock payment page with real Stripe integration. New `billing.service.ts`, `billing.repository.ts`. New `subscriptions` collection. Stripe webhook handler.                    |
-| **SSO / OAuth / SAML**                        | `server/src/middleware/auth.ts` (extend auth middleware), `shared/schemas/auth.ts` (add SSO provider schemas) | Replace or augment JWT auth with OAuth flow. New `auth_providers` and `sso_sessions` collections. New `SSOProviderService`.                                                           |
-| **Advanced Analytics / Reporting**            | `server/src/routes/analytics.ts`, `shared/schemas/analytics.ts`                                               | New route file, new schemas, new contracts. New `analytics.service.ts` that reads from existing collections and aggregates data. New `analytics` collection for pre-computed reports. |
-| **Time Tracking**                             | `server/src/routes/time-tracking.ts`, `shared/schemas/time-tracking.ts`                                       | New route file, new schemas, new contracts. New `time_entries` MongoDB collection. New `time-tracking.service.ts`.                                                                    |
-| **Task Comments / Activity Logs**             | `server/src/routes/comments.ts`, `server/src/routes/activity.ts`, `shared/schemas/comment.ts`                 | New route files, new schemas, new contracts. New `comments` and `activity_logs` collections.                                                                                          |
-| **External Integrations (Jira, Slack)**       | `server/src/routes/integrations.ts`, `shared/schemas/integration.ts`                                          | New route file, new schemas, new contracts. New `integrations` collection for storing webhook configs and OAuth tokens. New `integration.service.ts`.                                 |
-| **Real-time Updates (WebSocket)**             | `server/src/middleware/websocket.ts`, `ui/src/services/realtime.service.ts`                                   | Add WebSocket support to Hono Workers. New `realtime.service.ts` on the frontend. New `subscriptions` collection for tracking active subscriptions.                                   |
-| **Advanced RBAC (custom roles, permissions)** | `shared/schemas/rbac.ts` (extend role/permission schemas), `server/src/services/rbac.service.ts`              | Extend `TenantRole` and `ProjectRole` enums to support custom roles. New `permissions` collection for role-permission mapping. New `permission.service.ts`.                           |
-| **Multi-region / Multi-tenant DB**            | `server/src/db/mongo.ts` (connection routing), new `tenant_settings` collection                               | Add `region` field to `Tenant` document. Route database connections based on tenant region. New `tenant_settings` collection for per-tenant DB configuration.                         |
+| Future Feature                                | Where It Plugs In                                                                                                 | What Changes                                                                                                                                                                          |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Real Billing / Subscriptions**              | `server/src/routes/billing.ts`, `server/src/schemas/billing.ts`, `server/src/contracts/billing.contracts.ts`      | Replace mock payment page with real Stripe integration. New `billing.service.ts`, `billing.repository.ts`. New `subscriptions` collection. Stripe webhook handler.                    |
+| **SSO / OAuth / SAML**                        | `server/src/middleware/auth.ts` (extend auth middleware), `server/src/schemas/auth.ts` (add SSO provider schemas) | Replace or augment JWT auth with OAuth flow. New `auth_providers` and `sso_sessions` collections. New `SSOProviderService`.                                                           |
+| **Advanced Analytics / Reporting**            | `server/src/routes/analytics.ts`, `server/src/schemas/analytics.ts`                                               | New route file, new schemas, new contracts. New `analytics.service.ts` that reads from existing collections and aggregates data. New `analytics` collection for pre-computed reports. |
+| **Time Tracking**                             | `server/src/routes/time-tracking.ts`, `server/src/schemas/time-tracking.ts`                                       | New route file, new schemas, new contracts. New `time_entries` MongoDB collection. New `time-tracking.service.ts`.                                                                    |
+| **Task Comments / Activity Logs**             | `server/src/routes/comments.ts`, `server/src/routes/activity.ts`, `server/src/schemas/comment.ts`                 | New route files, new schemas, new contracts. New `comments` and `activity_logs` collections.                                                                                          |
+| **External Integrations (Jira, Slack)**       | `server/src/routes/integrations.ts`, `server/src/schemas/integration.ts`                                          | New route file, new schemas, new contracts. New `integrations` collection for storing webhook configs and OAuth tokens. New `integration.service.ts`.                                 |
+| **Real-time Updates (WebSocket)**             | `server/src/middleware/websocket.ts`, `ui/src/services/realtime.service.ts`                                       | Add WebSocket support to Hono Workers. New `realtime.service.ts` on the frontend. New `subscriptions` collection for tracking active subscriptions.                                   |
+| **Advanced RBAC (custom roles, permissions)** | `server/src/schemas/rbac.ts` (extend role/permission schemas), `server/src/services/rbac.service.ts`              | Extend `TenantRole` and `ProjectRole` enums to support custom roles. New `permissions` collection for role-permission mapping. New `permission.service.ts`.                           |
+| **Multi-region / Multi-tenant DB**            | `server/src/db/mongo.ts` (connection routing), new `tenant_settings` collection                                   | Add `region` field to `Tenant` document. Route database connections based on tenant region. New `tenant_settings` collection for per-tenant DB configuration.                         |
 
 ### 10.2 Design principles that enable extensions
 
 1. **Feature-oriented boundaries** — each new feature adds a new set of files in its own directory, without modifying
    existing feature code.
-2. **Shared package as contract layer** — new features define their schemas and contracts in `shared/`, ensuring the
-   frontend and backend stay in sync.
+2. **Server package as contract layer** — new features define their schemas and contracts in `server/src/schemas/` and
+   `server/src/contracts/`, ensuring the frontend and backend stay in sync.
 3. **Middleware pipeline is extensible** — new middleware (e.g., `websocketMiddleware`, `billingMiddleware`) can be
    added to the pipeline without changing existing middleware.
 4. **Repository pattern** — new data models add new repository files without changing existing repositories.
@@ -1512,7 +1535,7 @@ Angular frontend implementation: tenant member management, tenant settings, and 
 
 The route file [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:94) is missing the `GET /:tenantId/members`
 endpoint. The service method [`TenantService.getTenantMembers()`](server/src/services/tenant.service.ts:205) and the
-shared contract [`tenantContracts.listMembers`](shared/src/contracts/tenant.contracts.ts:74) already exist.
+shared contract [`tenantContracts.listMembers`](server/src/contracts/tenant.contracts.ts:74) already exist.
 
 **Required change:** Add the following route to [`server/src/routes/tenants.ts`](server/src/routes/tenants.ts:94):
 
@@ -2105,15 +2128,15 @@ getMyTasks(page?: number, limit?: number): Observable<MyTasksResponse>
 
 ### 12.7 Shared package additions
 
-| Location              | New additions                                                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `schemas/tenant.ts`   | `MyInvitationSchema`, `MyInvitationsResponseSchema`, `PendingInvitationSchema`, `PendingInvitationsResponseSchema` |
-| `schemas/task.ts`     | `MyTaskSchema` (extends `TaskSchema` with `tenantName`, `projectName`, `columnTitle`), `MyTasksResponseSchema`     |
-| `contracts/auth.ts`   | `getMyInvitations`, `declineInvitation`                                                                            |
-| `contracts/task.ts`   | `getMyTasks`                                                                                                       |
-| `contracts/tenant.ts` | `getPendingInvitations`                                                                                            |
-| `types/tenant.ts`     | `MyInvitation`, `PendingInvitation`                                                                                |
-| `types/task.ts`       | `MyTask`                                                                                                           |
+| Location                         | New additions                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `server/src/schemas/tenant.ts`   | `MyInvitationSchema`, `MyInvitationsResponseSchema`, `PendingInvitationSchema`, `PendingInvitationsResponseSchema` |
+| `server/src/schemas/task.ts`     | `MyTaskSchema` (extends `TaskSchema` with `tenantName`, `projectName`, `columnTitle`), `MyTasksResponseSchema`     |
+| `server/src/contracts/auth.ts`   | `getMyInvitations`, `declineInvitation`                                                                            |
+| `server/src/contracts/task.ts`   | `getMyTasks`                                                                                                       |
+| `server/src/contracts/tenant.ts` | `getPendingInvitations`                                                                                            |
+| `shared/src/types/tenant.ts`     | `MyInvitation`, `PendingInvitation`                                                                                |
+| `shared/src/types/task.ts`       | `MyTask`                                                                                                           |
 
 ### 12.8 Spartan UI component mapping (dashboard sub-views)
 
@@ -2157,11 +2180,11 @@ getMyTasks(page?: number, limit?: number): Observable<MyTasksResponse>
 | **Modify** | [`server/src/routes/index.ts`](server/src/routes/index.ts)                       | Register new invitation routes                                             |
 | **Modify** | [`server/src/services/tenant.service.ts`](server/src/services/tenant.service.ts) | Add `getPendingInvitations()` with RBAC                                    |
 | **Modify** | [`server/src/services/task.service.ts`](server/src/services/task.service.ts)     | Add `getMyTasks()` cross-tenant method                                     |
-| **Modify** | `shared/src/schemas/tenant.ts`                                                   | Add `MyInvitationSchema`, `PendingInvitationSchema`                        |
-| **Modify** | `shared/src/schemas/task.ts`                                                     | Add `MyTaskSchema`, `MyTasksResponseSchema`                                |
-| **Modify** | `shared/src/contracts/tenant.contracts.ts`                                       | Add `getPendingInvitations` contract                                       |
-| **Modify** | `shared/src/contracts/auth.contracts.ts`                                         | Add `getMyInvitations`, `declineInvitation` contracts                      |
-| **Modify** | `shared/src/contracts/task.contracts.ts`                                         | Add `getMyTasks` contract                                                  |
+| **Modify** | `server/src/schemas/tenant.ts`                                                   | Add `MyInvitationSchema`, `PendingInvitationSchema`                        |
+| **Modify** | `server/src/schemas/task.ts`                                                     | Add `MyTaskSchema`, `MyTasksResponseSchema`                                |
+| **Modify** | `server/src/contracts/tenant.contracts.ts`                                       | Add `getPendingInvitations` contract                                       |
+| **Modify** | `server/src/contracts/auth.contracts.ts`                                         | Add `getMyInvitations`, `declineInvitation` contracts                      |
+| **Modify** | `server/src/contracts/task.contracts.ts`                                         | Add `getMyTasks` contract                                                  |
 | **Modify** | `shared/src/types/tenant.ts`                                                     | Add `MyInvitation`, `PendingInvitation` types                              |
 | **Modify** | `shared/src/types/task.ts`                                                       | Add `MyTask` type                                                          |
 | **Modify** | [`ui/src/app/services/tenant-client.ts`](ui/src/app/services/tenant-client.ts)   | Add `getMyInvitations()`, `getPendingInvitations()`, `declineInvitation()` |
@@ -2200,14 +2223,14 @@ server.
 
 ### 13.2 Shared layer changes — `description` field
 
-Three Zod schemas in [`shared/src/schemas/tenant.ts`](shared/src/schemas/tenant.ts:8) require a `description` field:
+Three Zod schemas in [`server/src/schemas/tenant.ts`](server/src/schemas/tenant.ts:8) require a `description` field:
 
 #### 13.2.1 `TenantSchema` (line 8)
 
 Add `description` after `subscription`:
 
 ```typescript
-// shared/src/schemas/tenant.ts — TenantSchema (modified)
+// server/src/schemas/tenant.ts — TenantSchema (modified)
 export const TenantSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1).max(100),
@@ -2263,12 +2286,12 @@ export const UpdateTenantSchema = z.object({
 });
 ```
 
-**Type flow:** The [`Tenant`](shared/src/types/tenant.ts) type is derived from `TenantSchema` via `z.infer<>`, so it
-automatically includes `description` after the schema change. No manual type update needed.
+**Type flow:** The [`Tenant`](shared/src/types/tenant.ts) type is a plain TypeScript interface. After adding
+`description?: string | null` to the interface, it is automatically available across the codebase.
 
 #### 13.2.4 `TenantWithRoleSchema` (line 107)
 
-[`TenantWithRoleSchema`](shared/src/schemas/tenant.ts:107) extends `TenantSchema` via `.extend()` — it inherits the
+[`TenantWithRoleSchema`](server/src/schemas/tenant.ts:107) extends `TenantSchema` via `.extend()` — it inherits the
 `description` field automatically. No change needed.
 
 ---
@@ -2739,7 +2762,7 @@ Change the workspace card link target from projects to workspace detail:
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | [`server/src/services/tenant.service.ts`](server/src/services/tenant.service.ts) | `createTenant()` and `updateTenant()` pass input through via spread/direct delegation |
 | [`ui/src/app/stores/auth-store.ts`](ui/src/app/stores/auth-store.ts:27)          | `tenantRole` signal already exists                                                    |
-| [`shared/src/types/tenant.ts`](shared/src/types/tenant.ts)                       | Type is derived from `TenantSchema` via `z.infer<>` — auto-updated                    |
+| [`shared/src/types/tenant.ts`](shared/src/types/tenant.ts)                       | Plain TypeScript interface — add `description?: string \| null` field                 |
 
 ---
 
@@ -2759,14 +2782,14 @@ Change the workspace card link target from projects to workspace detail:
 
 ## Summary
 
-| Item                              | Detail                                                                                                                                                                                                                                                                        |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Architecture document**         | `docs/implementation/architecture.md`                                                                                                                                                                                                                                         |
-| **Reference specification**       | `docs/implementation/technical_specification.md` v4.0.0                                                                                                                                                                                                                       |
-| **Reference project description** | `docs/project_description.md`                                                                                                                                                                                                                                                 |
-| **Stack**                         | Angular 22.0.8 (standalone, zoneless, signals, `resource()`, `linkedSignal()`, `httpResource()`, signal forms) + Hono 4.8.0 on Cloudflare Workers + MongoDB Atlas + MongoDB Driver 7.0.0 + TypeScript 6.0.0 + Zod 4.0.0 + Tailwind CSS 4.1.0 + Spartan UI 0.12.0 + Resend 4.x |
-| **Key patterns**                  | Feature-oriented modules, service/repository separation, shared Zod v4 schemas (`z.interface()`, `zod/mini`) for end-to-end type safety, tenant isolation at data + application + API layers, signal-based state on the frontend, functional guards and resolvers             |
-| **MVP scope**                     | Auth, tenants (with subscription tiers), projects, boards, columns, tasks, sprints, RBAC, email-based invitation system, **Jira-style adaptive dashboard** — all scoped by tenant                                                                                             |
+| Item                              | Detail                                                                                                                                                                                                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture document**         | `docs/implementation/architecture.md`                                                                                                                                                                                                                                                                   |
+| **Reference specification**       | `docs/implementation/technical_specification.md` v4.0.0                                                                                                                                                                                                                                                 |
+| **Reference project description** | `docs/project_description.md`                                                                                                                                                                                                                                                                           |
+| **Stack**                         | Angular 22.0.8 (standalone, zoneless, signals, `resource()`, `linkedSignal()`, `httpResource()`, signal forms) + Hono 4.8.0 on Cloudflare Workers + MongoDB Atlas + MongoDB Driver 7.0.0 + TypeScript 6.0.0 + Zod 4.0.0 (server-only) + Tailwind CSS 4.1.0 + Spartan UI 0.12.0 + Resend 4.x             |
+| **Key patterns**                  | Feature-oriented modules, service/repository separation, runtime-library-free shared package (types + constants), server-side Zod v4 schemas (`z.interface()`) for validation, tenant isolation at data + application + API layers, signal-based state on the frontend, functional guards and resolvers |
+| **MVP scope**                     | Auth, tenants (with subscription tiers), projects, boards, columns, tasks, sprints, RBAC, email-based invitation system, **Jira-style adaptive dashboard** — all scoped by tenant                                                                                                                       |
 
 ### Risks and Assumptions
 

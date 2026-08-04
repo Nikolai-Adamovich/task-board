@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 
+set -e
+
 PROJECT_DIR="$HOME/Projects/task-board"
+
+cd "$PROJECT_DIR"
+
+echo "Building shared..."
+npm run build --workspace=shared
 
 cat >/tmp/task-board.kdl <<EOF
 layout {

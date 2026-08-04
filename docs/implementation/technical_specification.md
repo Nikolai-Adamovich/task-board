@@ -39,7 +39,8 @@ The MVP slice delivers a **fully functional, multi-tenant Kanban task board** wi
 - **Monorepo** with npm workspaces: `server/`, `shared/`, `ui/`, `docs/`
 - **Frontend:** Angular 22+, standalone components, zoneless, signals, signal forms, Spartan UI, Tailwind CSS v4
 - **Backend:** Hono on Cloudflare Workers + MongoDB
-- **Shared package:** TypeScript types, Zod v4 schemas, API contracts
+- **Shared package:** TypeScript types and constants (runtime-library free); Zod v4 schemas and API contracts in server
+  package
 - **Deployment:** Cloudflare Pages + Workers, MongoDB Atlas, Wrangler, GitHub Actions
 - **Style:** Feature-oriented modules, strong end-to-end type safety, cloud-native
 
@@ -55,7 +56,7 @@ upgrades are acceptable).
 | **Node.js**                | `22.x`   | LTS release                                                                              |
 | **Hono**                   | `4.8.0`  | RPC client for type-safe API calls                                                       |
 | **MongoDB Node.js Driver** | `7.0.0`  | Async/await native API                                                                   |
-| **Zod**                    | `4.0.0`  | `z.interface()` for schemas, `zod/mini` for tree-shaking                                 |
+| **Zod**                    | `4.0.0`  | Server-only: `z.interface()` for schemas, validation middleware                          |
 | **Tailwind CSS**           | `4.1.0`  | CSS-first config via `@theme`, no `tailwind.config.js`                                   |
 | **Spartan UI**             | `0.12.0` | `@spartan-ng/brain` + `@spartan-ng/helm`                                                 |
 | **Vitest**                 | `4.0.0`  | Unit and integration tests                                                               |
@@ -83,7 +84,10 @@ upgrades are acceptable).
 | Standalone components      | Default component model; no NgModules                        | Angular 14 |
 | Zoneless change detection  | No Zone.js; signal-driven change detection                   | Angular 18 |
 
-#### Key Zod 4 changes from v3
+#### Key Zod 4 changes from v3 (server-only)
+
+> **Note:** Zod is used exclusively in the server package. The shared package contains only plain TypeScript types with
+> no runtime validation dependency.
 
 | Aspect             | Zod 3                                         | Zod 4                                                                  |
 | ------------------ | --------------------------------------------- | ---------------------------------------------------------------------- |
@@ -321,7 +325,7 @@ tenant context derived from the authenticated user's membership. No cross-tenant
 ## 4. API Contracts
 
 All endpoints are RESTful under the base path `/api/v1`. Authentication is via Bearer JWT token in the `Authorization`
-header. Every request/response shape is defined with Zod schemas in the shared package.
+header. Every request/response shape is validated with Zod v4 schemas in the server package.
 
 ### 4.1 Base URL and auth
 
@@ -415,8 +419,9 @@ Tenant context: X-Tenant-Id header (derived from JWT claims)
 
 ### 4.9 Request/response shape examples (Zod v4 schema references)
 
-All schemas are defined in the shared package at `packages/shared/src/schemas/` using Zod v4 (`z.interface()` for object
-schemas — preferred over `z.object()` for better performance and type inference).
+All schemas are defined in the server package at `server/src/schemas/` using Zod v4 (`z.interface()` for object schemas
+— preferred over `z.object()` for better performance and type inference). Type definitions are in the shared package at
+`shared/src/types/`.
 
 #### Create Tenant Request
 
@@ -676,56 +681,82 @@ export const ErrorResponseSchema = z.interface({
 
 ### 6.1 Location
 
-`packages/shared/` — npm workspace package
+`shared/` — npm workspace package (runtime-library free, zero dependencies)
 
 ### 6.2 Contents
 
-| Path              | Purpose                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------ |
-| `src/schemas/`    | Zod validation schemas for all API request/response shapes                           |
-| `src/types/`      | TypeScript type definitions derived from Zod schemas (`infer` from Zod)              |
-| `src/contracts/`  | API contract definitions (endpoint paths, HTTP methods, request/response type pairs) |
-| `src/constants/`  | Shared constants (e.g., default column names, role enums, priority enums)            |
-| `src/validators/` | Reusable Zod validator helpers (e.g., UUID validator, slug validator)                |
-| `index.ts`        | Barrel exports for all shared types, schemas, and contracts                          |
+| Path             | Purpose                                                                |
+| ---------------- | ---------------------------------------------------------------------- |
+| `src/types/`     | Plain TypeScript interfaces for all domain objects                     |
+| `src/constants/` | Shared constants (role enums, HTTP methods, API paths, default values) |
+| `src/utils/`     | Utility helpers (`valuesOf()` for strongly-typed constant tuples)      |
+| `index.ts`       | Barrel exports for types, constants, `valuesOf`, `DEFAULT_THEME_ID`    |
 
-### 6.3 Key Zod schemas (file references)
+### 6.3 Key type definitions (file references)
 
-| Schema file          | Schemas defined                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `schemas/tenant.ts`  | `CreateTenantSchema`, `TenantSchema`, `UpdateTenantSchema`, `TenantMemberSchema`, `InviteMemberSchema`                   |
-| `schemas/user.ts`    | `UserSchema`, `CreateUserSchema`, `LoginRequestSchema`, `AuthResponseSchema`                                             |
-| `schemas/project.ts` | `CreateProjectSchema`, `ProjectSchema`, `UpdateProjectSchema`, `ProjectMemberSchema`                                     |
-| `schemas/board.ts`   | `CreateBoardSchema`, `BoardSchema`, `UpdateBoardSchema`, `ColumnSchema`                                                  |
-| `schemas/task.ts`    | `CreateTaskSchema`, `TaskSchema`, `UpdateTaskSchema`, `MoveTaskSchema`, `AssignTaskSchema`                               |
-| `schemas/sprint.ts`  | `CreateSprintSchema`, `SprintSchema`, `UpdateSprintSchema`                                                               |
-| `schemas/auth.ts`    | `LoginRequestSchema`, `RegisterRequestSchema`, `AuthResponseSchema`, `AcceptInvitationSchema`, `InvitationDetailsSchema` |
-| `schemas/common.ts`  | `ErrorResponseSchema`, `PaginationSchema`, `PaginatedResponseSchema`                                                     |
+| Type file          | Types defined                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `types/tenant.ts`  | `Tenant`, `CreateTenant`, `UpdateTenant`, `TenantMember`, `InviteMember`, `TenantWithRole`                                      |
+| `types/user.ts`    | `User`, `CreateUser`                                                                                                            |
+| `types/project.ts` | `Project`, `CreateProject`, `UpdateProject`, `ProjectMember`                                                                    |
+| `types/board.ts`   | `Board`, `CreateBoard`, `UpdateBoard`, `Column`, `CreateColumn`                                                                 |
+| `types/task.ts`    | `Task`, `CreateTask`, `UpdateTask`, `MoveTask`, `AssignTask`, `MyTask`                                                          |
+| `types/sprint.ts`  | `Sprint`, `CreateSprint`, `UpdateSprint`                                                                                        |
+| `types/auth.ts`    | `LoginRequest`, `RegisterRequest`, `AuthResponse`, `AcceptInvitation`, `InvitationDetails`, `MyInvitation`, `PendingInvitation` |
+| `types/common.ts`  | `ThemeManifestItem`, `ErrorResponse`, `Pagination`, `ListQuery`, `UserPreferences`, `UpdateUserPreferences`, `SupportRequest`   |
 
-### 6.4 Type derivation (Zod v4)
+### 6.4 Type definition pattern (plain TypeScript interfaces)
 
-All TypeScript types are derived from Zod v4 schemas using `z.infer<>` (API unchanged from v3):
+All TypeScript types in the shared package are plain interfaces with no runtime dependency:
 
 ```typescript
-// Example: packages/shared/src/types/project.ts
-import { z } from 'zod';
-import { ProjectSchema, CreateProjectSchema, UpdateProjectSchema } from '../schemas/project';
+// Example: shared/src/types/project.ts
+export interface Project {
+  id: string;
+  tenantId: string;
+  name: string;
+  slug: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export type Project = z.infer<typeof ProjectSchema>;
-export type CreateProjectInput = z.infer<typeof CreateProjectSchema>;
-export type UpdateProjectInput = z.infer<typeof UpdateProjectSchema>;
+export interface CreateProject {
+  name: string;
+  slug: string;
+  description?: string;
+}
 ```
 
-> **Zod v4 note:** For tree-shaking in the frontend bundle, import from `"zod/mini"` instead of `"zod"` when only
-> parsing/validation is needed (no full ZodError details). The backend can use the full `"zod"` bundle without concern.
+### 6.5 Zod schemas and contracts (server package)
 
-### 6.5 Contract definitions
+Zod validation schemas and API contracts live in the server package:
 
-API contracts define the method, path, request type, response type, and possible error codes for each endpoint:
+| Path                     | Purpose                                                             |
+| ------------------------ | ------------------------------------------------------------------- |
+| `server/src/schemas/`    | Zod v4 validation schemas for all API request/response shapes       |
+| `server/src/contracts/`  | API contract definitions (endpoint paths, HTTP methods, type pairs) |
+| `server/src/validators/` | Reusable Zod validator helpers (UUID, slug, pagination)             |
 
 ```typescript
-// Example: packages/shared/src/contracts/project.contracts.ts
-import { HttpMethod } from '../constants';
+// Example: server/src/schemas/project.ts
+import { z } from 'zod';
+import { TenantRoleValues } from '@task-board/shared';
+
+export const CreateProjectSchema = z.interface({
+  name: z.string().min(1).max(200),
+  slug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/),
+  description: z.string().max(1000).optional(),
+});
+```
+
+```typescript
+// Example: server/src/contracts/project.contracts.ts
+import { HttpMethod } from '@task-board/shared';
 
 export const ProjectContracts = {
   list: {
@@ -946,7 +977,7 @@ No `content` configuration is needed — Tailwind v4 auto-detects source files.
 // Example: fetch a single project by ID
 projectResource = httpResource(() => `/api/v1/projects/${this.projectId()}`, {
   defaultValue: null as Project | null,
-  parse: (data) => ProjectSchema.parse(data), // Zod v4 runtime validation
+  // parse handled by server-side validation
 });
 ```
 
@@ -981,7 +1012,7 @@ server/src/
 │   ├── auth.ts                 # JWT verification middleware
 │   ├── tenant-context.ts       # Extracts tenantId from JWT, attaches to context
 │   ├── rbac.ts                 # Role-based access control middleware
-│   ├── validation.ts           # Zod request body/query/param validation
+│   ├── validation.ts           # Zod v4 request body/query/param validation (schemas in server/src/schemas/)
 │   └── error-handler.ts        # Global error handler → standardized error responses
 ├── routes/
 │   ├── auth.ts                 # POST /auth/register, POST /auth/login, GET /auth/me
@@ -1029,8 +1060,8 @@ Request → ErrorHandler → AuthMiddleware → TenantContextMiddleware → RBAC
 4. **RBACMiddleware** — checks the user's role against the required permission for the route. Uses `rbac.service` to
    evaluate. Sets `c.get('userRole')`.
 5. **ValidationMiddleware** — validates request body, query params, and path params against Zod v4 schemas from the
-   shared package. Uses `z.interface().parse()` / `.safeParse()`. Returns 422 with structured validation errors on
-   failure.
+   server's `src/schemas/` directory. Uses `z.interface().parse()` / `.safeParse()`. Returns 422 with structured
+   validation errors on failure.
 6. **RouteHandler** — the actual endpoint handler, which delegates to the appropriate service.
 
 ### 8.3 Service layer design
@@ -1040,7 +1071,7 @@ Each service is a plain TypeScript class (no framework dependency) that:
 - Receives `tenantId` as its first parameter on every method
 - Delegates persistence to the corresponding repository
 - Enforces business rules (e.g., only project admin can delete a board, only members can create tasks)
-- Returns typed results that map directly to shared package response schemas
+- Returns typed results that map directly to shared package types
 
 **Example — `task.service.ts` method:**
 
@@ -1154,7 +1185,7 @@ access tenant-independent endpoints (auth, invitation acceptance, workspace crea
 | AC-12 | A project admin can move a task from backlog into a sprint                    | `POST /sprints/:sprintId/tasks` adds task to sprint; task's `sprintId` is updated             |
 | AC-13 | A viewer cannot create, edit, or delete tasks                                 | `POST /tasks` returns 403 for viewer role                                                     |
 | AC-14 | A user from tenant A cannot access data from tenant B                         | `GET /projects` with tenant B's ID returns 403 or empty list                                  |
-| AC-15 | All API responses conform to shared Zod schemas                               | Integration tests validate response shapes against schemas                                    |
+| AC-15 | All API responses conform to shared types                                     | Integration tests validate response shapes against server schemas                             |
 | AC-16 | The frontend renders a Kanban board with columns and tasks                    | Board view displays columns in order; tasks are draggable between columns                     |
 | AC-17 | The frontend enforces RBAC in the UI                                          | Viewers see read-only views; unauthorized actions are hidden/disabled                         |
 | AC-18 | Tenant isolation is enforced at the database level                            | All MongoDB queries include `tenantId` filter; no cross-tenant data is returned               |
@@ -1194,7 +1225,7 @@ sprints, with RBAC enforced throughout.
 
 ### 10.2 Deployment order
 
-1. **Shared package** — types, schemas, contracts (foundation for both frontend and backend)
+1. **Shared package** — types, constants (foundation for both frontend and backend)
 2. **Backend skeleton** — Hono app, middleware pipeline, error handler, MongoDB connection
 3. **Auth + Tenant** — register, login, tenant CRUD, tenant context middleware
 4. **Project + Board** — project CRUD, board + column CRUD
@@ -1428,8 +1459,8 @@ tenant settings (name, slug, delete). This avoids adding a top-level navigation 
 #### 12.1.7 Blocking question
 
 > **BQ-TM-1:** The server [`tenants.ts`](server/src/routes/tenants.ts:94) route file does not include a
-> `GET /:tenantId/members` endpoint (to list tenant members), although the shared contract
-> [`tenant.contracts.ts`](shared/src/contracts/tenant.contracts.ts:74) defines it as `listMembers`. This endpoint must
+> `GET /:tenantId/members` endpoint (to list tenant members), although the server contract
+> [`tenant.contracts.ts`](server/src/contracts/tenant.contracts.ts:74) defines it as `listMembers`. This endpoint must
 > be verified as deployed or added to the backend before the member list UI can function. **This is a blocking
 > dependency.**
 
@@ -2762,22 +2793,22 @@ header and sidebar with no content.
   route**.
 - Navigating to `/tenants/:tenantId` renders the [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts) with an empty
   `<router-outlet>`.
-- The [`TenantSchema`](shared/src/schemas/tenant.ts:8) has **no `description` field** — only `id`, `name`, `slug`,
+- The [`TenantSchema`](server/src/schemas/tenant.ts:8) has **no `description` field** — only `id`, `name`, `slug`,
   `subscription`, `createdAt`, `updatedAt`.
 - Owner dashboard ([`owner-dashboard.html`](ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html:48))
   workspace cards show the tenant name as plain text with separate action buttons (Projects, Settings, Members,
   Upgrade).
 - Member dashboard ([`member-dashboard.html`](ui/src/app/features/dashboard/member-dashboard/member-dashboard.html:34))
   workspace cards link directly to `/tenants/:tenantId/projects`.
-- The [`TenantWithRoleSchema`](shared/src/schemas/tenant.ts:107) extends
-  [`TenantSchema`](shared/src/schemas/tenant.ts:8) with a `role` field — already available from the tenant list
+- The [`TenantWithRoleSchema`](server/src/schemas/tenant.ts:107) extends
+  [`TenantSchema`](server/src/schemas/tenant.ts:8) with a `role` field — already available from the tenant list
   endpoint.
 
 **Target state:**
 
 - `/tenants/:tenantId` (empty child path) renders a new `WorkspaceDetail` component inside the
   [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts).
-- The [`TenantSchema`](shared/src/schemas/tenant.ts:8) includes an optional `description` field (max 500 characters,
+- The [`TenantSchema`](server/src/schemas/tenant.ts:8) includes an optional `description` field (max 500 characters,
   nullable).
 - Dashboard workspace card titles link to `/tenants/:tenantId` (the workspace detail page) instead of directly to
   projects or showing only plain text.
@@ -2786,8 +2817,8 @@ header and sidebar with no content.
 
 | #        | Requirement                                                                                                                                                                                                                                                                                                               | Priority |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------: |
-| FR-16.1  | Add `description` field (`string`, max 500, nullable/optional) to [`TenantSchema`](shared/src/schemas/tenant.ts:8)                                                                                                                                                                                                        |   High   |
-| FR-16.2  | Add `description` to [`CreateTenantSchema`](shared/src/schemas/tenant.ts:33) (optional) and [`UpdateTenantSchema`](shared/src/schemas/tenant.ts:50) (optional)                                                                                                                                                            |   High   |
+| FR-16.1  | Add `description` field (`string`, max 500, nullable/optional) to [`TenantSchema`](server/src/schemas/tenant.ts:8)                                                                                                                                                                                                        |   High   |
+| FR-16.2  | Add `description` to [`CreateTenantSchema`](server/src/schemas/tenant.ts:33) (optional) and [`UpdateTenantSchema`](server/src/schemas/tenant.ts:50) (optional)                                                                                                                                                            |   High   |
 | FR-16.3  | Update [`TenantDocument`](server/src/repositories/tenant.repository.ts:11) interface to include `description: string \| null`                                                                                                                                                                                             |   High   |
 | FR-16.4  | Update [`TenantRepository`](server/src/repositories/tenant.repository.ts:36) — [`create()`](server/src/repositories/tenant.repository.ts:57) and [`update()`](server/src/repositories/tenant.repository.ts:72) methods and [`toDomain()`](server/src/repositories/tenant.repository.ts:23) mapper to handle `description` |   High   |
 | FR-16.5  | Update [`TenantService.updateTenant()`](server/src/services/tenant.service.ts:96) to pass `description` through to the repository                                                                                                                                                                                         |   High   |
@@ -2888,13 +2919,13 @@ focus on the workspace overview when I don't need the project list.
 
 | #     | Criterion                                                                                                                                  | Verification method                                                                 |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| AC-1  | [`TenantSchema`](shared/src/schemas/tenant.ts:8) includes `description: z.string().max(500).nullable().optional()`                         | Unit test: schema parses `{ id, name, slug, subscription, description: null, ... }` |
-| AC-2  | [`CreateTenantSchema`](shared/src/schemas/tenant.ts:33) accepts optional `description` field                                               | Unit test: schema parses `{ name, slug, description: "text" }` and `{ name, slug }` |
-| AC-3  | [`UpdateTenantSchema`](shared/src/schemas/tenant.ts:50) accepts optional `description` field                                               | Unit test: schema parses `{ description: "new desc" }`                              |
+| AC-1  | [`TenantSchema`](server/src/schemas/tenant.ts:8) includes `description: z.string().max(500).nullable().optional()`                         | Unit test: schema parses `{ id, name, slug, subscription, description: null, ... }` |
+| AC-2  | [`CreateTenantSchema`](server/src/schemas/tenant.ts:33) accepts optional `description` field                                               | Unit test: schema parses `{ name, slug, description: "text" }` and `{ name, slug }` |
+| AC-3  | [`UpdateTenantSchema`](server/src/schemas/tenant.ts:50) accepts optional `description` field                                               | Unit test: schema parses `{ description: "new desc" }`                              |
 | AC-4  | [`TenantDocument`](server/src/repositories/tenant.repository.ts:11) has `description: string \| null`                                      | TypeScript compilation — no type errors                                             |
 | AC-5  | [`TenantRepository.create()`](server/src/repositories/tenant.repository.ts:57) stores `description` in MongoDB                             | Integration test: create tenant with description, read back                         |
 | AC-6  | [`TenantRepository.update()`](server/src/repositories/tenant.repository.ts:72) accepts and persists `description`                          | Integration test: update description, verify persistence                            |
-| AC-7  | [`TenantRepository.toDomain()`](server/src/repositories/tenant.repository.ts:23) maps `description` correctly (null → undefined if needed) | Unit test: mapper output matches [`TenantSchema`](shared/src/schemas/tenant.ts:8)   |
+| AC-7  | [`TenantRepository.toDomain()`](server/src/repositories/tenant.repository.ts:23) maps `description` correctly (null → undefined if needed) | Unit test: mapper output matches [`TenantSchema`](server/src/schemas/tenant.ts:8)   |
 | AC-8  | `PATCH /api/v1/tenants/:tenantId` accepts `{ description: "..." }` in request body                                                         | Integration test: HTTP PATCH with description body                                  |
 | AC-9  | `GET /api/v1/tenants/:tenantId` returns `description` in response                                                                          | Integration test: HTTP GET returns description field                                |
 | AC-10 | Route `''` (empty path) is registered as first child of `tenants/:tenantId` in [`app.routes.ts`](ui/src/app/app.routes.ts:37)              | Unit test: route inspection; navigating to `/tenants/:id` loads WorkspaceDetail     |
@@ -2914,12 +2945,12 @@ focus on the workspace overview when I don't need the project list.
 
 ### 16.7 Data model changes
 
-#### 16.7.1 Shared package — [`TenantSchema`](shared/src/schemas/tenant.ts:8)
+#### 16.7.1 Server package — [`TenantSchema`](server/src/schemas/tenant.ts:8)
 
 Add `description` field:
 
 ```typescript
-// In shared/src/schemas/tenant.ts — TenantSchema
+// In server/src/schemas/tenant.ts — TenantSchema
 export const TenantSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1).max(100),
@@ -2935,7 +2966,7 @@ export const TenantSchema = z.object({
 });
 ```
 
-#### 16.7.2 Shared package — [`CreateTenantSchema`](shared/src/schemas/tenant.ts:33)
+#### 16.7.2 Server package — [`CreateTenantSchema`](server/src/schemas/tenant.ts:33)
 
 Add optional `description`:
 
@@ -2952,7 +2983,7 @@ export const CreateTenantSchema = z.object({
 });
 ```
 
-#### 16.7.3 Shared package — [`UpdateTenantSchema`](shared/src/schemas/tenant.ts:50)
+#### 16.7.3 Server package — [`UpdateTenantSchema`](server/src/schemas/tenant.ts:50)
 
 Add optional `description`:
 
@@ -3031,7 +3062,7 @@ const tenant = await this.tenantRepo.create({ ...input, subscription, descriptio
 ```
 
 Update [`updateTenant()`](server/src/services/tenant.service.ts:96) — the `input` type already flows from
-[`UpdateTenantSchema`](shared/src/schemas/tenant.ts:50) through to the repository. No code change needed beyond the
+[`UpdateTenantSchema`](server/src/schemas/tenant.ts:50) through to the repository. No code change needed beyond the
 schema change if the service passes `input` directly to `this.tenantRepo.update(id, input)`. Verify this is the case; if
 the service destructures fields explicitly, add `description` to the destructure.
 
@@ -3237,7 +3268,7 @@ async updateTenant(tenantId: string, data: { name?: string; slug?: string; descr
 #### 16.8.5 [`TenantStore`](ui/src/app/stores/tenant-store.ts) — active tenant type
 
 The [`TenantStore`](ui/src/app/stores/tenant-store.ts:14) stores `Tenant` objects. After the
-[`TenantSchema`](shared/src/schemas/tenant.ts:8) change (§16.7.1), the `Tenant` type will include `description`. No
+[`TenantSchema`](server/src/schemas/tenant.ts:8) change (§16.7.1), the `Tenant` type will include `description`. No
 store code changes needed — the type flows automatically.
 
 #### 16.8.6 Dashboard changes
@@ -3329,7 +3360,7 @@ target from projects to workspace detail:
     "User emails are globally unique across all tenants.",
     "The `X-Tenant-Id` header is the mechanism for frontend to declare active tenant; the backend validates active membership (status: 'active').",
     "Password hashing uses bcryptjs (pure JS, Workers-compatible); no native bcrypt or argon2.",
-    "Zod v4 is used throughout; `z.interface()` preferred for object schemas, `zod/mini` for frontend tree-shaking.",
+    "Zod v4 is used in the server package for validation; `z.interface()` preferred for object schemas. The shared package is runtime-library free (no Zod dependency).",
     "Angular 22 zoneless mode is the default; no `zone.js` dependency.",
     "Tailwind CSS v4 CSS-first configuration; no `tailwind.config.js`.",
     "Hono RPC client is available for type-safe frontend→backend calls but the explicit shared-package contract approach is used as the primary pattern.",

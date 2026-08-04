@@ -661,9 +661,6 @@ Add barrel exports:
 // Schemas
 export { UserPreferencesSchema, UpdateUserPreferencesSchema } from './schemas/user-preferences.js';
 export type { UserPreferences, UpdateUserPreferences } from './schemas/user-preferences.js';
-
-// Contracts
-export { userPreferencesContracts } from './contracts/user-preferences.contracts.js';
 ```
 
 ---
