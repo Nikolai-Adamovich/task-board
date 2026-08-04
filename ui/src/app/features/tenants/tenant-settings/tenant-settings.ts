@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideSettings, lucideTrash2, lucideSave } from '@ng-icons/lucide';
 import { TenantStore } from '@stores/tenant-store';
@@ -18,6 +19,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 @Component({
   selector: 'ui-tenant-settings',
   imports: [
+    TranslocoPipe,
     NgIcon,
     HlmButtonImports,
     HlmCardImports,
@@ -51,8 +53,8 @@ export class TenantSettings implements OnInit {
   protected readonly settingsForm = form(
     this.model,
     schema<{ name: string; slug: string }>((field) => {
-      required(field.name, { message: 'Name is required' });
-      required(field.slug, { message: 'Slug is required' });
+      required(field.name, { message: 'validation.nameRequired' });
+      required(field.slug, { message: 'validation.slugRequired' });
     }),
     {
       submission: {
@@ -112,6 +114,6 @@ export class TenantSettings implements OnInit {
       return err.error?.message ?? err.message;
     }
 
-    return 'An unexpected error occurred. Please try again.';
+    return 'errors.unexpected';
   }
 }

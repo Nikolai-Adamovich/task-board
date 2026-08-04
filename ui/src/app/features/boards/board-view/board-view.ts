@@ -1,5 +1,6 @@
 import { Component, inject, input, signal, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
 import { TaskPriority } from '@task-board/shared';
@@ -31,6 +32,7 @@ interface CreateTaskForm {
 @Component({
   selector: 'ui-board-view',
   imports: [
+    TranslocoPipe,
     FormField,
     ColumnView,
     NgIcon,
@@ -68,8 +70,8 @@ export class BoardView implements OnInit {
   protected readonly newTaskForm = form(
     this.model,
     schema<CreateTaskForm>((field) => {
-      required(field.title, { message: 'Title is required' });
-      required(field.columnId, { message: 'Column is required' });
+      required(field.title, { message: 'validation.titleRequired' });
+      required(field.columnId, { message: 'validation.columnRequired' });
     }),
     {
       submission: {
@@ -187,6 +189,6 @@ export class BoardView implements OnInit {
       return err.error?.message ?? err.message;
     }
 
-    return 'An unexpected error occurred. Please try again.';
+    return 'errors.unexpected';
   }
 }

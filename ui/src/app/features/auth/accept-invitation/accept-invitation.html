@@ -1,48 +1,51 @@
 <div class="flex min-h-screen items-center justify-center bg-surface-50">
   @if (loading()) {
     <div class="flex items-center justify-center">
-      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading invitation...</span>
+      <hlm-spinner />
+      <span class="ml-2 text-sm text-muted-foreground">{{ 'auth.invitation.loading' | transloco }}</span>
     </div>
   } @else if (error() && !invitation()) {
     <hlm-card class="w-full max-w-md">
       <hlm-card-header>
-        <h3 hlmCardTitle>Invitation Error</h3>
+        <h3 hlmCardTitle>{{ 'auth.invitation.error' | transloco }}</h3>
       </hlm-card-header>
       <div hlmCardContent>
         <div class="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() }}
+          {{ error() | transloco }}
         </div>
       </div>
       <hlm-card-footer>
-        <a routerLink="/auth/login" hlmBtn variant="outline" class="w-full">Go to Sign in</a>
+        <a routerLink="/auth/login" hlmBtn variant="outline" class="w-full">{{
+          'auth.invitation.goToSignIn' | transloco
+        }}</a>
       </hlm-card-footer>
     </hlm-card>
   } @else if (invitation(); as inv) {
     <hlm-card class="w-full max-w-md">
       <hlm-card-header>
-        <h3 hlmCardTitle>Accept Invitation</h3>
-        <p hlmCardDescription>You've been invited to join a workspace.</p>
+        <h3 hlmCardTitle>{{ 'auth.invitation.title' | transloco }}</h3>
+        <p hlmCardDescription>{{ 'auth.invitation.description' | transloco }}</p>
       </hlm-card-header>
 
       <div hlmCardContent>
         @if (error()) {
           <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-            {{ error() }}
+            {{ error() | transloco }}
           </div>
         }
 
         <!-- Invitation details (readonly) -->
         <div class="mb-4 space-y-2 rounded-md bg-muted/50 p-3">
           <div class="flex items-center justify-between">
-            <span class="text-sm text-muted-foreground">Email</span>
+            <span class="text-sm text-muted-foreground">{{ 'auth.invitation.email' | transloco }}</span>
             <span class="text-sm font-medium text-foreground">{{ inv.email }}</span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-sm text-muted-foreground">Workspace</span>
+            <span class="text-sm text-muted-foreground">{{ 'auth.invitation.workspace' | transloco }}</span>
             <span class="text-sm font-medium text-foreground">{{ inv.tenantName }}</span>
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-sm text-muted-foreground">Role</span>
+            <span class="text-sm text-muted-foreground">{{ 'auth.invitation.role' | transloco }}</span>
             <span hlmBadge variant="outline">{{ inv.role }}</span>
           </div>
         </div>
@@ -50,14 +53,14 @@
         @if (inv.isRegistered) {
           <!-- Existing user: just accept -->
           <p class="text-sm text-muted-foreground">
-            You already have an account. Click below to accept this invitation.
+            {{ 'auth.invitation.existingUserHint' | transloco }}
           </p>
         } @else {
           <!-- New user: show registration form -->
           <form id="invitation-form" [formRoot]="invitationForm">
             <hlm-field-group>
               <hlm-field>
-                <label hlmFieldLabel for="displayName">Display Name</label>
+                <label hlmFieldLabel for="displayName">{{ 'auth.invitation.displayName' | transloco }}</label>
                 <input
                   hlmInput
                   id="displayName"
@@ -67,12 +70,12 @@
                   placeholder="John Doe"
                 />
                 @if (invitationForm.displayName().touched() && invitationForm.displayName().errors().length) {
-                  <p hlm-field-error>{{ invitationForm.displayName().errors()[0].message }}</p>
+                  <p hlm-field-error>{{ invitationForm.displayName().errors()[0].message | transloco }}</p>
                 }
               </hlm-field>
 
               <hlm-field>
-                <label hlmFieldLabel for="password">Password</label>
+                <label hlmFieldLabel for="password">{{ 'auth.invitation.password' | transloco }}</label>
                 <input
                   hlmInput
                   id="password"
@@ -82,12 +85,12 @@
                   placeholder="••••••••"
                 />
                 @if (invitationForm.password().touched() && invitationForm.password().errors().length) {
-                  <p hlm-field-error>{{ invitationForm.password().errors()[0].message }}</p>
+                  <p hlm-field-error>{{ invitationForm.password().errors()[0].message | transloco }}</p>
                 }
               </hlm-field>
 
               <hlm-field>
-                <label hlmFieldLabel for="confirmPassword">Confirm Password</label>
+                <label hlmFieldLabel for="confirmPassword">{{ 'auth.invitation.confirmPassword' | transloco }}</label>
                 <input
                   hlmInput
                   id="confirmPassword"
@@ -97,7 +100,7 @@
                   placeholder="••••••••"
                 />
                 @if (invitationForm.confirmPassword().touched() && invitationForm.confirmPassword().errors().length) {
-                  <p hlm-field-error>{{ invitationForm.confirmPassword().errors()[0].message }}</p>
+                  <p hlm-field-error>{{ invitationForm.confirmPassword().errors()[0].message | transloco }}</p>
                 }
               </hlm-field>
             </hlm-field-group>
@@ -109,9 +112,9 @@
         @if (inv.isRegistered) {
           <button hlmBtn class="w-full" (click)="acceptAsExistingUser()" [disabled]="loading()">
             @if (loading()) {
-              <hlm-spinner /> Accepting...
+              <hlm-spinner /> {{ 'auth.invitation.accepting' | transloco }}
             } @else {
-              Accept Invitation
+              {{ 'auth.invitation.accept' | transloco }}
             }
           </button>
         } @else {
@@ -123,15 +126,17 @@
             [disabled]="invitationForm().invalid() || invitationForm().submitting()"
           >
             @if (invitationForm().submitting()) {
-              <hlm-spinner /> Creating account...
+              <hlm-spinner /> {{ 'auth.invitation.creatingAccount' | transloco }}
             } @else {
-              Create Account & Accept
+              {{ 'auth.invitation.createAndAccept' | transloco }}
             }
           </button>
         }
         <p class="text-center text-sm text-muted-foreground">
-          Already have an account?
-          <a routerLink="/auth/login" class="font-medium text-primary hover:underline">Sign in</a>
+          {{ 'auth.invitation.hasAccount' | transloco }}
+          <a routerLink="/auth/login" class="font-medium text-primary hover:underline">{{
+            'auth.invitation.signIn' | transloco
+          }}</a>
         </p>
       </hlm-card-footer>
     </hlm-card>

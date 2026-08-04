@@ -1,11 +1,11 @@
 <div class="flex items-center justify-between gap-1">
-  <span class="text-sm pl-1">Zoom</span>
+  <span class="text-sm pl-1">{{ 'userMenu.zoom' | transloco }}</span>
   <div class="flex items-center gap-1">
     <button
       hlmBtn
       variant="ghost"
       size="sm"
-      aria-label="Zoom out"
+      [attr.aria-label]="'userMenu.zoomOut' | transloco"
       [disabled]="preferencesStore.zoom() <= 25"
       (click)="zoomOut()"
     >
@@ -16,7 +16,7 @@
       hlmBtn
       variant="ghost"
       size="sm"
-      aria-label="Zoom in"
+      [attr.aria-label]="'userMenu.zoomIn' | transloco"
       [disabled]="preferencesStore.zoom() >= 500"
       (click)="zoomIn()"
     >

@@ -1,5 +1,6 @@
 import { Component, DestroyRef, effect, inject, model, signal } from '@angular/core';
 import { ExpandState } from '@task-board/shared';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSheetImports } from '@spartan-ng/helm/sheet';
 import { PreferencesStore } from '@stores/preferences-store';
@@ -13,7 +14,7 @@ const GRID_GAP_X = 24;
 @Component({
   selector: 'ui-user-menu-theme-sheet',
   standalone: true,
-  imports: [HlmSheetImports, HlmButtonImports],
+  imports: [HlmSheetImports, HlmButtonImports, TranslocoPipe],
   templateUrl: './user-menu-theme-sheet.html',
 })
 export class UserMenuThemeSheet {

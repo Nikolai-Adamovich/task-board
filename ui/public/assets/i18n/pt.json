@@ -1,0 +1,448 @@
+{
+  "header": {
+    "search": "Pesquisar\u2026",
+    "clearSearch": "Limpar pesquisa",
+    "notifications": "Notifica\u00e7\u00f5es",
+    "noNotifications": "Sem notifica\u00e7\u00f5es",
+    "help": "Ajuda",
+    "faq": "FAQ",
+    "documentation": "Documenta\u00e7\u00e3o",
+    "support": "Suporte",
+    "signIn": "Entrar",
+    "userMenu": "Menu do usu\u00e1rio"
+  },
+  "sidebar": {
+    "brand": "Task Board",
+    "brandShort": "TB",
+    "projects": "Projetos",
+    "sprints": "Sprints",
+    "settings": "Configura\u00e7\u00f5es",
+    "members": "Membros",
+    "toggleSidebar": "Alternar barra lateral"
+  },
+  "tenantSwitcher": {
+    "selectWorkspace": "Selecionar workspace",
+    "noWorkspaces": "Nenhum workspace dispon\u00edvel",
+    "createWorkspace": "Criar Workspace"
+  },
+  "userMenu": {
+    "language": "Idioma",
+    "themes": "Temas",
+    "preferences": "Prefer\u00eancias",
+    "signOut": "Sair",
+    "zoom": "Zoom",
+    "zoomIn": "Aumentar zoom",
+    "zoomOut": "Diminuir zoom",
+    "openThemePicker": "Abrir seletor de tema",
+    "chooseTheme": "Escolher tema",
+    "availableThemes": "Temas dispon\u00edveis"
+  },
+  "auth": {
+    "login": {
+      "title": "Entrar no Task Board",
+      "description": "Insira suas credenciais para acessar seu workspace.",
+      "email": "E-mail",
+      "password": "Senha",
+      "submit": "Entrar",
+      "submitting": "Entrando\u2026",
+      "noAccount": "N\u00e3o tem uma conta?",
+      "createOne": "Criar uma",
+      "failed": "Falha ao entrar. Por favor, tente novamente."
+    },
+    "register": {
+      "title": "Crie sua conta",
+      "description": "Preencha os dados abaixo para come\u00e7ar.",
+      "name": "Nome",
+      "email": "E-mail",
+      "password": "Senha",
+      "submit": "Criar conta",
+      "submitting": "Criando conta\u2026",
+      "hasAccount": "J\u00e1 tem uma conta?",
+      "signIn": "Entrar",
+      "failed": "Falha no registro. Por favor, tente novamente."
+    },
+    "invitation": {
+      "loading": "Carregando convite\u2026",
+      "error": "Erro no Convite",
+      "goToSignIn": "Ir para Entrar",
+      "title": "Aceitar Convite",
+      "description": "Voc\u00ea foi convidado(a) a participar de um workspace.",
+      "email": "E-mail",
+      "workspace": "Workspace",
+      "role": "Fun\u00e7\u00e3o",
+      "existingUserHint": "Voc\u00ea j\u00e1 tem uma conta. Clique abaixo para aceitar este convite.",
+      "displayName": "Nome de Exibi\u00e7\u00e3o",
+      "password": "Senha",
+      "confirmPassword": "Confirmar Senha",
+      "accept": "Aceitar Convite",
+      "accepting": "Aceitando\u2026",
+      "createAndAccept": "Criar Conta e Aceitar",
+      "creatingAccount": "Criando conta\u2026",
+      "hasAccount": "J\u00e1 tem uma conta?",
+      "signIn": "Entrar",
+      "noToken": "Nenhum token de convite fornecido.",
+      "invalidOrExpired": "Convite inv\u00e1lido ou expirado.",
+      "passwordsNotMatch": "As senhas n\u00e3o coincidem.",
+      "failedAccept": "Falha ao aceitar o convite."
+    }
+  },
+  "landing": {
+    "title": "Task Board",
+    "subtitle": "Gest\u00e3o de projetos simples para equipes",
+    "getStarted": "Come\u00e7ar",
+    "signIn": "Entrar",
+    "kanban": {
+      "title": "Quadros Kanban",
+      "description": "Visualize seu fluxo de trabalho com quadros de arrastar e soltar. Acompanhe tarefas atrav\u00e9s de colunas, do backlog ao conclu\u00eddo."
+    },
+    "sprints": {
+      "title": "Sprints",
+      "description": "Planeje e execute sprints com facilidade. Acompanhe a velocidade e entregue no prazo."
+    },
+    "collaboration": {
+      "title": "Colabora\u00e7\u00e3o em Equipe",
+      "description": "Convide membros da equipe, atribua fun\u00e7\u00f5es e colabore em tempo real nos projetos."
+    },
+    "multiWorkspace": {
+      "title": "Multi-Workspaces",
+      "description": "Gerencie m\u00faltiplos workspaces para diferentes equipes ou clientes a partir de uma \u00fanica conta."
+    }
+  },
+  "welcome": {
+    "title": "Bem-vindo ao Task Board",
+    "greeting": ", {{name}}!",
+    "subtitle": "Vamos come\u00e7ar. Crie seu primeiro workspace para iniciar.",
+    "createWorkspace": {
+      "title": "Crie seu primeiro workspace",
+      "description": "Um workspace \u00e9 a base da sua equipe. Crie projetos, gerencie tarefas e colabore com sua equipe.",
+      "button": "Criar Workspace"
+    },
+    "freePlan": {
+      "title": "Plano Gratuito Inclui",
+      "workspace": "1 workspace",
+      "projects": "3 projetos",
+      "users": "10 usu\u00e1rios"
+    },
+    "pendingInvitations": "Convites Pendentes",
+    "accept": "Aceitar"
+  },
+  "invitationView": {
+    "title": "Voc\u00ea tem convites pendentes",
+    "subtitle": "Aceite um convite para participar de um workspace, ou crie o seu pr\u00f3prio.",
+    "invited": "Convidado em {{date}}",
+    "decline": "Recusar",
+    "accept": "Aceitar",
+    "or": "Ou",
+    "createOwn": "crie seu pr\u00f3prio workspace"
+  },
+  "ownerDashboard": {
+    "title": "Painel do Propriet\u00e1rio",
+    "subtitle": "Gerencie seus workspaces e acompanhe o progresso da sua equipe.",
+    "totalTasks": "Total de Tarefas",
+    "workspaces": "Workspaces",
+    "myWorkspaces": "Meus Workspaces",
+    "createAnother": "Criar outro workspace",
+    "projects": "Projetos",
+    "settings": "Configura\u00e7\u00f5es",
+    "members": "Membros",
+    "upgrade": "Atualizar",
+    "myRecentTasks": "Minhas Tarefas Recentes",
+    "noTasks": "Nenhuma tarefa atribu\u00edda a voc\u00ea ainda."
+  },
+  "memberDashboard": {
+    "title": "Painel",
+    "subtitle": "Seus workspaces e tarefas recentes de relance.",
+    "totalTasks": "Total de Tarefas",
+    "workspaces": "Workspaces",
+    "myWorkspaces": "Meus Workspaces",
+    "myRecentTasks": "Minhas Tarefas Recentes",
+    "noTasks": "Nenhuma tarefa atribu\u00edda a voc\u00ea ainda."
+  },
+  "workspace": {
+    "defaultName": "Workspace",
+    "settings": "Configura\u00e7\u00f5es",
+    "members": "Membros",
+    "upgrade": "Atualizar",
+    "projects": "Projetos",
+    "noProjects": "Nenhum projeto ainda.",
+    "createFirst": "Crie seu primeiro projeto"
+  },
+  "createWorkspace": {
+    "title": "Crie seu workspace",
+    "description": "Configure um workspace para come\u00e7ar a gerenciar seus projetos.",
+    "name": "Nome do Workspace",
+    "slug": "Slug",
+    "slugHint": "Usado em URLs. Apenas letras min\u00fasculas, n\u00fameros e h\u00edfens.",
+    "plan": "Plano de Assinatura",
+    "planFree": "Gratuito \u2014 At\u00e9 3 projetos e 5 usu\u00e1rios",
+    "submit": "Criar Workspace",
+    "submitting": "Criando workspace\u2026",
+    "failed": "Falha ao criar o workspace. Por favor, tente novamente."
+  },
+  "settings": {
+    "title": "Configura\u00e7\u00f5es"
+  },
+  "tenantSettings": {
+    "title": "Configura\u00e7\u00f5es do Tenant",
+    "loading": "Carregando configura\u00e7\u00f5es\u2026",
+    "general": "Configura\u00e7\u00f5es Gerais",
+    "name": "Nome",
+    "slug": "Slug",
+    "save": "Salvar Altera\u00e7\u00f5es",
+    "saving": "Salvando\u2026",
+    "dangerZone": "Zona de Perigo",
+    "dangerDescription": "Excluir um tenant \u00e9 irrevers\u00edvel. Todos os projetos, quadros e tarefas dentro deste tenant ser\u00e3o removidos permanentemente.",
+    "deleteTenant": "Excluir Tenant",
+    "deleteTitle": "Excluir Tenant",
+    "deleteConfirm": "Esta a\u00e7\u00e3o n\u00e3o pode ser desfeita. Para confirmar, digite o nome do tenant abaixo.",
+    "deleteName": "Nome do Tenant",
+    "deletePlaceholder": "Digite o nome do tenant para confirmar",
+    "cancel": "Cancelar"
+  },
+  "upgrade": {
+    "title": "Atualizar Plano",
+    "successTitle": "Voc\u00ea est\u00e1 no Premium!",
+    "successDescription": "Seu workspace foi atualizado para o plano Premium. Aproveite projetos e usu\u00e1rios ilimitados.",
+    "backToSettings": "Voltar para Configura\u00e7\u00f5es",
+    "currentPlan": "Plano Atual",
+    "freeLimit": "At\u00e9 3 projetos, 5 usu\u00e1rios por workspace",
+    "premiumUnlimited": "Projetos e usu\u00e1rios ilimitados",
+    "premiumPlan": "Plano Premium",
+    "premiumDescription": "Desbloqueie todo o poder do Task Board.",
+    "unlimitedProjects": "Projetos ilimitados",
+    "unlimitedMembers": "Membros da equipe ilimitados",
+    "prioritySupport": "Suporte priorit\u00e1rio",
+    "advancedAnalytics": "An\u00e1lises avan\u00e7adas",
+    "back": "Voltar",
+    "upgradeButton": "Atualizar para Premium",
+    "upgrading": "Atualizando\u2026",
+    "failed": "Falha ao atualizar. Por favor, tente novamente."
+  },
+  "members": {
+    "title": "Membros",
+    "loading": "Carregando membros\u2026",
+    "noMembers": "Nenhum membro encontrado.",
+    "pending": "Pendente",
+    "unknown": "Desconhecido",
+    "active": "Ativo",
+    "accessRevoked": "Acesso Revogado",
+    "declined": "Recusado",
+    "invite": "Convidar Membro",
+    "inviteTitle": "Convidar Membro",
+    "email": "E-mail",
+    "role": "Fun\u00e7\u00e3o",
+    "revokeAccess": "Revogar acesso",
+    "resendInvitation": "Reenviar convite",
+    "permanentlyDelete": "Excluir permanentemente",
+    "removeMember": "Remover membro",
+    "cancel": "Cancelar",
+    "inviteButton": "Convidar",
+    "inviting": "Convidando\u2026"
+  },
+  "projects": {
+    "title": "Projetos",
+    "new": "Novo Projeto",
+    "loading": "Carregando projetos\u2026",
+    "noProjects": "Nenhum projeto encontrado. Crie seu primeiro projeto para come\u00e7ar.",
+    "slug": "Slug: {{slug}}",
+    "createTitle": "Criar Projeto",
+    "name": "Nome",
+    "slugLabel": "Slug",
+    "description": "Descri\u00e7\u00e3o",
+    "descriptionPlaceholder": "Descri\u00e7\u00e3o opcional\u2026",
+    "cancel": "Cancelar",
+    "create": "Criar Projeto",
+    "creating": "Criando\u2026"
+  },
+  "projectDetail": {
+    "loading": "Carregando projeto\u2026",
+    "sprints": "Sprints",
+    "newBoard": "Novo Quadro",
+    "boards": "Quadros",
+    "noBoards": "Nenhum quadro ainda.",
+    "createBoard": "Criar um quadro",
+    "members": "Membros",
+    "addMember": "Adicionar Membro",
+    "noMembers": "Nenhum membro carregado.",
+    "changeRole": "Alterar fun\u00e7\u00e3o",
+    "removeMember": "Remover membro",
+    "createBoardTitle": "Criar Quadro",
+    "boardName": "Nome",
+    "boardDescription": "Descri\u00e7\u00e3o",
+    "descriptionPlaceholder": "Descri\u00e7\u00e3o opcional\u2026",
+    "cancel": "Cancelar",
+    "createBoardButton": "Criar Quadro",
+    "creating": "Criando\u2026",
+    "addMemberTitle": "Adicionar Membro",
+    "userId": "ID do Usu\u00e1rio",
+    "userIdPlaceholder": "Insira o ID do usu\u00e1rio",
+    "role": "Fun\u00e7\u00e3o",
+    "addMemberButton": "Adicionar Membro",
+    "adding": "Adicionando\u2026",
+    "removeMemberTitle": "Remover Membro",
+    "removeConfirm": "Tem certeza de que deseja remover este membro do projeto?",
+    "removeButton": "Remover"
+  },
+  "boardView": {
+    "loading": "Carregando quadro\u2026",
+    "newTask": "Nova Tarefa",
+    "createTaskTitle": "Criar Tarefa",
+    "title": "T\u00edtulo",
+    "titlePlaceholder": "T\u00edtulo da tarefa",
+    "description": "Descri\u00e7\u00e3o",
+    "descriptionPlaceholder": "Descri\u00e7\u00e3o opcional\u2026",
+    "priority": "Prioridade",
+    "column": "Coluna",
+    "cancel": "Cancelar",
+    "create": "Criar Tarefa",
+    "creating": "Criando\u2026"
+  },
+  "priority": {
+    "low": "Baixa",
+    "medium": "M\u00e9dia",
+    "high": "Alta",
+    "critical": "Cr\u00edtica"
+  },
+  "columnView": {
+    "addTask": "Adicionar tarefa \u00e0 coluna",
+    "noTasks": "Sem tarefas"
+  },
+  "taskDetail": {
+    "loading": "Carregando tarefa\u2026",
+    "created": "Criada em {{date}}",
+    "updated": "Atualizada em {{date}}",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "saving": "Salvando\u2026",
+    "edit": "Editar",
+    "title": "T\u00edtulo",
+    "description": "Descri\u00e7\u00e3o",
+    "descriptionPlaceholder": "Descri\u00e7\u00e3o da tarefa (suporta markdown)",
+    "noDescription": "Sem descri\u00e7\u00e3o",
+    "priority": "Prioridade",
+    "assignees": "Respons\u00e1veis",
+    "unassigned": "N\u00e3o atribu\u00eddo",
+    "actions": "A\u00e7\u00f5es",
+    "deleteTask": "Excluir Tarefa",
+    "deleteTitle": "Excluir Tarefa",
+    "deleteConfirm": "Tem certeza de que deseja excluir esta tarefa? Esta a\u00e7\u00e3o n\u00e3o pode ser desfeita.",
+    "cancelDelete": "Cancelar",
+    "confirmDelete": "Excluir"
+  },
+  "sprints": {
+    "title": "Sprints",
+    "new": "Novo Sprint",
+    "loading": "Carregando sprints\u2026",
+    "noSprints": "Nenhum sprint ainda.",
+    "createFirst": "Criar primeiro sprint",
+    "tasks": "{{count}} tarefas",
+    "sprintsCount": "{{count}} sprints",
+    "toggle": "Alternar",
+    "createTitle": "Criar Sprint",
+    "name": "Nome",
+    "startDate": "Data de In\u00edcio",
+    "endDate": "Data de T\u00e9rmino",
+    "goal": "Objetivo",
+    "goalPlaceholder": "Objetivo opcional do sprint\u2026",
+    "cancel": "Cancelar",
+    "create": "Criar Sprint",
+    "creating": "Criando\u2026"
+  },
+  "sprintDetail": {
+    "loading": "Carregando sprint\u2026",
+    "tasks": "Tarefas",
+    "backToProject": "Voltar ao Projeto",
+    "noTasks": "Nenhuma tarefa neste sprint.",
+    "removeFromSprint": "Remover do sprint"
+  },
+  "sprintBacklog": {
+    "backlog": "Backlog",
+    "loading": "Carregando backlog\u2026",
+    "allAssigned": "Todas as tarefas est\u00e3o atribu\u00eddas a sprints.",
+    "addToSprint": "Adicionar ao Sprint"
+  },
+  "docs": {
+    "title": "Documenta\u00e7\u00e3o",
+    "intro": "{{brand}} \u00e9 uma aplica\u00e7\u00e3o moderna e colaborativa de gest\u00e3o de projetos, projetada para ajudar equipes a organizar, acompanhar e entregar trabalho de forma eficiente. Re\u00fane quadros, colunas, tarefas e sprints em um workspace unificado que se adapta ao fluxo de trabalho da sua equipe.",
+    "brand": "Task Board",
+    "keyFeatures": "Recursos Principais",
+    "workspaces": "Workspaces e Projetos",
+    "workspacesDesc": "Crie workspaces isolados para diferentes equipes ou clientes, cada um contendo m\u00faltiplos projetos com seus pr\u00f3prios quadros e configura\u00e7\u00f5es.",
+    "boardManagement": "Gest\u00e3o de Quadros e Colunas",
+    "boardManagementDesc": "Organize tarefas em colunas personaliz\u00e1veis (por exemplo, A Fazer, Em Progresso, Conclu\u00eddo) com suporte a arrastar e soltar para facilitar a prioriza\u00e7\u00e3o.",
+    "taskTracking": "Acompanhamento de Tarefas",
+    "taskTrackingDesc": "Crie, atribua e acompanhe tarefas com detalhes ricos, incluindo descri\u00e7\u00f5es, etiquetas, prioridades e datas de vencimento.",
+    "sprintPlanning": "Planejamento de Sprints",
+    "sprintPlanningDesc": "Planeje itera\u00e7\u00f5es usando sprints, atribua tarefas a sprints espec\u00edficos e monitore o progresso com visualiza\u00e7\u00f5es estilo burndown.",
+    "teamCollaboration": "Colabora\u00e7\u00e3o em Equipe",
+    "teamCollaborationDesc": "Convide membros da equipe por e-mail, atribua fun\u00e7\u00f5es (Propriet\u00e1rio, Administrador, Membro) e colabore em tempo real em workspaces compartilhados.",
+    "rbac": "Controle de Acesso Baseado em Fun\u00e7\u00f5es",
+    "rbacDesc": "Permiss\u00f5es granulares garantem que os membros da equipe acessem apenas os recursos apropriados para sua fun\u00e7\u00e3o.",
+    "techStack": "Stack Tecnol\u00f3gico",
+    "techStackDesc": "Task Board \u00e9 constru\u00eddo com um stack moderno orientado a TypeScript. O frontend \u00e9 alimentado por Angular com componentes Spartan UI e Tailwind CSS para estiliza\u00e7\u00e3o. O backend roda no Cloudflare Workers com uma camada de dados MongoDB. Defini\u00e7\u00f5es de tipos compartilhados e esquemas de valida\u00e7\u00e3o garantem seguran\u00e7a de tipos ponta a ponta entre cliente e servidor."
+  },
+  "faq": {
+    "title": "Perguntas Frequentes",
+    "q1": {
+      "question": "O que \u00e9 o Task Board?",
+      "answer": "Task Board \u00e9 uma aplica\u00e7\u00e3o colaborativa de gest\u00e3o de projetos que ajuda equipes a organizar o trabalho usando quadros, colunas, tarefas e sprints. Suporta m\u00faltiplos workspaces, controle de acesso baseado em fun\u00e7\u00f5es e colabora\u00e7\u00e3o em tempo real."
+    },
+    "q2": {
+      "question": "Como crio um projeto?",
+      "answer": "Navegue at\u00e9 seu workspace, clique na se\u00e7\u00e3o \u00abProjetos\u00bb e use o bot\u00e3o \u00abCriar Projeto\u00bb. Voc\u00ea precisar\u00e1 fornecer um nome de projeto e uma descri\u00e7\u00e3o opcional. Os projetos est\u00e3o vinculados ao seu workspace atual."
+    },
+    "q3": {
+      "question": "Como convido membros da equipe?",
+      "answer": "V\u00e1 at\u00e9 as configura\u00e7\u00f5es do seu workspace e abra a aba \u00abMembros\u00bb. Clique em \u00abConvidar Membro\u00bb, insira o endere\u00e7o de e-mail e atribua uma fun\u00e7\u00e3o (Propriet\u00e1rio, Administrador ou Membro). Eles receber\u00e3o um convite por e-mail para participar do seu workspace."
+    },
+    "q4": {
+      "question": "Quais s\u00e3o os n\u00edveis de assinatura?",
+      "answer": "Task Board oferece os n\u00edveis Gratuito, Pro e Enterprise. O n\u00edvel Gratuito inclui gest\u00e3o b\u00e1sica de quadros e tarefas. Pro adiciona recursos avan\u00e7ados como sprints e an\u00e1lises. Enterprise inclui suporte priorit\u00e1rio, SSO e workspaces ilimitados."
+    },
+    "q5": {
+      "question": "Como altero meu tema?",
+      "answer": "Clique no seu avatar no canto superior direito para abrir o menu do usu\u00e1rio. De l\u00e1 voc\u00ea pode alternar entre o modo claro e escuro e ajustar o n\u00edvel de zoom da interface conforme sua prefer\u00eancia."
+    }
+  },
+  "support": {
+    "title": "Suporte",
+    "description": "Tem uma pergunta ou precisa de ajuda? Preencha o formul\u00e1rio abaixo e nossa equipe de suporte entrar\u00e1 em contato.",
+    "success": "Sua mensagem foi enviada com sucesso. Entraremos em contato em breve.",
+    "name": "Nome",
+    "namePlaceholder": "Seu nome",
+    "email": "E-mail",
+    "message": "Mensagem",
+    "messagePlaceholder": "Descreva seu problema ou pergunta\u2026",
+    "submit": "Enviar",
+    "submitting": "Enviando\u2026"
+  },
+  "validation": {
+    "emailRequired": "O e-mail \u00e9 obrigat\u00f3rio",
+    "emailInvalid": "Endere\u00e7o de e-mail inv\u00e1lido",
+    "passwordRequired": "A senha \u00e9 obrigat\u00f3ria",
+    "passwordMin": "A senha deve ter pelo menos 8 caracteres",
+    "passwordMax": "A senha deve ter no m\u00e1ximo 128 caracteres",
+    "nameRequired": "O nome \u00e9 obrigat\u00f3rio",
+    "nameMax": "O nome deve ter no m\u00e1ximo 200 caracteres",
+    "displayNameRequired": "O nome de exibi\u00e7\u00e3o \u00e9 obrigat\u00f3rio",
+    "displayNameMax": "O nome de exibi\u00e7\u00e3o deve ter no m\u00e1ximo 100 caracteres",
+    "slugRequired": "O slug \u00e9 obrigat\u00f3rio",
+    "slugMin": "O slug deve ter pelo menos 2 caracteres",
+    "slugMax": "O slug deve ter no m\u00e1ximo 80 caracteres",
+    "titleRequired": "O t\u00edtulo \u00e9 obrigat\u00f3rio",
+    "columnRequired": "A coluna \u00e9 obrigat\u00f3ria",
+    "boardNameRequired": "O nome do quadro \u00e9 obrigat\u00f3rio",
+    "userIdRequired": "O ID do usu\u00e1rio \u00e9 obrigat\u00f3rio",
+    "roleRequired": "A fun\u00e7\u00e3o \u00e9 obrigat\u00f3ria",
+    "workspaceNameRequired": "O nome do workspace \u00e9 obrigat\u00f3rio",
+    "confirmPasswordRequired": "Por favor, confirme sua senha",
+    "messageRequired": "A mensagem \u00e9 obrigat\u00f3ria",
+    "messageMax": "A mensagem deve ter no m\u00e1ximo 2000 caracteres",
+    "startDateRequired": "A data de in\u00edcio \u00e9 obrigat\u00f3ria",
+    "endDateRequired": "A data de t\u00e9rmino \u00e9 obrigat\u00f3ria"
+  },
+  "errors": {
+    "unexpected": "Ocorreu um erro inesperado. Por favor, tente novamente.",
+    "permissionDenied": "Voc\u00ea n\u00e3o tem permiss\u00e3o para realizar esta a\u00e7\u00e3o"
+  }
+}

@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideCheck, lucidePlus } from '@ng-icons/lucide';
 import { TenantStore } from '@stores/tenant-store';
@@ -10,7 +11,7 @@ import type { TenantWithRole } from '@task-board/shared';
 
 @Component({
   selector: 'ui-tenant-switcher',
-  imports: [NgIcon, HlmButtonImports],
+  imports: [NgIcon, HlmButtonImports, TranslocoPipe],
   providers: [provideIcons({ lucideChevronDown, lucideCheck, lucidePlus })],
   templateUrl: './tenant-switcher.html',
 })

@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { SubscriptionTier, TenantRole } from '@task-board/shared';
 import { form, FormField, FormRoot, schema, required, minLength, maxLength } from '@angular/forms/signals';
 import { TenantStore } from '@stores/tenant-store';
@@ -27,7 +28,16 @@ function slugify(value: string): string {
 }
 
 @Component({
-  imports: [FormField, FormRoot, HlmCardImports, HlmFieldImports, HlmInputImports, HlmButtonImports, HlmSpinnerImports],
+  imports: [
+    TranslocoPipe,
+    FormField,
+    FormRoot,
+    HlmCardImports,
+    HlmFieldImports,
+    HlmInputImports,
+    HlmButtonImports,
+    HlmSpinnerImports,
+  ],
   selector: 'ui-create-workspace',
   templateUrl: './create-workspace.html',
 })
@@ -40,11 +50,11 @@ export class CreateWorkspace {
   protected readonly workspaceForm = form(
     this.model,
     schema<WorkspaceModel>((field) => {
-      required(field.name, { message: 'Workspace name is required' });
-      maxLength(field.name, 100, { message: 'Name must be at most 100 characters' });
-      required(field.slug, { message: 'Slug is required' });
-      minLength(field.slug, 2, { message: 'Slug must be at least 2 characters' });
-      maxLength(field.slug, 80, { message: 'Slug must be at most 80 characters' });
+      required(field.name, { message: 'validation.workspaceNameRequired' });
+      maxLength(field.name, 100, { message: 'validation.nameMax' });
+      required(field.slug, { message: 'validation.slugRequired' });
+      minLength(field.slug, 2, { message: 'validation.slugMin' });
+      maxLength(field.slug, 80, { message: 'validation.slugMax' });
     }),
     {
       submission: {
@@ -65,7 +75,7 @@ export class CreateWorkspace {
             if (err instanceof HttpErrorResponse) {
               this.error.set(err.error?.message ?? err.message);
             } else {
-              this.error.set('Failed to create workspace. Please try again.');
+              this.error.set('createWorkspace.failed');
             }
           }
         },

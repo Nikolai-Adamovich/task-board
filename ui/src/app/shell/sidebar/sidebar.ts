@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -9,7 +10,7 @@ import { TenantSwitcher } from '../tenant-switcher/tenant-switcher';
 
 @Component({
   selector: 'ui-sidebar',
-  imports: [RouterLink, RouterLinkActive, HlmSidebarImports, HlmButtonImports, NgIcon, TenantSwitcher],
+  imports: [RouterLink, RouterLinkActive, HlmSidebarImports, HlmButtonImports, NgIcon, TenantSwitcher, TranslocoPipe],
   providers: [
     provideIcons({
       lucidePanelLeft,

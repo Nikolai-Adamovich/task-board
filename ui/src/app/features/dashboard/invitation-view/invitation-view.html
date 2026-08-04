@@ -1,8 +1,8 @@
 <div class="mx-auto max-w-3xl py-12">
   <!-- Header -->
   <div class="mb-8">
-    <h1 class="text-3xl font-bold text-foreground">You have pending invitations</h1>
-    <p class="mt-2 text-muted-foreground">Accept an invitation to join a workspace, or create your own.</p>
+    <h1 class="text-3xl font-bold text-foreground">{{ 'invitationView.title' | transloco }}</h1>
+    <p class="mt-2 text-muted-foreground">{{ 'invitationView.subtitle' | transloco }}</p>
   </div>
 
   <!-- Invitation Cards -->
@@ -21,7 +21,7 @@
                   <span hlmBadge class="bg-blue-100 text-blue-700">{{ invitation.role }}</span>
                   @if (invitation.invitedAt) {
                     <span class="text-xs text-muted-foreground">
-                      Invited {{ invitation.invitedAt | date: 'mediumDate' }}
+                      {{ 'invitationView.invited' | transloco: { date: (invitation.invitedAt | date: 'mediumDate') } }}
                     </span>
                   }
                 </div>
@@ -38,7 +38,7 @@
                 @if (decliningId() === invitation.id) {
                   <hlm-spinner class="mr-1 h-3 w-3" />
                 }
-                Decline
+                {{ 'invitationView.decline' | transloco }}
               </button>
               <button
                 hlmBtn
@@ -49,7 +49,7 @@
                 @if (acceptingId() === invitation.id) {
                   <hlm-spinner class="mr-1 h-3 w-3" />
                 }
-                Accept
+                {{ 'invitationView.accept' | transloco }}
               </button>
             </div>
           </div>
@@ -61,8 +61,10 @@
   <!-- Create own workspace link -->
   <div class="mt-8 text-center">
     <p class="text-sm text-muted-foreground">
-      Or
-      <a routerLink="/workspace/create" class="font-medium text-primary hover:underline">create your own workspace</a>
+      {{ 'invitationView.or' | transloco }}
+      <a routerLink="/workspace/create" class="font-medium text-primary hover:underline">{{
+        'invitationView.createOwn' | transloco
+      }}</a>
     </p>
   </div>
 </div>

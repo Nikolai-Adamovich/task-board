@@ -1,4 +1,5 @@
 import { Component, DestroyRef, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { PreferencesStore } from '@stores/preferences-store';
 import { getNextZoom } from '../../zoom.util';
@@ -6,7 +7,7 @@ import { getNextZoom } from '../../zoom.util';
 @Component({
   selector: 'ui-user-menu-zoom-controls',
   standalone: true,
-  imports: [HlmButtonImports],
+  imports: [HlmButtonImports, TranslocoPipe],
   templateUrl: './user-menu-zoom-controls.html',
 })
 export class UserMenuZoomControls {

@@ -1,24 +1,24 @@
 <div class="mx-auto max-w-5xl">
   <div class="mb-6 flex items-center justify-between">
-    <h2 class="text-2xl font-bold text-foreground">Sprints</h2>
+    <h2 class="text-2xl font-bold text-foreground">{{ 'sprints.title' | transloco }}</h2>
     @if (canCreate()) {
       <button hlmBtn (click)="showCreateModal.set(true)">
         <ng-icon name="lucidePlus" class="mr-1" />
-        New Sprint
+        {{ 'sprints.new' | transloco }}
       </button>
     }
   </div>
 
   @if (loading()) {
     <div class="flex items-center justify-center py-12">
-      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading sprints...</span>
+      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'sprints.loading' | transloco }}</span>
     </div>
   } @else if (sprints().length === 0) {
     <div class="rounded-lg border border-dashed border-border py-12 text-center">
       <ng-icon name="lucideCalendar" class="mx-auto h-12 w-12 text-muted-foreground" />
-      <p class="mt-4 text-sm text-muted-foreground">No sprints yet.</p>
+      <p class="mt-4 text-sm text-muted-foreground">{{ 'sprints.noSprints' | transloco }}</p>
       @if (canCreate()) {
-        <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">Create first sprint</button>
+        <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">{{ 'sprints.createFirst' | transloco }}</button>
       }
     </div>
   } @else if (projectId()) {
@@ -43,7 +43,7 @@
             }
             <p class="mt-1 text-xs text-muted-foreground">
               {{ sprint.startDate | date: 'mediumDate' }} — {{ sprint.endDate | date: 'mediumDate' }} &middot;
-              {{ sprint.taskIds.length }} tasks
+              {{ 'sprints.tasks' | transloco: { count: sprint.taskIds.length } }}
             </p>
           </div>
           <ng-icon
@@ -65,11 +65,13 @@
                 class="text-lg font-semibold text-primary hover:underline"
                 >{{ group.projectName }}</a
               >
-              <span hlmBadge variant="secondary">{{ group.sprints.length }} sprints</span>
+              <span hlmBadge variant="secondary">{{
+                'sprints.sprintsCount' | transloco: { count: group.sprints.length }
+              }}</span>
             </div>
             <button hlmCollapsibleTrigger hlmBtn variant="ghost" size="icon" class="size-8">
               <ng-icon name="lucideChevronsUpDown" />
-              <span class="sr-only">Toggle</span>
+              <span class="sr-only">{{ 'sprints.toggle' | transloco }}</span>
             </button>
           </div>
           <hlm-collapsible-content>
@@ -93,7 +95,7 @@
                     }
                     <p class="mt-1 text-xs text-muted-foreground">
                       {{ sprint.startDate | date: 'mediumDate' }} — {{ sprint.endDate | date: 'mediumDate' }} &middot;
-                      {{ sprint.taskIds.length }} tasks
+                      {{ 'sprints.tasks' | transloco: { count: sprint.taskIds.length } }}
                     </p>
                   </div>
                   <ng-icon
@@ -113,43 +115,43 @@
   <hlm-dialog [state]="showCreateModal() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
-        <h3 hlmDialogTitle>Create Sprint</h3>
+        <h3 hlmDialogTitle>{{ 'sprints.createTitle' | transloco }}</h3>
       </hlm-dialog-header>
 
       @if (error()) {
         <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() }}
+          {{ error() | transloco }}
         </div>
       }
 
       <form id="create-sprint-form" [formRoot]="newSprintForm" class="space-y-4">
         <hlm-field>
-          <label hlmFieldLabel for="sprint-name">Name</label>
+          <label hlmFieldLabel for="sprint-name">{{ 'sprints.name' | transloco }}</label>
           <input hlmInput id="sprint-name" type="text" [formField]="newSprintForm.name" placeholder="Sprint 1" />
         </hlm-field>
         <div class="grid grid-cols-2 gap-4">
           <hlm-field>
-            <label hlmFieldLabel for="sprint-start">Start Date</label>
+            <label hlmFieldLabel for="sprint-start">{{ 'sprints.startDate' | transloco }}</label>
             <input hlmInput id="sprint-start" type="date" [formField]="newSprintForm.startDate" />
           </hlm-field>
           <hlm-field>
-            <label hlmFieldLabel for="sprint-end">End Date</label>
+            <label hlmFieldLabel for="sprint-end">{{ 'sprints.endDate' | transloco }}</label>
             <input hlmInput id="sprint-end" type="date" [formField]="newSprintForm.endDate" />
           </hlm-field>
         </div>
         <hlm-field>
-          <label hlmFieldLabel for="sprint-goal">Goal</label>
+          <label hlmFieldLabel for="sprint-goal">{{ 'sprints.goal' | transloco }}</label>
           <textarea
             hlmTextarea
             id="sprint-goal"
             [formField]="newSprintForm.goal"
             rows="2"
-            placeholder="Optional sprint goal..."
+            [placeholder]="'sprints.goalPlaceholder' | transloco"
           ></textarea>
         </hlm-field>
       </form>
       <hlm-dialog-footer>
-        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'sprints.cancel' | transloco }}</button>
         <button
           hlmBtn
           type="submit"
@@ -157,9 +159,9 @@
           [disabled]="newSprintForm().invalid() || newSprintForm().submitting()"
         >
           @if (newSprintForm().submitting()) {
-            <hlm-spinner /> Creating...
+            <hlm-spinner /> {{ 'sprints.creating' | transloco }}
           } @else {
-            Create Sprint
+            {{ 'sprints.create' | transloco }}
           }
         </button>
       </hlm-dialog-footer>

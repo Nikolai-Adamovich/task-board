@@ -2,8 +2,12 @@
   <hlm-sidebar collapsible="icon" class="bg-card">
     <div hlmSidebarHeader>
       <div class="flex items-center gap-2 px-2">
-        <h1 class="text-lg font-bold text-sidebar-primary group-data-[collapsible=icon]:hidden">Task Board</h1>
-        <h1 class="text-lg font-bold text-sidebar-primary hidden group-data-[collapsible=icon]:block">TB</h1>
+        <h1 class="text-lg font-bold text-sidebar-primary group-data-[collapsible=icon]:hidden">
+          {{ 'sidebar.brand' | transloco }}
+        </h1>
+        <h1 class="text-lg font-bold text-sidebar-primary hidden group-data-[collapsible=icon]:block">
+          {{ 'sidebar.brandShort' | transloco }}
+        </h1>
       </div>
     </div>
 
@@ -22,11 +26,11 @@
                   routerLinkActive
                   #rlaProjects="routerLinkActive"
                   [isActive]="rlaProjects.isActive"
-                  tooltip="Projects"
+                  [tooltip]="'sidebar.projects' | transloco"
                   size="lg"
                 >
                   <ng-icon name="lucideFolder" />
-                  <span class="group-data-[collapsible=icon]:hidden">Projects</span>
+                  <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.projects' | transloco }}</span>
                 </a>
               </li>
               <li hlmSidebarMenuItem>
@@ -36,11 +40,11 @@
                   routerLinkActive
                   #rlaSprints="routerLinkActive"
                   [isActive]="rlaSprints.isActive"
-                  tooltip="Sprints"
+                  [tooltip]="'sidebar.sprints' | transloco"
                   size="lg"
                 >
                   <ng-icon name="lucideCalendar" />
-                  <span class="group-data-[collapsible=icon]:hidden">Sprints</span>
+                  <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.sprints' | transloco }}</span>
                 </a>
               </li>
               <li hlmSidebarMenuItem>
@@ -50,11 +54,11 @@
                   routerLinkActive
                   #rlaSettings="routerLinkActive"
                   [isActive]="rlaSettings.isActive"
-                  tooltip="Settings"
+                  [tooltip]="'sidebar.settings' | transloco"
                   size="lg"
                 >
                   <ng-icon name="lucideSettings" />
-                  <span class="group-data-[collapsible=icon]:hidden">Settings</span>
+                  <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.settings' | transloco }}</span>
                 </a>
               </li>
               <li hlmSidebarMenuItem>
@@ -64,11 +68,11 @@
                   routerLinkActive
                   #rlaMembers="routerLinkActive"
                   [isActive]="rlaMembers.isActive"
-                  tooltip="Members"
+                  [tooltip]="'sidebar.members' | transloco"
                   size="lg"
                 >
                   <ng-icon name="lucideUsers" />
-                  <span class="group-data-[collapsible=icon]:hidden">Members</span>
+                  <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.members' | transloco }}</span>
                 </a>
               </li>
             </ul>
@@ -78,7 +82,7 @@
     </div>
 
     <div hlmSidebarFooter>
-      <button hlmSidebarRail aria-label="Toggle Sidebar"></button>
+      <button hlmSidebarRail [attr.aria-label]="'sidebar.toggleSidebar' | transloco"></button>
     </div>
   </hlm-sidebar>
 

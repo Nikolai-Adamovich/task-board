@@ -1,27 +1,33 @@
 <div class="mx-auto max-w-5xl py-8">
   <!-- Header -->
   <div class="mb-8">
-    <h1 class="text-2xl font-bold text-foreground">Dashboard</h1>
-    <p class="mt-1 text-sm text-muted-foreground">Your workspaces and recent tasks at a glance.</p>
+    <h1 class="text-2xl font-bold text-foreground">{{ 'memberDashboard.title' | transloco }}</h1>
+    <p class="mt-1 text-sm text-muted-foreground">{{ 'memberDashboard.subtitle' | transloco }}</p>
   </div>
 
   <!-- Quick Stats -->
   <div class="mb-8 grid gap-4 sm:grid-cols-3">
     <hlm-card>
       <div hlmCardContent>
-        <p class="text-xs font-medium uppercase text-muted-foreground">Total Tasks</p>
+        <p class="text-xs font-medium uppercase text-muted-foreground">
+          {{ 'memberDashboard.totalTasks' | transloco }}
+        </p>
         <p class="mt-1 text-3xl font-bold text-foreground">{{ tasks().length }}</p>
       </div>
     </hlm-card>
     <hlm-card>
       <div hlmCardContent>
-        <p class="text-xs font-medium uppercase text-muted-foreground">Total Tasks</p>
+        <p class="text-xs font-medium uppercase text-muted-foreground">
+          {{ 'memberDashboard.totalTasks' | transloco }}
+        </p>
         <p class="mt-1 text-3xl font-bold text-foreground">{{ tasks().length }}</p>
       </div>
     </hlm-card>
     <hlm-card>
       <div hlmCardContent>
-        <p class="text-xs font-medium uppercase text-muted-foreground">Workspaces</p>
+        <p class="text-xs font-medium uppercase text-muted-foreground">
+          {{ 'memberDashboard.workspaces' | transloco }}
+        </p>
         <p class="mt-1 text-3xl font-bold text-foreground">{{ tenants().length }}</p>
       </div>
     </hlm-card>
@@ -29,7 +35,7 @@
 
   <!-- My Workspaces -->
   <section class="mb-8">
-    <h2 class="mb-4 text-lg font-semibold text-foreground">My Workspaces</h2>
+    <h2 class="mb-4 text-lg font-semibold text-foreground">{{ 'memberDashboard.myWorkspaces' | transloco }}</h2>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       @for (tenant of tenants(); track tenant.id) {
         <a
@@ -52,10 +58,10 @@
 
   <!-- My Recent Tasks -->
   <section>
-    <h2 class="mb-4 text-lg font-semibold text-foreground">My Recent Tasks</h2>
+    <h2 class="mb-4 text-lg font-semibold text-foreground">{{ 'memberDashboard.myRecentTasks' | transloco }}</h2>
     @if (tasks().length === 0) {
       <div class="rounded-lg border border-dashed border-border py-8 text-center">
-        <p class="text-sm text-muted-foreground">No tasks assigned to you yet.</p>
+        <p class="text-sm text-muted-foreground">{{ 'memberDashboard.noTasks' | transloco }}</p>
       </div>
     } @else {
       <div class="space-y-3">

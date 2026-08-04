@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideCheck, lucideArrowLeft, lucideCrown } from '@ng-icons/lucide';
 import { SubscriptionTier } from '@task-board/shared';
@@ -12,7 +13,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 
 @Component({
   selector: 'ui-upgrade',
-  imports: [NgIcon, HlmButtonImports, HlmCardImports, HlmSpinnerImports, HlmBadgeImports],
+  imports: [NgIcon, TranslocoPipe, HlmButtonImports, HlmCardImports, HlmSpinnerImports, HlmBadgeImports],
   providers: [provideIcons({ lucideCheck, lucideArrowLeft, lucideCrown })],
   templateUrl: './upgrade.html',
 })
@@ -50,7 +51,7 @@ export class Upgrade implements OnInit {
         this.upgrading.set(false);
       },
       (err: unknown) => {
-        const message = err instanceof HttpErrorResponse ? err.error?.message : 'Failed to upgrade. Please try again.';
+        const message = err instanceof HttpErrorResponse ? err.error?.message : 'upgrade.failed';
 
         this.error.set(message);
         this.upgrading.set(false);

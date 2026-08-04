@@ -1,6 +1,7 @@
 import { Component, input, output, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -13,7 +14,16 @@ import type { MyInvitation } from '@task-board/shared';
 
 @Component({
   selector: 'ui-invitation-view',
-  imports: [RouterLink, DatePipe, HlmCardImports, HlmButtonImports, HlmBadgeImports, HlmSpinnerImports, NgIcon],
+  imports: [
+    RouterLink,
+    DatePipe,
+    TranslocoPipe,
+    HlmCardImports,
+    HlmButtonImports,
+    HlmBadgeImports,
+    HlmSpinnerImports,
+    NgIcon,
+  ],
   providers: [provideIcons({ lucideMail, lucideBuilding2 })],
   templateUrl: './invitation-view.html',
 })

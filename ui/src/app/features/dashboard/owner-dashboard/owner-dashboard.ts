@@ -1,5 +1,6 @@
 import { Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -18,7 +19,7 @@ import type { TenantWithRole, MyTask } from '@task-board/shared';
 
 @Component({
   selector: 'ui-owner-dashboard',
-  imports: [RouterLink, HlmCardImports, HlmButtonImports, HlmBadgeImports, NgIcon],
+  imports: [RouterLink, TranslocoPipe, HlmCardImports, HlmButtonImports, HlmBadgeImports, NgIcon],
   providers: [
     provideIcons({
       lucideBuilding2,

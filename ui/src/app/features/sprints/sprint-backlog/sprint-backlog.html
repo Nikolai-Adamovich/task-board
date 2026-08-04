@@ -1,17 +1,18 @@
 <hlm-card>
   <div class="border-b border-border px-4 py-3">
     <h3 class="text-sm font-semibold text-foreground">
-      Backlog <span class="text-muted-foreground">({{ backlogTasks().length }})</span>
+      {{ 'sprintBacklog.backlog' | transloco }} <span class="text-muted-foreground">({{ backlogTasks().length }})</span>
     </h3>
   </div>
 
   @if (loading()) {
     <div class="flex items-center justify-center py-8">
-      <hlm-spinner class="text-sm" /> <span class="ml-2 text-xs text-muted-foreground">Loading backlog...</span>
+      <hlm-spinner class="text-sm" />
+      <span class="ml-2 text-xs text-muted-foreground">{{ 'sprintBacklog.loading' | transloco }}</span>
     </div>
   } @else if (backlogTasks().length === 0) {
     <div class="py-8 text-center">
-      <p class="text-sm text-muted-foreground">All tasks are assigned to sprints.</p>
+      <p class="text-sm text-muted-foreground">{{ 'sprintBacklog.allAssigned' | transloco }}</p>
     </div>
   } @else {
     <div class="divide-y divide-border">
@@ -28,7 +29,9 @@
           </div>
           <div class="flex items-center gap-2">
             @if (targetSprint()) {
-              <button hlmBtn size="sm" variant="outline" (click)="addTaskToSprint(task.id)">Add to Sprint</button>
+              <button hlmBtn size="sm" variant="outline" (click)="addTaskToSprint(task.id)">
+                {{ 'sprintBacklog.addToSprint' | transloco }}
+              </button>
             }
           </div>
         </div>

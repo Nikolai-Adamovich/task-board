@@ -4,7 +4,7 @@
   class="flex items-center gap-2 px-2"
   aria-haspopup="menu"
   [hlmDropdownMenuTrigger]="userMenu"
-  aria-label="User menu"
+  [attr.aria-label]="'header.userMenu' | transloco"
 >
   <hlm-avatar class="border-2" [style.border-color]="roleColor()" role="img">
     <span hlmAvatarFallback>{{ initials() }}</span>

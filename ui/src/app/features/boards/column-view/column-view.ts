@@ -1,4 +1,5 @@
 import { Component, input, output } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
 import type { Column, Task } from '@task-board/shared';
@@ -9,7 +10,7 @@ import { NgIcon } from '@ng-icons/core';
 
 @Component({
   selector: 'ui-column-view',
-  imports: [TaskCard, NgIcon, HlmButtonImports, HlmBadgeImports],
+  imports: [TaskCard, TranslocoPipe, NgIcon, HlmButtonImports, HlmBadgeImports],
   providers: [provideIcons({ lucidePlus })],
   host: {
     class: 'flex h-full min-w-[280px] max-w-[320px] flex-col rounded-lg border border-border bg-muted/30',

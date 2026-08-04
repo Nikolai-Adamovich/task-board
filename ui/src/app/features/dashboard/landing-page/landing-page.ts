@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { provideIcons, NgIcon } from '@ng-icons/core';
@@ -7,7 +8,7 @@ import { lucideLayoutDashboard, lucideUsers, lucideFolderKanban, lucideBuilding2
 
 @Component({
   selector: 'ui-landing-page',
-  imports: [RouterLink, HlmCardImports, HlmButtonImports, NgIcon],
+  imports: [RouterLink, TranslocoPipe, HlmCardImports, HlmButtonImports, NgIcon],
   providers: [provideIcons({ lucideLayoutDashboard, lucideUsers, lucideFolderKanban, lucideBuilding2 })],
   templateUrl: './landing-page.html',
 })

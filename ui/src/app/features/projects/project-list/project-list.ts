@@ -1,5 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideFolderOpen } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
@@ -28,6 +29,7 @@ export interface CreateProjectForm {
   selector: 'ui-project-list',
   imports: [
     RouterLink,
+    TranslocoPipe,
     FormField,
     FormRoot,
     NgIcon,
@@ -58,8 +60,8 @@ export class ProjectList implements OnInit {
   protected readonly newProjectForm = form(
     this.model,
     schema<CreateProjectForm>((field) => {
-      required(field.name, { message: 'Name is required' });
-      required(field.slug, { message: 'Slug is required' });
+      required(field.name, { message: 'validation.nameRequired' });
+      required(field.slug, { message: 'validation.slugRequired' });
     }),
     {
       submission: {
@@ -122,6 +124,6 @@ export class ProjectList implements OnInit {
       return err.error?.message ?? err.message;
     }
 
-    return 'An unexpected error occurred. Please try again.';
+    return 'errors.unexpected';
   }
 }

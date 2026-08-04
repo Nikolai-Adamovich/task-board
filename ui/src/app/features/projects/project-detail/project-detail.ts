@@ -1,5 +1,6 @@
 import { Component, inject, input, signal, computed, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucidePlus, lucideUserPlus, lucideTrash2 } from '@ng-icons/lucide';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -30,6 +31,7 @@ interface BoardFormModel {
   selector: 'ui-project-detail',
   imports: [
     RouterLink,
+    TranslocoPipe,
     NgIcon,
     HlmButtonImports,
     HlmDialogImports,
@@ -72,7 +74,7 @@ export class ProjectDetail implements OnInit {
   protected readonly createBoardForm = form(
     this.boardModel,
     schema<BoardFormModel>((field) => {
-      required(field.name, { message: 'Board name is required' });
+      required(field.name, { message: 'validation.boardNameRequired' });
     }),
     {
       submission: {
@@ -100,7 +102,7 @@ export class ProjectDetail implements OnInit {
   protected readonly addMemberForm = form(
     this.memberModel,
     schema<{ userId: string; role: string }>((field) => {
-      required(field.userId, { message: 'User ID is required' });
+      required(field.userId, { message: 'validation.userIdRequired' });
     }),
     {
       submission: {
@@ -209,6 +211,6 @@ export class ProjectDetail implements OnInit {
       return err.error?.message ?? err.message;
     }
 
-    return 'An unexpected error occurred. Please try again.';
+    return 'errors.unexpected';
   }
 }

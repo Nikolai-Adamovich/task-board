@@ -1,6 +1,6 @@
 @if (loading()) {
   <div class="flex items-center justify-center py-12">
-    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading board...</span>
+    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'boardView.loading' | transloco }}</span>
   </div>
 } @else if (board(); as b) {
   <div class="flex h-full flex-col">
@@ -14,7 +14,7 @@
       </div>
       <button hlmBtn size="sm" (click)="showCreateTask.set(true)">
         <ng-icon name="lucidePlus" class="mr-1" />
-        New Task
+        {{ 'boardView.newTask' | transloco }}
       </button>
     </div>
 
@@ -36,42 +36,48 @@
   <hlm-dialog [state]="showCreateTask() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
-        <h3 hlmDialogTitle>Create Task</h3>
+        <h3 hlmDialogTitle>{{ 'boardView.createTaskTitle' | transloco }}</h3>
       </hlm-dialog-header>
 
       @if (error()) {
         <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() }}
+          {{ error() | transloco }}
         </div>
       }
 
       <form id="create-task-form" [formRoot]="newTaskForm" class="space-y-4">
         <hlm-field>
-          <label hlmFieldLabel for="task-title">Title</label>
-          <input hlmInput id="task-title" type="text" [formField]="newTaskForm.title" placeholder="Task title" />
+          <label hlmFieldLabel for="task-title">{{ 'boardView.title' | transloco }}</label>
+          <input
+            hlmInput
+            id="task-title"
+            type="text"
+            [formField]="newTaskForm.title"
+            [placeholder]="'boardView.titlePlaceholder' | transloco"
+          />
         </hlm-field>
         <hlm-field>
-          <label hlmFieldLabel for="task-desc">Description</label>
+          <label hlmFieldLabel for="task-desc">{{ 'boardView.description' | transloco }}</label>
           <textarea
             hlmTextarea
             id="task-desc"
             [formField]="newTaskForm.description"
             rows="3"
-            placeholder="Optional description..."
+            [placeholder]="'boardView.descriptionPlaceholder' | transloco"
           ></textarea>
         </hlm-field>
         <hlm-field>
-          <label hlmFieldLabel for="task-priority">Priority</label>
+          <label hlmFieldLabel for="task-priority">{{ 'boardView.priority' | transloco }}</label>
           <select hlmNativeSelect id="task-priority" [formField]="newTaskForm.priority">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
+            <option value="low">{{ 'priority.low' | transloco }}</option>
+            <option value="medium">{{ 'priority.medium' | transloco }}</option>
+            <option value="high">{{ 'priority.high' | transloco }}</option>
+            <option value="critical">{{ 'priority.critical' | transloco }}</option>
           </select>
         </hlm-field>
         @if (columns().length > 0) {
           <hlm-field>
-            <label hlmFieldLabel for="task-column">Column</label>
+            <label hlmFieldLabel for="task-column">{{ 'boardView.column' | transloco }}</label>
             <select hlmNativeSelect id="task-column" [formField]="newTaskForm.columnId">
               @for (col of columns(); track col.id) {
                 <option [value]="col.id">{{ col.name }}</option>
@@ -81,7 +87,7 @@
         }
       </form>
       <hlm-dialog-footer>
-        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'boardView.cancel' | transloco }}</button>
         <button
           hlmBtn
           type="submit"
@@ -89,9 +95,9 @@
           [disabled]="newTaskForm().invalid() || newTaskForm().submitting()"
         >
           @if (newTaskForm().submitting()) {
-            <hlm-spinner /> Creating...
+            <hlm-spinner /> {{ 'boardView.creating' | transloco }}
           } @else {
-            Create Task
+            {{ 'boardView.create' | transloco }}
           }
         </button>
       </hlm-dialog-footer>

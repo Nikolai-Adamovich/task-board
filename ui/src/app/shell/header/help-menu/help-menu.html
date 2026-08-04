@@ -2,7 +2,7 @@
   hlmBtn
   variant="ghost"
   size="icon-sm"
-  aria-label="Help"
+  [attr.aria-label]="'header.help' | transloco"
   aria-haspopup="menu"
   [hlmDropdownMenuTrigger]="helpMenu"
 >
@@ -13,15 +13,15 @@
   <hlm-dropdown-menu>
     <a hlmDropdownMenuItem routerLink="/faq">
       <ng-icon name="lucideBookOpen" />
-      <span>FAQ</span>
+      <span>{{ 'header.faq' | transloco }}</span>
     </a>
     <a hlmDropdownMenuItem routerLink="/docs">
       <ng-icon name="lucideBookOpen" />
-      <span>Documentation</span>
+      <span>{{ 'header.documentation' | transloco }}</span>
     </a>
     <a hlmDropdownMenuItem routerLink="/support">
       <ng-icon name="lucideLifeBuoy" />
-      <span>Support</span>
+      <span>{{ 'header.support' | transloco }}</span>
     </a>
   </hlm-dropdown-menu>
 </ng-template>

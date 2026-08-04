@@ -1,46 +1,37 @@
 <div class="mx-auto max-w-3xl px-4 py-8">
-  <h1 class="mb-6 text-2xl font-bold">Documentation</h1>
+  <h1 class="mb-6 text-2xl font-bold">{{ 'docs.title' | transloco }}</h1>
 
   <div class="prose prose-sm max-w-none space-y-4 text-muted-foreground">
     <p>
-      <strong class="text-foreground">Task Board</strong> is a modern, collaborative project management application
-      designed to help teams organize, track, and deliver work efficiently. It brings together boards, columns, tasks,
-      and sprints into a unified workspace that adapts to your team's workflow.
+      <strong class="text-foreground">{{ 'docs.brand' | transloco }}</strong>
+      {{ 'docs.intro' | transloco: { brand: ('docs.brand' | transloco) } }}
     </p>
 
-    <h2 class="text-lg font-semibold text-foreground">Key Features</h2>
+    <h2 class="text-lg font-semibold text-foreground">{{ 'docs.keyFeatures' | transloco }}</h2>
     <ul class="list-inside list-disc space-y-1">
       <li>
-        <strong>Workspaces & Projects</strong> — Create isolated workspaces for different teams or clients, each
-        containing multiple projects with their own boards and settings.
+        <strong>{{ 'docs.workspaces' | transloco }}</strong> — {{ 'docs.workspacesDesc' | transloco }}
       </li>
       <li>
-        <strong>Board & Column Management</strong> — Organize tasks into customizable columns (e.g., To Do, In Progress,
-        Done) with drag-and-drop support for easy prioritization.
+        <strong>{{ 'docs.boardManagement' | transloco }}</strong> — {{ 'docs.boardManagementDesc' | transloco }}
       </li>
       <li>
-        <strong>Task Tracking</strong> — Create, assign, and track tasks with rich details including descriptions,
-        labels, priorities, and due dates.
+        <strong>{{ 'docs.taskTracking' | transloco }}</strong> — {{ 'docs.taskTrackingDesc' | transloco }}
       </li>
       <li>
-        <strong>Sprint Planning</strong> — Plan iterations using sprints, assign tasks to specific sprints, and monitor
-        progress with burndown-style views.
+        <strong>{{ 'docs.sprintPlanning' | transloco }}</strong> — {{ 'docs.sprintPlanningDesc' | transloco }}
       </li>
       <li>
-        <strong>Team Collaboration</strong> — Invite team members via email, assign roles (Owner, Admin, Member), and
-        collaborate in real time across shared workspaces.
+        <strong>{{ 'docs.teamCollaboration' | transloco }}</strong> — {{ 'docs.teamCollaborationDesc' | transloco }}
       </li>
       <li>
-        <strong>Role-Based Access Control</strong> — Fine-grained permissions ensure that team members only access the
-        resources appropriate for their role.
+        <strong>{{ 'docs.rbac' | transloco }}</strong> — {{ 'docs.rbacDesc' | transloco }}
       </li>
     </ul>
 
-    <h2 class="text-lg font-semibold text-foreground">Tech Stack</h2>
+    <h2 class="text-lg font-semibold text-foreground">{{ 'docs.techStack' | transloco }}</h2>
     <p>
-      Task Board is built with a modern TypeScript-first stack. The frontend is powered by Angular with Spartan UI
-      components and Tailwind CSS for styling. The backend runs on Cloudflare Workers with a MongoDB data layer. Shared
-      type definitions and validation schemas ensure end-to-end type safety between client and server.
+      {{ 'docs.techStackDesc' | transloco }}
     </p>
   </div>
 </div>

@@ -1,21 +1,21 @@
 <div class="flex min-h-screen items-center justify-center bg-surface-50">
   <hlm-card class="w-full max-w-md">
     <hlm-card-header>
-      <h3 hlmCardTitle>Sign in to Task Board</h3>
-      <p hlmCardDescription>Enter your credentials to access your workspace.</p>
+      <h3 hlmCardTitle>{{ 'auth.login.title' | transloco }}</h3>
+      <p hlmCardDescription>{{ 'auth.login.description' | transloco }}</p>
     </hlm-card-header>
 
     <div hlmCardContent>
       @if (error()) {
         <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() }}
+          {{ error() | transloco }}
         </div>
       }
 
       <form id="login-form" [formRoot]="loginForm">
         <hlm-field-group>
           <hlm-field>
-            <label hlmFieldLabel for="email">Email</label>
+            <label hlmFieldLabel for="email">{{ 'auth.login.email' | transloco }}</label>
             <input
               hlmInput
               id="email"
@@ -25,12 +25,12 @@
               placeholder="you&#64;example.com"
             />
             @if (loginForm.email().touched() && loginForm.email().errors().length) {
-              <p hlm-field-error>{{ loginForm.email().errors()[0].message }}</p>
+              <p hlm-field-error>{{ loginForm.email().errors()[0].message | transloco }}</p>
             }
           </hlm-field>
 
           <hlm-field>
-            <label hlmFieldLabel for="password">Password</label>
+            <label hlmFieldLabel for="password">{{ 'auth.login.password' | transloco }}</label>
             <input
               hlmInput
               id="password"
@@ -40,7 +40,7 @@
               placeholder="••••••••"
             />
             @if (loginForm.password().touched() && loginForm.password().errors().length) {
-              <p hlm-field-error>{{ loginForm.password().errors()[0].message }}</p>
+              <p hlm-field-error>{{ loginForm.password().errors()[0].message | transloco }}</p>
             }
           </hlm-field>
         </hlm-field-group>
@@ -56,14 +56,16 @@
         [disabled]="loginForm().invalid() || loginForm().submitting()"
       >
         @if (loginForm().submitting()) {
-          <hlm-spinner /> Signing in...
+          <hlm-spinner /> {{ 'auth.login.submitting' | transloco }}
         } @else {
-          Sign in
+          {{ 'auth.login.submit' | transloco }}
         }
       </button>
       <p class="text-center text-sm text-muted-foreground">
-        Don't have an account?
-        <a routerLink="/auth/register" class="font-medium text-primary hover:underline">Create one</a>
+        {{ 'auth.login.noAccount' | transloco }}
+        <a routerLink="/auth/register" class="font-medium text-primary hover:underline">{{
+          'auth.login.createOne' | transloco
+        }}</a>
       </p>
     </hlm-card-footer>
   </hlm-card>

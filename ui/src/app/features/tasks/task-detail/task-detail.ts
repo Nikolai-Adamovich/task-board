@@ -1,6 +1,7 @@
 import { Component, inject, input, signal, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { PriorityColorMap, NeutralColor } from '@app/constants/priority';
@@ -31,6 +32,7 @@ export interface EditTaskForm {
   selector: 'ui-task-detail',
   imports: [
     DatePipe,
+    TranslocoPipe,
     FormField,
     FormRoot,
     HlmButtonImports,
@@ -66,7 +68,7 @@ export class TaskDetail implements OnInit {
   protected readonly editForm = form(
     this.model,
     schema<EditTaskForm>((field) => {
-      required(field.title, { message: 'Title is required' });
+      required(field.title, { message: 'validation.titleRequired' });
     }),
     {
       submission: {
@@ -168,6 +170,6 @@ export class TaskDetail implements OnInit {
       return err.error?.message ?? err.message;
     }
 
-    return 'An unexpected error occurred. Please try again.';
+    return 'errors.unexpected';
   }
 }

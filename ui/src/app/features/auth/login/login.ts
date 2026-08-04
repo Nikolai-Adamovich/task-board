@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { form, FormField, FormRoot, submit, schema, required, email } from '@angular/forms/signals';
 import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -17,6 +18,7 @@ interface LoginModel {
 @Component({
   imports: [
     RouterLink,
+    TranslocoPipe,
     FormField,
     FormRoot,
     HlmCardImports,
@@ -36,9 +38,9 @@ export class Login {
   protected readonly loginForm = form(
     this.model,
     schema<LoginModel>((field) => {
-      required(field.email, { message: 'Email is required' });
-      email(field.email, { message: 'Invalid email address' });
-      required(field.password, { message: 'Password is required' });
+      required(field.email, { message: 'validation.emailRequired' });
+      email(field.email, { message: 'validation.emailInvalid' });
+      required(field.password, { message: 'validation.passwordRequired' });
     }),
     {
       submission: {
@@ -61,7 +63,7 @@ export class Login {
       return err.error?.message ?? err.message;
     }
 
-    return 'Sign in failed. Please try again.';
+    return 'auth.login.failed';
   }
 
   protected onSubmit(): void {

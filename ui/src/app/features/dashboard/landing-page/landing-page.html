@@ -1,11 +1,11 @@
 <div class="mx-auto max-w-4xl py-12">
   <!-- Hero Section -->
   <div class="mb-16 text-center">
-    <h1 class="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">Task Board</h1>
-    <p class="mt-4 text-lg text-muted-foreground">Simple project management for teams</p>
+    <h1 class="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">{{ 'landing.title' | transloco }}</h1>
+    <p class="mt-4 text-lg text-muted-foreground">{{ 'landing.subtitle' | transloco }}</p>
     <div class="mt-8 flex items-center justify-center gap-4">
-      <a hlmBtn size="lg" routerLink="/auth/register"> Get Started </a>
-      <a hlmBtn variant="outline" size="lg" routerLink="/auth/login"> Sign In </a>
+      <a hlmBtn size="lg" routerLink="/auth/register"> {{ 'landing.getStarted' | transloco }} </a>
+      <a hlmBtn variant="outline" size="lg" routerLink="/auth/login"> {{ 'landing.signIn' | transloco }} </a>
     </div>
   </div>
 
@@ -16,9 +16,9 @@
         <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <ng-icon name="lucideLayoutDashboard" class="h-5 w-5 text-primary" />
         </div>
-        <h3 class="text-base font-semibold text-foreground">Kanban Boards</h3>
+        <h3 class="text-base font-semibold text-foreground">{{ 'landing.kanban.title' | transloco }}</h3>
         <p class="mt-1 text-sm text-muted-foreground">
-          Visualize your workflow with drag-and-drop boards. Track tasks across columns from backlog to done.
+          {{ 'landing.kanban.description' | transloco }}
         </p>
       </div>
     </hlm-card>
@@ -28,9 +28,9 @@
         <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <ng-icon name="lucideFolderKanban" class="h-5 w-5 text-primary" />
         </div>
-        <h3 class="text-base font-semibold text-foreground">Sprints</h3>
+        <h3 class="text-base font-semibold text-foreground">{{ 'landing.sprints.title' | transloco }}</h3>
         <p class="mt-1 text-sm text-muted-foreground">
-          Plan and execute sprints with ease. Track velocity and deliver on time.
+          {{ 'landing.sprints.description' | transloco }}
         </p>
       </div>
     </hlm-card>
@@ -40,9 +40,9 @@
         <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <ng-icon name="lucideUsers" class="h-5 w-5 text-primary" />
         </div>
-        <h3 class="text-base font-semibold text-foreground">Team Collaboration</h3>
+        <h3 class="text-base font-semibold text-foreground">{{ 'landing.collaboration.title' | transloco }}</h3>
         <p class="mt-1 text-sm text-muted-foreground">
-          Invite team members, assign roles, and collaborate in real time on projects.
+          {{ 'landing.collaboration.description' | transloco }}
         </p>
       </div>
     </hlm-card>
@@ -52,9 +52,9 @@
         <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <ng-icon name="lucideBuilding2" class="h-5 w-5 text-primary" />
         </div>
-        <h3 class="text-base font-semibold text-foreground">Multi-Workspace</h3>
+        <h3 class="text-base font-semibold text-foreground">{{ 'landing.multiWorkspace.title' | transloco }}</h3>
         <p class="mt-1 text-sm text-muted-foreground">
-          Manage multiple workspaces for different teams or clients from a single account.
+          {{ 'landing.multiWorkspace.description' | transloco }}
         </p>
       </div>
     </hlm-card>

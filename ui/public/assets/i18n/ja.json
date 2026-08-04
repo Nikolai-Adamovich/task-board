@@ -1,0 +1,448 @@
+{
+  "header": {
+    "search": "検索\u2026",
+    "clearSearch": "検索をクリア",
+    "notifications": "通知",
+    "noNotifications": "通知はありません",
+    "help": "ヘルプ",
+    "faq": "FAQ",
+    "documentation": "ドキュメント",
+    "support": "サポート",
+    "signIn": "サインイン",
+    "userMenu": "ユーザーメニュー"
+  },
+  "sidebar": {
+    "brand": "Task Board",
+    "brandShort": "TB",
+    "projects": "プロジェクト",
+    "sprints": "スプリント",
+    "settings": "設定",
+    "members": "メンバー",
+    "toggleSidebar": "サイドバーの切替"
+  },
+  "tenantSwitcher": {
+    "selectWorkspace": "ワークスペースを選択",
+    "noWorkspaces": "利用可能なワークスペースがありません",
+    "createWorkspace": "ワークスペースを作成"
+  },
+  "userMenu": {
+    "language": "言語",
+    "themes": "テーマ",
+    "preferences": "設定",
+    "signOut": "サインアウト",
+    "zoom": "ズーム",
+    "zoomIn": "ズームイン",
+    "zoomOut": "ズームアウト",
+    "openThemePicker": "テーマピッカーを開く",
+    "chooseTheme": "テーマを選択",
+    "availableThemes": "利用可能なテーマ"
+  },
+  "auth": {
+    "login": {
+      "title": "Task Boardにサインイン",
+      "description": "ワークスペースにアクセスするための認証情報を入力してください。",
+      "email": "メールアドレス",
+      "password": "パスワード",
+      "submit": "サインイン",
+      "submitting": "サインイン中\u2026",
+      "noAccount": "アカウントをお持ちでないですか？",
+      "createOne": "新規作成",
+      "failed": "サインインに失敗しました。もう一度お試しください。"
+    },
+    "register": {
+      "title": "アカウントを作成",
+      "description": "以下の情報を入力して開始してください。",
+      "name": "名前",
+      "email": "メールアドレス",
+      "password": "パスワード",
+      "submit": "アカウント作成",
+      "submitting": "アカウント作成中\u2026",
+      "hasAccount": "すでにアカウントをお持ちですか？",
+      "signIn": "サインイン",
+      "failed": "登録に失敗しました。もう一度お試しください。"
+    },
+    "invitation": {
+      "loading": "招待を読み込み中\u2026",
+      "error": "招待エラー",
+      "goToSignIn": "サインインへ",
+      "title": "招待を受け入れる",
+      "description": "ワークスペースへの招待が届いています。",
+      "email": "メールアドレス",
+      "workspace": "ワークスペース",
+      "role": "役割",
+      "existingUserHint": "すでにアカウントをお持ちです。以下のボタンをクリックしてこの招待を受け入れてください。",
+      "displayName": "表示名",
+      "password": "パスワード",
+      "confirmPassword": "パスワード確認",
+      "accept": "招待を受け入れる",
+      "accepting": "受け入れ中\u2026",
+      "createAndAccept": "アカウント作成して受け入れる",
+      "creatingAccount": "アカウント作成中\u2026",
+      "hasAccount": "すでにアカウントをお持ちですか？",
+      "signIn": "サインイン",
+      "noToken": "招待トークンが提供されていません。",
+      "invalidOrExpired": "無効または期限切れの招待です。",
+      "passwordsNotMatch": "パスワードが一致しません。",
+      "failedAccept": "招待の受け入れに失敗しました。"
+    }
+  },
+  "landing": {
+    "title": "Task Board",
+    "subtitle": "チームのためのシンプルなプロジェクト管理",
+    "getStarted": "始める",
+    "signIn": "サインイン",
+    "kanban": {
+      "title": "カンバンボード",
+      "description": "ドラッグ＆ドロップでワークフローを可視化。バックログから完了まで、カラム全体でタスクを追跡します。"
+    },
+    "sprints": {
+      "title": "スプリント",
+      "description": "スプリントを簡単に計画・実行。ベロシティを追跡し、期限通りに納品します。"
+    },
+    "collaboration": {
+      "title": "チームコラボレーション",
+      "description": "チームメンバーを招待し、役割を割り当て、プロジェクトでリアルタイムにコラボレーションします。"
+    },
+    "multiWorkspace": {
+      "title": "マルチワークスペース",
+      "description": "1つのアカウントから、異なるチームやクライアントの複数ワークスペースを管理します。"
+    }
+  },
+  "welcome": {
+    "title": "Task Boardへようこそ",
+    "greeting": "さん、{{name}}！",
+    "subtitle": "始めましょう。最初のワークスペースを作成してください。",
+    "createWorkspace": {
+      "title": "最初のワークスペースを作成",
+      "description": "ワークスペースはチームの拠点です。プロジェクトを作成し、タスクを管理し、チームとコラボレーションしましょう。",
+      "button": "ワークスペースを作成"
+    },
+    "freePlan": {
+      "title": "無料プランに含まれるもの",
+      "workspace": "ワークスペース1個",
+      "projects": "プロジェクト3個",
+      "users": "ユーザー10名"
+    },
+    "pendingInvitations": "保留中の招待",
+    "accept": "受け入れる"
+  },
+  "invitationView": {
+    "title": "保留中の招待があります",
+    "subtitle": "招待を受け入れてワークスペースに参加するか、自分のワークスペースを作成してください。",
+    "invited": "{{date}}に招待",
+    "decline": "辞退",
+    "accept": "受け入れる",
+    "or": "または",
+    "createOwn": "自分のワークスペースを作成"
+  },
+  "ownerDashboard": {
+    "title": "オーナーダッシュボード",
+    "subtitle": "ワークスペースを管理し、チームの進捗を追跡します。",
+    "totalTasks": "タスク合計",
+    "workspaces": "ワークスペース",
+    "myWorkspaces": "マイワークスペース",
+    "createAnother": "別のワークスペースを作成",
+    "projects": "プロジェクト",
+    "settings": "設定",
+    "members": "メンバー",
+    "upgrade": "アップグレード",
+    "myRecentTasks": "最近のタスク",
+    "noTasks": "まだタスクが割り当てられていません。"
+  },
+  "memberDashboard": {
+    "title": "ダッシュボード",
+    "subtitle": "ワークスペースと最近のタスクを一目で確認。",
+    "totalTasks": "タスク合計",
+    "workspaces": "ワークスペース",
+    "myWorkspaces": "マイワークスペース",
+    "myRecentTasks": "最近のタスク",
+    "noTasks": "まだタスクが割り当てられていません。"
+  },
+  "workspace": {
+    "defaultName": "ワークスペース",
+    "settings": "設定",
+    "members": "メンバー",
+    "upgrade": "アップグレード",
+    "projects": "プロジェクト",
+    "noProjects": "まだプロジェクトがありません。",
+    "createFirst": "最初のプロジェクトを作成"
+  },
+  "createWorkspace": {
+    "title": "ワークスペースを作成",
+    "description": "ワークスペースを設定してプロジェクトの管理を開始します。",
+    "name": "ワークスペース名",
+    "slug": "スラッグ",
+    "slugHint": "URLで使用されます。小文字、数字、ハイフンのみ。",
+    "plan": "サブスクリプションプラン",
+    "planFree": "無料 \u2014 最大3プロジェクト、5ユーザー",
+    "submit": "ワークスペースを作成",
+    "submitting": "ワークスペース作成中\u2026",
+    "failed": "ワークスペースの作成に失敗しました。もう一度お試しください。"
+  },
+  "settings": {
+    "title": "設定"
+  },
+  "tenantSettings": {
+    "title": "テナント設定",
+    "loading": "設定を読み込み中\u2026",
+    "general": "一般設定",
+    "name": "名前",
+    "slug": "スラッグ",
+    "save": "変更を保存",
+    "saving": "保存中\u2026",
+    "dangerZone": "危険ゾーン",
+    "dangerDescription": "テナントの削除は元に戻せません。このテナント内のすべてのプロジェクト、ボード、タスクが完全に削除されます。",
+    "deleteTenant": "テナントを削除",
+    "deleteTitle": "テナントを削除",
+    "deleteConfirm": "この操作は元に戻せません。確認するには、以下にテナント名を入力してください。",
+    "deleteName": "テナント名",
+    "deletePlaceholder": "確認のためにテナント名を入力",
+    "cancel": "キャンセル"
+  },
+  "upgrade": {
+    "title": "プランのアップグレード",
+    "successTitle": "プレミアムプランです！",
+    "successDescription": "ワークスペースがプレミアムプランにアップグレードされました。無制限のプロジェクトとユーザーをお楽しみください。",
+    "backToSettings": "設定に戻る",
+    "currentPlan": "現在のプラン",
+    "freeLimit": "ワークスペースあたり最大3プロジェクト、5ユーザー",
+    "premiumUnlimited": "無制限のプロジェクトとユーザー",
+    "premiumPlan": "プレミアムプラン",
+    "premiumDescription": "Task Boardのすべての機能を解除。",
+    "unlimitedProjects": "無制限のプロジェクト",
+    "unlimitedMembers": "無制限のチームメンバー",
+    "prioritySupport": "優先サポート",
+    "advancedAnalytics": "高度な分析",
+    "back": "戻る",
+    "upgradeButton": "プレミアムにアップグレード",
+    "upgrading": "アップグレード中\u2026",
+    "failed": "アップグレードに失敗しました。もう一度お試しください。"
+  },
+  "members": {
+    "title": "メンバー",
+    "loading": "メンバーを読み込み中\u2026",
+    "noMembers": "メンバーが見つかりません。",
+    "pending": "保留中",
+    "unknown": "不明",
+    "active": "アクティブ",
+    "accessRevoked": "アクセス取消済み",
+    "declined": "辞退済み",
+    "invite": "メンバーを招待",
+    "inviteTitle": "メンバーを招待",
+    "email": "メールアドレス",
+    "role": "役割",
+    "revokeAccess": "アクセスを取り消す",
+    "resendInvitation": "招待を再送信",
+    "permanentlyDelete": "完全に削除",
+    "removeMember": "メンバーを削除",
+    "cancel": "キャンセル",
+    "inviteButton": "招待",
+    "inviting": "招待中\u2026"
+  },
+  "projects": {
+    "title": "プロジェクト",
+    "new": "新規プロジェクト",
+    "loading": "プロジェクトを読み込み中\u2026",
+    "noProjects": "プロジェクトが見つかりません。最初のプロジェクトを作成してください。",
+    "slug": "スラッグ: {{slug}}",
+    "createTitle": "プロジェクトを作成",
+    "name": "名前",
+    "slugLabel": "スラッグ",
+    "description": "説明",
+    "descriptionPlaceholder": "任意の説明\u2026",
+    "cancel": "キャンセル",
+    "create": "プロジェクトを作成",
+    "creating": "作成中\u2026"
+  },
+  "projectDetail": {
+    "loading": "プロジェクトを読み込み中\u2026",
+    "sprints": "スプリント",
+    "newBoard": "新規ボード",
+    "boards": "ボード",
+    "noBoards": "まだボードがありません。",
+    "createBoard": "ボードを作成",
+    "members": "メンバー",
+    "addMember": "メンバーを追加",
+    "noMembers": "メンバーが読み込まれていません。",
+    "changeRole": "役割を変更",
+    "removeMember": "メンバーを削除",
+    "createBoardTitle": "ボードを作成",
+    "boardName": "名前",
+    "boardDescription": "説明",
+    "descriptionPlaceholder": "任意の説明\u2026",
+    "cancel": "キャンセル",
+    "createBoardButton": "ボードを作成",
+    "creating": "作成中\u2026",
+    "addMemberTitle": "メンバーを追加",
+    "userId": "ユーザーID",
+    "userIdPlaceholder": "ユーザーIDを入力",
+    "role": "役割",
+    "addMemberButton": "メンバーを追加",
+    "adding": "追加中\u2026",
+    "removeMemberTitle": "メンバーを削除",
+    "removeConfirm": "このメンバーをプロジェクトから削除してもよろしいですか？",
+    "removeButton": "削除"
+  },
+  "boardView": {
+    "loading": "ボードを読み込み中\u2026",
+    "newTask": "新規タスク",
+    "createTaskTitle": "タスクを作成",
+    "title": "タイトル",
+    "titlePlaceholder": "タスクのタイトル",
+    "description": "説明",
+    "descriptionPlaceholder": "任意の説明\u2026",
+    "priority": "優先度",
+    "column": "カラム",
+    "cancel": "キャンセル",
+    "create": "タスクを作成",
+    "creating": "作成中\u2026"
+  },
+  "priority": {
+    "low": "低",
+    "medium": "中",
+    "high": "高",
+    "critical": "緊急"
+  },
+  "columnView": {
+    "addTask": "カラムにタスクを追加",
+    "noTasks": "タスクなし"
+  },
+  "taskDetail": {
+    "loading": "タスクを読み込み中\u2026",
+    "created": "{{date}}に作成",
+    "updated": "{{date}}に更新",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "saving": "保存中\u2026",
+    "edit": "編集",
+    "title": "タイトル",
+    "description": "説明",
+    "descriptionPlaceholder": "タスクの説明（マークダウン対応）",
+    "noDescription": "説明なし",
+    "priority": "優先度",
+    "assignees": "担当者",
+    "unassigned": "未割り当て",
+    "actions": "アクション",
+    "deleteTask": "タスクを削除",
+    "deleteTitle": "タスクを削除",
+    "deleteConfirm": "このタスクを削除してもよろしいですか？この操作は元に戻せません。",
+    "cancelDelete": "キャンセル",
+    "confirmDelete": "削除"
+  },
+  "sprints": {
+    "title": "スプリント",
+    "new": "新規スプリント",
+    "loading": "スプリントを読み込み中\u2026",
+    "noSprints": "まだスプリントがありません。",
+    "createFirst": "最初のスプリントを作成",
+    "tasks": "{{count}}件のタスク",
+    "sprintsCount": "{{count}}件のスプリント",
+    "toggle": "切替",
+    "createTitle": "スプリントを作成",
+    "name": "名前",
+    "startDate": "開始日",
+    "endDate": "終了日",
+    "goal": "目標",
+    "goalPlaceholder": "任意のスプリント目標\u2026",
+    "cancel": "キャンセル",
+    "create": "スプリントを作成",
+    "creating": "作成中\u2026"
+  },
+  "sprintDetail": {
+    "loading": "スプリントを読み込み中\u2026",
+    "tasks": "タスク",
+    "backToProject": "プロジェクトに戻る",
+    "noTasks": "このスプリントにタスクがありません。",
+    "removeFromSprint": "スプリントから削除"
+  },
+  "sprintBacklog": {
+    "backlog": "バックログ",
+    "loading": "バックログを読み込み中\u2026",
+    "allAssigned": "すべてのタスクがスプリントに割り当てられています。",
+    "addToSprint": "スプリントに追加"
+  },
+  "docs": {
+    "title": "ドキュメント",
+    "intro": "{{brand}}は、チームが作業を効率的に整理、追跡、提供するためのモダンで協調的なプロジェクト管理アプリケーションです。ボード、カラム、タスク、スプリントを、チームのワークフローに適応する統合ワークスペースにまとめます。",
+    "brand": "Task Board",
+    "keyFeatures": "主な機能",
+    "workspaces": "ワークスペースとプロジェクト",
+    "workspacesDesc": "異なるチームやクライアント用の隔離されたワークスペースを作成し、それぞれに独自のボードと設定を持つ複数のプロジェクトを含めることができます。",
+    "boardManagement": "ボードとカラムの管理",
+    "boardManagementDesc": "ドラッグ＆ドロップ対応で、カスタマイズ可能なカラム（例：未着手、進行中、完了）にタスクを整理し、優先順位付けを簡単にします。",
+    "taskTracking": "タスク追跡",
+    "taskTrackingDesc": "説明、ラベル、優先度、期限などの豊富な詳細を含むタスクを作成、割り当て、追跡します。",
+    "sprintPlanning": "スプリント計画",
+    "sprintPlanningDesc": "スプリントを使用してイテレーションを計画し、特定のスプリントにタスクを割り当て、バーンダウンスタイルのビューで進捗を監視します。",
+    "teamCollaboration": "チームコラボレーション",
+    "teamCollaborationDesc": "メールでチームメンバーを招待し、役割（オーナー、管理者、メンバー）を割り当て、共有ワークスペースでリアルタイムにコラボレーションします。",
+    "rbac": "ロールベースのアクセス制御",
+    "rbacDesc": "きめ細かな権限により、チームメンバーは自分の役割に適したリソースのみにアクセスできます。",
+    "techStack": "技術スタック",
+    "techStackDesc": "Task BoardはTypeScriptファーストのモダンなスタックで構築されています。フロントエンドはAngularとSpartan UIコンポーネント、Tailwind CSSでスタイリングされています。バックエンドはCloudflare WorkersとMongoDBデータ層で動作します。共有型定義とバリデーションスキーマにより、クライアントとサーバー間のエンドツーエンドの型安全性を確保しています。"
+  },
+  "faq": {
+    "title": "よくある質問",
+    "q1": {
+      "question": "Task Boardとは何ですか？",
+      "answer": "Task Boardは、ボード、カラム、タスク、スプリントを使用してチームが作業を整理するのを支援する協調的なプロジェクト管理アプリケーションです。複数のワークスペース、ロールベースのアクセス制御、リアルタイムコラボレーションをサポートしています。"
+    },
+    "q2": {
+      "question": "プロジェクトの作成方法は？",
+      "answer": "ワークスペースに移動し、「プロジェクト」セクションをクリックして「プロジェクトを作成」ボタンを使用します。プロジェクト名と任意の説明を入力する必要があります。プロジェクトは現在のワークスペースに紐づきます。"
+    },
+    "q3": {
+      "question": "チームメンバーの招待方法は？",
+      "answer": "ワークスペースの設定に移動し、「メンバー」タブを開きます。「メンバーを招待」をクリックし、メールアドレスを入力して役割（オーナー、管理者、またはメンバー）を割り当てます。招待メールが送信され、ワークスペースに参加できます。"
+    },
+    "q4": {
+      "question": "サブスクリプションの階層について教えてください。",
+      "answer": "Task Boardは無料、Pro、Enterpriseの階層を提供しています。無料階層には基本的なボードとタスク管理が含まれます。Proはスプリントや分析などの高度な機能を追加します。Enterpriseには優先サポート、SSO、無制限のワークスペースが含まれます。"
+    },
+    "q5": {
+      "question": "テーマの変更方法は？",
+      "answer": "右上のアバターをクリックしてユーザーメニューを開きます。そこからライトモードとダークモードを切り替えたり、インターフェースのズームレベルを好みに合わせて調整できます。"
+    }
+  },
+  "support": {
+    "title": "サポート",
+    "description": "ご質問やサポートが必要ですか？以下のフォームにご記入ください。サポートチームがご連絡いたします。",
+    "success": "メッセージが正常に送信されました。近日中にご連絡いたします。",
+    "name": "名前",
+    "namePlaceholder": "お名前",
+    "email": "メールアドレス",
+    "message": "メッセージ",
+    "messagePlaceholder": "問題や質問を説明してください\u2026",
+    "submit": "送信",
+    "submitting": "送信中\u2026"
+  },
+  "validation": {
+    "emailRequired": "メールアドレスは必須です",
+    "emailInvalid": "無効なメールアドレスです",
+    "passwordRequired": "パスワードは必須です",
+    "passwordMin": "パスワードは8文字以上でなければなりません",
+    "passwordMax": "パスワードは128文字以下でなければなりません",
+    "nameRequired": "名前は必須です",
+    "nameMax": "名前は200文字以下でなければなりません",
+    "displayNameRequired": "表示名は必須です",
+    "displayNameMax": "表示名は100文字以下でなければなりません",
+    "slugRequired": "スラッグは必須です",
+    "slugMin": "スラッグは2文字以上でなければなりません",
+    "slugMax": "スラッグは80文字以下でなければなりません",
+    "titleRequired": "タイトルは必須です",
+    "columnRequired": "カラムは必須です",
+    "boardNameRequired": "ボード名は必須です",
+    "userIdRequired": "ユーザーIDは必須です",
+    "roleRequired": "役割は必須です",
+    "workspaceNameRequired": "ワークスペース名は必須です",
+    "confirmPasswordRequired": "パスワードを確認してください",
+    "messageRequired": "メッセージは必須です",
+    "messageMax": "メッセージは2000文字以下でなければなりません",
+    "startDateRequired": "開始日は必須です",
+    "endDateRequired": "終了日は必須です"
+  },
+  "errors": {
+    "unexpected": "予期しないエラーが発生しました。もう一度お試しください。",
+    "permissionDenied": "この操作を実行する権限がありません"
+  }
+}

@@ -1,15 +1,28 @@
 <hlm-sheet [state]="open()" (stateChanged)="open.set($event)" side="bottom">
-  <button hlmSheetTrigger side="bottom" class="hidden" aria-label="Open theme picker"></button>
-  <hlm-sheet-content *hlmSheetPortal="let ctx" side="bottom" class="gap-0" role="dialog" aria-label="Choose theme">
+  <button
+    hlmSheetTrigger
+    side="bottom"
+    class="hidden"
+    [attr.aria-label]="'userMenu.openThemePicker' | transloco"
+  ></button>
+  <hlm-sheet-content
+    *hlmSheetPortal="let ctx"
+    side="bottom"
+    class="gap-0"
+    role="dialog"
+    [attr.aria-label]="'userMenu.chooseTheme' | transloco"
+  >
     <hlm-sheet-header class="p-3">
-      <h3 hlm-sheet-title class="text-lg font-semibold text-foreground text-center">Themes</h3>
+      <h3 hlm-sheet-title class="text-lg font-semibold text-foreground text-center">
+        {{ 'userMenu.themes' | transloco }}
+      </h3>
     </hlm-sheet-header>
     <div
       #themeGrid
       class="grid gap-y-4 gap-x-6 py-3 px-6 max-h-89 overflow-y-auto outline-none"
       [style.grid-template-columns]="'repeat(auto-fill, minmax(' + minColumnWidth + ', 1fr))'"
       role="listbox"
-      aria-label="Available themes"
+      [attr.aria-label]="'userMenu.availableThemes' | transloco"
       tabindex="0"
       (keydown)="onThemeKeydown($event)"
     >

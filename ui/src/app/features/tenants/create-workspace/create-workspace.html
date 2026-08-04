@@ -1,21 +1,21 @@
 <div class="flex min-h-screen items-center justify-center bg-surface-50">
   <hlm-card class="w-full max-w-md">
     <hlm-card-header>
-      <h3 hlmCardTitle>Create your workspace</h3>
-      <p hlmCardDescription>Set up a workspace to start managing your projects.</p>
+      <h3 hlmCardTitle>{{ 'createWorkspace.title' | transloco }}</h3>
+      <p hlmCardDescription>{{ 'createWorkspace.description' | transloco }}</p>
     </hlm-card-header>
 
     <div hlmCardContent>
       @if (error()) {
         <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() }}
+          {{ error() | transloco }}
         </div>
       }
 
       <form id="workspace-form" [formRoot]="workspaceForm">
         <hlm-field-group>
           <hlm-field>
-            <label hlmFieldLabel for="workspace-name">Workspace Name</label>
+            <label hlmFieldLabel for="workspace-name">{{ 'createWorkspace.name' | transloco }}</label>
             <input
               hlmInput
               id="workspace-name"
@@ -25,12 +25,12 @@
               (input)="onNameChange()"
             />
             @if (workspaceForm.name().touched() && workspaceForm.name().errors().length) {
-              <p hlm-field-error>{{ workspaceForm.name().errors()[0].message }}</p>
+              <p hlm-field-error>{{ workspaceForm.name().errors()[0].message | transloco }}</p>
             }
           </hlm-field>
 
           <hlm-field>
-            <label hlmFieldLabel for="workspace-slug">Slug</label>
+            <label hlmFieldLabel for="workspace-slug">{{ 'createWorkspace.slug' | transloco }}</label>
             <input
               hlmInput
               id="workspace-slug"
@@ -39,17 +39,17 @@
               placeholder="my-workspace"
             />
             @if (workspaceForm.slug().touched() && workspaceForm.slug().errors().length) {
-              <p hlm-field-error>{{ workspaceForm.slug().errors()[0].message }}</p>
+              <p hlm-field-error>{{ workspaceForm.slug().errors()[0].message | transloco }}</p>
             }
             <p class="mt-1 text-xs text-muted-foreground">
-              Used in URLs. Only lowercase letters, numbers, and hyphens.
+              {{ 'createWorkspace.slugHint' | transloco }}
             </p>
           </hlm-field>
 
           <div class="space-y-1">
-            <span class="text-sm font-medium text-foreground">Subscription Plan</span>
+            <span class="text-sm font-medium text-foreground">{{ 'createWorkspace.plan' | transloco }}</span>
             <div class="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-foreground">
-              Free — Up to 3 projects and 5 users
+              {{ 'createWorkspace.planFree' | transloco }}
             </div>
           </div>
         </hlm-field-group>
@@ -65,9 +65,9 @@
         [disabled]="workspaceForm().invalid() || workspaceForm().submitting()"
       >
         @if (workspaceForm().submitting()) {
-          <hlm-spinner /> Creating workspace...
+          <hlm-spinner /> {{ 'createWorkspace.submitting' | transloco }}
         } @else {
-          Create Workspace
+          {{ 'createWorkspace.submit' | transloco }}
         }
       </button>
     </hlm-card-footer>

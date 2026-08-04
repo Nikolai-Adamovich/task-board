@@ -1,0 +1,448 @@
+{
+  "header": {
+    "search": "검색\u2026",
+    "clearSearch": "검색 지우기",
+    "notifications": "알림",
+    "noNotifications": "알림 없음",
+    "help": "도움말",
+    "faq": "FAQ",
+    "documentation": "문서",
+    "support": "지원",
+    "signIn": "로그인",
+    "userMenu": "사용자 메뉴"
+  },
+  "sidebar": {
+    "brand": "Task Board",
+    "brandShort": "TB",
+    "projects": "프로젝트",
+    "sprints": "스프린트",
+    "settings": "설정",
+    "members": "멤버",
+    "toggleSidebar": "사이드바 전환"
+  },
+  "tenantSwitcher": {
+    "selectWorkspace": "워크스페이스 선택",
+    "noWorkspaces": "사용 가능한 워크스페이스가 없습니다",
+    "createWorkspace": "워크스페이스 만들기"
+  },
+  "userMenu": {
+    "language": "언어",
+    "themes": "테마",
+    "preferences": "환경설정",
+    "signOut": "로그아웃",
+    "zoom": "확대/축소",
+    "zoomIn": "확대",
+    "zoomOut": "축소",
+    "openThemePicker": "테마 선택기 열기",
+    "chooseTheme": "테마 선택",
+    "availableThemes": "사용 가능한 테마"
+  },
+  "auth": {
+    "login": {
+      "title": "Task Board 로그인",
+      "description": "워크스페이스에 접근하려면 자격 증명을 입력하세요.",
+      "email": "이메일",
+      "password": "비밀번호",
+      "submit": "로그인",
+      "submitting": "로그인 중\u2026",
+      "noAccount": "계정이 없으신가요?",
+      "createOne": "만들기",
+      "failed": "로그인에 실패했습니다. 다시 시도해 주세요."
+    },
+    "register": {
+      "title": "계정 만들기",
+      "description": "시작하려면 아래 정보를 입력하세요.",
+      "name": "이름",
+      "email": "이메일",
+      "password": "비밀번호",
+      "submit": "계정 만들기",
+      "submitting": "계정 생성 중\u2026",
+      "hasAccount": "이미 계정이 있으신가요?",
+      "signIn": "로그인",
+      "failed": "회원가입에 실패했습니다. 다시 시도해 주세요."
+    },
+    "invitation": {
+      "loading": "초대 로딩 중\u2026",
+      "error": "초대 오류",
+      "goToSignIn": "로그인으로 이동",
+      "title": "초대 수락",
+      "description": "워크스페이스에 초대되었습니다.",
+      "email": "이메일",
+      "workspace": "워크스페이스",
+      "role": "역할",
+      "existingUserHint": "이미 계정이 있습니다. 아래를 클릭하여 이 초대를 수락하세요.",
+      "displayName": "표시 이름",
+      "password": "비밀번호",
+      "confirmPassword": "비밀번호 확인",
+      "accept": "초대 수락",
+      "accepting": "수락 중\u2026",
+      "createAndAccept": "계정 만들기 및 수락",
+      "creatingAccount": "계정 생성 중\u2026",
+      "hasAccount": "이미 계정이 있으신가요?",
+      "signIn": "로그인",
+      "noToken": "초대 토큰이 제공되지 않았습니다.",
+      "invalidOrExpired": "유효하지 않거나 만료된 초대입니다.",
+      "passwordsNotMatch": "비밀번호가 일치하지 않습니다.",
+      "failedAccept": "초대 수락에 실패했습니다."
+    }
+  },
+  "landing": {
+    "title": "Task Board",
+    "subtitle": "팀을 위한 간편한 프로젝트 관리",
+    "getStarted": "시작하기",
+    "signIn": "로그인",
+    "kanban": {
+      "title": "칸반 보드",
+      "description": "드래그 앤 드롭 보드로 워크플로를 시각화하세요. 백로그에서 완료까지 열 전체에서 작업을 추적합니다."
+    },
+    "sprints": {
+      "title": "스프린트",
+      "description": "스프린트를 쉽게 계획하고 실행하세요. 속도를 추적하고 제시간에 납품하세요."
+    },
+    "collaboration": {
+      "title": "팀 협업",
+      "description": "팀 멤버를 초대하고, 역할을 할당하며, 프로젝트에서 실시간으로 협업하세요."
+    },
+    "multiWorkspace": {
+      "title": "다중 워크스페이스",
+      "description": "하나의 계정으로 다양한 팀이나 고객을 위한 여러 워크스페이스를 관리하세요."
+    }
+  },
+  "welcome": {
+    "title": "Task Board에 오신 것을 환영합니다",
+    "greeting": ", {{name}}!",
+    "subtitle": "시작해 봅시다. 첫 번째 워크스페이스를 만드세요.",
+    "createWorkspace": {
+      "title": "첫 번째 워크스페이스 만들기",
+      "description": "워크스페이스는 팀의 기지입니다. 프로젝트를 만들고, 작업을 관리하며, 팀과 협업하세요.",
+      "button": "워크스페이스 만들기"
+    },
+    "freePlan": {
+      "title": "무료 플랜 포함 사항",
+      "workspace": "워크스페이스 1개",
+      "projects": "프로젝트 3개",
+      "users": "사용자 10명"
+    },
+    "pendingInvitations": "대기 중인 초대",
+    "accept": "수락"
+  },
+  "invitationView": {
+    "title": "대기 중인 초대가 있습니다",
+    "subtitle": "초대를 수락하여 워크스페이스에 참여하거나, 직접 만드세요.",
+    "invited": "{{date}}에 초대됨",
+    "decline": "거절",
+    "accept": "수락",
+    "or": "또는",
+    "createOwn": "직접 워크스페이스 만들기"
+  },
+  "ownerDashboard": {
+    "title": "소유자 대시보드",
+    "subtitle": "워크스페이스를 관리하고 팀의 진행 상황을 추적하세요.",
+    "totalTasks": "전체 작업",
+    "workspaces": "워크스페이스",
+    "myWorkspaces": "내 워크스페이스",
+    "createAnother": "다른 워크스페이스 만들기",
+    "projects": "프로젝트",
+    "settings": "설정",
+    "members": "멤버",
+    "upgrade": "업그레이드",
+    "myRecentTasks": "최근 작업",
+    "noTasks": "아직 할당된 작업이 없습니다."
+  },
+  "memberDashboard": {
+    "title": "대시보드",
+    "subtitle": "워크스페이스와 최근 작업을 한눈에 확인하세요.",
+    "totalTasks": "전체 작업",
+    "workspaces": "워크스페이스",
+    "myWorkspaces": "내 워크스페이스",
+    "myRecentTasks": "최근 작업",
+    "noTasks": "아직 할당된 작업이 없습니다."
+  },
+  "workspace": {
+    "defaultName": "워크스페이스",
+    "settings": "설정",
+    "members": "멤버",
+    "upgrade": "업그레이드",
+    "projects": "프로젝트",
+    "noProjects": "아직 프로젝트가 없습니다.",
+    "createFirst": "첫 번째 프로젝트 만들기"
+  },
+  "createWorkspace": {
+    "title": "워크스페이스 만들기",
+    "description": "워크스페이스를 설정하여 프로젝트 관리를 시작하세요.",
+    "name": "워크스페이스 이름",
+    "slug": "슬러그",
+    "slugHint": "URL에서 사용됩니다. 소문자, 숫자, 하이픈만 허용됩니다.",
+    "plan": "구독 플랜",
+    "planFree": "무료 \u2014 프로젝트 3개, 사용자 5명까지",
+    "submit": "워크스페이스 만들기",
+    "submitting": "워크스페이스 생성 중\u2026",
+    "failed": "워크스페이스 생성에 실패했습니다. 다시 시도해 주세요."
+  },
+  "settings": {
+    "title": "설정"
+  },
+  "tenantSettings": {
+    "title": "테넌트 설정",
+    "loading": "설정 로딩 중\u2026",
+    "general": "일반 설정",
+    "name": "이름",
+    "slug": "슬러그",
+    "save": "변경사항 저장",
+    "saving": "저장 중\u2026",
+    "dangerZone": "위험 영역",
+    "dangerDescription": "테넌트 삭제는 되돌릴 수 없습니다. 이 테넌트의 모든 프로젝트, 보드, 작업이 영구적으로 삭제됩니다.",
+    "deleteTenant": "테넌트 삭제",
+    "deleteTitle": "테넌트 삭제",
+    "deleteConfirm": "이 작업은 되돌릴 수 없습니다. 확인하려면 아래에 테넌트 이름을 입력하세요.",
+    "deleteName": "테넌트 이름",
+    "deletePlaceholder": "확인을 위해 테넌트 이름 입력",
+    "cancel": "취소"
+  },
+  "upgrade": {
+    "title": "플랜 업그레이드",
+    "successTitle": "프리미엄 플랜입니다!",
+    "successDescription": "워크스페이스가 프리미엄 플랜으로 업그레이드되었습니다. 무제한 프로젝트와 사용자를 즐기세요.",
+    "backToSettings": "설정으로 돌아가기",
+    "currentPlan": "현재 플랜",
+    "freeLimit": "워크스페이스당 프로젝트 3개, 사용자 5명까지",
+    "premiumUnlimited": "무제한 프로젝트 및 사용자",
+    "premiumPlan": "프리미엄 플랜",
+    "premiumDescription": "Task Board의 모든 기능을 해제하세요.",
+    "unlimitedProjects": "무제한 프로젝트",
+    "unlimitedMembers": "무제한 팀 멤버",
+    "prioritySupport": "우선 지원",
+    "advancedAnalytics": "고급 분석",
+    "back": "뒤로",
+    "upgradeButton": "프리미엄으로 업그레이드",
+    "upgrading": "업그레이드 중\u2026",
+    "failed": "업그레이드에 실패했습니다. 다시 시도해 주세요."
+  },
+  "members": {
+    "title": "멤버",
+    "loading": "멤버 로딩 중\u2026",
+    "noMembers": "멤버를 찾을 수 없습니다.",
+    "pending": "대기 중",
+    "unknown": "알 수 없음",
+    "active": "활성",
+    "accessRevoked": "접근 취소됨",
+    "declined": "거절됨",
+    "invite": "멤버 초대",
+    "inviteTitle": "멤버 초대",
+    "email": "이메일",
+    "role": "역할",
+    "revokeAccess": "접근 취소",
+    "resendInvitation": "초대 재전송",
+    "permanentlyDelete": "영구 삭제",
+    "removeMember": "멤버 제거",
+    "cancel": "취소",
+    "inviteButton": "초대",
+    "inviting": "초대 중\u2026"
+  },
+  "projects": {
+    "title": "프로젝트",
+    "new": "새 프로젝트",
+    "loading": "프로젝트 로딩 중\u2026",
+    "noProjects": "프로젝트를 찾을 수 없습니다. 첫 번째 프로젝트를 만들어 시작하세요.",
+    "slug": "슬러그: {{slug}}",
+    "createTitle": "프로젝트 만들기",
+    "name": "이름",
+    "slugLabel": "슬러그",
+    "description": "설명",
+    "descriptionPlaceholder": "선택 사항 설명\u2026",
+    "cancel": "취소",
+    "create": "프로젝트 만들기",
+    "creating": "생성 중\u2026"
+  },
+  "projectDetail": {
+    "loading": "프로젝트 로딩 중\u2026",
+    "sprints": "스프린트",
+    "newBoard": "새 보드",
+    "boards": "보드",
+    "noBoards": "아직 보드가 없습니다.",
+    "createBoard": "보드 만들기",
+    "members": "멤버",
+    "addMember": "멤버 추가",
+    "noMembers": "멤버가 로드되지 않았습니다.",
+    "changeRole": "역할 변경",
+    "removeMember": "멤버 제거",
+    "createBoardTitle": "보드 만들기",
+    "boardName": "이름",
+    "boardDescription": "설명",
+    "descriptionPlaceholder": "선택 사항 설명\u2026",
+    "cancel": "취소",
+    "createBoardButton": "보드 만들기",
+    "creating": "생성 중\u2026",
+    "addMemberTitle": "멤버 추가",
+    "userId": "사용자 ID",
+    "userIdPlaceholder": "사용자 ID 입력",
+    "role": "역할",
+    "addMemberButton": "멤버 추가",
+    "adding": "추가 중\u2026",
+    "removeMemberTitle": "멤버 제거",
+    "removeConfirm": "이 멤버를 프로젝트에서 제거하시겠습니까?",
+    "removeButton": "제거"
+  },
+  "boardView": {
+    "loading": "보드 로딩 중\u2026",
+    "newTask": "새 작업",
+    "createTaskTitle": "작업 만들기",
+    "title": "제목",
+    "titlePlaceholder": "작업 제목",
+    "description": "설명",
+    "descriptionPlaceholder": "선택 사항 설명\u2026",
+    "priority": "우선순위",
+    "column": "열",
+    "cancel": "취소",
+    "create": "작업 만들기",
+    "creating": "생성 중\u2026"
+  },
+  "priority": {
+    "low": "낮음",
+    "medium": "보통",
+    "high": "높음",
+    "critical": "긴급"
+  },
+  "columnView": {
+    "addTask": "열에 작업 추가",
+    "noTasks": "작업 없음"
+  },
+  "taskDetail": {
+    "loading": "작업 로딩 중\u2026",
+    "created": "{{date}}에 생성됨",
+    "updated": "{{date}}에 업데이트됨",
+    "cancel": "취소",
+    "save": "저장",
+    "saving": "저장 중\u2026",
+    "edit": "편집",
+    "title": "제목",
+    "description": "설명",
+    "descriptionPlaceholder": "작업 설명 (마크다운 지원)",
+    "noDescription": "설명 없음",
+    "priority": "우선순위",
+    "assignees": "담당자",
+    "unassigned": "미할당",
+    "actions": "작업",
+    "deleteTask": "작업 삭제",
+    "deleteTitle": "작업 삭제",
+    "deleteConfirm": "이 작업을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "cancelDelete": "취소",
+    "confirmDelete": "삭제"
+  },
+  "sprints": {
+    "title": "스프린트",
+    "new": "새 스프린트",
+    "loading": "스프린트 로딩 중\u2026",
+    "noSprints": "아직 스프린트가 없습니다.",
+    "createFirst": "첫 스프린트 만들기",
+    "tasks": "{{count}}개 작업",
+    "sprintsCount": "{{count}}개 스프린트",
+    "toggle": "전환",
+    "createTitle": "스프린트 만들기",
+    "name": "이름",
+    "startDate": "시작일",
+    "endDate": "종료일",
+    "goal": "목표",
+    "goalPlaceholder": "선택 사항 스프린트 목표\u2026",
+    "cancel": "취소",
+    "create": "스프린트 만들기",
+    "creating": "생성 중\u2026"
+  },
+  "sprintDetail": {
+    "loading": "스프린트 로딩 중\u2026",
+    "tasks": "작업",
+    "backToProject": "프로젝트로 돌아가기",
+    "noTasks": "이 스프린트에 작업이 없습니다.",
+    "removeFromSprint": "스프린트에서 제거"
+  },
+  "sprintBacklog": {
+    "backlog": "백로그",
+    "loading": "백로그 로딩 중\u2026",
+    "allAssigned": "모든 작업이 스프린트에 할당되었습니다.",
+    "addToSprint": "스프린트에 추가"
+  },
+  "docs": {
+    "title": "문서",
+    "intro": "{{brand}}은(는) 팀이 작업을 효율적으로 구성, 추적 및 전달할 수 있도록 설계된 현대적인 협업 프로젝트 관리 애플리케이션입니다. 보드, 열, 작업, 스프린트를 팀의 워크플로에 맞게 적응하는 통합 워크스페이스로 통합합니다.",
+    "brand": "Task Board",
+    "keyFeatures": "주요 기능",
+    "workspaces": "워크스페이스 및 프로젝트",
+    "workspacesDesc": "다양한 팀이나 고객을 위한 격리된 워크스페이스를 만들고, 각각 독립적인 보드와 설정을 가진 여러 프로젝트를 포함할 수 있습니다.",
+    "boardManagement": "보드 및 열 관리",
+    "boardManagementDesc": "드래그 앤 드롭 지원으로 사용자 정의 가능한 열(예: 할 일, 진행 중, 완료)에 작업을 정리하여 쉽게 우선순위를 지정할 수 있습니다.",
+    "taskTracking": "작업 추적",
+    "taskTrackingDesc": "설명, 레이블, 우선순위, 마감일 등 풍부한 세부 정보를 포함하여 작업을 생성, 할당 및 추적합니다.",
+    "sprintPlanning": "스프린트 계획",
+    "sprintPlanningDesc": "스프린트를 사용하여 반복을 계획하고, 특정 스프린트에 작업을 할당하며, 번다운 스타일 뷰로 진행 상황을 모니터링합니다.",
+    "teamCollaboration": "팀 협업",
+    "teamCollaborationDesc": "이메일로 팀 멤버를 초대하고, 역할(소유자, 관리자, 멤버)을 할당하며, 공유 워크스페이스에서 실시간으로 협업합니다.",
+    "rbac": "역할 기반 접근 제어",
+    "rbacDesc": "세분화된 권한을 통해 팀 멤버가 자신의 역할에 적합한 리소스에만 접근할 수 있도록 보장합니다.",
+    "techStack": "기술 스택",
+    "techStackDesc": "Task Board는 TypeScript 우선의 현대적인 스택으로 구축되었습니다. 프론트엔드는 Angular와 Spartan UI 컴포넌트, Tailwind CSS 스타일링으로 구동됩니다. 백엔드는 Cloudflare Workers와 MongoDB 데이터 계층에서 실행됩니다. 공유 타입 정의와 유효성 검사 스키마를 통해 클라이언트와 서버 간의 엔드투엔드 타입 안전성을 보장합니다."
+  },
+  "faq": {
+    "title": "자주 묻는 질문",
+    "q1": {
+      "question": "Task Board란 무엇인가요?",
+      "answer": "Task Board는 보드, 열, 작업, 스프린트를 사용하여 팀이 작업을 구성하도록 돕는 협업 프로젝트 관리 애플리케이션입니다. 다중 워크스페이스, 역할 기반 접근 제어, 실시간 협업을 지원합니다."
+    },
+    "q2": {
+      "question": "프로젝트를 어떻게 만들나요?",
+      "answer": "워크스페이스로 이동하여 \u2018프로젝트\u2019 섹션을 클릭하고 \u2018프로젝트 만들기\u2019 버튼을 사용하세요. 프로젝트 이름과 선택적 설명을 입력해야 합니다. 프로젝트는 현재 워크스페이스에 속합니다."
+    },
+    "q3": {
+      "question": "팀 멤버를 어떻게 초대하나요?",
+      "answer": "워크스페이스 설정으로 이동하여 \u2018멤버\u2019 탭을 여세요. \u2018멤버 초대\u2019를 클릭하고, 이메일 주소를 입력한 후 역할(소유자, 관리자 또는 멤버)을 할당하세요. 워크스페이스에 참여하라는 이메일 초대를 받게 됩니다."
+    },
+    "q4": {
+      "question": "구독 티어는 무엇이 있나요?",
+      "answer": "Task Board는 무료, Pro, Enterprise 티어를 제공합니다. 무료 티어에는 기본 보드 및 작업 관리가 포함됩니다. Pro는 스프린트 및 분석과 같은 고급 기능을 추가합니다. Enterprise에는 우선 지원, SSO, 무제한 워크스페이스가 포함됩니다."
+    },
+    "q5": {
+      "question": "테마를 어떻게 변경하나요?",
+      "answer": "오른쪽 상단의 아바타를 클릭하여 사용자 메뉴를 여세요. 거기에서 라이트 모드와 다크 모드를 전환하고, 인터페이스 확대/축소 수준을 선호에 맞게 조정할 수 있습니다."
+    }
+  },
+  "support": {
+    "title": "지원",
+    "description": "질문이 있거나 도움이 필요하신가요? 아래 양식을 작성해 주시면 지원팀이 연락드리겠습니다.",
+    "success": "메시지가 성공적으로 전송되었습니다. 곧 연락드리겠습니다.",
+    "name": "이름",
+    "namePlaceholder": "이름",
+    "email": "이메일",
+    "message": "메시지",
+    "messagePlaceholder": "문제나 질문을 설명해 주세요\u2026",
+    "submit": "제출",
+    "submitting": "전송 중\u2026"
+  },
+  "validation": {
+    "emailRequired": "이메일은 필수입니다",
+    "emailInvalid": "유효하지 않은 이메일 주소",
+    "passwordRequired": "비밀번호는 필수입니다",
+    "passwordMin": "비밀번호는 최소 8자 이상이어야 합니다",
+    "passwordMax": "비밀번호는 최대 128자 이하여야 합니다",
+    "nameRequired": "이름은 필수입니다",
+    "nameMax": "이름은 최대 200자 이하여야 합니다",
+    "displayNameRequired": "표시 이름은 필수입니다",
+    "displayNameMax": "표시 이름은 최대 100자 이하여야 합니다",
+    "slugRequired": "슬러그는 필수입니다",
+    "slugMin": "슬러그는 최소 2자 이상이어야 합니다",
+    "slugMax": "슬러그는 최대 80자 이하여야 합니다",
+    "titleRequired": "제목은 필수입니다",
+    "columnRequired": "열은 필수입니다",
+    "boardNameRequired": "보드 이름은 필수입니다",
+    "userIdRequired": "사용자 ID는 필수입니다",
+    "roleRequired": "역할은 필수입니다",
+    "workspaceNameRequired": "워크스페이스 이름은 필수입니다",
+    "confirmPasswordRequired": "비밀번호를 확인해 주세요",
+    "messageRequired": "메시지는 필수입니다",
+    "messageMax": "메시지는 최대 2000자 이하여야 합니다",
+    "startDateRequired": "시작일은 필수입니다",
+    "endDateRequired": "종료일은 필수입니다"
+  },
+  "errors": {
+    "unexpected": "예기치 않은 오류가 발생했습니다. 다시 시도해 주세요.",
+    "permissionDenied": "이 작업을 수행할 권한이 없습니다"
+  }
+}

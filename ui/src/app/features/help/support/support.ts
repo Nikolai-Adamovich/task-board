@@ -1,4 +1,5 @@
 import { Component, signal, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { form, FormRoot, FormField, schema, required, email, maxLength } from '@angular/forms/signals';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
@@ -17,6 +18,7 @@ interface SupportModel {
 @Component({
   selector: 'ui-support',
   imports: [
+    TranslocoPipe,
     FormRoot,
     FormField,
     HlmFieldImports,
@@ -36,12 +38,12 @@ export class Support {
   protected readonly supportForm = form(
     this.model,
     schema<SupportModel>((field) => {
-      required(field.name, { message: 'Name is required' });
-      maxLength(field.name, 200, { message: 'Name must be at most 200 characters' });
-      required(field.email, { message: 'Email is required' });
-      email(field.email, { message: 'Invalid email address' });
-      required(field.message, { message: 'Message is required' });
-      maxLength(field.message, 2000, { message: 'Message must be at most 2000 characters' });
+      required(field.name, { message: 'validation.nameRequired' });
+      maxLength(field.name, 200, { message: 'validation.nameMax' });
+      required(field.email, { message: 'validation.emailRequired' });
+      email(field.email, { message: 'validation.emailInvalid' });
+      required(field.message, { message: 'validation.messageRequired' });
+      maxLength(field.message, 2000, { message: 'validation.messageMax' });
     }),
     {
       submission: {
@@ -74,6 +76,6 @@ export class Support {
       return err.error?.message ?? err.message;
     }
 
-    return 'An unexpected error occurred. Please try again.';
+    return 'errors.unexpected';
   }
 }

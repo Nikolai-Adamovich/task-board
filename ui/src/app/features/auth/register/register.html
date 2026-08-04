@@ -1,21 +1,21 @@
 <div class="flex min-h-screen items-center justify-center bg-surface-50">
   <hlm-card class="w-full max-w-md">
     <hlm-card-header>
-      <h3 hlmCardTitle>Create your account</h3>
-      <p hlmCardDescription>Fill in the details below to get started.</p>
+      <h3 hlmCardTitle>{{ 'auth.register.title' | transloco }}</h3>
+      <p hlmCardDescription>{{ 'auth.register.description' | transloco }}</p>
     </hlm-card-header>
 
     <div hlmCardContent>
       @if (error()) {
         <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() }}
+          {{ error() | transloco }}
         </div>
       }
 
       <form id="register-form" [formRoot]="registerForm">
         <hlm-field-group>
           <hlm-field>
-            <label hlmFieldLabel for="displayName">Name</label>
+            <label hlmFieldLabel for="displayName">{{ 'auth.register.name' | transloco }}</label>
             <input
               hlmInput
               id="displayName"
@@ -25,12 +25,12 @@
               placeholder="John Doe"
             />
             @if (registerForm.displayName().touched() && registerForm.displayName().errors().length) {
-              <p hlm-field-error>{{ registerForm.displayName().errors()[0].message }}</p>
+              <p hlm-field-error>{{ registerForm.displayName().errors()[0].message | transloco }}</p>
             }
           </hlm-field>
 
           <hlm-field>
-            <label hlmFieldLabel for="email">Email</label>
+            <label hlmFieldLabel for="email">{{ 'auth.register.email' | transloco }}</label>
             <input
               hlmInput
               id="email"
@@ -40,12 +40,12 @@
               placeholder="you&#64;example.com"
             />
             @if (registerForm.email().touched() && registerForm.email().errors().length) {
-              <p hlm-field-error>{{ registerForm.email().errors()[0].message }}</p>
+              <p hlm-field-error>{{ registerForm.email().errors()[0].message | transloco }}</p>
             }
           </hlm-field>
 
           <hlm-field>
-            <label hlmFieldLabel for="password">Password</label>
+            <label hlmFieldLabel for="password">{{ 'auth.register.password' | transloco }}</label>
             <input
               hlmInput
               id="password"
@@ -55,7 +55,7 @@
               placeholder="••••••••"
             />
             @if (registerForm.password().touched() && registerForm.password().errors().length) {
-              <p hlm-field-error>{{ registerForm.password().errors()[0].message }}</p>
+              <p hlm-field-error>{{ registerForm.password().errors()[0].message | transloco }}</p>
             }
           </hlm-field>
         </hlm-field-group>
@@ -71,14 +71,16 @@
         [disabled]="registerForm().invalid() || registerForm().submitting()"
       >
         @if (registerForm().submitting()) {
-          <hlm-spinner /> Creating account...
+          <hlm-spinner /> {{ 'auth.register.submitting' | transloco }}
         } @else {
-          Create account
+          {{ 'auth.register.submit' | transloco }}
         }
       </button>
       <p class="text-center text-sm text-muted-foreground">
-        Already have an account?
-        <a routerLink="/auth/login" class="font-medium text-primary hover:underline">Sign in</a>
+        {{ 'auth.register.hasAccount' | transloco }}
+        <a routerLink="/auth/login" class="font-medium text-primary hover:underline">{{
+          'auth.register.signIn' | transloco
+        }}</a>
       </p>
     </hlm-card-footer>
   </hlm-card>

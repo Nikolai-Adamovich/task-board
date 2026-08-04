@@ -1,5 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { form, FormField, FormRoot, schema, required, minLength, maxLength } from '@angular/forms/signals';
@@ -22,6 +23,7 @@ interface InvitationFormModel {
 @Component({
   imports: [
     RouterLink,
+    TranslocoPipe,
     FormField,
     FormRoot,
     HlmCardImports,
@@ -47,12 +49,12 @@ export class AcceptInvitation implements OnInit {
   protected readonly invitationForm = form(
     this.model,
     schema<InvitationFormModel>((field) => {
-      required(field.displayName, { message: 'Display name is required' });
-      maxLength(field.displayName, 100, { message: 'Display name must be at most 100 characters' });
-      required(field.password, { message: 'Password is required' });
-      minLength(field.password, 8, { message: 'Password must be at least 8 characters' });
-      maxLength(field.password, 128, { message: 'Password must be at most 128 characters' });
-      required(field.confirmPassword, { message: 'Please confirm your password' });
+      required(field.displayName, { message: 'validation.displayNameRequired' });
+      maxLength(field.displayName, 100, { message: 'validation.displayNameMax' });
+      required(field.password, { message: 'validation.passwordRequired' });
+      minLength(field.password, 8, { message: 'validation.passwordMin' });
+      maxLength(field.password, 128, { message: 'validation.passwordMax' });
+      required(field.confirmPassword, { message: 'validation.confirmPasswordRequired' });
     }),
     {
       submission: {
@@ -67,7 +69,7 @@ export class AcceptInvitation implements OnInit {
     const token = this.route.snapshot.queryParamMap.get('token');
 
     if (!token) {
-      this.error.set('No invitation token provided.');
+      this.error.set('auth.invitation.noToken');
       this.loading.set(false);
       return;
     }
@@ -82,7 +84,7 @@ export class AcceptInvitation implements OnInit {
           this.invitation.set(details);
         },
         error: (err: HttpErrorResponse) => {
-          this.error.set(err.error?.message ?? 'Invalid or expired invitation.');
+          this.error.set(err.error?.message ?? 'auth.invitation.invalidOrExpired');
         },
       });
   }
@@ -95,7 +97,7 @@ export class AcceptInvitation implements OnInit {
     const modelValue = this.model();
 
     if (modelValue.password !== modelValue.confirmPassword) {
-      this.error.set('Passwords do not match.');
+      this.error.set('auth.invitation.passwordsNotMatch');
       return;
     }
 
@@ -113,7 +115,7 @@ export class AcceptInvitation implements OnInit {
           this.router.navigateByUrl('/');
         },
         error: (err: HttpErrorResponse) => {
-          this.error.set(err.error?.message ?? 'Failed to accept invitation.');
+          this.error.set(err.error?.message ?? 'auth.invitation.failedAccept');
         },
       });
   }
@@ -131,7 +133,7 @@ export class AcceptInvitation implements OnInit {
           this.router.navigateByUrl('/');
         },
         error: (err: HttpErrorResponse) => {
-          this.error.set(err.error?.message ?? 'Failed to accept invitation.');
+          this.error.set(err.error?.message ?? 'auth.invitation.failedAccept');
         },
       });
   }

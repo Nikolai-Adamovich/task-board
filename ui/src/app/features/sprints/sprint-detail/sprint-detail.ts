@@ -1,6 +1,7 @@
 import { Component, inject, input, signal, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucideX } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
@@ -22,7 +23,7 @@ import type { Sprint, Task } from '@task-board/shared';
 
 @Component({
   selector: 'ui-sprint-detail',
-  imports: [RouterLink, DatePipe, NgIcon, HlmButtonImports, HlmSpinnerImports, HlmBadgeImports],
+  imports: [RouterLink, DatePipe, TranslocoPipe, NgIcon, HlmButtonImports, HlmSpinnerImports, HlmBadgeImports],
   providers: [provideIcons({ lucideX })],
   templateUrl: './sprint-detail.html',
 })

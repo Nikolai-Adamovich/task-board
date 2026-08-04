@@ -1,4 +1,5 @@
 import { Component, inject, input, signal, computed, OnInit } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideUserPlus, lucideTrash2, lucideShield, lucideBan, lucideRefreshCw, lucideSkull } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
@@ -30,6 +31,7 @@ interface InviteFormModel {
   imports: [
     FormRoot,
     FormField,
+    TranslocoPipe,
     NgIcon,
     HlmButtonImports,
     HlmCardImports,
@@ -60,8 +62,8 @@ export class TenantMemberList implements OnInit {
   protected readonly inviteForm = form(
     this.model,
     schema<InviteFormModel>((field) => {
-      required(field.email, { message: 'Email is required' });
-      required(field.role, { message: 'Role is required' });
+      required(field.email, { message: 'validation.emailRequired' });
+      required(field.role, { message: 'validation.roleRequired' });
     }),
     {
       submission: {
@@ -201,6 +203,6 @@ export class TenantMemberList implements OnInit {
       return err.error?.message ?? err.message;
     }
 
-    return 'An unexpected error occurred. Please try again.';
+    return 'errors.unexpected';
   }
 }

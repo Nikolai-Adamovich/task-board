@@ -1,12 +1,448 @@
 {
   "header": {
-    "search": "Szukaj...",
-    "notifications": "Powiadomienia"
+    "search": "Szukaj\u2026",
+    "clearSearch": "Wyczyść szukanie",
+    "notifications": "Powiadomienia",
+    "noNotifications": "Brak powiadomień",
+    "help": "Pomoc",
+    "faq": "FAQ",
+    "documentation": "Dokumentacja",
+    "support": "Wsparcie",
+    "signIn": "Zaloguj się",
+    "userMenu": "Menu użytkownika"
+  },
+  "sidebar": {
+    "brand": "Task Board",
+    "brandShort": "TB",
+    "projects": "Projekty",
+    "sprints": "Sprinty",
+    "settings": "Ustawienia",
+    "members": "Członkowie",
+    "toggleSidebar": "Przełącz panel boczny"
+  },
+  "tenantSwitcher": {
+    "selectWorkspace": "Wybierz przestrzeń roboczą",
+    "noWorkspaces": "Brak dostępnych przestrzeni roboczych",
+    "createWorkspace": "Utwórz przestrzeń roboczą"
   },
   "userMenu": {
     "language": "Język",
     "themes": "Motywy",
     "preferences": "Preferencje",
-    "signOut": "Wyloguj się"
+    "signOut": "Wyloguj się",
+    "zoom": "Powiększenie",
+    "zoomIn": "Powiększ",
+    "zoomOut": "Pomniejsz",
+    "openThemePicker": "Otwórz wybór motywu",
+    "chooseTheme": "Wybierz motyw",
+    "availableThemes": "Dostępne motywy"
+  },
+  "auth": {
+    "login": {
+      "title": "Zaloguj się do Task Board",
+      "description": "Wprowadź swoje dane logowania, aby uzyskać dostęp do przestrzeni roboczej.",
+      "email": "E-mail",
+      "password": "Hasło",
+      "submit": "Zaloguj się",
+      "submitting": "Logowanie\u2026",
+      "noAccount": "Nie masz konta?",
+      "createOne": "Utwórz konto",
+      "failed": "Logowanie nie powiodło się. Spróbuj ponownie."
+    },
+    "register": {
+      "title": "Utwórz swoje konto",
+      "description": "Wypełnij poniższe dane, aby rozpocząć.",
+      "name": "Imię",
+      "email": "E-mail",
+      "password": "Hasło",
+      "submit": "Utwórz konto",
+      "submitting": "Tworzenie konta\u2026",
+      "hasAccount": "Masz już konto?",
+      "signIn": "Zaloguj się",
+      "failed": "Rejestracja nie powiodła się. Spróbuj ponownie."
+    },
+    "invitation": {
+      "loading": "Ładowanie zaproszenia\u2026",
+      "error": "Błąd zaproszenia",
+      "goToSignIn": "Przejdź do logowania",
+      "title": "Akceptuj zaproszenie",
+      "description": "Zostałeś zaproszony do dołączenia do przestrzeni roboczej.",
+      "email": "E-mail",
+      "workspace": "Przestrzeń robocza",
+      "role": "Rola",
+      "existingUserHint": "Masz już konto. Kliknij poniżej, aby zaakceptować to zaproszenie.",
+      "displayName": "Wyświetlana nazwa",
+      "password": "Hasło",
+      "confirmPassword": "Potwierdź hasło",
+      "accept": "Akceptuj zaproszenie",
+      "accepting": "Akceptowanie\u2026",
+      "createAndAccept": "Utwórz konto i zaakceptuj",
+      "creatingAccount": "Tworzenie konta\u2026",
+      "hasAccount": "Masz już konto?",
+      "signIn": "Zaloguj się",
+      "noToken": "Nie podano tokenu zaproszenia.",
+      "invalidOrExpired": "Nieprawidłowe lub wygasłe zaproszenie.",
+      "passwordsNotMatch": "Hasła nie są zgodne.",
+      "failedAccept": "Nie udało się zaakceptować zaproszenia."
+    }
+  },
+  "landing": {
+    "title": "Task Board",
+    "subtitle": "Proste zarządzanie projektami dla zespołów",
+    "getStarted": "Rozpocznij",
+    "signIn": "Zaloguj się",
+    "kanban": {
+      "title": "Tablice Kanban",
+      "description": "Wizualizuj swój przepływ pracy dzięki tablicom z przeciąganiem i upuszczaniem. Śledź zadania w kolumnach od backlogu do ukończonych."
+    },
+    "sprints": {
+      "title": "Sprinty",
+      "description": "Planuj i realizuj sprinty z łatwością. Śledź prędkość i dostarczaj na czas."
+    },
+    "collaboration": {
+      "title": "Współpraca zespołowa",
+      "description": "Zapraszaj członków zespołu, przypisuj role i współpracuj w czasie rzeczywistym nad projektami."
+    },
+    "multiWorkspace": {
+      "title": "Wiele przestrzeni roboczych",
+      "description": "Zarządzaj wieloma przestrzeniami roboczymi dla różnych zespołów lub klientów z jednego konta."
+    }
+  },
+  "welcome": {
+    "title": "Witaj w Task Board",
+    "greeting": ", {{name}}!",
+    "subtitle": "Zacznijmy. Utwórz swoją pierwszą przestrzeń roboczą, aby rozpocząć.",
+    "createWorkspace": {
+      "title": "Utwórz swoją pierwszą przestrzeń roboczą",
+      "description": "Przestrzeń robocza to baza Twojego zespołu. Twórz projekty, zarządzaj zadaniami i współpracuj ze swoim zespołem.",
+      "button": "Utwórz przestrzeń roboczą"
+    },
+    "freePlan": {
+      "title": "Plan darmowy obejmuje",
+      "workspace": "1 przestrzeń roboczą",
+      "projects": "3 projekty",
+      "users": "10 użytkowników"
+    },
+    "pendingInvitations": "Oczekujące zaproszenia",
+    "accept": "Akceptuj"
+  },
+  "invitationView": {
+    "title": "Masz oczekujące zaproszenia",
+    "subtitle": "Zaakceptuj zaproszenie, aby dołączyć do przestrzeni roboczej, lub utwórz własną.",
+    "invited": "Zaproszony {{date}}",
+    "decline": "Odrzuć",
+    "accept": "Akceptuj",
+    "or": "Lub",
+    "createOwn": "utwórz własną przestrzeń roboczą"
+  },
+  "ownerDashboard": {
+    "title": "Panel właściciela",
+    "subtitle": "Zarządzaj swoimi przestrzeniami roboczymi i śledź postępy zespołu.",
+    "totalTasks": "Wszystkie zadania",
+    "workspaces": "Przestrzenie robocze",
+    "myWorkspaces": "Moje przestrzenie robocze",
+    "createAnother": "Utwórz kolejną przestrzeń roboczą",
+    "projects": "Projekty",
+    "settings": "Ustawienia",
+    "members": "Członkowie",
+    "upgrade": "Ulepsz",
+    "myRecentTasks": "Moje ostatnie zadania",
+    "noTasks": "Nie masz jeszcze przypisanych zadań."
+  },
+  "memberDashboard": {
+    "title": "Panel",
+    "subtitle": "Twoje przestrzenie robocze i ostatnie zadania na pierwszy rzut oka.",
+    "totalTasks": "Wszystkie zadania",
+    "workspaces": "Przestrzenie robocze",
+    "myWorkspaces": "Moje przestrzenie robocze",
+    "myRecentTasks": "Moje ostatnie zadania",
+    "noTasks": "Nie masz jeszcze przypisanych zadań."
+  },
+  "workspace": {
+    "defaultName": "Przestrzeń robocza",
+    "settings": "Ustawienia",
+    "members": "Członkowie",
+    "upgrade": "Ulepsz",
+    "projects": "Projekty",
+    "noProjects": "Brak projektów.",
+    "createFirst": "Utwórz swój pierwszy projekt"
+  },
+  "createWorkspace": {
+    "title": "Utwórz swoją przestrzeń roboczą",
+    "description": "Skonfiguruj przestrzeń roboczą, aby rozpocząć zarządzanie projektami.",
+    "name": "Nazwa przestrzeni roboczej",
+    "slug": "Slug",
+    "slugHint": "Używany w adresach URL. Tylko małe litery, cyfry i myślniki.",
+    "plan": "Plan subskrypcji",
+    "planFree": "Darmowy \u2014 Do 3 projektów i 5 użytkowników",
+    "submit": "Utwórz przestrzeń roboczą",
+    "submitting": "Tworzenie przestrzeni roboczej\u2026",
+    "failed": "Nie udało się utworzyć przestrzeni roboczej. Spróbuj ponownie."
+  },
+  "settings": {
+    "title": "Ustawienia"
+  },
+  "tenantSettings": {
+    "title": "Ustawienia dzierżawy",
+    "loading": "Ładowanie ustawień\u2026",
+    "general": "Ustawienia ogólne",
+    "name": "Nazwa",
+    "slug": "Slug",
+    "save": "Zapisz zmiany",
+    "saving": "Zapisywanie\u2026",
+    "dangerZone": "Strefa niebezpieczna",
+    "dangerDescription": "Usunięcie dzierżawy jest nieodwracalne. Wszystkie projekty, tablice i zadania w tej dzierżawie zostaną trwale usunięte.",
+    "deleteTenant": "Usuń dzierżawę",
+    "deleteTitle": "Usuń dzierżawę",
+    "deleteConfirm": "Tej operacji nie można cofnąć. Aby potwierdzić, wpisz nazwę dzierżawy poniżej.",
+    "deleteName": "Nazwa dzierżawy",
+    "deletePlaceholder": "Wpisz nazwę dzierżawy, aby potwierdzić",
+    "cancel": "Anuluj"
+  },
+  "upgrade": {
+    "title": "Ulepsz plan",
+    "successTitle": "Masz plan Premium!",
+    "successDescription": "Twoja przestrzeń robocza została ulepszona do planu Premium. Ciesz się nieograniczoną liczbą projektów i użytkowników.",
+    "backToSettings": "Powrót do ustawień",
+    "currentPlan": "Aktualny plan",
+    "freeLimit": "Do 3 projektów, 5 użytkowników na przestrzeń roboczą",
+    "premiumUnlimited": "Nieograniczona liczba projektów i użytkowników",
+    "premiumPlan": "Plan Premium",
+    "premiumDescription": "Odblokuj pełną moc Task Board.",
+    "unlimitedProjects": "Nieograniczona liczba projektów",
+    "unlimitedMembers": "Nieograniczona liczba członków zespołu",
+    "prioritySupport": "Priorytetowe wsparcie",
+    "advancedAnalytics": "Zaawansowana analityka",
+    "back": "Wstecz",
+    "upgradeButton": "Ulepsz do Premium",
+    "upgrading": "Ulepszanie\u2026",
+    "failed": "Nie udało się ulepszyć. Spróbuj ponownie."
+  },
+  "members": {
+    "title": "Członkowie",
+    "loading": "Ładowanie członków\u2026",
+    "noMembers": "Nie znaleziono członków.",
+    "pending": "Oczekujący",
+    "unknown": "Nieznany",
+    "active": "Aktywny",
+    "accessRevoked": "Dostęp cofnięty",
+    "declined": "Odrzucony",
+    "invite": "Zaproś członka",
+    "inviteTitle": "Zaproś członka",
+    "email": "E-mail",
+    "role": "Rola",
+    "revokeAccess": "Cofnij dostęp",
+    "resendInvitation": "Wyślij ponownie zaproszenie",
+    "permanentlyDelete": "Trwale usuń",
+    "removeMember": "Usuń członka",
+    "cancel": "Anuluj",
+    "inviteButton": "Zaproś",
+    "inviting": "Zapraszanie\u2026"
+  },
+  "projects": {
+    "title": "Projekty",
+    "new": "Nowy projekt",
+    "loading": "Ładowanie projektów\u2026",
+    "noProjects": "Nie znaleziono projektów. Utwórz swój pierwszy projekt, aby rozpocząć.",
+    "slug": "Slug: {{slug}}",
+    "createTitle": "Utwórz projekt",
+    "name": "Nazwa",
+    "slugLabel": "Slug",
+    "description": "Opis",
+    "descriptionPlaceholder": "Opcjonalny opis\u2026",
+    "cancel": "Anuluj",
+    "create": "Utwórz projekt",
+    "creating": "Tworzenie\u2026"
+  },
+  "projectDetail": {
+    "loading": "Ładowanie projektu\u2026",
+    "sprints": "Sprinty",
+    "newBoard": "Nowa tablica",
+    "boards": "Tablice",
+    "noBoards": "Brak tablic.",
+    "createBoard": "Utwórz tablicę",
+    "members": "Członkowie",
+    "addMember": "Dodaj członka",
+    "noMembers": "Nie załadowano członków.",
+    "changeRole": "Zmień rolę",
+    "removeMember": "Usuń członka",
+    "createBoardTitle": "Utwórz tablicę",
+    "boardName": "Nazwa",
+    "boardDescription": "Opis",
+    "descriptionPlaceholder": "Opcjonalny opis\u2026",
+    "cancel": "Anuluj",
+    "createBoardButton": "Utwórz tablicę",
+    "creating": "Tworzenie\u2026",
+    "addMemberTitle": "Dodaj członka",
+    "userId": "ID użytkownika",
+    "userIdPlaceholder": "Wprowadź ID użytkownika",
+    "role": "Rola",
+    "addMemberButton": "Dodaj członka",
+    "adding": "Dodawanie\u2026",
+    "removeMemberTitle": "Usuń członka",
+    "removeConfirm": "Czy na pewno chcesz usunąć tego członka z projektu?",
+    "removeButton": "Usuń"
+  },
+  "boardView": {
+    "loading": "Ładowanie tablicy\u2026",
+    "newTask": "Nowe zadanie",
+    "createTaskTitle": "Utwórz zadanie",
+    "title": "Tytuł",
+    "titlePlaceholder": "Tytuł zadania",
+    "description": "Opis",
+    "descriptionPlaceholder": "Opcjonalny opis\u2026",
+    "priority": "Priorytet",
+    "column": "Kolumna",
+    "cancel": "Anuluj",
+    "create": "Utwórz zadanie",
+    "creating": "Tworzenie\u2026"
+  },
+  "priority": {
+    "low": "Niski",
+    "medium": "Średni",
+    "high": "Wysoki",
+    "critical": "Krytyczny"
+  },
+  "columnView": {
+    "addTask": "Dodaj zadanie do kolumny",
+    "noTasks": "Brak zadań"
+  },
+  "taskDetail": {
+    "loading": "Ładowanie zadania\u2026",
+    "created": "Utworzono {{date}}",
+    "updated": "Zaktualizowano {{date}}",
+    "cancel": "Anuluj",
+    "save": "Zapisz",
+    "saving": "Zapisywanie\u2026",
+    "edit": "Edytuj",
+    "title": "Tytuł",
+    "description": "Opis",
+    "descriptionPlaceholder": "Opis zadania (obsługuje markdown)",
+    "noDescription": "Brak opisu",
+    "priority": "Priorytet",
+    "assignees": "Przypisani",
+    "unassigned": "Nieprzypisany",
+    "actions": "Akcje",
+    "deleteTask": "Usuń zadanie",
+    "deleteTitle": "Usuń zadanie",
+    "deleteConfirm": "Czy na pewno chcesz usunąć to zadanie? Tej operacji nie można cofnąć.",
+    "cancelDelete": "Anuluj",
+    "confirmDelete": "Usuń"
+  },
+  "sprints": {
+    "title": "Sprinty",
+    "new": "Nowy sprint",
+    "loading": "Ładowanie sprintów\u2026",
+    "noSprints": "Brak sprintów.",
+    "createFirst": "Utwórz pierwszy sprint",
+    "tasks": "{{count}} zadań",
+    "sprintsCount": "{{count}} sprintów",
+    "toggle": "Przełącz",
+    "createTitle": "Utwórz sprint",
+    "name": "Nazwa",
+    "startDate": "Data rozpoczęcia",
+    "endDate": "Data zakończenia",
+    "goal": "Cel",
+    "goalPlaceholder": "Opcjonalny cel sprintu\u2026",
+    "cancel": "Anuluj",
+    "create": "Utwórz sprint",
+    "creating": "Tworzenie\u2026"
+  },
+  "sprintDetail": {
+    "loading": "Ładowanie sprintu\u2026",
+    "tasks": "Zadania",
+    "backToProject": "Powrót do projektu",
+    "noTasks": "Brak zadań w tym sprincie.",
+    "removeFromSprint": "Usuń ze sprintu"
+  },
+  "sprintBacklog": {
+    "backlog": "Backlog",
+    "loading": "Ładowanie backlogu\u2026",
+    "allAssigned": "Wszystkie zadania są przypisane do sprintów.",
+    "addToSprint": "Dodaj do sprintu"
+  },
+  "docs": {
+    "title": "Dokumentacja",
+    "intro": "{{brand}} to nowoczesna, oparta na współpracy aplikacja do zarządzania projektami, zaprojektowana, aby pomóc zespołom w organizacji, śledzeniu i efektywnym dostarczaniu pracy. Łączy tablice, kolumny, zadania i sprinty w jednolitą przestrzeń roboczą, która dostosowuje się do przepływu pracy Twojego zespołu.",
+    "brand": "Task Board",
+    "keyFeatures": "Kluczowe funkcje",
+    "workspaces": "Przestrzenie robocze i projekty",
+    "workspacesDesc": "Twórz izolowane przestrzenie robocze dla różnych zespołów lub klientów, z których każda zawiera wiele projektów z własnymi tablicami i ustawieniami.",
+    "boardManagement": "Zarządzanie tablicami i kolumnami",
+    "boardManagementDesc": "Organizuj zadania w konfigurowalnych kolumnach (np. Do zrobienia, W trakcie, Gotowe) z obsługą przeciągania i upuszczania dla łatwego ustalania priorytetów.",
+    "taskTracking": "Śledzenie zadań",
+    "taskTrackingDesc": "Twórz, przypisuj i śledź zadania ze szczegółowymi informacjami, w tym opisy, etykiety, priorytety i terminy.",
+    "sprintPlanning": "Planowanie sprintów",
+    "sprintPlanningDesc": "Planuj iteracje za pomocą sprintów, przypisuj zadania do poszczególnych sprintów i monitoruj postępy dzięki widokom w stylu burndown.",
+    "teamCollaboration": "Współpraca zespołowa",
+    "teamCollaborationDesc": "Zapraszaj członków zespołu przez e-mail, przypisuj role (Właściciel, Administrator, Członek) i współpracuj w czasie rzeczywistym w udostępnionych przestrzeniach roboczych.",
+    "rbac": "Kontrola dostępu oparta na rolach",
+    "rbacDesc": "Szczegółowe uprawnienia zapewniają, że członkowie zespołu mają dostęp tylko do zasobów odpowiednich dla ich roli.",
+    "techStack": "Stos technologiczny",
+    "techStackDesc": "Task Board jest zbudowany w oparciu o nowoczesny stos zorientowany na TypeScript. Frontend jest napędzany przez Angular z komponentami Spartan UI i Tailwind CSS do stylizacji. Backend działa na Cloudflare Workers z warstwą danych MongoDB. Współdzielone definicje typów i schematy walidacji zapewniają bezpieczeństwo typów end-to-end między klientem a serwerem."
+  },
+  "faq": {
+    "title": "Najczęściej zadawane pytania",
+    "q1": {
+      "question": "Czym jest Task Board?",
+      "answer": "Task Board to oparta na współpracy aplikacja do zarządzania projektami, która pomaga zespołom organizować pracę za pomocą tablic, kolumn, zadań i sprintów. Obsługuje wiele przestrzeni roboczych, kontrolę dostępu opartą na rolach i współpracę w czasie rzeczywistym."
+    },
+    "q2": {
+      "question": "Jak utworzyć projekt?",
+      "answer": "Przejdź do swojej przestrzeni roboczej, kliknij sekcję \u201eProjekty\u201c i użyj przycisku \u201eUtwórz projekt\u201c. Będziesz musiał podać nazwę projektu i opcjonalny opis. Projekty są przypisane do bieżącej przestrzeni roboczej."
+    },
+    "q3": {
+      "question": "Jak zaprosić członków zespołu?",
+      "answer": "Przejdź do ustawień przestrzeni roboczej i otwórz zakładkę \u201eCzłonkowie\u201c. Kliknij \u201eZaproś członka\u201c, wpisz adres e-mail i przypisz rolę (Właściciel, Administrator lub Członek). Otrzymają e-mail z zaproszeniem do dołączenia do Twojej przestrzeni roboczej."
+    },
+    "q4": {
+      "question": "Czym są poziomy subskrypcji?",
+      "answer": "Task Board oferuje poziomy Darmowy, Pro i Enterprise. Poziom Darmowy obejmuje podstawowe zarządzanie tablicami i zadaniami. Pro dodaje zaawansowane funkcje, takie jak sprinty i analityka. Enterprise obejmuje priorytetowe wsparcie, SSO i nieograniczone przestrzenie robocze."
+    },
+    "q5": {
+      "question": "Jak zmienić motyw?",
+      "answer": "Kliknij swój awatar w prawym górnym rogu, aby otworzyć menu użytkownika. Stamtąd możesz przełączać między trybem jasnym i ciemnym oraz dostosowywać poziom powiększenia interfejsu."
+    }
+  },
+  "support": {
+    "title": "Wsparcie",
+    "description": "Masz pytanie lub potrzebujesz pomocy? Wypełnij poniższy formularz, a nasz zespół wsparcia się z Tobą skontaktuje.",
+    "success": "Twoja wiadomość została wysłana pomyślnie. Wkrótce się z Tobą skontaktujemy.",
+    "name": "Imię",
+    "namePlaceholder": "Twoje imię",
+    "email": "E-mail",
+    "message": "Wiadomość",
+    "messagePlaceholder": "Opisz swój problem lub pytanie\u2026",
+    "submit": "Wyślij",
+    "submitting": "Wysyłanie\u2026"
+  },
+  "validation": {
+    "emailRequired": "E-mail jest wymagany",
+    "emailInvalid": "Nieprawidłowy adres e-mail",
+    "passwordRequired": "Hasło jest wymagane",
+    "passwordMin": "Hasło musi mieć co najmniej 8 znaków",
+    "passwordMax": "Hasło może mieć maksymalnie 128 znaków",
+    "nameRequired": "Imię jest wymagane",
+    "nameMax": "Imię może mieć maksymalnie 200 znaków",
+    "displayNameRequired": "Wyświetlana nazwa jest wymagana",
+    "displayNameMax": "Wyświetlana nazwa może mieć maksymalnie 100 znaków",
+    "slugRequired": "Slug jest wymagany",
+    "slugMin": "Slug musi mieć co najmniej 2 znaki",
+    "slugMax": "Slug może mieć maksymalnie 80 znaków",
+    "titleRequired": "Tytuł jest wymagany",
+    "columnRequired": "Kolumna jest wymagana",
+    "boardNameRequired": "Nazwa tablicy jest wymagana",
+    "userIdRequired": "ID użytkownika jest wymagany",
+    "roleRequired": "Rola jest wymagana",
+    "workspaceNameRequired": "Nazwa przestrzeni roboczej jest wymagana",
+    "confirmPasswordRequired": "Potwierdź swoje hasło",
+    "messageRequired": "Wiadomość jest wymagana",
+    "messageMax": "Wiadomość może mieć maksymalnie 2000 znaków",
+    "startDateRequired": "Data rozpoczęcia jest wymagana",
+    "endDateRequired": "Data zakończenia jest wymagana"
+  },
+  "errors": {
+    "unexpected": "Wystąpił nieoczekiwany błąd. Spróbuj ponownie.",
+    "permissionDenied": "Nie masz uprawnień do wykonania tej operacji"
   }
 }

@@ -2,7 +2,7 @@
   @if (authStore.needsWorkspace()) {
     <button hlmBtn variant="outline" size="lg" class="w-full" (click)="navigateToCreate()">
       <ng-icon name="lucidePlus" class="mr-1" />
-      Create Workspace
+      {{ 'tenantSwitcher.createWorkspace' | transloco }}
     </button>
   } @else {
     <button
@@ -17,7 +17,7 @@
       @if (tenantStore.activeTenant(); as tenant) {
         <span class="font-medium">{{ tenant.name }}</span>
       } @else {
-        <span class="text-muted-foreground">Select workspace</span>
+        <span class="text-muted-foreground">{{ 'tenantSwitcher.selectWorkspace' | transloco }}</span>
       }
       <ng-icon name="lucideChevronDown" class="ml-1" />
     </button>
@@ -43,7 +43,7 @@
             }
           </button>
         } @empty {
-          <div class="px-3 py-2 text-sm text-muted-foreground">No workspaces available</div>
+          <div class="px-3 py-2 text-sm text-muted-foreground">{{ 'tenantSwitcher.noWorkspaces' | transloco }}</div>
         }
         <div class="border-t border-border">
           <button
@@ -51,7 +51,7 @@
             (click)="navigateToCreate()"
           >
             <ng-icon name="lucidePlus" class="mr-2 h-4 w-4" />
-            Create Workspace
+            {{ 'tenantSwitcher.createWorkspace' | transloco }}
           </button>
         </div>
       </div>

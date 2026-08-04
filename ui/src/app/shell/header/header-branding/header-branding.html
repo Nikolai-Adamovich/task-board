@@ -1,9 +1,9 @@
 <a
   routerLink="/"
-  aria-label="Task Board - Home"
+  [attr.aria-label]="'sidebar.brand' | transloco"
   class="font-bold text-foreground flex items-center gap-2 p-2"
   tabindex="0"
 >
   <ng-icon name="lucideLayoutDashboard" />
-  <span>Task Board</span>
+  <span>{{ 'sidebar.brand' | transloco }}</span>
 </a>

@@ -1,11 +1,11 @@
 @if (loading()) {
   <div class="flex items-center justify-center py-12">
-    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading task...</span>
+    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'taskDetail.loading' | transloco }}</span>
   </div>
 } @else if (error()) {
   <div class="mx-auto max-w-3xl px-4 py-8">
     <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-      {{ error() }}
+      {{ error() | transloco }}
     </div>
   </div>
 } @else if (task(); as t) {
@@ -25,12 +25,15 @@
           </span>
         </div>
         <p class="mt-1 text-xs text-muted-foreground">
-          Created {{ t.createdAt | date: 'medium' }} &middot; Updated {{ t.updatedAt | date: 'medium' }}
+          {{ 'taskDetail.created' | transloco: { date: (t.createdAt | date: 'medium') } }} &middot;
+          {{ 'taskDetail.updated' | transloco: { date: (t.updatedAt | date: 'medium') } }}
         </p>
       </div>
       @if (isEditing()) {
         <div class="flex gap-2">
-          <button hlmBtn variant="outline" size="sm" (click)="cancelEdit()">Cancel</button>
+          <button hlmBtn variant="outline" size="sm" (click)="cancelEdit()">
+            {{ 'taskDetail.cancel' | transloco }}
+          </button>
           <button
             hlmBtn
             size="sm"
@@ -39,14 +42,14 @@
             [disabled]="editForm().invalid() || editForm().submitting()"
           >
             @if (editForm().submitting()) {
-              <hlm-spinner /> Saving...
+              <hlm-spinner /> {{ 'taskDetail.saving' | transloco }}
             } @else {
-              Save
+              {{ 'taskDetail.save' | transloco }}
             }
           </button>
         </div>
       } @else {
-        <button hlmBtn variant="outline" size="sm" (click)="startEdit()">Edit</button>
+        <button hlmBtn variant="outline" size="sm" (click)="startEdit()">{{ 'taskDetail.edit' | transloco }}</button>
       }
     </div>
 
@@ -59,26 +62,26 @@
             @if (isEditing()) {
               <form id="edit-task-form" [formRoot]="editForm" class="space-y-4">
                 <hlm-field>
-                  <label hlmFieldLabel for="edit-title">Title</label>
+                  <label hlmFieldLabel for="edit-title">{{ 'taskDetail.title' | transloco }}</label>
                   <input hlmInput id="edit-title" type="text" [formField]="editForm.title" />
                 </hlm-field>
                 <hlm-field>
-                  <label hlmFieldLabel for="edit-description">Description</label>
+                  <label hlmFieldLabel for="edit-description">{{ 'taskDetail.description' | transloco }}</label>
                   <textarea
                     hlmTextarea
                     id="edit-description"
                     [formField]="editForm.description"
                     rows="6"
-                    placeholder="Task description (supports markdown)"
+                    [placeholder]="'taskDetail.descriptionPlaceholder' | transloco"
                   ></textarea>
                 </hlm-field>
               </form>
             } @else {
-              <h3 class="text-sm font-medium text-foreground">Description</h3>
+              <h3 class="text-sm font-medium text-foreground">{{ 'taskDetail.description' | transloco }}</h3>
               @if (t.description) {
                 <p class="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{{ t.description }}</p>
               } @else {
-                <p class="mt-2 text-sm italic text-muted-foreground">No description</p>
+                <p class="mt-2 text-sm italic text-muted-foreground">{{ 'taskDetail.noDescription' | transloco }}</p>
               }
             }
           </div>
@@ -90,13 +93,13 @@
         <!-- Priority -->
         <hlm-card>
           <div hlmCardContent>
-            <h4 class="text-xs font-medium uppercase text-muted-foreground">Priority</h4>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">{{ 'taskDetail.priority' | transloco }}</h4>
             @if (isEditing()) {
               <select hlmNativeSelect class="mt-2" [formField]="editForm.priority">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
+                <option value="low">{{ 'priority.low' | transloco }}</option>
+                <option value="medium">{{ 'priority.medium' | transloco }}</option>
+                <option value="high">{{ 'priority.high' | transloco }}</option>
+                <option value="critical">{{ 'priority.critical' | transloco }}</option>
               </select>
             } @else {
               <p class="mt-1 text-sm font-medium text-foreground">{{ t.priority }}</p>
@@ -107,10 +110,12 @@
         <!-- Assignees -->
         <hlm-card>
           <div hlmCardContent>
-            <h4 class="text-xs font-medium uppercase text-muted-foreground">Assignees</h4>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">
+              {{ 'taskDetail.assignees' | transloco }}
+            </h4>
             <div class="mt-2 space-y-1">
               @if (t.assigneeIds.length === 0) {
-                <p class="text-xs text-muted-foreground">Unassigned</p>
+                <p class="text-xs text-muted-foreground">{{ 'taskDetail.unassigned' | transloco }}</p>
               }
               @for (assigneeId of t.assigneeIds; track assigneeId) {
                 <div class="flex items-center gap-2">
@@ -130,9 +135,11 @@
         @if (canDelete()) {
           <hlm-card>
             <div hlmCardContent>
-              <h4 class="text-xs font-medium uppercase text-muted-foreground">Actions</h4>
+              <h4 class="text-xs font-medium uppercase text-muted-foreground">
+                {{ 'taskDetail.actions' | transloco }}
+              </h4>
               <button hlmBtn variant="destructive" size="sm" class="mt-2 w-full" (click)="confirmDeleteTask(t)">
-                Delete Task
+                {{ 'taskDetail.deleteTask' | transloco }}
               </button>
             </div>
           </hlm-card>
@@ -144,13 +151,17 @@
     <hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
       <hlm-dialog-content *hlmDialogPortal>
         <div class="space-y-4">
-          <h3 hlmDialogTitle>Delete Task</h3>
+          <h3 hlmDialogTitle>{{ 'taskDetail.deleteTitle' | transloco }}</h3>
           <p class="text-sm text-muted-foreground">
-            Are you sure you want to delete this task? This action cannot be undone.
+            {{ 'taskDetail.deleteConfirm' | transloco }}
           </p>
           <hlm-dialog-footer>
-            <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">Cancel</button>
-            <button hlmBtn variant="destructive" (click)="deleteTask()">Delete</button>
+            <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">
+              {{ 'taskDetail.cancelDelete' | transloco }}
+            </button>
+            <button hlmBtn variant="destructive" (click)="deleteTask()">
+              {{ 'taskDetail.confirmDelete' | transloco }}
+            </button>
           </hlm-dialog-footer>
         </div>
       </hlm-dialog-content>

@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import {
   lucideSettings,
@@ -25,6 +26,7 @@ import type { Project } from '@task-board/shared';
   selector: 'ui-workspace-detail',
   imports: [
     RouterLink,
+    TranslocoPipe,
     NgIcon,
     HlmBadgeImports,
     HlmButtonImports,

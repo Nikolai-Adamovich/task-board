@@ -1,40 +1,40 @@
 <div class="mx-auto max-w-3xl px-4 py-8">
-  <h1 class="mb-6 text-2xl font-bold">Support</h1>
+  <h1 class="mb-6 text-2xl font-bold">{{ 'support.title' | transloco }}</h1>
 
   <p class="mb-6 text-muted-foreground">
-    Have a question or need help? Fill out the form below and our support team will get back to you.
+    {{ 'support.description' | transloco }}
   </p>
 
   @if (error()) {
     <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-      {{ error() }}
+      {{ error() | transloco }}
     </div>
   }
 
   @if (success()) {
     <div class="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-700" role="alert">
-      Your message has been sent successfully. We'll get back to you soon.
+      {{ 'support.success' | transloco }}
     </div>
   }
 
   <form id="support-form" [formRoot]="supportForm" class="max-w-lg space-y-4">
     <hlm-field>
-      <label hlmFieldLabel for="support-name">Name</label>
+      <label hlmFieldLabel for="support-name">{{ 'support.name' | transloco }}</label>
       <input
         hlmInput
         id="support-name"
         type="text"
         [formField]="supportForm.name"
         autocomplete="name"
-        placeholder="Your name"
+        [placeholder]="'support.namePlaceholder' | transloco"
       />
       @if (supportForm.name().touched() && supportForm.name().errors().length) {
-        <p hlm-field-error>{{ supportForm.name().errors()[0].message }}</p>
+        <p hlm-field-error>{{ supportForm.name().errors()[0].message | transloco }}</p>
       }
     </hlm-field>
 
     <hlm-field>
-      <label hlmFieldLabel for="support-email">Email</label>
+      <label hlmFieldLabel for="support-email">{{ 'support.email' | transloco }}</label>
       <input
         hlmInput
         id="support-email"
@@ -44,21 +44,21 @@
         placeholder="you&#64;example.com"
       />
       @if (supportForm.email().touched() && supportForm.email().errors().length) {
-        <p hlm-field-error>{{ supportForm.email().errors()[0].message }}</p>
+        <p hlm-field-error>{{ supportForm.email().errors()[0].message | transloco }}</p>
       }
     </hlm-field>
 
     <hlm-field>
-      <label hlmFieldLabel for="support-message">Message</label>
+      <label hlmFieldLabel for="support-message">{{ 'support.message' | transloco }}</label>
       <textarea
         hlmTextarea
         id="support-message"
         rows="5"
         [formField]="supportForm.message"
-        placeholder="Describe your issue or question..."
+        [placeholder]="'support.messagePlaceholder' | transloco"
       ></textarea>
       @if (supportForm.message().touched() && supportForm.message().errors().length) {
-        <p hlm-field-error>{{ supportForm.message().errors()[0].message }}</p>
+        <p hlm-field-error>{{ supportForm.message().errors()[0].message | transloco }}</p>
       }
     </hlm-field>
 
@@ -70,9 +70,9 @@
 
     <button hlmBtn type="submit" form="support-form" [disabled]="supportForm().invalid() || supportForm().submitting()">
       @if (supportForm().submitting()) {
-        <hlm-spinner /> Sending...
+        <hlm-spinner /> {{ 'support.submitting' | transloco }}
       } @else {
-        Submit
+        {{ 'support.submit' | transloco }}
       }
     </button>
   </form>

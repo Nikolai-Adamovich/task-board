@@ -1,12 +1,448 @@
 {
   "header": {
-    "search": "Suchen...",
-    "notifications": "Benachrichtigungen"
+    "search": "Suchen\u2026",
+    "clearSearch": "Suche löschen",
+    "notifications": "Benachrichtigungen",
+    "noNotifications": "Keine Benachrichtigungen",
+    "help": "Hilfe",
+    "faq": "FAQ",
+    "documentation": "Dokumentation",
+    "support": "Support",
+    "signIn": "Anmelden",
+    "userMenu": "Benutzermenü"
+  },
+  "sidebar": {
+    "brand": "Task Board",
+    "brandShort": "TB",
+    "projects": "Projekte",
+    "sprints": "Sprints",
+    "settings": "Einstellungen",
+    "members": "Mitglieder",
+    "toggleSidebar": "Seitenleiste umschalten"
+  },
+  "tenantSwitcher": {
+    "selectWorkspace": "Arbeitsbereich auswählen",
+    "noWorkspaces": "Keine Arbeitsbereiche verfügbar",
+    "createWorkspace": "Arbeitsbereich erstellen"
   },
   "userMenu": {
     "language": "Sprache",
-    "themes": "Themen",
+    "themes": "Themes",
     "preferences": "Einstellungen",
-    "signOut": "Abmelden"
+    "signOut": "Abmelden",
+    "zoom": "Zoom",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "openThemePicker": "Theme-Auswahl öffnen",
+    "chooseTheme": "Theme wählen",
+    "availableThemes": "Verfügbare Themes"
+  },
+  "auth": {
+    "login": {
+      "title": "Bei Task Board anmelden",
+      "description": "Geben Sie Ihre Anmeldedaten ein, um auf Ihren Arbeitsbereich zuzugreifen.",
+      "email": "E-Mail",
+      "password": "Passwort",
+      "submit": "Anmelden",
+      "submitting": "Anmeldung läuft\u2026",
+      "noAccount": "Noch kein Konto?",
+      "createOne": "Konto erstellen",
+      "failed": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut."
+    },
+    "register": {
+      "title": "Konto erstellen",
+      "description": "Füllen Sie die folgenden Daten aus, um zu beginnen.",
+      "name": "Name",
+      "email": "E-Mail",
+      "password": "Passwort",
+      "submit": "Konto erstellen",
+      "submitting": "Konto wird erstellt\u2026",
+      "hasAccount": "Bereits ein Konto?",
+      "signIn": "Anmelden",
+      "failed": "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut."
+    },
+    "invitation": {
+      "loading": "Einladung wird geladen\u2026",
+      "error": "Einladungsfehler",
+      "goToSignIn": "Zur Anmeldung",
+      "title": "Einladung annehmen",
+      "description": "Sie wurden eingeladen, einem Arbeitsbereich beizutreten.",
+      "email": "E-Mail",
+      "workspace": "Arbeitsbereich",
+      "role": "Rolle",
+      "existingUserHint": "Sie haben bereits ein Konto. Klicken Sie unten, um diese Einladung anzunehmen.",
+      "displayName": "Anzeigename",
+      "password": "Passwort",
+      "confirmPassword": "Passwort bestätigen",
+      "accept": "Einladung annehmen",
+      "accepting": "Einladung wird angenommen\u2026",
+      "createAndAccept": "Konto erstellen & annehmen",
+      "creatingAccount": "Konto wird erstellt\u2026",
+      "hasAccount": "Bereits ein Konto?",
+      "signIn": "Anmelden",
+      "noToken": "Kein Einladungstoken bereitgestellt.",
+      "invalidOrExpired": "Ungültige oder abgelaufene Einladung.",
+      "passwordsNotMatch": "Passwörter stimmen nicht überein.",
+      "failedAccept": "Einladung konnte nicht angenommen werden."
+    }
+  },
+  "landing": {
+    "title": "Task Board",
+    "subtitle": "Einfaches Projektmanagement für Teams",
+    "getStarted": "Loslegen",
+    "signIn": "Anmelden",
+    "kanban": {
+      "title": "Kanban-Boards",
+      "description": "Visualisieren Sie Ihren Workflow mit Drag-and-Drop-Boards. Verfolgen Sie Aufgaben über Spalten vom Backlog bis zur Fertigstellung."
+    },
+    "sprints": {
+      "title": "Sprints",
+      "description": "Planen und führen Sie Sprints mühelos durch. Verfolgen Sie die Velocity und liefern Sie pünktlich."
+    },
+    "collaboration": {
+      "title": "Team-Zusammenarbeit",
+      "description": "Laden Sie Teammitglieder ein, weisen Sie Rollen zu und arbeiten Sie in Echtzeit an Projekten zusammen."
+    },
+    "multiWorkspace": {
+      "title": "Mehrere Arbeitsbereiche",
+      "description": "Verwalten Sie mehrere Arbeitsbereiche für verschiedene Teams oder Kunden von einem einzigen Konto aus."
+    }
+  },
+  "welcome": {
+    "title": "Willkommen bei Task Board",
+    "greeting": ", {{name}}!",
+    "subtitle": "Lassen Sie uns beginnen. Erstellen Sie Ihren ersten Arbeitsbereich.",
+    "createWorkspace": {
+      "title": "Erstellen Sie Ihren ersten Arbeitsbereich",
+      "description": "Ein Arbeitsbereich ist die Basis Ihres Teams. Erstellen Sie Projekte, verwalten Sie Aufgaben und arbeiten Sie mit Ihrem Team zusammen.",
+      "button": "Arbeitsbereich erstellen"
+    },
+    "freePlan": {
+      "title": "Kostenloser Plan beinhaltet",
+      "workspace": "1 Arbeitsbereich",
+      "projects": "3 Projekte",
+      "users": "10 Benutzer"
+    },
+    "pendingInvitations": "Ausstehende Einladungen",
+    "accept": "Annehmen"
+  },
+  "invitationView": {
+    "title": "Sie haben ausstehende Einladungen",
+    "subtitle": "Nehmen Sie eine Einladung an, um einem Arbeitsbereich beizutreten, oder erstellen Sie Ihren eigenen.",
+    "invited": "Eingeladen am {{date}}",
+    "decline": "Ablehnen",
+    "accept": "Annehmen",
+    "or": "Oder",
+    "createOwn": "erstellen Sie Ihren eigenen Arbeitsbereich"
+  },
+  "ownerDashboard": {
+    "title": "Eigentümer-Dashboard",
+    "subtitle": "Verwalten Sie Ihre Arbeitsbereiche und verfolgen Sie den Fortschritt Ihres Teams.",
+    "totalTasks": "Aufgaben gesamt",
+    "workspaces": "Arbeitsbereiche",
+    "myWorkspaces": "Meine Arbeitsbereiche",
+    "createAnother": "Weiteren Arbeitsbereich erstellen",
+    "projects": "Projekte",
+    "settings": "Einstellungen",
+    "members": "Mitglieder",
+    "upgrade": "Upgraden",
+    "myRecentTasks": "Meine letzten Aufgaben",
+    "noTasks": "Ihnen sind noch keine Aufgaben zugewiesen."
+  },
+  "memberDashboard": {
+    "title": "Dashboard",
+    "subtitle": "Ihre Arbeitsbereiche und letzten Aufgaben auf einen Blick.",
+    "totalTasks": "Aufgaben gesamt",
+    "workspaces": "Arbeitsbereiche",
+    "myWorkspaces": "Meine Arbeitsbereiche",
+    "myRecentTasks": "Meine letzten Aufgaben",
+    "noTasks": "Ihnen sind noch keine Aufgaben zugewiesen."
+  },
+  "workspace": {
+    "defaultName": "Arbeitsbereich",
+    "settings": "Einstellungen",
+    "members": "Mitglieder",
+    "upgrade": "Upgraden",
+    "projects": "Projekte",
+    "noProjects": "Noch keine Projekte.",
+    "createFirst": "Erstellen Sie Ihr erstes Projekt"
+  },
+  "createWorkspace": {
+    "title": "Arbeitsbereich erstellen",
+    "description": "Richten Sie einen Arbeitsbereich ein, um mit der Verwaltung Ihrer Projekte zu beginnen.",
+    "name": "Name des Arbeitsbereichs",
+    "slug": "Slug",
+    "slugHint": "Wird in URLs verwendet. Nur Kleinbuchstaben, Zahlen und Bindestriche.",
+    "plan": "Abonnementplan",
+    "planFree": "Kostenlos \u2014 Bis zu 3 Projekte und 5 Benutzer",
+    "submit": "Arbeitsbereich erstellen",
+    "submitting": "Arbeitsbereich wird erstellt\u2026",
+    "failed": "Arbeitsbereich konnte nicht erstellt werden. Bitte versuchen Sie es erneut."
+  },
+  "settings": {
+    "title": "Einstellungen"
+  },
+  "tenantSettings": {
+    "title": "Mandanteneinstellungen",
+    "loading": "Einstellungen werden geladen\u2026",
+    "general": "Allgemeine Einstellungen",
+    "name": "Name",
+    "slug": "Slug",
+    "save": "Änderungen speichern",
+    "saving": "Wird gespeichert\u2026",
+    "dangerZone": "Gefahrenzone",
+    "dangerDescription": "Das Löschen eines Mandanten ist unwiderruflich. Alle Projekte, Boards und Aufgaben in diesem Mandanten werden dauerhaft entfernt.",
+    "deleteTenant": "Mandant löschen",
+    "deleteTitle": "Mandant löschen",
+    "deleteConfirm": "Diese Aktion kann nicht rückgängig gemacht werden. Zur Bestätigung geben Sie den Mandantennamen unten ein.",
+    "deleteName": "Mandantenname",
+    "deletePlaceholder": "Mandantennamen zur Bestätigung eingeben",
+    "cancel": "Abbrechen"
+  },
+  "upgrade": {
+    "title": "Plan upgraden",
+    "successTitle": "Sie haben Premium!",
+    "successDescription": "Ihr Arbeitsbereich wurde auf den Premium-Plan upgraden. Genießen Sie unbegrenzte Projekte und Benutzer.",
+    "backToSettings": "Zurück zu den Einstellungen",
+    "currentPlan": "Aktueller Plan",
+    "freeLimit": "Bis zu 3 Projekte, 5 Benutzer pro Arbeitsbereich",
+    "premiumUnlimited": "Unbegrenzte Projekte und Benutzer",
+    "premiumPlan": "Premium-Plan",
+    "premiumDescription": "Schalten Sie die volle Leistung von Task Board frei.",
+    "unlimitedProjects": "Unbegrenzte Projekte",
+    "unlimitedMembers": "Unbegrenzte Teammitglieder",
+    "prioritySupport": "Bevorzugter Support",
+    "advancedAnalytics": "Erweiterte Analytik",
+    "back": "Zurück",
+    "upgradeButton": "Auf Premium upgraden",
+    "upgrading": "Upgrade läuft\u2026",
+    "failed": "Upgrade fehlgeschlagen. Bitte versuchen Sie es erneut."
+  },
+  "members": {
+    "title": "Mitglieder",
+    "loading": "Mitglieder werden geladen\u2026",
+    "noMembers": "Keine Mitglieder gefunden.",
+    "pending": "Ausstehend",
+    "unknown": "Unbekannt",
+    "active": "Aktiv",
+    "accessRevoked": "Zugriff entzogen",
+    "declined": "Abgelehnt",
+    "invite": "Mitglied einladen",
+    "inviteTitle": "Mitglied einladen",
+    "email": "E-Mail",
+    "role": "Rolle",
+    "revokeAccess": "Zugriff entziehen",
+    "resendInvitation": "Einladung erneut senden",
+    "permanentlyDelete": "Dauerhaft löschen",
+    "removeMember": "Mitglied entfernen",
+    "cancel": "Abbrechen",
+    "inviteButton": "Einladen",
+    "inviting": "Einladung läuft\u2026"
+  },
+  "projects": {
+    "title": "Projekte",
+    "new": "Neues Projekt",
+    "loading": "Projekte werden geladen\u2026",
+    "noProjects": "Keine Projekte gefunden. Erstellen Sie Ihr erstes Projekt, um zu beginnen.",
+    "slug": "Slug: {{slug}}",
+    "createTitle": "Projekt erstellen",
+    "name": "Name",
+    "slugLabel": "Slug",
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Optionale Beschreibung\u2026",
+    "cancel": "Abbrechen",
+    "create": "Projekt erstellen",
+    "creating": "Wird erstellt\u2026"
+  },
+  "projectDetail": {
+    "loading": "Projekt wird geladen\u2026",
+    "sprints": "Sprints",
+    "newBoard": "Neues Board",
+    "boards": "Boards",
+    "noBoards": "Noch keine Boards.",
+    "createBoard": "Board erstellen",
+    "members": "Mitglieder",
+    "addMember": "Mitglied hinzufügen",
+    "noMembers": "Keine Mitglieder geladen.",
+    "changeRole": "Rolle ändern",
+    "removeMember": "Mitglied entfernen",
+    "createBoardTitle": "Board erstellen",
+    "boardName": "Name",
+    "boardDescription": "Beschreibung",
+    "descriptionPlaceholder": "Optionale Beschreibung\u2026",
+    "cancel": "Abbrechen",
+    "createBoardButton": "Board erstellen",
+    "creating": "Wird erstellt\u2026",
+    "addMemberTitle": "Mitglied hinzufügen",
+    "userId": "Benutzer-ID",
+    "userIdPlaceholder": "Benutzer-ID eingeben",
+    "role": "Rolle",
+    "addMemberButton": "Mitglied hinzufügen",
+    "adding": "Wird hinzugefügt\u2026",
+    "removeMemberTitle": "Mitglied entfernen",
+    "removeConfirm": "Sind Sie sicher, dass Sie dieses Mitglied aus dem Projekt entfernen möchten?",
+    "removeButton": "Entfernen"
+  },
+  "boardView": {
+    "loading": "Board wird geladen\u2026",
+    "newTask": "Neue Aufgabe",
+    "createTaskTitle": "Aufgabe erstellen",
+    "title": "Titel",
+    "titlePlaceholder": "Aufgabentitel",
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Optionale Beschreibung\u2026",
+    "priority": "Priorität",
+    "column": "Spalte",
+    "cancel": "Abbrechen",
+    "create": "Aufgabe erstellen",
+    "creating": "Wird erstellt\u2026"
+  },
+  "priority": {
+    "low": "Niedrig",
+    "medium": "Mittel",
+    "high": "Hoch",
+    "critical": "Kritisch"
+  },
+  "columnView": {
+    "addTask": "Aufgabe zur Spalte hinzufügen",
+    "noTasks": "Keine Aufgaben"
+  },
+  "taskDetail": {
+    "loading": "Aufgabe wird geladen\u2026",
+    "created": "Erstellt am {{date}}",
+    "updated": "Aktualisiert am {{date}}",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "saving": "Wird gespeichert\u2026",
+    "edit": "Bearbeiten",
+    "title": "Titel",
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Aufgabenbeschreibung (unterstützt Markdown)",
+    "noDescription": "Keine Beschreibung",
+    "priority": "Priorität",
+    "assignees": "Zugewiesene",
+    "unassigned": "Nicht zugewiesen",
+    "actions": "Aktionen",
+    "deleteTask": "Aufgabe löschen",
+    "deleteTitle": "Aufgabe löschen",
+    "deleteConfirm": "Sind Sie sicher, dass Sie diese Aufgabe löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "cancelDelete": "Abbrechen",
+    "confirmDelete": "Löschen"
+  },
+  "sprints": {
+    "title": "Sprints",
+    "new": "Neuer Sprint",
+    "loading": "Sprints werden geladen\u2026",
+    "noSprints": "Noch keine Sprints.",
+    "createFirst": "Ersten Sprint erstellen",
+    "tasks": "{{count}} Aufgaben",
+    "sprintsCount": "{{count}} Sprints",
+    "toggle": "Umschalten",
+    "createTitle": "Sprint erstellen",
+    "name": "Name",
+    "startDate": "Startdatum",
+    "endDate": "Enddatum",
+    "goal": "Ziel",
+    "goalPlaceholder": "Optionales Sprint-Ziel\u2026",
+    "cancel": "Abbrechen",
+    "create": "Sprint erstellen",
+    "creating": "Wird erstellt\u2026"
+  },
+  "sprintDetail": {
+    "loading": "Sprint wird geladen\u2026",
+    "tasks": "Aufgaben",
+    "backToProject": "Zurück zum Projekt",
+    "noTasks": "Keine Aufgaben in diesem Sprint.",
+    "removeFromSprint": "Aus Sprint entfernen"
+  },
+  "sprintBacklog": {
+    "backlog": "Backlog",
+    "loading": "Backlog wird geladen\u2026",
+    "allAssigned": "Alle Aufgaben sind Sprints zugewiesen.",
+    "addToSprint": "Zum Sprint hinzufügen"
+  },
+  "docs": {
+    "title": "Dokumentation",
+    "intro": "{{brand}} ist eine moderne, kollaborative Projektmanagement-Anwendung, die Teams dabei hilft, Arbeit effizient zu organisieren, zu verfolgen und zu liefern. Sie vereint Boards, Spalten, Aufgaben und Sprints in einem einheitlichen Arbeitsbereich, der sich an den Workflow Ihres Teams anpasst.",
+    "brand": "Task Board",
+    "keyFeatures": "Hauptfunktionen",
+    "workspaces": "Arbeitsbereiche & Projekte",
+    "workspacesDesc": "Erstellen Sie isolierte Arbeitsbereiche für verschiedene Teams oder Kunden, die jeweils mehrere Projekte mit eigenen Boards und Einstellungen enthalten.",
+    "boardManagement": "Board- & Spaltenverwaltung",
+    "boardManagementDesc": "Organisieren Sie Aufgaben in anpassbaren Spalten (z.B. Zu erledigen, In Bearbeitung, Erledigt) mit Drag-and-Drop-Unterstützung für einfache Priorisierung.",
+    "taskTracking": "Aufgabenverfolgung",
+    "taskTrackingDesc": "Erstellen, zuweisen und verfolgen Sie Aufgaben mit umfangreichen Details einschließlich Beschreibungen, Labels, Prioritäten und Fälligkeitsdaten.",
+    "sprintPlanning": "Sprint-Planung",
+    "sprintPlanningDesc": "Planen Sie Iterationen mit Sprints, weisen Sie Aufgaben bestimmten Sprints zu und überwachen Sie den Fortschritt mit Burndown-Ansichten.",
+    "teamCollaboration": "Team-Zusammenarbeit",
+    "teamCollaborationDesc": "Laden Sie Teammitglieder per E-Mail ein, weisen Sie Rollen zu (Eigentümer, Administrator, Mitglied) und arbeiten Sie in Echtzeit in gemeinsamen Arbeitsbereichen zusammen.",
+    "rbac": "Rollenbasierte Zugriffskontrolle",
+    "rbacDesc": "Fein abgestufte Berechtigungen stellen sicher, dass Teammitglieder nur auf die Ressourcen zugreifen, die für ihre Rolle geeignet sind.",
+    "techStack": "Technologie-Stack",
+    "techStackDesc": "Task Board ist mit einem modernen TypeScript-first-Stack aufgebaut. Das Frontend wird von Angular mit Spartan-UI-Komponenten und Tailwind CSS für das Styling angetrieben. Das Backend läuft auf Cloudflare Workers mit einer MongoDB-Datenschicht. Gemeinsame Typdefinitionen und Validierungsschemas gewährleisten eine durchgängige Typsicherheit zwischen Client und Server."
+  },
+  "faq": {
+    "title": "Häufig gestellte Fragen",
+    "q1": {
+      "question": "Was ist Task Board?",
+      "answer": "Task Board ist eine kollaborative Projektmanagement-Anwendung, die Teams hilft, Arbeit mithilfe von Boards, Spalten, Aufgaben und Sprints zu organisieren. Sie unterstützt mehrere Arbeitsbereiche, rollenbasierte Zugriffskontrolle und Echtzeit-Zusammenarbeit."
+    },
+    "q2": {
+      "question": "Wie erstelle ich ein Projekt?",
+      "answer": "Navigieren Sie zu Ihrem Arbeitsbereich, klicken Sie auf den Bereich \u201eProjekte\u201c und verwenden Sie die Schaltfläche \u201eProjekt erstellen\u201c. Sie müssen einen Projektnamen und eine optionale Beschreibung angeben. Projekte sind auf Ihren aktuellen Arbeitsbereich beschränkt."
+    },
+    "q3": {
+      "question": "Wie lade ich Teammitglieder ein?",
+      "answer": "Gehen Sie zu Ihren Arbeitsbereichseinstellungen und öffnen Sie die Registerkarte \u201eMitglieder\u201c. Klicken Sie auf \u201eMitglied einladen\u201c, geben Sie die E-Mail-Adresse ein und weisen Sie eine Rolle zu (Eigentümer, Administrator oder Mitglied). Sie erhalten eine E-Mail-Einladung, Ihrem Arbeitsbereich beizutreten."
+    },
+    "q4": {
+      "question": "Was sind Abonnementstufen?",
+      "answer": "Task Board bietet die Stufen Kostenlos, Pro und Enterprise. Die kostenlose Stufe umfasst grundlegende Board- und Aufgabenverwaltung. Pro fügt erweiterte Funktionen wie Sprints und Analytik hinzu. Enterprise umfasst bevorzugten Support, SSO und unbegrenzte Arbeitsbereiche."
+    },
+    "q5": {
+      "question": "Wie ändere ich mein Theme?",
+      "answer": "Klicken Sie auf Ihren Avatar in der oberen rechten Ecke, um das Benutzermenü zu öffnen. Von dort aus können Sie zwischen hellem und dunklem Modus wechseln und die Zoomstufe der Oberfläche an Ihre Bedürfnisse anpassen."
+    }
+  },
+  "support": {
+    "title": "Support",
+    "description": "Haben Sie eine Frage oder benötigen Sie Hilfe? Füllen Sie das untenstehende Formular aus und unser Support-Team wird sich bei Ihnen melden.",
+    "success": "Ihre Nachricht wurde erfolgreich gesendet. Wir werden uns bald bei Ihnen melden.",
+    "name": "Name",
+    "namePlaceholder": "Ihr Name",
+    "email": "E-Mail",
+    "message": "Nachricht",
+    "messagePlaceholder": "Beschreiben Sie Ihr Problem oder Ihre Frage\u2026",
+    "submit": "Senden",
+    "submitting": "Wird gesendet\u2026"
+  },
+  "validation": {
+    "emailRequired": "E-Mail ist erforderlich",
+    "emailInvalid": "Ungültige E-Mail-Adresse",
+    "passwordRequired": "Passwort ist erforderlich",
+    "passwordMin": "Passwort muss mindestens 8 Zeichen lang sein",
+    "passwordMax": "Passwort darf maximal 128 Zeichen lang sein",
+    "nameRequired": "Name ist erforderlich",
+    "nameMax": "Name darf maximal 200 Zeichen lang sein",
+    "displayNameRequired": "Anzeigename ist erforderlich",
+    "displayNameMax": "Anzeigename darf maximal 100 Zeichen lang sein",
+    "slugRequired": "Slug ist erforderlich",
+    "slugMin": "Slug muss mindestens 2 Zeichen lang sein",
+    "slugMax": "Slug darf maximal 80 Zeichen lang sein",
+    "titleRequired": "Titel ist erforderlich",
+    "columnRequired": "Spalte ist erforderlich",
+    "boardNameRequired": "Board-Name ist erforderlich",
+    "userIdRequired": "Benutzer-ID ist erforderlich",
+    "roleRequired": "Rolle ist erforderlich",
+    "workspaceNameRequired": "Arbeitsbereichname ist erforderlich",
+    "confirmPasswordRequired": "Bitte bestätigen Sie Ihr Passwort",
+    "messageRequired": "Nachricht ist erforderlich",
+    "messageMax": "Nachricht darf maximal 2000 Zeichen lang sein",
+    "startDateRequired": "Startdatum ist erforderlich",
+    "endDateRequired": "Enddatum ist erforderlich"
+  },
+  "errors": {
+    "unexpected": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+    "permissionDenied": "Sie haben keine Berechtigung, diese Aktion auszuführen"
   }
 }

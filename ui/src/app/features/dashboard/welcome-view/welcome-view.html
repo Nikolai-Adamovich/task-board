@@ -2,13 +2,12 @@
   <!-- Welcome Header -->
   <div class="mb-8">
     <h1 class="text-3xl font-bold text-foreground">
-      Welcome to Task Board
+      {{ 'welcome.title' | transloco }}
       @if (authStore.currentUser(); as user) {
-        , {{ user.displayName }}
+        {{ 'welcome.greeting' | transloco: { name: user.displayName } }}
       }
-      !
     </h1>
-    <p class="mt-2 text-muted-foreground">Let's get you started. Create your first workspace to begin.</p>
+    <p class="mt-2 text-muted-foreground">{{ 'welcome.subtitle' | transloco }}</p>
   </div>
 
   <div class="grid gap-6 sm:grid-cols-2">
@@ -20,12 +19,12 @@
             <ng-icon name="lucideBuilding2" class="h-6 w-6 text-primary" />
           </div>
           <div class="flex-1">
-            <h3 class="text-lg font-semibold text-foreground">Create your first workspace</h3>
+            <h3 class="text-lg font-semibold text-foreground">{{ 'welcome.createWorkspace.title' | transloco }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">
-              A workspace is your team's home base. Create projects, manage tasks, and collaborate with your team.
+              {{ 'welcome.createWorkspace.description' | transloco }}
             </p>
           </div>
-          <a hlmBtn routerLink="/workspace/create"> Create Workspace </a>
+          <a hlmBtn routerLink="/workspace/create"> {{ 'welcome.createWorkspace.button' | transloco }} </a>
         </div>
       </div>
     </hlm-card>
@@ -33,19 +32,19 @@
     <!-- Free Plan Info -->
     <hlm-card>
       <div hlmCardContent class="pt-6">
-        <h3 class="text-sm font-semibold text-foreground">Free Plan Includes</h3>
+        <h3 class="text-sm font-semibold text-foreground">{{ 'welcome.freePlan.title' | transloco }}</h3>
         <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
           <li class="flex items-center gap-2">
             <ng-icon name="lucideCheck" class="h-4 w-4 text-green-600" />
-            1 workspace
+            {{ 'welcome.freePlan.workspace' | transloco }}
           </li>
           <li class="flex items-center gap-2">
             <ng-icon name="lucideCheck" class="h-4 w-4 text-green-600" />
-            3 projects
+            {{ 'welcome.freePlan.projects' | transloco }}
           </li>
           <li class="flex items-center gap-2">
             <ng-icon name="lucideCheck" class="h-4 w-4 text-green-600" />
-            10 users
+            {{ 'welcome.freePlan.users' | transloco }}
           </li>
         </ul>
       </div>
@@ -57,7 +56,7 @@
         <div hlmCardContent class="pt-6">
           <div class="mb-3 flex items-center gap-2">
             <ng-icon name="lucideMail" class="h-4 w-4 text-muted-foreground" />
-            <h3 class="text-sm font-semibold text-foreground">Pending Invitations</h3>
+            <h3 class="text-sm font-semibold text-foreground">{{ 'welcome.pendingInvitations' | transloco }}</h3>
           </div>
           <div class="space-y-3">
             @for (invitation of invitations(); track invitation.id) {
@@ -77,7 +76,7 @@
                   @if (acceptingId() === invitation.id) {
                     <hlm-spinner class="mr-1 h-3 w-3" />
                   }
-                  Accept
+                  {{ 'welcome.accept' | transloco }}
                 </button>
               </div>
             }

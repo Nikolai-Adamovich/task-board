@@ -1,5 +1,6 @@
 import { Component, input, output, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -13,7 +14,7 @@ import type { MyInvitation } from '@task-board/shared';
 
 @Component({
   selector: 'ui-welcome-view',
-  imports: [RouterLink, HlmCardImports, HlmButtonImports, HlmBadgeImports, HlmSpinnerImports, NgIcon],
+  imports: [RouterLink, TranslocoPipe, HlmCardImports, HlmButtonImports, HlmBadgeImports, HlmSpinnerImports, NgIcon],
   providers: [provideIcons({ lucideBuilding2, lucideCheck, lucideMail })],
   templateUrl: './welcome-view.html',
 })

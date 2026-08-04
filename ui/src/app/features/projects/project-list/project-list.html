@@ -1,21 +1,21 @@
 <div class="mx-auto max-w-5xl">
   <div class="mb-6 flex items-center justify-between">
-    <h2 class="text-2xl font-bold text-foreground">Projects</h2>
+    <h2 class="text-2xl font-bold text-foreground">{{ 'projects.title' | transloco }}</h2>
     @if (canCreate()) {
       <button hlmBtn (click)="showCreateModal.set(true)">
         <ng-icon name="lucidePlus" class="mr-1" />
-        New Project
+        {{ 'projects.new' | transloco }}
       </button>
     }
   </div>
 
   @if (loading()) {
     <div class="flex items-center justify-center py-12">
-      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">Loading projects...</span>
+      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'projects.loading' | transloco }}</span>
     </div>
   } @else if (projects().length === 0) {
     <div class="rounded-lg border border-dashed border-border py-12 text-center">
-      <p class="text-sm text-muted-foreground">No projects found. Create your first project to get started.</p>
+      <p class="text-sm text-muted-foreground">{{ 'projects.noProjects' | transloco }}</p>
     </div>
   } @else {
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -28,7 +28,7 @@
           @if (project.description) {
             <p class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
           }
-          <p class="mt-2 text-xs text-muted-foreground">Slug: {{ project.slug }}</p>
+          <p class="mt-2 text-xs text-muted-foreground">{{ 'projects.slug' | transloco: { slug: project.slug } }}</p>
         </a>
       }
     </div>
@@ -38,43 +38,43 @@
   <hlm-dialog [state]="showCreateModal() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
-        <h3 hlmDialogTitle>Create Project</h3>
+        <h3 hlmDialogTitle>{{ 'projects.createTitle' | transloco }}</h3>
       </hlm-dialog-header>
 
       @if (error()) {
         <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() }}
+          {{ error() | transloco }}
         </div>
       }
 
       <form id="create-project-form" [formRoot]="newProjectForm" class="space-y-4">
         <hlm-field>
-          <label hlmFieldLabel for="project-name">Name</label>
+          <label hlmFieldLabel for="project-name">{{ 'projects.name' | transloco }}</label>
           <input hlmInput id="project-name" type="text" [formField]="newProjectForm.name" placeholder="Project name" />
           @if (newProjectForm.name().touched() && newProjectForm.name().errors().length) {
-            <p hlm-field-error>{{ newProjectForm.name().errors()[0].message }}</p>
+            <p hlm-field-error>{{ newProjectForm.name().errors()[0].message | transloco }}</p>
           }
         </hlm-field>
         <hlm-field>
-          <label hlmFieldLabel for="project-slug">Slug</label>
+          <label hlmFieldLabel for="project-slug">{{ 'projects.slugLabel' | transloco }}</label>
           <input hlmInput id="project-slug" type="text" [formField]="newProjectForm.slug" placeholder="project-slug" />
           @if (newProjectForm.slug().touched() && newProjectForm.slug().errors().length) {
-            <p hlm-field-error>{{ newProjectForm.slug().errors()[0].message }}</p>
+            <p hlm-field-error>{{ newProjectForm.slug().errors()[0].message | transloco }}</p>
           }
         </hlm-field>
         <hlm-field>
-          <label hlmFieldLabel for="project-desc">Description</label>
+          <label hlmFieldLabel for="project-desc">{{ 'projects.description' | transloco }}</label>
           <textarea
             hlmTextarea
             id="project-desc"
             [formField]="newProjectForm.description"
             rows="3"
-            placeholder="Optional description..."
+            [placeholder]="'projects.descriptionPlaceholder' | transloco"
           ></textarea>
         </hlm-field>
       </form>
       <hlm-dialog-footer>
-        <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'projects.cancel' | transloco }}</button>
         <button
           hlmBtn
           type="submit"
@@ -82,9 +82,9 @@
           [disabled]="newProjectForm().invalid() || newProjectForm().submitting()"
         >
           @if (newProjectForm().submitting()) {
-            <hlm-spinner /> Creating...
+            <hlm-spinner /> {{ 'projects.creating' | transloco }}
           } @else {
-            Create Project
+            {{ 'projects.create' | transloco }}
           }
         </button>
       </hlm-dialog-footer>

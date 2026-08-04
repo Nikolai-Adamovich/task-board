@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HttpErrorResponse } from '@angular/common/http';
 import { form, FormField, FormRoot, schema, required, email, minLength, maxLength } from '@angular/forms/signals';
 import { AuthStore } from '@stores/auth-store';
@@ -18,6 +19,7 @@ interface RegisterModel {
 @Component({
   imports: [
     RouterLink,
+    TranslocoPipe,
     FormField,
     FormRoot,
     HlmCardImports,
@@ -37,13 +39,13 @@ export class Register {
   protected readonly registerForm = form(
     this.model,
     schema<RegisterModel>((field) => {
-      required(field.displayName, { message: 'Display name is required' });
-      maxLength(field.displayName, 100, { message: 'Display name must be at most 100 characters' });
-      required(field.email, { message: 'Email is required' });
-      email(field.email, { message: 'Invalid email address' });
-      required(field.password, { message: 'Password is required' });
-      minLength(field.password, 8, { message: 'Password must be at least 8 characters' });
-      maxLength(field.password, 128, { message: 'Password must be at most 128 characters' });
+      required(field.displayName, { message: 'validation.nameRequired' });
+      maxLength(field.displayName, 100, { message: 'validation.displayNameMax' });
+      required(field.email, { message: 'validation.emailRequired' });
+      email(field.email, { message: 'validation.emailInvalid' });
+      required(field.password, { message: 'validation.passwordRequired' });
+      minLength(field.password, 8, { message: 'validation.passwordMin' });
+      maxLength(field.password, 128, { message: 'validation.passwordMax' });
     }),
     {
       submission: {
@@ -66,6 +68,6 @@ export class Register {
       return err.error?.message ?? err.message;
     }
 
-    return 'Registration failed. Please try again.';
+    return 'auth.register.failed';
   }
 }

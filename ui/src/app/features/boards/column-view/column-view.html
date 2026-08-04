@@ -7,7 +7,13 @@
     </span>
   </div>
   @if (showAddButton()) {
-    <button hlmBtn variant="ghost" size="icon-sm" (click)="addTask.emit(column())" aria-label="Add task to column">
+    <button
+      hlmBtn
+      variant="ghost"
+      size="icon-sm"
+      (click)="addTask.emit(column())"
+      [attr.aria-label]="'columnView.addTask' | transloco"
+    >
       <ng-icon name="lucidePlus" />
     </button>
   }
@@ -24,6 +30,6 @@
   @for (task of tasks(); track task.id) {
     <ui-task-card [task]="task" (dragStart)="onTaskDragStart($event)" (taskClick)="taskClick.emit(task)" />
   } @empty {
-    <div class="py-8 text-center text-xs text-muted-foreground">No tasks</div>
+    <div class="py-8 text-center text-xs text-muted-foreground">{{ 'columnView.noTasks' | transloco }}</div>
   }
 </div>

@@ -1,12 +1,448 @@
 {
   "header": {
-    "search": "Search...",
-    "notifications": "Notifications"
+    "search": "Search\u2026",
+    "clearSearch": "Clear search",
+    "notifications": "Notifications",
+    "noNotifications": "No notifications",
+    "help": "Help",
+    "faq": "FAQ",
+    "documentation": "Documentation",
+    "support": "Support",
+    "signIn": "Sign in",
+    "userMenu": "User menu"
+  },
+  "sidebar": {
+    "brand": "Task Board",
+    "brandShort": "TB",
+    "projects": "Projects",
+    "sprints": "Sprints",
+    "settings": "Settings",
+    "members": "Members",
+    "toggleSidebar": "Toggle Sidebar"
+  },
+  "tenantSwitcher": {
+    "selectWorkspace": "Select workspace",
+    "noWorkspaces": "No workspaces available",
+    "createWorkspace": "Create Workspace"
   },
   "userMenu": {
     "language": "Language",
     "themes": "Themes",
     "preferences": "Preferences",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "openThemePicker": "Open theme picker",
+    "chooseTheme": "Choose theme",
+    "availableThemes": "Available themes"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in to Task Board",
+      "description": "Enter your credentials to access your workspace.",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "submitting": "Signing in\u2026",
+      "noAccount": "Don't have an account?",
+      "createOne": "Create one",
+      "failed": "Sign in failed. Please try again."
+    },
+    "register": {
+      "title": "Create your account",
+      "description": "Fill in the details below to get started.",
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Create account",
+      "submitting": "Creating account\u2026",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "failed": "Registration failed. Please try again."
+    },
+    "invitation": {
+      "loading": "Loading invitation\u2026",
+      "error": "Invitation Error",
+      "goToSignIn": "Go to Sign in",
+      "title": "Accept Invitation",
+      "description": "You've been invited to join a workspace.",
+      "email": "Email",
+      "workspace": "Workspace",
+      "role": "Role",
+      "existingUserHint": "You already have an account. Click below to accept this invitation.",
+      "displayName": "Display Name",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "accept": "Accept Invitation",
+      "accepting": "Accepting\u2026",
+      "createAndAccept": "Create Account & Accept",
+      "creatingAccount": "Creating account\u2026",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "noToken": "No invitation token provided.",
+      "invalidOrExpired": "Invalid or expired invitation.",
+      "passwordsNotMatch": "Passwords do not match.",
+      "failedAccept": "Failed to accept invitation."
+    }
+  },
+  "landing": {
+    "title": "Task Board",
+    "subtitle": "Simple project management for teams",
+    "getStarted": "Get Started",
+    "signIn": "Sign In",
+    "kanban": {
+      "title": "Kanban Boards",
+      "description": "Visualize your workflow with drag-and-drop boards. Track tasks across columns from backlog to done."
+    },
+    "sprints": {
+      "title": "Sprints",
+      "description": "Plan and execute sprints with ease. Track velocity and deliver on time."
+    },
+    "collaboration": {
+      "title": "Team Collaboration",
+      "description": "Invite team members, assign roles, and collaborate in real time on projects."
+    },
+    "multiWorkspace": {
+      "title": "Multi-Workspace",
+      "description": "Manage multiple workspaces for different teams or clients from a single account."
+    }
+  },
+  "welcome": {
+    "title": "Welcome to Task Board",
+    "greeting": ", {{name}}!",
+    "subtitle": "Let's get you started. Create your first workspace to begin.",
+    "createWorkspace": {
+      "title": "Create your first workspace",
+      "description": "A workspace is your team's home base. Create projects, manage tasks, and collaborate with your team.",
+      "button": "Create Workspace"
+    },
+    "freePlan": {
+      "title": "Free Plan Includes",
+      "workspace": "1 workspace",
+      "projects": "3 projects",
+      "users": "10 users"
+    },
+    "pendingInvitations": "Pending Invitations",
+    "accept": "Accept"
+  },
+  "invitationView": {
+    "title": "You have pending invitations",
+    "subtitle": "Accept an invitation to join a workspace, or create your own.",
+    "invited": "Invited {{date}}",
+    "decline": "Decline",
+    "accept": "Accept",
+    "or": "Or",
+    "createOwn": "create your own workspace"
+  },
+  "ownerDashboard": {
+    "title": "Owner Dashboard",
+    "subtitle": "Manage your workspaces and track your team's progress.",
+    "totalTasks": "Total Tasks",
+    "workspaces": "Workspaces",
+    "myWorkspaces": "My Workspaces",
+    "createAnother": "Create another workspace",
+    "projects": "Projects",
+    "settings": "Settings",
+    "members": "Members",
+    "upgrade": "Upgrade",
+    "myRecentTasks": "My Recent Tasks",
+    "noTasks": "No tasks assigned to you yet."
+  },
+  "memberDashboard": {
+    "title": "Dashboard",
+    "subtitle": "Your workspaces and recent tasks at a glance.",
+    "totalTasks": "Total Tasks",
+    "workspaces": "Workspaces",
+    "myWorkspaces": "My Workspaces",
+    "myRecentTasks": "My Recent Tasks",
+    "noTasks": "No tasks assigned to you yet."
+  },
+  "workspace": {
+    "defaultName": "Workspace",
+    "settings": "Settings",
+    "members": "Members",
+    "upgrade": "Upgrade",
+    "projects": "Projects",
+    "noProjects": "No projects yet.",
+    "createFirst": "Create your first project"
+  },
+  "createWorkspace": {
+    "title": "Create your workspace",
+    "description": "Set up a workspace to start managing your projects.",
+    "name": "Workspace Name",
+    "slug": "Slug",
+    "slugHint": "Used in URLs. Only lowercase letters, numbers, and hyphens.",
+    "plan": "Subscription Plan",
+    "planFree": "Free \u2014 Up to 3 projects and 5 users",
+    "submit": "Create Workspace",
+    "submitting": "Creating workspace\u2026",
+    "failed": "Failed to create workspace. Please try again."
+  },
+  "settings": {
+    "title": "Settings"
+  },
+  "tenantSettings": {
+    "title": "Tenant Settings",
+    "loading": "Loading settings\u2026",
+    "general": "General Settings",
+    "name": "Name",
+    "slug": "Slug",
+    "save": "Save Changes",
+    "saving": "Saving\u2026",
+    "dangerZone": "Danger Zone",
+    "dangerDescription": "Deleting a tenant is irreversible. All projects, boards, and tasks within this tenant will be permanently removed.",
+    "deleteTenant": "Delete Tenant",
+    "deleteTitle": "Delete Tenant",
+    "deleteConfirm": "This action cannot be undone. To confirm, type the tenant name below.",
+    "deleteName": "Tenant Name",
+    "deletePlaceholder": "Type tenant name to confirm",
+    "cancel": "Cancel"
+  },
+  "upgrade": {
+    "title": "Upgrade Plan",
+    "successTitle": "You're on Premium!",
+    "successDescription": "Your workspace has been upgraded to the Premium plan. Enjoy unlimited projects and users.",
+    "backToSettings": "Back to Settings",
+    "currentPlan": "Current Plan",
+    "freeLimit": "Up to 3 projects, 5 users per workspace",
+    "premiumUnlimited": "Unlimited projects and users",
+    "premiumPlan": "Premium Plan",
+    "premiumDescription": "Unlock the full power of Task Board.",
+    "unlimitedProjects": "Unlimited projects",
+    "unlimitedMembers": "Unlimited team members",
+    "prioritySupport": "Priority support",
+    "advancedAnalytics": "Advanced analytics",
+    "back": "Back",
+    "upgradeButton": "Upgrade to Premium",
+    "upgrading": "Upgrading\u2026",
+    "failed": "Failed to upgrade. Please try again."
+  },
+  "members": {
+    "title": "Members",
+    "loading": "Loading members\u2026",
+    "noMembers": "No members found.",
+    "pending": "Pending",
+    "unknown": "Unknown",
+    "active": "Active",
+    "accessRevoked": "Access Revoked",
+    "declined": "Declined",
+    "invite": "Invite Member",
+    "inviteTitle": "Invite Member",
+    "email": "Email",
+    "role": "Role",
+    "revokeAccess": "Revoke access",
+    "resendInvitation": "Resend invitation",
+    "permanentlyDelete": "Permanently delete",
+    "removeMember": "Remove member",
+    "cancel": "Cancel",
+    "inviteButton": "Invite",
+    "inviting": "Inviting\u2026"
+  },
+  "projects": {
+    "title": "Projects",
+    "new": "New Project",
+    "loading": "Loading projects\u2026",
+    "noProjects": "No projects found. Create your first project to get started.",
+    "slug": "Slug: {{slug}}",
+    "createTitle": "Create Project",
+    "name": "Name",
+    "slugLabel": "Slug",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description\u2026",
+    "cancel": "Cancel",
+    "create": "Create Project",
+    "creating": "Creating\u2026"
+  },
+  "projectDetail": {
+    "loading": "Loading project\u2026",
+    "sprints": "Sprints",
+    "newBoard": "New Board",
+    "boards": "Boards",
+    "noBoards": "No boards yet.",
+    "createBoard": "Create a board",
+    "members": "Members",
+    "addMember": "Add Member",
+    "noMembers": "No members loaded.",
+    "changeRole": "Change role",
+    "removeMember": "Remove member",
+    "createBoardTitle": "Create Board",
+    "boardName": "Name",
+    "boardDescription": "Description",
+    "descriptionPlaceholder": "Optional description\u2026",
+    "cancel": "Cancel",
+    "createBoardButton": "Create Board",
+    "creating": "Creating\u2026",
+    "addMemberTitle": "Add Member",
+    "userId": "User ID",
+    "userIdPlaceholder": "Enter user ID",
+    "role": "Role",
+    "addMemberButton": "Add Member",
+    "adding": "Adding\u2026",
+    "removeMemberTitle": "Remove Member",
+    "removeConfirm": "Are you sure you want to remove this member from the project?",
+    "removeButton": "Remove"
+  },
+  "boardView": {
+    "loading": "Loading board\u2026",
+    "newTask": "New Task",
+    "createTaskTitle": "Create Task",
+    "title": "Title",
+    "titlePlaceholder": "Task title",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description\u2026",
+    "priority": "Priority",
+    "column": "Column",
+    "cancel": "Cancel",
+    "create": "Create Task",
+    "creating": "Creating\u2026"
+  },
+  "priority": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical"
+  },
+  "columnView": {
+    "addTask": "Add task to column",
+    "noTasks": "No tasks"
+  },
+  "taskDetail": {
+    "loading": "Loading task\u2026",
+    "created": "Created {{date}}",
+    "updated": "Updated {{date}}",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving\u2026",
+    "edit": "Edit",
+    "title": "Title",
+    "description": "Description",
+    "descriptionPlaceholder": "Task description (supports markdown)",
+    "noDescription": "No description",
+    "priority": "Priority",
+    "assignees": "Assignees",
+    "unassigned": "Unassigned",
+    "actions": "Actions",
+    "deleteTask": "Delete Task",
+    "deleteTitle": "Delete Task",
+    "deleteConfirm": "Are you sure you want to delete this task? This action cannot be undone.",
+    "cancelDelete": "Cancel",
+    "confirmDelete": "Delete"
+  },
+  "sprints": {
+    "title": "Sprints",
+    "new": "New Sprint",
+    "loading": "Loading sprints\u2026",
+    "noSprints": "No sprints yet.",
+    "createFirst": "Create first sprint",
+    "tasks": "{{count}} tasks",
+    "sprintsCount": "{{count}} sprints",
+    "toggle": "Toggle",
+    "createTitle": "Create Sprint",
+    "name": "Name",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "goal": "Goal",
+    "goalPlaceholder": "Optional sprint goal\u2026",
+    "cancel": "Cancel",
+    "create": "Create Sprint",
+    "creating": "Creating\u2026"
+  },
+  "sprintDetail": {
+    "loading": "Loading sprint\u2026",
+    "tasks": "Tasks",
+    "backToProject": "Back to Project",
+    "noTasks": "No tasks in this sprint.",
+    "removeFromSprint": "Remove from sprint"
+  },
+  "sprintBacklog": {
+    "backlog": "Backlog",
+    "loading": "Loading backlog\u2026",
+    "allAssigned": "All tasks are assigned to sprints.",
+    "addToSprint": "Add to Sprint"
+  },
+  "docs": {
+    "title": "Documentation",
+    "intro": "{{brand}} is a modern, collaborative project management application designed to help teams organize, track, and deliver work efficiently. It brings together boards, columns, tasks, and sprints into a unified workspace that adapts to your team's workflow.",
+    "brand": "Task Board",
+    "keyFeatures": "Key Features",
+    "workspaces": "Workspaces & Projects",
+    "workspacesDesc": "Create isolated workspaces for different teams or clients, each containing multiple projects with their own boards and settings.",
+    "boardManagement": "Board & Column Management",
+    "boardManagementDesc": "Organize tasks into customizable columns (e.g., To Do, In Progress, Done) with drag-and-drop support for easy prioritization.",
+    "taskTracking": "Task Tracking",
+    "taskTrackingDesc": "Create, assign, and track tasks with rich details including descriptions, labels, priorities, and due dates.",
+    "sprintPlanning": "Sprint Planning",
+    "sprintPlanningDesc": "Plan iterations using sprints, assign tasks to specific sprints, and monitor progress with burndown-style views.",
+    "teamCollaboration": "Team Collaboration",
+    "teamCollaborationDesc": "Invite team members via email, assign roles (Owner, Admin, Member), and collaborate in real time across shared workspaces.",
+    "rbac": "Role-Based Access Control",
+    "rbacDesc": "Fine-grained permissions ensure that team members only access the resources appropriate for their role.",
+    "techStack": "Tech Stack",
+    "techStackDesc": "Task Board is built with a modern TypeScript-first stack. The frontend is powered by Angular with Spartan UI components and Tailwind CSS for styling. The backend runs on Cloudflare Workers with a MongoDB data layer. Shared type definitions and validation schemas ensure end-to-end type safety between client and server."
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "q1": {
+      "question": "What is Task Board?",
+      "answer": "Task Board is a collaborative project management application that helps teams organize work using boards, columns, tasks, and sprints. It supports multiple workspaces, role-based access control, and real-time collaboration."
+    },
+    "q2": {
+      "question": "How do I create a project?",
+      "answer": "Navigate to your workspace, click the \"Projects\" section, and use the \"Create Project\" button. You will need to provide a project name and optional description. Projects are scoped to your current workspace."
+    },
+    "q3": {
+      "question": "How do I invite team members?",
+      "answer": "Go to your workspace settings and open the \"Members\" tab. Click \"Invite Member\", enter their email address, and assign a role (Owner, Admin, or Member). They will receive an email invitation to join your workspace."
+    },
+    "q4": {
+      "question": "What are subscription tiers?",
+      "answer": "Task Board offers Free, Pro, and Enterprise tiers. The Free tier includes basic board and task management. Pro adds advanced features like sprints and analytics. Enterprise includes priority support, SSO, and unlimited workspaces."
+    },
+    "q5": {
+      "question": "How do I change my theme?",
+      "answer": "Click your avatar in the top-right corner to open the user menu. From there you can toggle between light and dark mode, and adjust the interface zoom level to your preference."
+    }
+  },
+  "support": {
+    "title": "Support",
+    "description": "Have a question or need help? Fill out the form below and our support team will get back to you.",
+    "success": "Your message has been sent successfully. We'll get back to you soon.",
+    "name": "Name",
+    "namePlaceholder": "Your name",
+    "email": "Email",
+    "message": "Message",
+    "messagePlaceholder": "Describe your issue or question\u2026",
+    "submit": "Submit",
+    "submitting": "Sending\u2026"
+  },
+  "validation": {
+    "emailRequired": "Email is required",
+    "emailInvalid": "Invalid email address",
+    "passwordRequired": "Password is required",
+    "passwordMin": "Password must be at least 8 characters",
+    "passwordMax": "Password must be at most 128 characters",
+    "nameRequired": "Name is required",
+    "nameMax": "Name must be at most 200 characters",
+    "displayNameRequired": "Display name is required",
+    "displayNameMax": "Display name must be at most 100 characters",
+    "slugRequired": "Slug is required",
+    "slugMin": "Slug must be at least 2 characters",
+    "slugMax": "Slug must be at most 80 characters",
+    "titleRequired": "Title is required",
+    "columnRequired": "Column is required",
+    "boardNameRequired": "Board name is required",
+    "userIdRequired": "User ID is required",
+    "roleRequired": "Role is required",
+    "workspaceNameRequired": "Workspace name is required",
+    "confirmPasswordRequired": "Please confirm your password",
+    "messageRequired": "Message is required",
+    "messageMax": "Message must be at most 2000 characters",
+    "startDateRequired": "Start date is required",
+    "endDateRequired": "End date is required"
+  },
+  "errors": {
+    "unexpected": "An unexpected error occurred. Please try again.",
+    "permissionDenied": "You do not have permission to perform this action"
   }
 }

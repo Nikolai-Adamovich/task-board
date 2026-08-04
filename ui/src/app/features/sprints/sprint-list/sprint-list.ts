@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
@@ -40,6 +41,7 @@ interface ProjectSprintGroup {
   imports: [
     RouterLink,
     DatePipe,
+    TranslocoPipe,
     FormField,
     FormRoot,
     NgIcon,
@@ -74,9 +76,9 @@ export class SprintList implements OnInit {
   protected readonly newSprintForm = form(
     this.model,
     schema<CreateSprintForm>((field) => {
-      required(field.name, { message: 'Name is required' });
-      required(field.startDate, { message: 'Start date is required' });
-      required(field.endDate, { message: 'End date is required' });
+      required(field.name, { message: 'validation.nameRequired' });
+      required(field.startDate, { message: 'validation.startDateRequired' });
+      required(field.endDate, { message: 'validation.endDateRequired' });
     }),
     {
       submission: {
@@ -174,6 +176,6 @@ export class SprintList implements OnInit {
       return err.error?.message ?? err.message;
     }
 
-    return 'An unexpected error occurred. Please try again.';
+    return 'errors.unexpected';
   }
 }

@@ -5,7 +5,7 @@
     hlmBtn
     variant="ghost"
     size="icon-sm"
-    aria-label="Notifications"
+    [attr.aria-label]="'header.notifications' | transloco"
     aria-haspopup="dialog"
     (click)="sheetOpen.set(true)"
   >
@@ -17,10 +17,10 @@
     class="top-(--header-height) h-[calc(100vh-var(--header-height))]"
   >
     <hlm-sheet-header>
-      <h3 hlm-sheet-title>Notifications</h3>
+      <h3 hlm-sheet-title>{{ 'header.notifications' | transloco }}</h3>
     </hlm-sheet-header>
     <div class="p-4">
-      <p class="text-muted-foreground text-sm">No notifications</p>
+      <p class="text-muted-foreground text-sm">{{ 'header.noNotifications' | transloco }}</p>
     </div>
   </hlm-sheet-content>
 </hlm-sheet>

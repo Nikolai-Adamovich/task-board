@@ -2,7 +2,7 @@
   <!-- Header: Name + Role badge -->
   <div class="mb-6">
     <div class="flex items-center gap-3">
-      <h1 class="text-2xl font-bold text-foreground">{{ tenant()?.name ?? 'Workspace' }}</h1>
+      <h1 class="text-2xl font-bold text-foreground">{{ tenant()?.name ?? ('workspace.defaultName' | transloco) }}</h1>
       @if (role()) {
         <span hlmBadge variant="secondary">{{ role() }}</span>
       }
@@ -18,16 +18,16 @@
     <div class="mb-8 flex flex-wrap gap-3">
       <a hlmBtn variant="outline" [routerLink]="['/tenants', tenant()?.id, 'settings']">
         <ng-icon name="lucideSettings" class="mr-2 h-4 w-4" />
-        Settings
+        {{ 'workspace.settings' | transloco }}
       </a>
       <a hlmBtn variant="outline" [routerLink]="['/tenants', tenant()?.id, 'settings', 'members']">
         <ng-icon name="lucideUsers" class="mr-2 h-4 w-4" />
-        Members
+        {{ 'workspace.members' | transloco }}
       </a>
       @if (showUpgrade()) {
         <a hlmBtn variant="outline" [routerLink]="['/tenants', tenant()?.id, 'upgrade']">
           <ng-icon name="lucideCreditCard" class="mr-2 h-4 w-4" />
-          Upgrade
+          {{ 'workspace.upgrade' | transloco }}
         </a>
       }
     </div>
@@ -36,7 +36,7 @@
   <!-- Collapsible Project List -->
   <hlm-collapsible [expanded]="projectsExpanded()" (expandedChange)="projectsExpanded.set($event)">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-foreground">Projects</h2>
+      <h2 class="text-lg font-semibold text-foreground">{{ 'workspace.projects' | transloco }}</h2>
       <button hlmBtn variant="ghost" size="sm" hlmCollapsibleTrigger>
         <ng-icon [name]="projectsExpanded() ? 'lucideChevronDown' : 'lucideChevronRight'" class="h-4 w-4" />
       </button>
@@ -48,10 +48,10 @@
         </div>
       } @else if (projects().length === 0) {
         <div class="rounded-lg border border-dashed border-border py-8 text-center">
-          <p class="text-sm text-muted-foreground">No projects yet.</p>
+          <p class="text-sm text-muted-foreground">{{ 'workspace.noProjects' | transloco }}</p>
           @if (isOwnerOrAdmin()) {
             <a hlmBtn variant="outline" size="sm" class="mt-3" [routerLink]="['/tenants', tenant()?.id, 'projects']">
-              Create your first project
+              {{ 'workspace.createFirst' | transloco }}
             </a>
           }
         </div>

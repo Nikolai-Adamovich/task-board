@@ -1,4 +1,5 @@
 import { Component, inject, input, signal, OnInit, output } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
 import { PriorityDotColorMap, NeutralDotColor } from '@app/constants/priority';
@@ -10,7 +11,7 @@ import type { Task, Sprint } from '@task-board/shared';
 
 @Component({
   selector: 'ui-sprint-backlog',
-  imports: [HlmButtonImports, HlmSpinnerImports, HlmCardImports],
+  imports: [TranslocoPipe, HlmButtonImports, HlmSpinnerImports, HlmCardImports],
   templateUrl: './sprint-backlog.html',
 })
 export class SprintBacklog implements OnInit {

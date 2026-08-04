@@ -2,12 +2,12 @@
   <!-- Page header -->
   <div class="mb-6 flex items-center gap-3">
     <ng-icon name="lucideCrown" class="h-6 w-6 text-foreground" />
-    <h2 class="text-2xl font-bold text-foreground">Upgrade Plan</h2>
+    <h2 class="text-2xl font-bold text-foreground">{{ 'upgrade.title' | transloco }}</h2>
   </div>
 
   @if (error()) {
     <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-      {{ error() }}
+      {{ error() | transloco }}
     </div>
   }
 
@@ -15,15 +15,15 @@
     <hlm-card>
       <div hlmCardContent class="py-8 text-center">
         <ng-icon name="lucideCrown" class="mx-auto mb-4 h-12 w-12 text-yellow-500" />
-        <h3 class="text-xl font-bold text-foreground">You're on Premium!</h3>
+        <h3 class="text-xl font-bold text-foreground">{{ 'upgrade.successTitle' | transloco }}</h3>
         <p class="mt-2 text-sm text-muted-foreground">
-          Your workspace has been upgraded to the Premium plan. Enjoy unlimited projects and users.
+          {{ 'upgrade.successDescription' | transloco }}
         </p>
       </div>
       <hlm-card-footer class="justify-center">
         <button hlmBtn (click)="goBack()">
           <ng-icon name="lucideArrowLeft" class="mr-1" />
-          Back to Settings
+          {{ 'upgrade.backToSettings' | transloco }}
         </button>
       </hlm-card-footer>
     </hlm-card>
@@ -31,7 +31,7 @@
     <!-- Current plan -->
     <hlm-card class="mb-6">
       <hlm-card-header>
-        <h3 hlmCardTitle>Current Plan</h3>
+        <h3 hlmCardTitle>{{ 'upgrade.currentPlan' | transloco }}</h3>
       </hlm-card-header>
       <div hlmCardContent>
         <div class="flex items-center justify-between">
@@ -39,9 +39,9 @@
             <p class="text-lg font-semibold text-foreground capitalize">{{ currentPlan() }}</p>
             <p class="text-sm text-muted-foreground">
               @if (currentPlan() === SubscriptionTier.Free) {
-                Up to 3 projects, 5 users per workspace
+                {{ 'upgrade.freeLimit' | transloco }}
               } @else {
-                Unlimited projects and users
+                {{ 'upgrade.premiumUnlimited' | transloco }}
               }
             </p>
           </div>
@@ -53,40 +53,40 @@
     <!-- Premium plan card -->
     <hlm-card class="border-primary/30">
       <hlm-card-header>
-        <h3 hlmCardTitle>Premium Plan</h3>
-        <p hlmCardDescription>Unlock the full power of Task Board.</p>
+        <h3 hlmCardTitle>{{ 'upgrade.premiumPlan' | transloco }}</h3>
+        <p hlmCardDescription>{{ 'upgrade.premiumDescription' | transloco }}</p>
       </hlm-card-header>
       <div hlmCardContent>
         <ul class="space-y-3">
           <li class="flex items-center gap-2 text-sm text-foreground">
             <ng-icon name="lucideCheck" class="h-4 w-4 text-green-600" />
-            Unlimited projects
+            {{ 'upgrade.unlimitedProjects' | transloco }}
           </li>
           <li class="flex items-center gap-2 text-sm text-foreground">
             <ng-icon name="lucideCheck" class="h-4 w-4 text-green-600" />
-            Unlimited team members
+            {{ 'upgrade.unlimitedMembers' | transloco }}
           </li>
           <li class="flex items-center gap-2 text-sm text-foreground">
             <ng-icon name="lucideCheck" class="h-4 w-4 text-green-600" />
-            Priority support
+            {{ 'upgrade.prioritySupport' | transloco }}
           </li>
           <li class="flex items-center gap-2 text-sm text-foreground">
             <ng-icon name="lucideCheck" class="h-4 w-4 text-green-600" />
-            Advanced analytics
+            {{ 'upgrade.advancedAnalytics' | transloco }}
           </li>
         </ul>
       </div>
       <hlm-card-footer class="gap-3">
         <button hlmBtn variant="outline" (click)="goBack()">
           <ng-icon name="lucideArrowLeft" class="mr-1" />
-          Back
+          {{ 'upgrade.back' | transloco }}
         </button>
         <button hlmBtn (click)="upgrade()" [disabled]="upgrading() || currentPlan() === SubscriptionTier.Premium">
           @if (upgrading()) {
-            <hlm-spinner /> Upgrading...
+            <hlm-spinner /> {{ 'upgrade.upgrading' | transloco }}
           } @else {
             <ng-icon name="lucideCrown" class="mr-1" />
-            Upgrade to Premium
+            {{ 'upgrade.upgradeButton' | transloco }}
           }
         </button>
       </hlm-card-footer>
