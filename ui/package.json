@@ -17,8 +17,7 @@
     "pree2e": "npm run generate:themes",
     "e2e": "npx playwright test",
     "e2e:ui": "npx playwright test --ui",
-    "create-stats": "ng build --configuration production --stats-json",
-    "analyze-stats": "esbuild-visualizer --metadata dist/ui/stats.json --filename dist/ui/stats.html"
+    "analyze": "ng build --configuration production --stats-json && esbuild-visualizer --metadata dist/ui/stats.json --filename dist/ui/stats.html && xdg-open dist/ui/stats.html"
   },
   "dependencies": {
     "@angular/animations": "^22.0.0",
