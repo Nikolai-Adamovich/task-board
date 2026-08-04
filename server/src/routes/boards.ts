@@ -7,7 +7,7 @@ import { ColumnRepository } from '../repositories/column.repository.js';
 import { getCollection } from '../db/mongo.js';
 import type { BoardDocument } from '../repositories/board.repository.js';
 import type { ColumnDocument } from '../repositories/column.repository.js';
-import { CreateBoardSchema, UpdateBoardSchema } from '@task-board/shared';
+import { CreateBoardSchema, UpdateBoardSchema } from '../schemas/board.js';
 
 // ─── Board Routes ────────────────────────────────────────────────────────────
 

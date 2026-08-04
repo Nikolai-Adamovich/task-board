@@ -5,7 +5,7 @@ import { ColumnService } from '../services/column.service.js';
 import { ColumnRepository } from '../repositories/column.repository.js';
 import { getCollection } from '../db/mongo.js';
 import type { ColumnDocument } from '../repositories/column.repository.js';
-import { CreateColumnSchema } from '@task-board/shared';
+import { CreateColumnSchema } from '../schemas/board.js';
 import { z } from 'zod';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────

@@ -1,19 +1,45 @@
-import type { z } from 'zod';
-import type {
-  ProjectSchema,
-  CreateProjectSchema,
-  UpdateProjectSchema,
-  ProjectMemberSchema,
-} from '../schemas/project.js';
+import type { ProjectRole } from '../constants/roles.js';
 
 /** Project entity type */
-export type Project = z.infer<typeof ProjectSchema>;
+export interface Project {
+  /** Unique project identifier (UUID v4) */
+  id: string;
+  /** Owning tenant ID */
+  tenantId: string;
+  /** Project name */
+  name: string;
+  /** URL-friendly slug for the project */
+  slug: string;
+  /** Optional project description */
+  description?: string | null;
+  /** Creation timestamp (ISO 8601) */
+  createdAt: string;
+  /** Last update timestamp (ISO 8601) */
+  updatedAt: string;
+}
 
 /** Create project request body type */
-export type CreateProject = z.infer<typeof CreateProjectSchema>;
+export interface CreateProject {
+  name: string;
+  slug: string;
+  description?: string;
+}
 
 /** Update project request body type */
-export type UpdateProject = z.infer<typeof UpdateProjectSchema>;
+export interface UpdateProject {
+  name?: string;
+  slug?: string;
+  description?: string;
+}
 
-/** Project member type */
-export type ProjectMember = z.infer<typeof ProjectMemberSchema>;
+/** Project membership type */
+export interface ProjectMember {
+  /** User ID of the member */
+  userId: string;
+  /** Project ID */
+  projectId: string;
+  /** Tenant ID (denormalized for multi-tenant queries) */
+  tenantId: string;
+  /** Role of the user within the project */
+  role: ProjectRole;
+}

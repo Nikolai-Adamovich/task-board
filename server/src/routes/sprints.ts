@@ -10,7 +10,7 @@ import { getCollection } from '../db/mongo.js';
 import type { SprintDocument } from '../repositories/sprint.repository.js';
 import type { TaskDocument } from '../repositories/task.repository.js';
 import type { ProjectDocument } from '../repositories/project.repository.js';
-import { CreateSprintSchema, UpdateSprintSchema } from '@task-board/shared';
+import { CreateSprintSchema, UpdateSprintSchema } from '../schemas/sprint.js';
 
 // ─── Sprint Routes ───────────────────────────────────────────────────────────
 

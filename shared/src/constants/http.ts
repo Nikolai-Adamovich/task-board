@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { valuesOf } from '../utils/values-of.js';
 
 /** Supported HTTP methods for API contracts */
 export const HttpMethod = {
@@ -10,5 +10,4 @@ export const HttpMethod = {
 } as const;
 
 export type HttpMethod = (typeof HttpMethod)[keyof typeof HttpMethod];
-export const HttpMethodSchema = z.enum(HttpMethod);
-export const HttpMethodValues = Object.values(HttpMethod) as [HttpMethod, ...HttpMethod[]];
+export const HttpMethodValues = valuesOf(HttpMethod);

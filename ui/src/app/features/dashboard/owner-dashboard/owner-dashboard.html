@@ -41,14 +41,9 @@
         <hlm-card>
           <div hlmCardContent class="pt-6">
             <div class="mb-4 flex items-center gap-3">
-              <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <ng-icon name="lucideBuilding2" class="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <a
-                  [routerLink]="['/tenants', tenant.id]"
-                  class="text-sm font-semibold text-foreground hover:underline"
-                  >{{ tenant.name }}</a
+              <div class="flex justify-between items-center gap-2 grow">
+                <a hlmBtn variant="ghost" size="lg" [routerLink]="['/tenants', tenant.id]" class="font-bold">
+                  <ng-icon name="lucideBuilding2" />{{ tenant.name }}</a
                 >
                 <span hlmBadge class="mt-0.5 bg-purple-100 text-purple-700">{{ tenant.role }}</span>
               </div>

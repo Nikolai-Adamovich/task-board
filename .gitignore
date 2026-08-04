@@ -50,3 +50,6 @@ Thumbs.db
 # Wrangler (Cloudflare)
 .wrangler/
 .dev.vars
+
+# Generated theme manifest (build artifact)
+ui/public/themes/manifest.json

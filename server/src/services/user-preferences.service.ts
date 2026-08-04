@@ -1,4 +1,4 @@
-import { Theme } from '@task-board/shared';
+import { DEFAULT_THEME_ID } from '@task-board/shared';
 import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
 import type { UserPreferencesRepository } from '../repositories/user-preferences.repository.js';
 
@@ -8,7 +8,7 @@ function defaultPreferences(userId: string): UserPreferences {
   return {
     userId,
     zoom: 100,
-    theme: Theme.Light,
+    theme: DEFAULT_THEME_ID,
     language: 'en',
     updatedAt: new Date().toISOString(),
   };

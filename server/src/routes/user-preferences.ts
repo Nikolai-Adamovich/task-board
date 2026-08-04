@@ -4,7 +4,7 @@ import { UserPreferencesRepository } from '../repositories/user-preferences.repo
 import type { UserPreferencesDocument } from '../repositories/user-preferences.repository.js';
 import { UserPreferencesService } from '../services/user-preferences.service.js';
 import { getCollection } from '../db/mongo.js';
-import { UpdateUserPreferencesSchema } from '@task-board/shared';
+import { UpdateUserPreferencesSchema } from '../schemas/user-preferences.js';
 
 // ─── User Preferences Routes ─────────────────────────────────────────────────
 

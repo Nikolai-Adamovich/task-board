@@ -15,6 +15,7 @@
   "dependencies": {
     "@task-board/shared": "*",
     "bcryptjs": "^3.0.3",
+    "zod": "^4.0.0",
     "hono": "^4.8.0",
     "mongodb": "^7.0.0",
     "resend": "^6.18.1"

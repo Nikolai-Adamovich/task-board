@@ -1,5 +1,5 @@
 import type { Collection } from 'mongodb';
-import { Theme } from '@task-board/shared';
+import { DEFAULT_THEME_ID } from '@task-board/shared';
 import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -11,7 +11,7 @@ export interface UserPreferencesDocument {
   _id?: import('mongodb').ObjectId;
   userId: string;
   zoom: number;
-  theme: Theme;
+  theme: string;
   language: string;
   updatedAt: Date;
 }
@@ -50,7 +50,7 @@ export class UserPreferencesRepository {
     const $setOnInsert: Record<string, unknown> = { userId };
 
     if (data.zoom === undefined) $setOnInsert.zoom = 100;
-    if (data.theme === undefined) $setOnInsert.theme = Theme.Light;
+    if (data.theme === undefined) $setOnInsert.theme = DEFAULT_THEME_ID;
     if (data.language === undefined) $setOnInsert.language = 'en';
 
     const result = await this.collection.findOneAndUpdate(

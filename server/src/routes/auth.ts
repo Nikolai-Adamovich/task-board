@@ -10,7 +10,7 @@ import { getCollection } from '../db/mongo.js';
 import type { UserDocument } from '../repositories/user.repository.js';
 import type { TenantDocument } from '../repositories/tenant.repository.js';
 import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
-import { RegisterRequestSchema, LoginRequestSchema, AcceptInvitationSchema } from '@task-board/shared';
+import { RegisterRequestSchema, LoginRequestSchema, AcceptInvitationSchema } from '../schemas/auth.js';
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────────
 

@@ -1,9 +1,9 @@
 <div class="flex items-center gap-2">
+  <ui-help-menu />
   @if (authStore.isAuthenticated()) {
-    <ui-user-menu />
     <ui-notifications-button />
+    <ui-user-menu />
   } @else {
     <ui-sign-in-button />
   }
-  <ui-help-menu />
 </div>

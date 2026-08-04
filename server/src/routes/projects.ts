@@ -9,17 +9,18 @@ import { getCollection } from '../db/mongo.js';
 import type { ProjectDocument } from '../repositories/project.repository.js';
 import type { ProjectMemberDocument } from '../repositories/project-member.repository.js';
 import type { TenantDocument } from '../repositories/tenant.repository.js';
-import { CreateProjectSchema, UpdateProjectSchema, ProjectRole } from '@task-board/shared';
+import { ProjectRoleValues } from '@task-board/shared';
+import { CreateProjectSchema, UpdateProjectSchema } from '../schemas/project.js';
 import { z } from 'zod';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const AddProjectMemberSchema = z.object({
   userId: z.uuid(),
-  role: z.enum(ProjectRole),
+  role: z.enum(ProjectRoleValues),
 });
 const UpdateProjectMemberSchema = z.object({
-  role: z.enum(ProjectRole),
+  role: z.enum(ProjectRoleValues),
 });
 
 // ─── Project Routes ──────────────────────────────────────────────────────────

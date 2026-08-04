@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
-import { SupportRequestSchema } from '@task-board/shared';
+import { SupportRequestSchema } from '../schemas/support.js';
 import { validateBody } from '../middleware/validation.js';
 import { EmailService, ConsoleEmailService } from '../services/email.service.js';
 import { ValidationError } from '../middleware/error-handler.js';

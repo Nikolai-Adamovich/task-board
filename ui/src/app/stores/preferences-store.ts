@@ -1,13 +1,13 @@
-import { Service, signal, inject, DestroyRef, effect } from '@angular/core';
+import { Service, signal, inject, effect } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
-import { Theme } from '@task-board/shared';
+import { DEFAULT_THEME_ID } from '@task-board/shared';
 import { UserPreferencesClient } from '@services/user-preferences-client';
 import { AuthStore } from '@stores/auth-store';
+import { ThemeLoader } from '@services/theme-loader';
 import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
 
 const THEME_KEY = 'taskboard_theme';
-const ZOOM_SAVE_DELAY_MS = 3_000;
 
 /**
  * Signal-based preferences store.
@@ -18,16 +18,18 @@ const ZOOM_SAVE_DELAY_MS = 3_000;
 export class PreferencesStore {
   private readonly client = inject(UserPreferencesClient);
   private readonly authStore = inject(AuthStore);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly transloco = inject(TranslocoService);
+  private readonly themeLoader = inject(ThemeLoader);
   readonly zoom = signal<number>(100);
-  readonly theme = signal<Theme>(Theme.Light);
+  readonly theme = signal<string>(DEFAULT_THEME_ID);
   readonly language = signal<string>('en');
-  private zoomDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Tracks the last zoom applied locally but not yet persisted to the backend. */
+  private pendingZoom: number | null = null;
+  /** Tracks the last theme applied locally but not yet persisted to the backend. */
+  private pendingTheme: string | null = null;
 
   constructor() {
     this.restoreThemeFromLocalStorage();
-    this.destroyRef.onDestroy(() => this.cleanup());
 
     // Load preferences from backend once the user is authenticated.
     effect(() => {
@@ -37,21 +39,13 @@ export class PreferencesStore {
     });
   }
 
-  /** Clean up the zoom debounce timer. */
-  private cleanup(): void {
-    if (this.zoomDebounceTimer !== null) {
-      clearTimeout(this.zoomDebounceTimer);
-      this.zoomDebounceTimer = null;
-    }
-  }
-
-  /** Restore theme preference from localStorage and apply the CSS class immediately. */
+  /** Restore theme preference from localStorage and apply the theme CSS. */
   restoreThemeFromLocalStorage(): void {
     const stored = localStorage.getItem(THEME_KEY);
 
-    if (stored === Theme.Dark) {
-      this.theme.set(Theme.Dark);
-      document.documentElement.classList.add(Theme.Dark);
+    if (stored) {
+      this.theme.set(stored);
+      this.themeLoader.loadTheme(stored);
     }
   }
 
@@ -66,25 +60,35 @@ export class PreferencesStore {
     this.applyPreferences(prefs);
   }
 
-  /** Set zoom level, apply CSS, and schedule a debounced backend save. */
-  setZoom(value: number): void {
+  /** Set zoom level and apply CSS — without saving to backend. */
+  setZoomLocal(value: number): void {
     this.zoom.set(value);
     document.documentElement.style.setProperty('font-size', `${value}%`);
-    this.scheduleZoomSave();
+    this.pendingZoom = value;
   }
 
-  /** Set theme, toggle CSS class, sync localStorage, and save immediately to backend. */
-  setTheme(theme: Theme): void {
-    this.theme.set(theme);
-
-    if (theme === Theme.Dark) {
-      document.documentElement.classList.add(Theme.Dark);
-    } else {
-      document.documentElement.classList.remove(Theme.Dark);
+  /** Persist the pending zoom change to the backend. No-op if nothing is pending. */
+  commitZoom(): void {
+    if (this.pendingZoom !== null) {
+      this.saveToBackend({ zoom: this.pendingZoom });
+      this.pendingZoom = null;
     }
+  }
 
-    localStorage.setItem(THEME_KEY, theme);
-    this.saveToBackend({ theme });
+  /** Set theme, load the corresponding CSS file, and sync localStorage — without saving to backend. */
+  setThemeLocal(themeId: string): void {
+    this.theme.set(themeId);
+    this.themeLoader.loadTheme(themeId);
+    localStorage.setItem(THEME_KEY, themeId);
+    this.pendingTheme = themeId;
+  }
+
+  /** Persist the pending theme change to the backend. No-op if nothing is pending. */
+  commitTheme(): void {
+    if (this.pendingTheme !== null) {
+      this.saveToBackend({ theme: this.pendingTheme });
+      this.pendingTheme = null;
+    }
   }
 
   /** Set language, switch Transloco active lang, and persist to backend. */
@@ -103,25 +107,9 @@ export class PreferencesStore {
 
     document.documentElement.style.setProperty('font-size', `${prefs.zoom}%`);
 
-    if (prefs.theme === Theme.Dark) {
-      document.documentElement.classList.add(Theme.Dark);
-    } else {
-      document.documentElement.classList.remove(Theme.Dark);
-    }
+    this.themeLoader.loadTheme(prefs.theme);
 
     localStorage.setItem(THEME_KEY, prefs.theme);
-  }
-
-  /** Clear existing debounce timer and schedule a new 5-second zoom save. */
-  private scheduleZoomSave(): void {
-    if (this.zoomDebounceTimer !== null) {
-      clearTimeout(this.zoomDebounceTimer);
-    }
-
-    this.zoomDebounceTimer = setTimeout(() => {
-      this.zoomDebounceTimer = null;
-      this.saveToBackend({ zoom: this.zoom() });
-    }, ZOOM_SAVE_DELAY_MS);
   }
 
   /** Persist a partial preferences update to the backend. */

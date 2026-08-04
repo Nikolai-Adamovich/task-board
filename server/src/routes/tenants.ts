@@ -10,7 +10,7 @@ import { getCollection } from '../db/mongo.js';
 import type { TenantDocument } from '../repositories/tenant.repository.js';
 import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
 import type { UserDocument } from '../repositories/user.repository.js';
-import { CreateTenantSchema, UpdateTenantSchema, InviteMemberSchema } from '@task-board/shared';
+import { CreateTenantSchema, UpdateTenantSchema, InviteMemberSchema } from '../schemas/tenant.js';
 import type { CreateTenant } from '@task-board/shared';
 
 // ─── Tenant Routes ───────────────────────────────────────────────────────────

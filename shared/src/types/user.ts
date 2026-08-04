@@ -1,8 +1,20 @@
-import type { z } from 'zod';
-import type { UserSchema, CreateUserSchema } from '../schemas/user.js';
-
 /** User entity type */
-export type User = z.infer<typeof UserSchema>;
+export interface User {
+  /** Unique user identifier (UUID v4) */
+  id: string;
+  /** User's email address */
+  email: string;
+  /** User's display name */
+  displayName: string;
+  /** Account creation timestamp (ISO 8601) */
+  createdAt: string;
+  /** Last update timestamp (ISO 8601) */
+  updatedAt: string;
+}
 
 /** Create user request body type */
-export type CreateUser = z.infer<typeof CreateUserSchema>;
+export interface CreateUser {
+  email: string;
+  password: string;
+  displayName: string;
+}

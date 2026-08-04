@@ -13,7 +13,7 @@ import type { ColumnDocument } from '../repositories/column.repository.js';
 import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
 import type { TenantDocument } from '../repositories/tenant.repository.js';
 import type { ProjectDocument } from '../repositories/project.repository.js';
-import { CreateTaskSchema, UpdateTaskSchema, MoveTaskSchema, AssignTaskSchema } from '@task-board/shared';
+import { CreateTaskSchema, UpdateTaskSchema, MoveTaskSchema, AssignTaskSchema } from '../schemas/task.js';
 
 // ─── Task Routes ─────────────────────────────────────────────────────────────
 

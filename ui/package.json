@@ -5,14 +5,20 @@
   "type": "module",
   "scripts": {
     "ng": "ng",
+    "generate:themes": "node scripts/generate-theme-manifest.mjs",
+    "prestart": "npm run generate:themes",
     "start": "ng serve",
+    "prebuild": "npm run generate:themes",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development",
+    "pretest": "npm run generate:themes",
     "test": "ng test --no-watch",
+    "pretest:verbose": "npm run generate:themes",
     "test:verbose": "ng test --no-watch --reporters=verbose",
+    "pree2e": "npm run generate:themes",
     "e2e": "npx playwright test",
     "e2e:ui": "npx playwright test --ui",
-    "analyze": "esbuild-visualizer --metadata dist/ui/stats.json --filename dist/ui/stats.html"
+    "create-stats": "ng build --configuration production --stats-json",
+    "analyze-stats": "esbuild-visualizer --metadata dist/ui/stats.json --filename dist/ui/stats.html"
   },
   "dependencies": {
     "@angular/animations": "^22.0.0",

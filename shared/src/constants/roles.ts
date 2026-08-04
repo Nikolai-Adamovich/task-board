@@ -1,8 +1,8 @@
-import { z } from 'zod';
+import { valuesOf } from '../utils/values-of.js';
 
 /**
- * Type-safe enum-like constants with Zod schema support.
- * Each constant provides both the value object and a Zod enum schema.
+ * Type-safe enum-like constants.
+ * Each constant provides the value object, the union type, and a values tuple.
  */
 
 // ─── TenantRole ──────────────────────────────────────────────────────────────
@@ -13,8 +13,7 @@ export const TenantRole = {
 } as const;
 
 export type TenantRole = (typeof TenantRole)[keyof typeof TenantRole];
-export const TenantRoleSchema = z.enum(TenantRole);
-export const TenantRoleValues = Object.values(TenantRole) as [TenantRole, ...TenantRole[]];
+export const TenantRoleValues = valuesOf(TenantRole);
 
 // ─── ProjectRole ─────────────────────────────────────────────────────────────
 export const ProjectRole = {
@@ -24,8 +23,7 @@ export const ProjectRole = {
 } as const;
 
 export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole];
-export const ProjectRoleSchema = z.enum(ProjectRole);
-export const ProjectRoleValues = Object.values(ProjectRole) as [ProjectRole, ...ProjectRole[]];
+export const ProjectRoleValues = valuesOf(ProjectRole);
 
 // ─── TaskPriority ────────────────────────────────────────────────────────────
 export const TaskPriority = {
@@ -36,8 +34,7 @@ export const TaskPriority = {
 } as const;
 
 export type TaskPriority = (typeof TaskPriority)[keyof typeof TaskPriority];
-export const TaskPrioritySchema = z.enum(TaskPriority);
-export const TaskPriorityValues = Object.values(TaskPriority) as [TaskPriority, ...TaskPriority[]];
+export const TaskPriorityValues = valuesOf(TaskPriority);
 
 // ─── SprintStatus ────────────────────────────────────────────────────────────
 export const SprintStatus = {
@@ -47,8 +44,7 @@ export const SprintStatus = {
 } as const;
 
 export type SprintStatus = (typeof SprintStatus)[keyof typeof SprintStatus];
-export const SprintStatusSchema = z.enum(SprintStatus);
-export const SprintStatusValues = Object.values(SprintStatus) as [SprintStatus, ...SprintStatus[]];
+export const SprintStatusValues = valuesOf(SprintStatus);
 
 // ─── MemberStatus ────────────────────────────────────────────────────────────
 export const MemberStatus = {
@@ -59,8 +55,7 @@ export const MemberStatus = {
 } as const;
 
 export type MemberStatus = (typeof MemberStatus)[keyof typeof MemberStatus];
-export const MemberStatusSchema = z.enum(MemberStatus);
-export const MemberStatusValues = Object.values(MemberStatus) as [MemberStatus, ...MemberStatus[]];
+export const MemberStatusValues = valuesOf(MemberStatus);
 
 // ─── SubscriptionTier ────────────────────────────────────────────────────────
 export const SubscriptionTier = {
@@ -69,5 +64,4 @@ export const SubscriptionTier = {
 } as const;
 
 export type SubscriptionTier = (typeof SubscriptionTier)[keyof typeof SubscriptionTier];
-export const SubscriptionTierSchema = z.enum(SubscriptionTier);
-export const SubscriptionTierValues = Object.values(SubscriptionTier) as [SubscriptionTier, ...SubscriptionTier[]];
+export const SubscriptionTierValues = valuesOf(SubscriptionTier);

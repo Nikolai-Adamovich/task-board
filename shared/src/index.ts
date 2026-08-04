@@ -1,59 +1,34 @@
 // @task-board/shared
-// Single source of truth for types, schemas, contracts, constants, and validators.
+// Single source of truth for types and constants.
+// Runtime-library free — no imports from Zod, Angular, Hono, RxJS, etc.
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+export { valuesOf } from './utils/values-of.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 export {
   TenantRole,
-  TenantRoleSchema,
   TenantRoleValues,
   ProjectRole,
-  ProjectRoleSchema,
   ProjectRoleValues,
   TaskPriority,
-  TaskPrioritySchema,
   TaskPriorityValues,
   SprintStatus,
-  SprintStatusSchema,
   SprintStatusValues,
   MemberStatus,
-  MemberStatusSchema,
   MemberStatusValues,
   SubscriptionTier,
-  SubscriptionTierSchema,
   SubscriptionTierValues,
 } from './constants/roles.js';
 export { DefaultColumnNames } from './constants/columns.js';
 export { ExpandState } from './constants/expand-state.js';
-export { HttpMethod, HttpMethodSchema, HttpMethodValues } from './constants/http.js';
+export { HttpMethod, HttpMethodValues } from './constants/http.js';
 export { API_BASE_PATH, ApiPaths } from './constants/paths.js';
-export { Theme, ThemeSchema, ThemeValues } from './constants/theme.js';
+export { DEFAULT_THEME_ID } from './constants/theme.js';
 
-// ─── Validators ─────────────────────────────────────────────────────────────
-export { uuid } from './validators/uuid.js';
-export { slug } from './validators/slug.js';
-export { paginationQuery } from './validators/pagination.js';
+// ─── Types ───────────────────────────────────────────────────────────────────
+export type { User, CreateUser } from './types/user.js';
 
-// ─── Schemas ────────────────────────────────────────────────────────────────
-export {
-  ErrorResponseSchema,
-  PaginationSchema,
-  createPaginatedResponseSchema,
-  ListQuerySchema,
-} from './schemas/common.js';
-export type { ErrorResponse, Pagination, ListQuery } from './schemas/common.js';
-
-export { UserSchema, CreateUserSchema } from './schemas/user.js';
-export type { User, CreateUser } from './schemas/user.js';
-
-export {
-  LoginRequestSchema,
-  RegisterRequestSchema,
-  AuthResponseSchema,
-  AcceptInvitationSchema,
-  InvitationDetailsSchema,
-  MyInvitationSchema,
-  PendingInvitationSchema,
-} from './schemas/auth.js';
 export type {
   LoginRequest,
   RegisterRequest,
@@ -62,63 +37,24 @@ export type {
   InvitationDetails,
   MyInvitation,
   PendingInvitation,
-} from './schemas/auth.js';
+} from './types/auth.js';
 
-export {
-  TenantSchema,
-  CreateTenantSchema,
-  UpdateTenantSchema,
-  TenantMemberSchema,
-  InviteMemberSchema,
-  TenantWithRoleSchema,
-} from './schemas/tenant.js';
+export type { Tenant, CreateTenant, UpdateTenant, TenantMember, InviteMember, TenantWithRole } from './types/tenant.js';
+
+export type { Project, CreateProject, UpdateProject, ProjectMember } from './types/project.js';
+
+export type { Board, CreateBoard, UpdateBoard, Column, CreateColumn } from './types/board.js';
+
+export type { Task, CreateTask, UpdateTask, MoveTask, AssignTask, MyTask } from './types/task.js';
+
+export type { Sprint, CreateSprint, UpdateSprint } from './types/sprint.js';
+
 export type {
-  Tenant,
-  CreateTenant,
-  UpdateTenant,
-  TenantMember,
-  InviteMember,
-  TenantWithRole,
-} from './schemas/tenant.js';
-
-export { ProjectSchema, CreateProjectSchema, UpdateProjectSchema, ProjectMemberSchema } from './schemas/project.js';
-export type { Project, CreateProject, UpdateProject, ProjectMember } from './schemas/project.js';
-
-export {
-  BoardSchema,
-  CreateBoardSchema,
-  UpdateBoardSchema,
-  ColumnSchema,
-  CreateColumnSchema,
-} from './schemas/board.js';
-export type { Board, CreateBoard, UpdateBoard, Column, CreateColumn } from './schemas/board.js';
-
-export {
-  TaskSchema,
-  CreateTaskSchema,
-  UpdateTaskSchema,
-  MoveTaskSchema,
-  AssignTaskSchema,
-  MyTaskSchema,
-} from './schemas/task.js';
-export type { Task, CreateTask, UpdateTask, MoveTask, AssignTask, MyTask } from './schemas/task.js';
-
-export { SprintSchema, CreateSprintSchema, UpdateSprintSchema } from './schemas/sprint.js';
-export type { Sprint, CreateSprint, UpdateSprint } from './schemas/sprint.js';
-
-export { UserPreferencesSchema, UpdateUserPreferencesSchema } from './schemas/user-preferences.js';
-export type { UserPreferences, UpdateUserPreferences } from './schemas/user-preferences.js';
-
-export { SupportRequestSchema } from './schemas/support.js';
-export type { SupportRequest } from './schemas/support.js';
-
-// ─── Contracts ──────────────────────────────────────────────────────────────
-export type { ApiContract } from './contracts/common.contracts.js';
-export { authContracts } from './contracts/auth.contracts.js';
-export { userContracts } from './contracts/user.contracts.js';
-export { tenantContracts } from './contracts/tenant.contracts.js';
-export { projectContracts } from './contracts/project.contracts.js';
-export { boardContracts } from './contracts/board.contracts.js';
-export { taskContracts } from './contracts/task.contracts.js';
-export { sprintContracts } from './contracts/sprint.contracts.js';
-export { userPreferencesContracts } from './contracts/user-preferences.contracts.js';
+  ThemeManifestItem,
+  UserPreferences,
+  UpdateUserPreferences,
+  ErrorResponse,
+  Pagination,
+  ListQuery,
+  SupportRequest,
+} from './types/common.js';
