@@ -10,6 +10,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { WorkspaceDetail } from './workspace-detail';
 import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
@@ -56,6 +57,7 @@ describe('WorkspaceDetail', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -150,6 +152,7 @@ describe('WorkspaceDetail', () => {
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),

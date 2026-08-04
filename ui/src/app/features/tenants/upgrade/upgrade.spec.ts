@@ -11,6 +11,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { Upgrade } from './upgrade';
 import { TenantStore } from '@stores/tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
@@ -52,6 +53,7 @@ describe('Upgrade', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -120,7 +122,7 @@ describe('Upgrade', () => {
       component.upgrade();
       await new Promise((r) => setTimeout(r, 0));
 
-      expect(component.error()).toBe('Failed to upgrade. Please try again.');
+      expect(component.error()).toBe('upgrade.failed');
       expect(component.upgrading()).toBe(false);
     });
 
@@ -154,6 +156,7 @@ describe('Upgrade', () => {
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),

@@ -11,6 +11,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { InvitationView } from './invitation-view';
 import { TenantClient } from '@services/tenant-client';
 import { API_BASE_URL } from '@app/api-url.token';
@@ -37,6 +38,7 @@ describe('InvitationView', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),

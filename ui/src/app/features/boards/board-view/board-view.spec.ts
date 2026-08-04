@@ -16,6 +16,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { BoardView } from './board-view';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
@@ -133,6 +134,7 @@ describe('BoardView', () => {
     routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -166,6 +168,7 @@ describe('BoardView', () => {
       routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -199,6 +202,7 @@ describe('BoardView', () => {
       routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),

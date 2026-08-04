@@ -10,6 +10,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { ColumnView } from './column-view';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Column, Task } from '@task-board/shared';
@@ -65,6 +66,7 @@ describe('ColumnView', () => {
 
   function setup() {
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),

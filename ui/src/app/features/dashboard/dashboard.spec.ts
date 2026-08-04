@@ -12,6 +12,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { Dashboard } from './dashboard';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
@@ -87,6 +88,7 @@ describe('Dashboard', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -143,6 +145,7 @@ describe('Dashboard', () => {
       taskClientMock = { getMyTasks: vi.fn().mockReturnValue(of({ data: [], total: 0 })) };
 
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -180,6 +183,7 @@ describe('Dashboard', () => {
       taskClientMock = { getMyTasks: vi.fn() };
 
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),

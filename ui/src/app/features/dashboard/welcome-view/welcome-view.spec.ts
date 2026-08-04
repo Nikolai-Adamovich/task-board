@@ -9,6 +9,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { WelcomeView } from './welcome-view';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
@@ -35,6 +36,7 @@ describe('WelcomeView', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),

@@ -18,6 +18,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TenantMemberList } from './tenant-member-list';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
@@ -84,6 +85,7 @@ describe('TenantMemberList', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),

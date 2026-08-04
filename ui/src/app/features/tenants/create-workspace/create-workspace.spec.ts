@@ -10,6 +10,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { CreateWorkspace } from './create-workspace';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
@@ -51,6 +52,7 @@ describe('CreateWorkspace', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),

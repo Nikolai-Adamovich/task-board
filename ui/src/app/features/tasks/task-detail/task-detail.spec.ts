@@ -15,6 +15,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TaskDetail, EditTaskForm } from './task-detail';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
@@ -63,6 +64,7 @@ describe('TaskDetail', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -110,6 +112,7 @@ describe('TaskDetail', () => {
         currentUser: vi.fn().mockReturnValue(null),
       };
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -229,6 +232,7 @@ describe('TaskDetail', () => {
         delete: vi.fn(),
       };
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),

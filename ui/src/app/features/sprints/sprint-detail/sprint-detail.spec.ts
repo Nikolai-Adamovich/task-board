@@ -12,6 +12,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { SprintDetail } from './sprint-detail';
 import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
@@ -94,6 +95,7 @@ describe('SprintDetail', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -143,6 +145,7 @@ describe('SprintDetail', () => {
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),

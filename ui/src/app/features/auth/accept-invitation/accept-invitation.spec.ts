@@ -14,6 +14,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { AcceptInvitation } from './accept-invitation';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
@@ -61,6 +62,7 @@ describe('AcceptInvitation', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -193,7 +195,7 @@ describe('AcceptInvitation', () => {
     it('should set error when no token in query params', () => {
       setup(null);
 
-      expect(component.error()).toBe('No invitation token provided.');
+      expect(component.error()).toBe('auth.invitation.noToken');
       expect(component.loading()).toBe(false);
       expect(tenantClientMock.getInvitationDetails).not.toHaveBeenCalled();
     });
@@ -209,6 +211,7 @@ describe('AcceptInvitation', () => {
       routeMock = { snapshot: { queryParamMap: { get: vi.fn().mockReturnValue('bad-token') } } };
 
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),

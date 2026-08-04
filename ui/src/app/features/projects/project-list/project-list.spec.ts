@@ -13,6 +13,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { ProjectList, CreateProjectForm } from './project-list';
 import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
@@ -67,6 +68,7 @@ describe('ProjectList', () => {
     };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -109,6 +111,7 @@ describe('ProjectList', () => {
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),

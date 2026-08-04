@@ -13,6 +13,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { submit } from '@angular/forms/signals';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TenantSettings } from './tenant-settings';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
@@ -54,6 +55,7 @@ describe('TenantSettings', () => {
     routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -150,7 +152,7 @@ describe('TenantSettings', () => {
       submit(component.settingsForm);
 
       await new Promise((r) => setTimeout(r, 0));
-      expect(component.error()).toBe('An unexpected error occurred. Please try again.');
+      expect(component.error()).toBe('errors.unexpected');
       expect(component.loading()).toBe(false);
     });
   });
@@ -183,7 +185,7 @@ describe('TenantSettings', () => {
       component.deleteTenant();
 
       await new Promise((r) => setTimeout(r, 0));
-      expect(component.error()).toBe('An unexpected error occurred. Please try again.');
+      expect(component.error()).toBe('errors.unexpected');
       expect(component.loading()).toBe(false);
     });
   });
