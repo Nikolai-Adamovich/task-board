@@ -59,4 +59,7 @@
 <ng-template #languageMenu>
   <ui-language-switcher />
 </ng-template>
-<ui-user-menu-theme-sheet [open]="themeSheetOpen()" (openChange)="themeSheetOpen.set($event)" />
+
+@defer (on idle) {
+  <ui-user-menu-theme-sheet [open]="themeSheetOpen()" (openChange)="themeSheetOpen.set($event)" />
+}

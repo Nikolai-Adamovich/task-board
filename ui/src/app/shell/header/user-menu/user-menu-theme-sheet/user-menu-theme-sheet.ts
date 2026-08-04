@@ -27,8 +27,12 @@ export class UserMenuThemeSheet {
   protected readonly focusedTheme = signal<string | null>(null);
 
   constructor() {
-    // Load manifest lazily when the component is created (i.e., when the sheet opens).
-    this.themeRegistry.load();
+    // Load manifest only when the sheet is actually opened by the user.
+    effect(() => {
+      if (this.open() === ExpandState.Open) {
+        this.themeRegistry.load();
+      }
+    });
 
     // Commit pending theme to backend when the sheet is closed.
     effect(() => {
