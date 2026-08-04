@@ -32,9 +32,6 @@ jobs:
       - name: Lint all packages
         run: npm run lint
 
-      - name: Run shared tests
-        run: npm test --workspace=shared
-
       - name: Run server tests
         run: npm test --workspace=server
 

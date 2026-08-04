@@ -6,7 +6,7 @@ import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { PreferencesStore } from './preferences-store';
 import { AuthStore } from './auth-store';
-import { ThemeLoaderService } from '@services/theme-loader.service';
+import { ThemeLoader } from '@services/theme-loader';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { User, UserPreferences } from '@task-board/shared';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -30,14 +30,14 @@ describe('PreferencesStore', () => {
           }),
         ),
         {
-          provide: ThemeLoaderService,
+          provide: ThemeLoader,
           useValue: { loadTheme: vi.fn() },
         },
       ],
     });
 
     httpMock = TestBed.inject(HttpTestingController);
-    themeLoader = TestBed.inject(ThemeLoaderService);
+    themeLoader = TestBed.inject(ThemeLoader);
   }
 
   beforeEach(() => {
