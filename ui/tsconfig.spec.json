@@ -47,5 +47,5 @@
     "strictTemplates": true
   },
   "files": [],
-  "include": ["src/**/*.spec.ts", "src/**/*.test.ts", "libs/ui/**/src/**/*.ts"]
+  "include": ["src/**/*.spec.ts", "src/**/*.test.ts", "libs/ui/**/src/**/*.ts", "test-setup.ts"]
 }
