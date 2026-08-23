@@ -13,10 +13,10 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { FilterPanel } from './filter-panel';
+import { FilterPanel, type AppliedFilterState } from './filter-panel';
 import { FilterClient } from '@services/filter-client';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Filter, FilterCriteria } from '@task-board/shared';
+import type { Filter } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockFilters: Filter[] = [
@@ -50,7 +50,7 @@ describe('FilterPanel', () => {
     create: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
-  let emittedCriteria: FilterCriteria | undefined;
+  let emittedCriteria: AppliedFilterState | undefined;
 
   function setup(filters: Filter[] = mockFilters) {
     emittedCriteria = undefined;
@@ -90,8 +90,8 @@ describe('FilterPanel', () => {
     fixture.componentRef.setInput('currentSort', { field: 'createdAt', direction: 'desc' });
 
     component = fixture.componentInstance;
-    component.filterApplied.subscribe((criteria: FilterCriteria) => {
-      emittedCriteria = criteria;
+    component.filterApplied.subscribe((state: AppliedFilterState) => {
+      emittedCriteria = state;
     });
     fixture.detectChanges();
   }
@@ -162,7 +162,10 @@ describe('FilterPanel', () => {
     const filter = component.filters()[0];
 
     component.applyFilter(filter);
-    expect(emittedCriteria).toEqual({ priority: ['HIGH', 'CRITICAL'] });
+    expect(emittedCriteria).toEqual({
+      filters: { priority: ['HIGH', 'CRITICAL'] },
+      sort: { field: 'priority', direction: 'desc' },
+    });
   });
 
   // ── Delete ──────────────────────────────────────────────────────

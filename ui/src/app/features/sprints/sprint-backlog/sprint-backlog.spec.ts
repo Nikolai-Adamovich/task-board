@@ -84,9 +84,7 @@ describe('SprintBacklog', () => {
       list: vi
         .fn()
         .mockReturnValue(of({ data: mockBacklogTasks, pagination: { total: 2, page: 1, limit: 200, totalPages: 1 } })),
-      update: vi
-        .fn()
-        .mockImplementation((_id: string, data: Partial<Task>) => of({ data: { ...mockBacklogTasks[0], ...data } })),
+      update: vi.fn().mockImplementation((_id: string, data: Partial<Task>) => of({ ...mockBacklogTasks[0], ...data })),
     };
 
     TestBed.configureTestingModule({

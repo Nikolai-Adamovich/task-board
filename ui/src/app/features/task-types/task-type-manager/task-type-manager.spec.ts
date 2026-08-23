@@ -18,6 +18,8 @@ import { submit } from '@angular/forms/signals';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TaskTypeManager } from './task-type-manager';
 import { TaskTypeClient } from '@services/task-type-client';
+import { ProjectStore } from '@stores/project-store';
+import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { TaskType } from '@task-board/shared';
 
@@ -40,7 +42,7 @@ describe('TaskTypeManager', () => {
 
   function setup() {
     taskTypeClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: [...mockTaskTypes] })),
+      list: vi.fn().mockReturnValue(of([...mockTaskTypes])),
       create: vi
         .fn()
         .mockImplementation((_pid: string, data: { key: string; name: string; icon: string; position: number }) =>
@@ -60,9 +62,9 @@ describe('TaskTypeManager', () => {
       update: vi.fn().mockImplementation((id: string, data: { name?: string; icon?: string; position?: number }) => {
         const existing = mockTaskTypes.find((t) => t.id === id) ?? mockTaskTypes[0];
 
-        return of({ data: { ...existing, ...data, updatedAt: NOW } });
+        return of({ ...existing, ...data, updatedAt: NOW });
       }),
-      delete: vi.fn().mockReturnValue(of({ data: { success: true } })),
+      delete: vi.fn().mockReturnValue(of({ success: true })),
     };
 
     TestBed.configureTestingModule({
@@ -72,13 +74,23 @@ describe('TaskTypeManager', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        {
+          provide: AuthStore,
+          useValue: {
+            isAuthenticated: () => false,
+            currentUser: () => null,
+            token: () => null,
+            tenantRole: () => null,
+          },
+        },
         { provide: TaskTypeClient, useValue: taskTypeClientMock },
+        { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
       ],
     });
 
     const fixture = TestBed.createComponent(TaskTypeManager);
 
-    fixture.componentRef.setInput('projectId', 'p1');
+    fixture.componentRef.setInput('projectKey', 'proj-key');
     component = fixture.componentInstance;
     fixture.detectChanges();
   }
@@ -111,13 +123,23 @@ describe('TaskTypeManager', () => {
           provideHttpClientTesting(),
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+          {
+            provide: AuthStore,
+            useValue: {
+              isAuthenticated: () => false,
+              currentUser: () => null,
+              token: () => null,
+              tenantRole: () => null,
+            },
+          },
           { provide: TaskTypeClient, useValue: taskTypeClientMock },
+          { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
         ],
       });
 
       const fixture = TestBed.createComponent(TaskTypeManager);
 
-      fixture.componentRef.setInput('projectId', 'p1');
+      fixture.componentRef.setInput('projectKey', 'proj-key');
       component = fixture.componentInstance;
       fixture.detectChanges();
       expect(component.loading()).toBe(false);

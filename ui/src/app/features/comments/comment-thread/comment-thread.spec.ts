@@ -16,6 +16,7 @@ import { of, throwError } from 'rxjs';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { CommentThread } from './comment-thread';
 import { CommentClient } from '@services/comment-client';
+import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Comment } from '@task-board/shared';
 
@@ -89,6 +90,7 @@ describe('CommentThread', () => {
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: CommentClient, useValue: commentClientMock },
+        { provide: AuthStore, useValue: { tenantRole: vi.fn().mockReturnValue(canEdit ? 'ADMIN' : null) } },
       ],
     });
 
@@ -126,6 +128,7 @@ describe('CommentThread', () => {
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: CommentClient, useValue: commentClientMock },
+        { provide: AuthStore, useValue: { tenantRole: vi.fn().mockReturnValue(null) } },
       ],
     });
 

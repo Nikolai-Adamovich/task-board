@@ -19,6 +19,7 @@ import { ProjectDetail } from './project-detail';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
 import { AuthStore } from '@stores/auth-store';
+import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Project, Board } from '@task-board/shared';
 
@@ -72,7 +73,12 @@ describe('ProjectDetail', () => {
     list: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
   };
-  let authStoreMock: { tenantRole: ReturnType<typeof vi.fn> };
+  let authStoreMock: {
+    tenantRole: ReturnType<typeof vi.fn>;
+    isAuthenticated: () => boolean;
+    currentUser: () => null;
+    token: () => null;
+  };
 
   function setup() {
     projectClientMock = {
@@ -88,6 +94,9 @@ describe('ProjectDetail', () => {
     };
     authStoreMock = {
       tenantRole: vi.fn().mockReturnValue('OWNER'),
+      isAuthenticated: () => false,
+      currentUser: () => null,
+      token: () => null,
     };
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
@@ -99,12 +108,13 @@ describe('ProjectDetail', () => {
         { provide: ProjectClient, useValue: projectClientMock },
         { provide: BoardClient, useValue: boardClientMock },
         { provide: AuthStore, useValue: authStoreMock },
+        { provide: ProjectStore, useValue: { activeProject: () => ({ id: mockProject.id }), projectRole: () => null } },
       ],
     });
 
     const fixture = TestBed.createComponent(ProjectDetail);
 
-    fixture.componentRef.setInput('projectId', mockProject.id);
+    fixture.componentRef.setInput('projectKey', mockProject.key);
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -198,7 +208,12 @@ describe('ProjectDetail', () => {
     });
 
     it('should be true when tenantRole is ADMIN', () => {
-      authStoreMock = { tenantRole: vi.fn().mockReturnValue('ADMIN') };
+      authStoreMock = {
+        tenantRole: vi.fn().mockReturnValue('ADMIN'),
+        isAuthenticated: () => false,
+        currentUser: () => null,
+        token: () => null,
+      };
       projectClientMock = {
         getById: vi.fn().mockReturnValue(of(mockProject)),
         archive: vi.fn(),
@@ -221,12 +236,16 @@ describe('ProjectDetail', () => {
           { provide: ProjectClient, useValue: projectClientMock },
           { provide: BoardClient, useValue: boardClientMock },
           { provide: AuthStore, useValue: authStoreMock },
+          {
+            provide: ProjectStore,
+            useValue: { activeProject: () => ({ id: mockProject.id }), projectRole: () => null },
+          },
         ],
       });
 
       const fixture = TestBed.createComponent(ProjectDetail);
 
-      fixture.componentRef.setInput('projectId', mockProject.id);
+      fixture.componentRef.setInput('projectKey', mockProject.key);
 
       component = fixture.componentInstance;
       fixture.detectChanges();
@@ -235,7 +254,12 @@ describe('ProjectDetail', () => {
     });
 
     it('should be false when tenantRole is MEMBER', () => {
-      authStoreMock = { tenantRole: vi.fn().mockReturnValue('MEMBER') };
+      authStoreMock = {
+        tenantRole: vi.fn().mockReturnValue('MEMBER'),
+        isAuthenticated: () => false,
+        currentUser: () => null,
+        token: () => null,
+      };
       projectClientMock = {
         getById: vi.fn().mockReturnValue(of(mockProject)),
         archive: vi.fn(),
@@ -259,12 +283,16 @@ describe('ProjectDetail', () => {
           { provide: ProjectClient, useValue: projectClientMock },
           { provide: BoardClient, useValue: boardClientMock },
           { provide: AuthStore, useValue: authStoreMock },
+          {
+            provide: ProjectStore,
+            useValue: { activeProject: () => ({ id: mockProject.id }), projectRole: () => null },
+          },
         ],
       });
 
       const fixture = TestBed.createComponent(ProjectDetail);
 
-      fixture.componentRef.setInput('projectId', mockProject.id);
+      fixture.componentRef.setInput('projectKey', mockProject.key);
 
       component = fixture.componentInstance;
       fixture.detectChanges();

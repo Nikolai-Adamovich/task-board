@@ -19,6 +19,9 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { BoardView } from './board-view';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
+import { StatusClient } from '@services/status-client';
+import { ProjectStore } from '@stores/project-store';
+import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Board, Task, TaskPriority } from '@task-board/shared';
 
@@ -82,7 +85,7 @@ const mockTasks: Task[] = [
 
 function createBoardClientMock() {
   return {
-    getById: vi.fn().mockReturnValue(of({ data: mockBoard })),
+    getById: vi.fn().mockReturnValue(of(mockBoard)),
   };
 }
 
@@ -91,9 +94,7 @@ function createTaskClientMock() {
     list: vi
       .fn()
       .mockReturnValue(of({ data: mockTasks, pagination: { total: 3, page: 1, limit: 200, totalPages: 1 } })),
-    create: vi
-      .fn()
-      .mockReturnValue(of({ data: makeTask({ id: 'tk000000-0000-0000-0000-000000000099', title: 'New Task' }) })),
+    create: vi.fn().mockReturnValue(of(makeTask({ id: 'tk000000-0000-0000-0000-000000000099', title: 'New Task' }))),
   };
 }
 
@@ -118,15 +119,30 @@ describe('BoardView', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        {
+          provide: AuthStore,
+          useValue: {
+            isAuthenticated: () => false,
+            currentUser: () => null,
+            token: () => null,
+            tenantRole: () => null,
+          },
+        },
         { provide: BoardClient, useValue: boardClientMock },
         { provide: TaskClient, useValue: taskClientMock },
+        { provide: StatusClient, useValue: { list: vi.fn().mockReturnValue(of([])) } },
         { provide: Router, useValue: routerMock },
         {
           provide: ActivatedRoute,
           useValue: {
+            queryParams: of({}),
             snapshot: { paramMap: { get: () => 't1' } },
-            parent: { snapshot: { paramMap: { get: () => 't1' } }, parent: null },
+            parent: { queryParams: of({}), snapshot: { paramMap: { get: () => 't1' } }, parent: null },
           },
+        },
+        {
+          provide: ProjectStore,
+          useValue: { activeProject: () => ({ id: 'p0000000-0000-0000-0000-000000000001' }), projectRole: () => null },
         },
       ],
     });
@@ -135,7 +151,7 @@ describe('BoardView', () => {
 
     // Set required input before detectChanges
     fixture.componentRef.setInput('boardId', 'b0000000-0000-0000-0000-000000000001');
-    fixture.componentRef.setInput('projectId', 'p0000000-0000-0000-0000-000000000001');
+    fixture.componentRef.setInput('projectKey', 'proj-key');
     Object.entries(inputOverrides).forEach(([key, value]) => {
       fixture.componentRef.setInput(key, value);
     });
@@ -159,14 +175,32 @@ describe('BoardView', () => {
           provideHttpClientTesting(),
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+          {
+            provide: AuthStore,
+            useValue: {
+              isAuthenticated: () => false,
+              currentUser: () => null,
+              token: () => null,
+              tenantRole: () => null,
+            },
+          },
           { provide: BoardClient, useValue: boardClientMock },
           { provide: TaskClient, useValue: taskClientMock },
+          { provide: StatusClient, useValue: { list: vi.fn().mockReturnValue(of([])) } },
           { provide: Router, useValue: routerMock },
           {
             provide: ActivatedRoute,
             useValue: {
+              queryParams: of({}),
               snapshot: { paramMap: { get: () => 't1' } },
-              parent: { snapshot: { paramMap: { get: () => 't1' } }, parent: null },
+              parent: { queryParams: of({}), snapshot: { paramMap: { get: () => 't1' } }, parent: null },
+            },
+          },
+          {
+            provide: ProjectStore,
+            useValue: {
+              activeProject: () => ({ id: 'p0000000-0000-0000-0000-000000000001' }),
+              projectRole: () => null,
             },
           },
         ],
@@ -200,14 +234,32 @@ describe('BoardView', () => {
           provideHttpClientTesting(),
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+          {
+            provide: AuthStore,
+            useValue: {
+              isAuthenticated: () => false,
+              currentUser: () => null,
+              token: () => null,
+              tenantRole: () => null,
+            },
+          },
           { provide: BoardClient, useValue: boardClientMock },
           { provide: TaskClient, useValue: taskClientMock },
+          { provide: StatusClient, useValue: { list: vi.fn().mockReturnValue(of([])) } },
           { provide: Router, useValue: routerMock },
           {
             provide: ActivatedRoute,
             useValue: {
+              queryParams: of({}),
               snapshot: { paramMap: { get: () => 't1' } },
-              parent: { snapshot: { paramMap: { get: () => 't1' } }, parent: null },
+              parent: { queryParams: of({}), snapshot: { paramMap: { get: () => 't1' } }, parent: null },
+            },
+          },
+          {
+            provide: ProjectStore,
+            useValue: {
+              activeProject: () => ({ id: 'p0000000-0000-0000-0000-000000000001' }),
+              projectRole: () => null,
             },
           },
         ],

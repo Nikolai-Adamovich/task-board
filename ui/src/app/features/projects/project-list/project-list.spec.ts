@@ -76,8 +76,8 @@ describe('ProjectList', () => {
 
   function setup(hasTenant = true, hasUser = true) {
     projectClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: mockProjects })),
-      create: vi.fn().mockReturnValue(of({ data: { ...mockProjects[0], id: 'p3', name: 'New Project', key: 'NP' } })),
+      list: vi.fn().mockReturnValue(of(mockProjects)),
+      create: vi.fn().mockReturnValue(of({ ...mockProjects[0], id: 'p3', name: 'New Project', key: 'NP' })),
     };
     tenantStoreMock = {
       activeTenant: vi.fn().mockReturnValue(hasTenant ? mockTenant : null),
@@ -122,7 +122,7 @@ describe('ProjectList', () => {
     it('should not load projects when no active tenant', () => {
       // Re-setup without tenant
       projectClientMock = {
-        list: vi.fn().mockReturnValue(of({ data: [] })),
+        list: vi.fn().mockReturnValue(of([])),
         create: vi.fn(),
       };
       tenantStoreMock = { activeTenant: vi.fn().mockReturnValue(null) };

@@ -56,7 +56,7 @@ describe('WorkspaceDetail', () => {
 
   function setup(tenant: TenantWithRole | null = mockFreeTenant, role = 'OWNER') {
     projectClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: mockProjects, total: 1, page: 1, limit: 100 })),
+      list: vi.fn().mockReturnValue(of(mockProjects)),
     };
     tenantStoreMock = {
       activeTenant: vi.fn().mockReturnValue(tenant),

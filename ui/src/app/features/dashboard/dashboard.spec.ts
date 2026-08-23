@@ -82,10 +82,10 @@ describe('Dashboard', () => {
       loadTenants: vi.fn().mockResolvedValue(tenants),
     };
     tenantClientMock = {
-      getMyInvitations: vi.fn().mockReturnValue(of({ data: [], total: 0 })),
+      getMyInvitations: vi.fn().mockReturnValue(of([])),
     };
     taskClientMock = {
-      getMyTasks: vi.fn().mockReturnValue(of({ data: [], total: 0 })),
+      getMyTasks: vi.fn().mockReturnValue(of([])),
     };
 
     TestBed.configureTestingModule({
@@ -142,8 +142,8 @@ describe('Dashboard', () => {
         tenants: vi.fn().mockReturnValue([]),
         loadTenants: vi.fn().mockResolvedValue([]),
       };
-      tenantClientMock = { getMyInvitations: vi.fn().mockReturnValue(of({ data: [], total: 0 })) };
-      taskClientMock = { getMyTasks: vi.fn().mockReturnValue(of({ data: [], total: 0 })) };
+      tenantClientMock = { getMyInvitations: vi.fn().mockReturnValue(of([])) };
+      taskClientMock = { getMyTasks: vi.fn().mockReturnValue(of([])) };
 
       TestBed.configureTestingModule({
         imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],

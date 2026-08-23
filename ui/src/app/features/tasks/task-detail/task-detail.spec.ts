@@ -62,8 +62,8 @@ describe('TaskDetail', () => {
     const task = { ...mockTask, ...taskOverrides };
 
     taskClientMock = {
-      getById: vi.fn().mockReturnValue(of({ data: task })),
-      update: vi.fn().mockReturnValue(of({ data: { ...task, title: 'Updated Title', version: 2 } })),
+      getById: vi.fn().mockReturnValue(of(task)),
+      update: vi.fn().mockReturnValue(of({ ...task, title: 'Updated Title', version: 2 })),
       delete: vi.fn().mockReturnValue(of(undefined)),
     };
     authStoreMock = {
@@ -78,6 +78,15 @@ describe('TaskDetail', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        {
+          provide: AuthStore,
+          useValue: {
+            isAuthenticated: () => false,
+            currentUser: () => null,
+            token: () => null,
+            tenantRole: () => null,
+          },
+        },
         { provide: TaskClient, useValue: taskClientMock },
         { provide: AuthStore, useValue: authStoreMock },
         {
@@ -134,6 +143,15 @@ describe('TaskDetail', () => {
           provideHttpClientTesting(),
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+          {
+            provide: AuthStore,
+            useValue: {
+              isAuthenticated: () => false,
+              currentUser: () => null,
+              token: () => null,
+              tenantRole: () => null,
+            },
+          },
           { provide: TaskClient, useValue: taskClientMock },
           { provide: AuthStore, useValue: authStoreMock },
           {
@@ -261,7 +279,7 @@ describe('TaskDetail', () => {
         tenantRole: vi.fn().mockReturnValue(null),
       };
       taskClientMock = {
-        getById: vi.fn().mockReturnValue(of({ data: mockTask })),
+        getById: vi.fn().mockReturnValue(of(mockTask)),
         update: vi.fn(),
         delete: vi.fn(),
       };
@@ -272,6 +290,15 @@ describe('TaskDetail', () => {
           provideHttpClientTesting(),
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+          {
+            provide: AuthStore,
+            useValue: {
+              isAuthenticated: () => false,
+              currentUser: () => null,
+              token: () => null,
+              tenantRole: () => null,
+            },
+          },
           { provide: TaskClient, useValue: taskClientMock },
           { provide: AuthStore, useValue: authStoreMock },
           {
@@ -311,7 +338,7 @@ describe('TaskDetail', () => {
       submit(component.editForm);
 
       expect(component.showConflictDialog()).toBe(true);
-      expect(component.conflictMessage()).toBe('Version conflict');
+      expect(component.conflictMessage()).toBe('taskDetail.conflictHint');
     });
 
     it('should reload task and close conflict dialog on reloadAfterConflict', () => {

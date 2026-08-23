@@ -17,6 +17,8 @@ import { submit } from '@angular/forms/signals';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { LabelManager } from './label-manager';
 import { LabelClient } from '@services/label-client';
+import { ProjectStore } from '@stores/project-store';
+import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Label } from '@task-board/shared';
 
@@ -39,25 +41,23 @@ describe('LabelManager', () => {
 
   function setup() {
     labelClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: [...mockLabels] })),
+      list: vi.fn().mockReturnValue(of([...mockLabels])),
       create: vi.fn().mockImplementation((_pid: string, data: { name: string }) =>
         of({
-          data: {
-            id: 'l4',
-            projectId: 'p1',
-            name: data.name,
-            normalizedName: data.name.toLowerCase(),
-            createdAt: NOW,
-            updatedAt: NOW,
-          },
+          id: 'l4',
+          projectId: 'p1',
+          name: data.name,
+          normalizedName: data.name.toLowerCase(),
+          createdAt: NOW,
+          updatedAt: NOW,
         }),
       ),
       update: vi.fn().mockImplementation((id: string, data: { name: string }) => {
         const existing = mockLabels.find((l) => l.id === id) ?? mockLabels[0];
 
-        return of({ data: { ...existing, ...data, updatedAt: NOW } });
+        return of({ ...existing, ...data, updatedAt: NOW });
       }),
-      delete: vi.fn().mockReturnValue(of({ data: { success: true } })),
+      delete: vi.fn().mockReturnValue(of({ success: true })),
     };
 
     TestBed.configureTestingModule({
@@ -67,13 +67,23 @@ describe('LabelManager', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        {
+          provide: AuthStore,
+          useValue: {
+            isAuthenticated: () => false,
+            currentUser: () => null,
+            token: () => null,
+            tenantRole: () => null,
+          },
+        },
         { provide: LabelClient, useValue: labelClientMock },
+        { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
       ],
     });
 
     const fixture = TestBed.createComponent(LabelManager);
 
-    fixture.componentRef.setInput('projectId', 'p1');
+    fixture.componentRef.setInput('projectKey', 'proj-key');
     component = fixture.componentInstance;
     fixture.detectChanges();
   }
@@ -106,13 +116,23 @@ describe('LabelManager', () => {
           provideHttpClientTesting(),
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+          {
+            provide: AuthStore,
+            useValue: {
+              isAuthenticated: () => false,
+              currentUser: () => null,
+              token: () => null,
+              tenantRole: () => null,
+            },
+          },
           { provide: LabelClient, useValue: labelClientMock },
+          { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
         ],
       });
 
       const fixture = TestBed.createComponent(LabelManager);
 
-      fixture.componentRef.setInput('projectId', 'p1');
+      fixture.componentRef.setInput('projectKey', 'proj-key');
       component = fixture.componentInstance;
       fixture.detectChanges();
       expect(component.loading()).toBe(false);

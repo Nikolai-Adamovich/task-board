@@ -18,6 +18,8 @@ import { submit } from '@angular/forms/signals';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { StatusManager } from './status-manager';
 import { StatusClient } from '@services/status-client';
+import { ProjectStore } from '@stores/project-store';
+import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Status } from '@task-board/shared';
 
@@ -48,7 +50,7 @@ describe('StatusManager', () => {
 
   function setup() {
     statusClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: [...mockStatuses] })),
+      list: vi.fn().mockReturnValue(of([...mockStatuses])),
       create: vi.fn().mockImplementation((_pid: string, data: { name: string; position: number }) =>
         of({
           data: {
@@ -65,9 +67,9 @@ describe('StatusManager', () => {
       update: vi.fn().mockImplementation((id: string, data: { name?: string; position?: number }) => {
         const existing = mockStatuses.find((s) => s.id === id) ?? mockStatuses[0];
 
-        return of({ data: { ...existing, ...data, updatedAt: NOW } });
+        return of({ ...existing, ...data, updatedAt: NOW });
       }),
-      delete: vi.fn().mockReturnValue(of({ data: { success: true } })),
+      delete: vi.fn().mockReturnValue(of({ success: true })),
     };
 
     TestBed.configureTestingModule({
@@ -77,13 +79,23 @@ describe('StatusManager', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        {
+          provide: AuthStore,
+          useValue: {
+            isAuthenticated: () => false,
+            currentUser: () => null,
+            token: () => null,
+            tenantRole: () => null,
+          },
+        },
         { provide: StatusClient, useValue: statusClientMock },
+        { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
       ],
     });
 
     const fixture = TestBed.createComponent(StatusManager);
 
-    fixture.componentRef.setInput('projectId', 'p1');
+    fixture.componentRef.setInput('projectKey', 'proj-key');
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -117,13 +129,23 @@ describe('StatusManager', () => {
           provideHttpClientTesting(),
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+          {
+            provide: AuthStore,
+            useValue: {
+              isAuthenticated: () => false,
+              currentUser: () => null,
+              token: () => null,
+              tenantRole: () => null,
+            },
+          },
           { provide: StatusClient, useValue: statusClientMock },
+          { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
         ],
       });
 
       const fixture = TestBed.createComponent(StatusManager);
 
-      fixture.componentRef.setInput('projectId', 'p1');
+      fixture.componentRef.setInput('projectKey', 'proj-key');
       component = fixture.componentInstance;
       fixture.detectChanges();
 

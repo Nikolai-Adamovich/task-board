@@ -18,6 +18,7 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { SprintList, CreateSprintForm } from './sprint-list';
 import { SprintClient } from '@services/sprint-client';
 import { AuthStore } from '@stores/auth-store';
+import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { NeutralColor } from '@app/constants/priority';
 import type { Sprint, User } from '@task-board/shared';
@@ -54,16 +55,24 @@ describe('SprintList', () => {
     listByTenant: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
   };
-  let authStoreMock: { currentUser: ReturnType<typeof vi.fn> };
+  let authStoreMock: {
+    currentUser: ReturnType<typeof vi.fn>;
+    isAuthenticated: () => boolean;
+    token: () => string | null;
+    tenantRole: () => string | null;
+  };
 
   function setup(projectId?: string) {
     sprintClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: mockSprints, total: 2, page: 1, limit: 20 })),
-      listByTenant: vi.fn().mockReturnValue(of({ data: mockSprints, total: 2, page: 1, limit: 20 })),
-      create: vi.fn().mockReturnValue(of({ data: mockSprints[0] })),
+      list: vi.fn().mockReturnValue(of(mockSprints)),
+      listByTenant: vi.fn().mockReturnValue(of(mockSprints)),
+      create: vi.fn().mockReturnValue(of(mockSprints[0])),
     };
     authStoreMock = {
       currentUser: vi.fn().mockReturnValue({ id: 'u1' } as User),
+      isAuthenticated: () => true,
+      token: () => 'fake-jwt',
+      tenantRole: () => 'OWNER',
     };
 
     TestBed.configureTestingModule({
@@ -75,13 +84,17 @@ describe('SprintList', () => {
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: SprintClient, useValue: sprintClientMock },
         { provide: AuthStore, useValue: authStoreMock },
+        {
+          provide: ProjectStore,
+          useValue: { activeProject: () => (projectId ? { id: projectId } : null), projectRole: () => null },
+        },
       ],
     });
 
     const fixture = TestBed.createComponent(SprintList);
 
     if (projectId) {
-      fixture.componentRef.setInput('projectId', projectId);
+      fixture.componentRef.setInput('projectKey', projectId);
     }
 
     component = fixture.componentInstance;
@@ -127,7 +140,12 @@ describe('SprintList', () => {
         listByTenant: vi.fn(),
         create: vi.fn(),
       };
-      authStoreMock = { currentUser: vi.fn().mockReturnValue(null) };
+      authStoreMock = {
+        currentUser: vi.fn().mockReturnValue(null),
+        isAuthenticated: () => false,
+        token: () => null,
+        tenantRole: () => null,
+      };
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
@@ -139,6 +157,7 @@ describe('SprintList', () => {
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
           { provide: SprintClient, useValue: sprintClientMock },
           { provide: AuthStore, useValue: authStoreMock },
+          { provide: ProjectStore, useValue: { activeProject: () => null, projectRole: () => null } },
         ],
       });
 
@@ -172,8 +191,8 @@ describe('SprintList', () => {
   describe('isGroupExpanded / toggleGroup', () => {
     beforeEach(() => setup());
 
-    it('should default to collapsed', () => {
-      expect(component.isGroupExpanded('p1')).toBe(false);
+    it('should default to expanded', () => {
+      expect(component.isGroupExpanded('p1')).toBe(true);
     });
 
     it('should toggle to expanded', () => {

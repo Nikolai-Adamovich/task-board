@@ -15,6 +15,7 @@ import { of, throwError } from 'rxjs';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { AuditLogViewer } from './audit-log-viewer';
 import { AuditClient } from '@services/audit-client';
+import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { AuditEvent, PaginatedResponse } from '@task-board/shared';
 
@@ -83,12 +84,13 @@ describe('AuditLogViewer', () => {
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: AuditClient, useValue: auditClientMock },
+        { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
       ],
     });
 
     const fixture = TestBed.createComponent(AuditLogViewer);
 
-    fixture.componentRef.setInput('projectId', 'p1');
+    fixture.componentRef.setInput('projectKey', 'proj-key');
     component = fixture.componentInstance;
     fixture.detectChanges();
   }

@@ -36,6 +36,8 @@ const mockMembers: TenantMember[] = [
     role: 'OWNER',
     status: 'ACTIVE',
     invitation: null,
+    displayName: 'Owner User',
+    email: 'owner@example.com',
     createdAt: NOW,
     updatedAt: NOW,
   },
@@ -46,6 +48,8 @@ const mockMembers: TenantMember[] = [
     role: 'MEMBER',
     status: 'ACTIVE',
     invitation: null,
+    displayName: 'Member User',
+    email: 'member@example.com',
     createdAt: NOW,
     updatedAt: NOW,
   },
@@ -61,6 +65,8 @@ const mockMembers: TenantMember[] = [
       invitedBy: 'u1',
       invitedOn: NOW,
     },
+    displayName: null,
+    email: null,
     createdAt: NOW,
     updatedAt: NOW,
   },
@@ -80,22 +86,30 @@ describe('TenantMemberList', () => {
     restoreMembership: ReturnType<typeof vi.fn>;
     reinviteMember: ReturnType<typeof vi.fn>;
   };
-  let authStoreMock: { tenantRole: ReturnType<typeof vi.fn> };
+  let authStoreMock: {
+    tenantRole: ReturnType<typeof vi.fn>;
+    isAuthenticated: () => boolean;
+    currentUser: () => null;
+    token: () => null;
+  };
 
   function setup(role = 'OWNER') {
     tenantClientMock = {
-      listMembers: vi.fn().mockReturnValue(of({ data: mockMembers })),
-      inviteMember: vi.fn().mockReturnValue(of({ data: mockMembers[0] })),
+      listMembers: vi.fn().mockReturnValue(of(mockMembers)),
+      inviteMember: vi.fn().mockReturnValue(of(mockMembers[0])),
       updateMemberRole: vi.fn().mockReturnValue(of({ ...mockMembers[1], role: 'ADMIN' })),
       removeMember: vi.fn().mockReturnValue(of(undefined)),
       revokeAccess: vi.fn().mockReturnValue(of({ success: true })),
       resendInvitation: vi.fn().mockReturnValue(of({ success: true })),
       hardDeleteMember: vi.fn().mockReturnValue(of({ success: true })),
-      restoreMembership: vi.fn().mockReturnValue(of({ data: { success: true } })),
-      reinviteMember: vi.fn().mockReturnValue(of({ data: { success: true } })),
+      restoreMembership: vi.fn().mockReturnValue(of({ success: true })),
+      reinviteMember: vi.fn().mockReturnValue(of({ success: true })),
     };
     authStoreMock = {
       tenantRole: vi.fn().mockReturnValue(role),
+      isAuthenticated: () => false,
+      currentUser: () => null,
+      token: () => null,
     };
 
     TestBed.configureTestingModule({

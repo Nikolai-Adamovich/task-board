@@ -88,25 +88,33 @@ describe('SprintDetail', () => {
     delete: ReturnType<typeof vi.fn>;
   };
   let taskClientMock: { list: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
-  let authStoreMock: { currentUser: ReturnType<typeof vi.fn> };
+  let authStoreMock: {
+    currentUser: ReturnType<typeof vi.fn>;
+    isAuthenticated: () => boolean;
+    token: () => string | null;
+    tenantRole: () => string | null;
+  };
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
 
   function setup(sprintOverrides: Partial<Sprint> = {}) {
     const sprint = { ...mockSprint, ...sprintOverrides };
 
     sprintClientMock = {
-      getById: vi.fn().mockReturnValue(of({ data: sprint })),
-      update: vi.fn().mockReturnValue(of({ data: { ...sprint, status: 'COMPLETED' } })),
+      getById: vi.fn().mockReturnValue(of(sprint)),
+      update: vi.fn().mockReturnValue(of({ ...sprint, status: 'COMPLETED' })),
       delete: vi.fn().mockReturnValue(of(undefined)),
     };
     taskClientMock = {
       list: vi
         .fn()
         .mockReturnValue(of({ data: mockSprintTasks, pagination: { total: 2, page: 1, limit: 200, totalPages: 1 } })),
-      update: vi.fn().mockReturnValue(of({ data: mockSprintTasks[0] })),
+      update: vi.fn().mockReturnValue(of(mockSprintTasks[0])),
     };
     authStoreMock = {
       currentUser: vi.fn().mockReturnValue({ id: 'u1' } as User),
+      isAuthenticated: () => true,
+      token: () => 'fake-jwt',
+      tenantRole: () => 'OWNER',
     };
     routerMock = {
       navigate: vi.fn().mockResolvedValue(true),
@@ -171,7 +179,12 @@ describe('SprintDetail', () => {
         delete: vi.fn(),
       };
       taskClientMock = { list: vi.fn(), update: vi.fn() };
-      authStoreMock = { currentUser: vi.fn().mockReturnValue(null) };
+      authStoreMock = {
+        currentUser: vi.fn().mockReturnValue(null),
+        isAuthenticated: () => false,
+        token: () => null,
+        tenantRole: () => null,
+      };
       routerMock = { navigate: vi.fn() };
 
       TestBed.resetTestingModule();
@@ -267,7 +280,7 @@ describe('SprintDetail', () => {
 
     it('should show Reopen Sprint for COMPLETED sprint', () => {
       setup({ status: 'COMPLETED' });
-      expect(component.availableTransitions).toEqual([{ label: 'Reopen Sprint', status: 'FUTURE' }]);
+      expect(component.availableTransitions).toEqual([{ label: 'Reopen Sprint', status: 'ACTIVE' }]);
     });
 
     it('should call sprintClient.update on transitionSprint', () => {

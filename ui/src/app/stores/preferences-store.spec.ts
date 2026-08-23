@@ -106,10 +106,11 @@ describe('PreferencesStore', () => {
       zoom: 125,
       theme: 'dark',
       language: 'pl',
+      pageSize: 20,
       updatedAt: new Date().toISOString(),
     };
 
-    req.flush(mockPrefs);
+    req.flush({ data: mockPrefs });
     await promise;
 
     expect(store.zoom()).toBe(125);
