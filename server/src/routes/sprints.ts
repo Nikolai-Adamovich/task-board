@@ -1,159 +1,82 @@
 import { Hono } from 'hono';
-import { SprintStatus } from '@task-board/shared';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
 import { SprintService } from '../services/sprint.service.js';
 import { SprintRepository } from '../repositories/sprint.repository.js';
-import { TaskRepository } from '../repositories/task.repository.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
+import { TaskRepository } from '../repositories/task.repository.js';
 import { getCollection } from '../db/mongo.js';
 import type { SprintDocument } from '../repositories/sprint.repository.js';
-import type { TaskDocument } from '../repositories/task.repository.js';
 import type { ProjectDocument } from '../repositories/project.repository.js';
+import type { TaskDocument } from '../repositories/task.repository.js';
 import { CreateSprintSchema, UpdateSprintSchema } from '../schemas/sprint.js';
 
 // ─── Sprint Routes ───────────────────────────────────────────────────────────
 
-/**
- * Creates and returns the sprint Hono app with all sprint-related routes.
- *
- * Tenant context is already resolved. Sprint routes expect `projectId` as
- * a query parameter for listing.
- */
 export function createSprintRoutes(): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
   /**
-   * GET / — List sprints.
-   * If `projectId` query parameter is provided, lists sprints for that project.
-   * Otherwise, lists all sprints for the tenant.
+   * GET /projects/:projectId/sprints — List sprints for a project.
    */
-  router.get('/', async (c) => {
-    const tenantId = c.get('tenantId');
-    const projectId = c.req.query('projectId');
+  router.get('/projects/:projectId/sprints', async (c) => {
+    const projectId = c.req.param('projectId');
     const service = createSprintService();
-    const sprints = projectId ? await service.listSprints(tenantId, projectId) : await service.listAllSprints(tenantId);
+    const sprints = await service.getSprintsByProject(projectId);
 
-    return c.json({
-      data: sprints,
-      total: sprints.length,
-      page: 1,
-      limit: sprints.length,
-    });
+    return c.json({ data: sprints });
   });
 
   /**
-   * POST / — Create a new sprint. Admin+ only.
-   * Requires `projectId` query parameter.
+   * POST /projects/:projectId/sprints — Create a sprint.
    */
-  router.post('/', validateBody(CreateSprintSchema), async (c) => {
-    const tenantId = c.get('tenantId');
-    const userRole = c.get('userRole');
-    const projectId = c.req.query('projectId');
-    const body = c.get('validatedBody' as never) as {
-      name: string;
-      startDate: string;
-      endDate: string;
-      goal?: string;
-    };
-
-    if (!projectId) {
-      return c.json({ code: 'VALIDATION_ERROR', message: 'projectId query parameter is required' }, 422);
-    }
-
+  router.post('/projects/:projectId/sprints', validateBody(CreateSprintSchema), async (c) => {
+    const projectId = c.req.param('projectId');
+    const body = c.get('validatedBody' as never) as { name: string; startDate?: string; endDate?: string };
     const service = createSprintService();
-    const sprint = await service.createSprint(tenantId, projectId, body, userRole);
+    const sprint = await service.createSprint(projectId, body);
 
-    return c.json(sprint, 201);
+    return c.json({ data: sprint }, 201);
   });
 
   /**
-   * GET /:sprintId — Get sprint details with tasks.
+   * GET /sprints/:sprintId — Get sprint details.
    */
-  router.get('/:sprintId', async (c) => {
-    const tenantId = c.get('tenantId');
+  router.get('/sprints/:sprintId', async (c) => {
     const sprintId = c.req.param('sprintId');
     const service = createSprintService();
-    const result = await service.getSprint(tenantId, sprintId);
+    const sprint = await service.getSprint(sprintId);
 
-    return c.json({ ...result.sprint, tasks: result.tasks });
+    return c.json({ data: sprint });
   });
 
   /**
-   * PATCH /:sprintId — Update sprint. Admin+ only.
+   * PATCH /sprints/:sprintId — Update sprint (name, dates, status).
    */
-  router.patch('/:sprintId', validateBody(UpdateSprintSchema), async (c) => {
-    const tenantId = c.get('tenantId');
-    const userRole = c.get('userRole');
+  router.patch('/sprints/:sprintId', validateBody(UpdateSprintSchema), async (c) => {
     const sprintId = c.req.param('sprintId');
     const body = c.get('validatedBody' as never) as {
       name?: string;
       startDate?: string;
       endDate?: string;
-      goal?: string;
-      status?: string;
+      status?: 'FUTURE' | 'ACTIVE' | 'COMPLETED';
     };
     const service = createSprintService();
-    const sprint = await service.updateSprint(
-      tenantId,
-      sprintId,
-      body as {
-        name?: string;
-        startDate?: string;
-        endDate?: string;
-        goal?: string;
-        status?: SprintStatus;
-      },
-      userRole,
-    );
+    const sprint = await service.updateSprint(sprintId, body);
 
-    return c.json(sprint);
+    return c.json({ data: sprint });
   });
 
   /**
-   * DELETE /:sprintId — Delete sprint. Admin+ only.
+   * DELETE /sprints/:sprintId — Delete sprint (tasks → backlog).
    */
-  router.delete('/:sprintId', async (c) => {
-    const tenantId = c.get('tenantId');
-    const userRole = c.get('userRole');
+  router.delete('/sprints/:sprintId', async (c) => {
     const sprintId = c.req.param('sprintId');
     const service = createSprintService();
 
-    await service.deleteSprint(tenantId, sprintId, userRole);
+    await service.deleteSprint(sprintId);
 
-    return c.json({ success: true as const });
-  });
-
-  /**
-   * POST /:sprintId/tasks — Add task(s) from backlog to sprint.
-   * Body: { taskId: string }
-   */
-  router.post('/:sprintId/tasks', async (c) => {
-    const tenantId = c.get('tenantId');
-    const sprintId = c.req.param('sprintId');
-    const body = await c.req.json<{ taskId: string }>();
-
-    if (!body.taskId) {
-      return c.json({ code: 'VALIDATION_ERROR', message: 'taskId is required' }, 422);
-    }
-
-    const service = createSprintService();
-    const sprint = await service.addTaskToSprint(tenantId, sprintId, body.taskId);
-
-    return c.json(sprint);
-  });
-
-  /**
-   * DELETE /:sprintId/tasks/:taskId — Remove task from sprint.
-   */
-  router.delete('/:sprintId/tasks/:taskId', async (c) => {
-    const tenantId = c.get('tenantId');
-    const sprintId = c.req.param('sprintId');
-    const taskId = c.req.param('taskId');
-    const service = createSprintService();
-    const sprint = await service.removeTaskFromSprint(tenantId, sprintId, taskId);
-
-    return c.json(sprint);
+    return c.json({ data: { success: true } });
   });
 
   return router;
@@ -163,8 +86,8 @@ export function createSprintRoutes(): Hono<AppEnv> {
 
 function createSprintService(): SprintService {
   const sprintRepo = new SprintRepository(getCollection<SprintDocument>('sprints'));
-  const taskRepo = new TaskRepository(getCollection<TaskDocument>('tasks'));
   const projectRepo = new ProjectRepository(getCollection<ProjectDocument>('projects'));
+  const taskRepo = new TaskRepository(getCollection<TaskDocument>('tasks')) as never;
 
-  return new SprintService(sprintRepo, taskRepo, projectRepo);
+  return new SprintService(sprintRepo, projectRepo, taskRepo);
 }

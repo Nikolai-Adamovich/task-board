@@ -7,6 +7,7 @@
  * - deleteTenant method
  * - canEdit computed
  * - onDialogStateChange
+ * - archiveTenant / restoreTenant / cancelDeletion
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -18,16 +19,16 @@ import { TenantSettings } from './tenant-settings';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { TenantWithRole } from '@task-board/shared';
+import type { TenantWithRole } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockTenant: TenantWithRole = {
   id: 't1',
   name: 'Acme',
-  slug: 'acme',
   description: null,
-  subscription: 'free',
-  role: 'owner',
+  status: 'ACTIVE',
+  deletionScheduledAt: null,
+  role: 'OWNER',
   createdAt: NOW,
   updatedAt: NOW,
 };
@@ -39,15 +40,21 @@ describe('TenantSettings', () => {
     activeTenant: ReturnType<typeof vi.fn>;
     updateTenant: ReturnType<typeof vi.fn>;
     deleteTenant: ReturnType<typeof vi.fn>;
+    archiveTenant: ReturnType<typeof vi.fn>;
+    restoreTenant: ReturnType<typeof vi.fn>;
+    cancelDeletion: ReturnType<typeof vi.fn>;
   };
   let authStoreMock: { tenantRole: ReturnType<typeof vi.fn> };
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
 
-  function setup(role = 'owner') {
+  function setup(role = 'OWNER') {
     tenantStoreMock = {
       activeTenant: vi.fn().mockReturnValue(mockTenant),
       updateTenant: vi.fn().mockResolvedValue({ ...mockTenant, name: 'Updated' }),
       deleteTenant: vi.fn().mockResolvedValue(undefined),
+      archiveTenant: vi.fn().mockResolvedValue(undefined),
+      restoreTenant: vi.fn().mockResolvedValue(undefined),
+      cancelDeletion: vi.fn().mockResolvedValue(undefined),
     };
     authStoreMock = {
       tenantRole: vi.fn().mockReturnValue(role),
@@ -78,9 +85,8 @@ describe('TenantSettings', () => {
   describe('ngOnInit', () => {
     beforeEach(() => setup());
 
-    it('should populate name and slug from active tenant', () => {
+    it('should populate name from active tenant', () => {
       expect(component.model().name).toBe('Acme');
-      expect(component.model().slug).toBe('acme');
     });
 
     it('should set loading to false', () => {
@@ -91,18 +97,18 @@ describe('TenantSettings', () => {
   // ── canEdit ────────────────────────────────────────────────────────────
 
   describe('canEdit', () => {
-    it('should be true for owner', () => {
-      setup('owner');
+    it('should be true for OWNER', () => {
+      setup('OWNER');
       expect(component.canEdit()).toBe(true);
     });
 
-    it('should be true for admin', () => {
-      setup('admin');
+    it('should be true for ADMIN', () => {
+      setup('ADMIN');
       expect(component.canEdit()).toBe(true);
     });
 
-    it('should be false for member', () => {
-      setup('member');
+    it('should be false for MEMBER', () => {
+      setup('MEMBER');
       expect(component.canEdit()).toBe(false);
     });
   });
@@ -113,30 +119,21 @@ describe('TenantSettings', () => {
     beforeEach(() => setup());
 
     it('should call tenantStore.updateTenant', () => {
-      component.model.update((m: { name: string; slug: string }) => ({ ...m, name: 'New Name' }));
-      component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: 'new-slug' }));
+      component.model.update((m: { name: string }) => ({ ...m, name: 'New Name' }));
       submit(component.settingsForm);
 
-      expect(tenantStoreMock.updateTenant).toHaveBeenCalledWith('t1', { name: 'New Name', slug: 'new-slug' });
+      expect(tenantStoreMock.updateTenant).toHaveBeenCalledWith('t1', { name: 'New Name' });
     });
 
     it('should not save when name is empty', () => {
-      component.model.update((m: { name: string; slug: string }) => ({ ...m, name: '' }));
-      submit(component.settingsForm);
-
-      expect(tenantStoreMock.updateTenant).not.toHaveBeenCalled();
-    });
-
-    it('should not save when slug is empty', () => {
-      component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: '' }));
+      component.model.update((m: { name: string }) => ({ ...m, name: '' }));
       submit(component.settingsForm);
 
       expect(tenantStoreMock.updateTenant).not.toHaveBeenCalled();
     });
 
     it('should navigate to home on success', async () => {
-      component.model.update((m: { name: string; slug: string }) => ({ ...m, name: 'New Name' }));
-      component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: 'new-slug' }));
+      component.model.update((m: { name: string }) => ({ ...m, name: 'New Name' }));
       submit(component.settingsForm);
 
       // Wait for async resolution
@@ -147,8 +144,7 @@ describe('TenantSettings', () => {
 
     it('should set error message on failure', async () => {
       tenantStoreMock.updateTenant.mockRejectedValueOnce(new Error('fail'));
-      component.model.update((m: { name: string; slug: string }) => ({ ...m, name: 'New Name' }));
-      component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: 'new-slug' }));
+      component.model.update((m: { name: string }) => ({ ...m, name: 'New Name' }));
       submit(component.settingsForm);
 
       await new Promise((r) => setTimeout(r, 0));
@@ -187,6 +183,39 @@ describe('TenantSettings', () => {
       await new Promise((r) => setTimeout(r, 0));
       expect(component.error()).toBe('errors.unexpected');
       expect(component.loading()).toBe(false);
+    });
+  });
+
+  // ── archiveTenant ──────────────────────────────────────────────────────
+
+  describe('archiveTenant', () => {
+    beforeEach(() => setup());
+
+    it('should call tenantStore.archiveTenant', () => {
+      component.archiveTenant();
+      expect(tenantStoreMock.archiveTenant).toHaveBeenCalledWith('t1');
+    });
+  });
+
+  // ── restoreTenant ──────────────────────────────────────────────────────
+
+  describe('restoreTenant', () => {
+    beforeEach(() => setup());
+
+    it('should call tenantStore.restoreTenant', () => {
+      component.restoreTenant();
+      expect(tenantStoreMock.restoreTenant).toHaveBeenCalledWith('t1');
+    });
+  });
+
+  // ── cancelDeletion ─────────────────────────────────────────────────────
+
+  describe('cancelDeletion', () => {
+    beforeEach(() => setup());
+
+    it('should call tenantStore.cancelDeletion', () => {
+      component.cancelDeletion();
+      expect(tenantStoreMock.cancelDeletion).toHaveBeenCalledWith('t1');
     });
   });
 

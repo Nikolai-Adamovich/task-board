@@ -1,0 +1,187 @@
+<div class="mx-auto max-w-3xl">
+  <div class="mb-6 flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-foreground">{{ 'statusManager.title' | transloco }}</h2>
+    @if (canManage()) {
+      <button hlmBtn (click)="showCreateDialog.set(true)">
+        <ng-icon name="lucidePlus" class="mr-1" />
+        {{ 'statusManager.newStatus' | transloco }}
+      </button>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+      {{ error() | transloco }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="flex items-center justify-center py-12">
+      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'statusManager.loading' | transloco }}</span>
+    </div>
+  } @else if (statuses().length === 0) {
+    <div class="rounded-lg border border-dashed border-border py-12 text-center">
+      <ng-icon name="lucideGripVertical" class="mx-auto h-12 w-12 text-muted-foreground" />
+      <p class="mt-4 text-sm text-muted-foreground">{{ 'statusManager.noStatuses' | transloco }}</p>
+      @if (canManage()) {
+        <button hlmBtn class="mt-4" (click)="showCreateDialog.set(true)">
+          {{ 'statusManager.createFirst' | transloco }}
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="rounded-lg border border-border">
+      @for (status of statuses(); track status.id; let idx = $index) {
+        <div class="flex items-center justify-between border-b border-border px-4 py-3 last:border-b-0">
+          <div class="flex items-center gap-3">
+            @if (canManage()) {
+              <div class="flex flex-col gap-0.5">
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  class="h-5 w-5 text-muted-foreground"
+                  [disabled]="idx === 0"
+                  (click)="moveUp(status)"
+                  [attr.aria-label]="'statusManager.moveUp' | transloco"
+                >
+                  <ng-icon name="lucideGripVertical" />
+                </button>
+              </div>
+            }
+            <span hlmBadge variant="secondary" class="min-w-[2rem] justify-center">{{ status.position }}</span>
+            @if (editingId() === status.id) {
+              <div class="flex items-center gap-2">
+                <input
+                  hlmInput
+                  type="text"
+                  class="h-8 w-48"
+                  [value]="editingName()"
+                  (input)="editingName.set($any($event.target).value)"
+                  (keydown.enter)="saveEdit(status)"
+                  (keydown.escape)="cancelEdit()"
+                />
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8 text-green-600"
+                  (click)="saveEdit(status)"
+                  [disabled]="saving()"
+                  [attr.aria-label]="'statusManager.save' | transloco"
+                >
+                  <ng-icon name="lucideCheck" />
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8"
+                  (click)="cancelEdit()"
+                  [attr.aria-label]="'statusManager.cancel' | transloco"
+                >
+                  <ng-icon name="lucideX" />
+                </button>
+              </div>
+            } @else {
+              <span class="text-sm font-medium text-foreground">{{ status.name }}</span>
+            }
+          </div>
+          @if (canManage() && editingId() !== status.id) {
+            <div class="flex items-center gap-1">
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+                (click)="startEdit(status)"
+                [attr.aria-label]="'statusManager.edit' | transloco"
+              >
+                <ng-icon name="lucidePencil" />
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 text-destructive hover:text-destructive"
+                (click)="confirmDelete(status)"
+                [attr.aria-label]="'statusManager.delete' | transloco"
+              >
+                <ng-icon name="lucideTrash2" />
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Create Status Dialog -->
+  <hlm-dialog [state]="showCreateDialog() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'statusManager.createTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+
+      <form id="create-status-form" [formRoot]="createForm" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="status-name">{{ 'statusManager.name' | transloco }}</label>
+          <input hlmInput id="status-name" type="text" [formField]="createForm.name" placeholder="TODO" />
+        </hlm-field>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'statusManager.cancel' | transloco }}</button>
+        <button
+          hlmBtn
+          type="submit"
+          form="create-status-form"
+          [disabled]="createForm().invalid() || createForm().submitting()"
+        >
+          @if (createForm().submitting()) {
+            <hlm-spinner /> {{ 'statusManager.creating' | transloco }}
+          } @else {
+            {{ 'statusManager.create' | transloco }}
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- Delete Status Dialog -->
+  <hlm-dialog [state]="showDeleteDialog() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'statusManager.deleteTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+      <p class="text-sm text-muted-foreground">
+        {{ 'statusManager.deleteConfirm' | transloco }}
+      </p>
+      @if (otherStatuses().length > 0) {
+        <hlm-field>
+          <label hlmFieldLabel for="replacement-status">{{ 'statusManager.replacementStatus' | transloco }}</label>
+          <hlm-native-select
+            id="replacement-status"
+            [value]="replacementStatusId()"
+            (valueChange)="replacementStatusId.set($event ?? '')"
+          >
+            <option value="">— {{ 'statusManager.noReplacement' | transloco }} —</option>
+            @for (s of otherStatuses(); track s.id) {
+              <option [value]="s.id">{{ s.name }} ({{ s.position }})</option>
+            }
+          </hlm-native-select>
+        </hlm-field>
+      }
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'statusManager.cancel' | transloco }}</button>
+        <button hlmBtn variant="destructive" (click)="deleteStatus()" [disabled]="saving()">
+          @if (saving()) {
+            <hlm-spinner /> {{ 'statusManager.deleting' | transloco }}
+          } @else {
+            <ng-icon name="lucideTrash2" class="mr-1" />
+            {{ 'statusManager.deleteButton' | transloco }}
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</div>

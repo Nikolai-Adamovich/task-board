@@ -3,6 +3,11 @@
   <div class="mb-6 flex items-center gap-3">
     <ng-icon name="lucideSettings" class="h-6 w-6 text-foreground" />
     <h2 class="text-2xl font-bold text-foreground">{{ 'tenantSettings.title' | transloco }}</h2>
+    @if (currentStatus() !== TenantStatus.ACTIVE) {
+      <span hlmBadge [class]="getStatusColor(currentStatus())">
+        {{ currentStatus() }}
+      </span>
+    }
   </div>
 
   @if (loading()) {
@@ -26,10 +31,6 @@
           <hlm-field>
             <label hlmFieldLabel for="tenant-name">{{ 'tenantSettings.name' | transloco }}</label>
             <input hlmInput id="tenant-name" type="text" [formField]="settingsForm.name" placeholder="Tenant Name" />
-          </hlm-field>
-          <hlm-field>
-            <label hlmFieldLabel for="tenant-slug">{{ 'tenantSettings.slug' | transloco }}</label>
-            <input hlmInput id="tenant-slug" type="text" [formField]="settingsForm.slug" placeholder="tenant-slug" />
           </hlm-field>
         </form>
       </div>
@@ -63,11 +64,27 @@
             {{ 'tenantSettings.dangerDescription' | transloco }}
           </p>
         </div>
-        <hlm-card-footer>
-          <button hlmBtn variant="destructive" (click)="showDeleteDialog.set(true)">
-            <ng-icon name="lucideTrash2" class="mr-1" />
-            {{ 'tenantSettings.deleteTenant' | transloco }}
-          </button>
+        <hlm-card-footer class="flex flex-wrap gap-3">
+          @if (currentStatus() === TenantStatus.ACTIVE) {
+            <button hlmBtn variant="outline" (click)="archiveTenant()">
+              <ng-icon name="lucideArchive" class="mr-1" />
+              {{ 'tenantSettings.archiveTenant' | transloco }}
+            </button>
+            <button hlmBtn variant="destructive" (click)="showDeleteDialog.set(true)">
+              <ng-icon name="lucideTrash2" class="mr-1" />
+              {{ 'tenantSettings.deleteTenant' | transloco }}
+            </button>
+          } @else if (currentStatus() === TenantStatus.ARCHIVED) {
+            <button hlmBtn variant="outline" (click)="restoreTenant()">
+              <ng-icon name="lucideRotateCcw" class="mr-1" />
+              {{ 'tenantSettings.restoreTenant' | transloco }}
+            </button>
+          } @else if (currentStatus() === TenantStatus.DELETION_PENDING) {
+            <button hlmBtn variant="outline" (click)="cancelDeletion()">
+              <ng-icon name="lucideXCircle" class="mr-1" />
+              {{ 'tenantSettings.cancelDeletion' | transloco }}
+            </button>
+          }
         </hlm-card-footer>
       </hlm-card>
     }

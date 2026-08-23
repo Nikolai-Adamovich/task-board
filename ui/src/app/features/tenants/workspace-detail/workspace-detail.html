@@ -1,10 +1,13 @@
 <div class="mx-auto max-w-4xl py-8">
-  <!-- Header: Name + Role badge -->
+  <!-- Header: Name + Role badge + Status badge -->
   <div class="mb-6">
     <div class="flex items-center gap-3">
       <h1 class="text-2xl font-bold text-foreground">{{ tenant()?.name ?? ('workspace.defaultName' | transloco) }}</h1>
       @if (role()) {
         <span hlmBadge variant="secondary">{{ role() }}</span>
+      }
+      @if (tenant()?.status && tenant()?.status !== TenantStatus.ACTIVE) {
+        <span hlmBadge [class]="getStatusColor(tenant()!.status)">{{ tenant()!.status }}</span>
       }
     </div>
     <!-- Description -->
@@ -24,12 +27,6 @@
         <ng-icon name="lucideUsers" class="mr-2 h-4 w-4" />
         {{ 'workspace.members' | transloco }}
       </a>
-      @if (showUpgrade()) {
-        <a hlmBtn variant="outline" [routerLink]="['/tenants', tenant()?.id, 'upgrade']">
-          <ng-icon name="lucideCreditCard" class="mr-2 h-4 w-4" />
-          {{ 'workspace.upgrade' | transloco }}
-        </a>
-      }
     </div>
   }
 
@@ -63,12 +60,20 @@
               class="flex items-center gap-3 rounded-md border border-border p-3 transition-colors hover:bg-surface-50"
             >
               <ng-icon name="lucideFolder" class="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p class="text-sm font-medium text-foreground">{{ project.name }}</p>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <p class="text-sm font-medium text-foreground">{{ project.name }}</p>
+                  <span class="text-xs font-mono text-muted-foreground">[{{ project.key }}]</span>
+                </div>
                 @if (project.description) {
                   <p class="text-xs text-muted-foreground">{{ project.description }}</p>
                 }
               </div>
+              @if (project.status !== 'ACTIVE') {
+                <span hlmBadge [class]="getStatusColor(project.status)" class="text-xs">
+                  {{ project.status }}
+                </span>
+              }
             </a>
           }
         </div>

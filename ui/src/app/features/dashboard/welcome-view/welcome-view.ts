@@ -10,7 +10,7 @@ import { TenantClient } from '@services/tenant-client';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideBuilding2, lucideCheck, lucideMail } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
-import type { MyInvitation } from '@task-board/shared';
+import type { MyInvitation } from '@app/types/frontend';
 
 @Component({
   selector: 'ui-welcome-view',

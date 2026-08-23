@@ -1,0 +1,188 @@
+import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { provideIcons, NgIcon } from '@ng-icons/core';
+import { lucidePlus, lucidePencil, lucideTrash2, lucideCheck, lucideX, lucideTag } from '@ng-icons/lucide';
+import { HttpErrorResponse } from '@angular/common/http';
+import { finalize } from 'rxjs';
+import { LabelClient } from '@services/label-client';
+import { AuthStore } from '@stores/auth-store';
+import { ProjectStore } from '@stores/project-store';
+import { canManageProject } from '@app/shared/utils/role-utils';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmDialogImports } from '@spartan-ng/helm/dialog';
+import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
+import { HlmFieldImports } from '@spartan-ng/helm/field';
+import { HlmInputImports } from '@spartan-ng/helm/input';
+import { HlmBadgeImports } from '@spartan-ng/helm/badge';
+import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
+import type { Label, CreateLabel } from '@task-board/shared';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+
+interface CreateLabelForm {
+  name: string;
+}
+
+@Component({
+  selector: 'ui-label-manager',
+  imports: [
+    TranslocoPipe,
+    NgIcon,
+    HlmButtonImports,
+    HlmDialogImports,
+    HlmSpinnerImports,
+    HlmFieldImports,
+    HlmInputImports,
+    HlmBadgeImports,
+    FormField,
+    FormRoot,
+  ],
+  providers: [provideIcons({ lucidePlus, lucidePencil, lucideTrash2, lucideCheck, lucideX, lucideTag })],
+  templateUrl: './label-manager.html',
+})
+export class LabelManager implements OnInit {
+  private readonly labelClient = inject(LabelClient);
+  private readonly authStore = inject(AuthStore);
+  private readonly projectStore = inject(ProjectStore);
+  protected readonly canManage = computed(() =>
+    canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole()),
+  );
+  /** Bound via withComponentInputBinding() — now receives project key from route */
+  readonly projectKey = input.required<string>();
+  /** Resolved project UUID from the store */
+  protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
+  protected readonly labels = signal<Label[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly error = signal('');
+  protected readonly showCreateDialog = signal(false);
+  protected readonly showDeleteDialog = signal(false);
+  protected readonly deletingLabel = signal<Label | null>(null);
+  protected readonly editingId = signal<string | null>(null);
+  protected readonly editingName = signal('');
+  protected readonly saving = signal(false);
+  private readonly createModel = signal<CreateLabelForm>({ name: '' });
+  protected readonly createForm = form(
+    this.createModel,
+    schema<CreateLabelForm>((field) => {
+      required(field.name, { message: 'validation.labelNameRequired' });
+    }),
+    {
+      submission: {
+        action: async (f) => {
+          this.error.set('');
+
+          const data: CreateLabel = { name: this.createModel().name.trim() };
+
+          this.labelClient.create(this.projectId(), data).subscribe({
+            next: (label) => {
+              this.labels.update((list) => [...list, label]);
+              this.showCreateDialog.set(false);
+              f().reset({ name: '' });
+            },
+            error: (err) => {
+              this.error.set(this.getErrorMessage(err));
+            },
+          });
+        },
+      },
+    },
+  );
+
+  protected startEdit(label: Label): void {
+    this.editingId.set(label.id);
+    this.editingName.set(label.name);
+  }
+
+  protected cancelEdit(): void {
+    this.editingId.set(null);
+    this.editingName.set('');
+  }
+
+  protected saveEdit(label: Label): void {
+    const name = this.editingName().trim();
+
+    if (!name || name === label.name) {
+      this.cancelEdit();
+      return;
+    }
+
+    this.saving.set(true);
+    this.labelClient
+      .update(label.id, { name })
+      .pipe(finalize(() => this.saving.set(false)))
+      .subscribe({
+        next: (updated) => {
+          this.labels.update((list) => list.map((l) => (l.id === updated.id ? updated : l)));
+          this.cancelEdit();
+        },
+        error: (err) => {
+          this.error.set(this.getErrorMessage(err));
+        },
+      });
+  }
+
+  protected confirmDelete(label: Label): void {
+    this.deletingLabel.set(label);
+    this.showDeleteDialog.set(true);
+  }
+
+  protected deleteLabel(): void {
+    const label = this.deletingLabel();
+
+    if (!label) return;
+
+    this.saving.set(true);
+    this.labelClient
+      .delete(label.id)
+      .pipe(finalize(() => this.saving.set(false)))
+      .subscribe({
+        next: () => {
+          this.labels.update((list) => list.filter((l) => l.id !== label.id));
+          this.showDeleteDialog.set(false);
+          this.deletingLabel.set(null);
+        },
+        error: (err) => {
+          this.error.set(this.getErrorMessage(err));
+        },
+      });
+  }
+
+  protected onDialogStateChange(state: BrnDialogState): void {
+    if (state === 'closed') {
+      this.showCreateDialog.set(false);
+    }
+  }
+
+  protected onDeleteDialogStateChange(state: BrnDialogState): void {
+    if (state === 'closed') {
+      this.showDeleteDialog.set(false);
+      this.deletingLabel.set(null);
+    }
+  }
+
+  ngOnInit(): void {
+    this.loadLabels();
+  }
+
+  private loadLabels(): void {
+    this.loading.set(true);
+    this.error.set('');
+    this.labelClient
+      .list(this.projectId())
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (labels) => {
+          this.labels.set(labels);
+        },
+        error: (err) => {
+          this.error.set(this.getErrorMessage(err));
+        },
+      });
+  }
+
+  private getErrorMessage(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      return err.error?.message ?? err.message;
+    }
+    return 'errors.unexpected';
+  }
+}

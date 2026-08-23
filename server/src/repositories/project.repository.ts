@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
+import { ProjectStatus } from '@task-board/shared';
 import type { Project } from '@task-board/shared';
+
+// Required MongoDB indexes:
+// - { id: 1 } (unique)
+// - { tenantId: 1, key: 1 } (unique)
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
@@ -8,9 +13,14 @@ export interface ProjectDocument {
   _id?: import('mongodb').ObjectId;
   id: string;
   tenantId: string;
+  key: string;
   name: string;
-  slug: string;
   description: string | null;
+  status: string;
+  defaultStatusId: string;
+  defaultBoardId: string;
+  archiveReason: string | null;
+  deletionScheduledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,9 +31,14 @@ function toDomain(doc: ProjectDocument): Project {
   return {
     id: doc.id,
     tenantId: doc.tenantId,
+    key: doc.key,
     name: doc.name,
-    slug: doc.slug,
-    description: doc.description ?? undefined,
+    description: doc.description,
+    status: doc.status as Project['status'],
+    defaultStatusId: doc.defaultStatusId,
+    defaultBoardId: doc.defaultBoardId,
+    archiveReason: doc.archiveReason as Project['archiveReason'],
+    deletionScheduledAt: doc.deletionScheduledAt ? doc.deletionScheduledAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };
@@ -34,8 +49,14 @@ function toDomain(doc: ProjectDocument): Project {
 export class ProjectRepository {
   constructor(private readonly collection: Collection<ProjectDocument>) {}
 
-  async findById(tenantId: string, id: string): Promise<Project | null> {
-    const doc = await this.collection.findOne({ id, tenantId });
+  async findById(id: string): Promise<Project | null> {
+    const doc = await this.collection.findOne({ id });
+
+    return doc ? toDomain(doc) : null;
+  }
+
+  async findByKey(key: string): Promise<Project | null> {
+    const doc = await this.collection.findOne({ key });
 
     return doc ? toDomain(doc) : null;
   }
@@ -46,20 +67,25 @@ export class ProjectRepository {
     return docs.map(toDomain);
   }
 
-  async findBySlug(tenantId: string, slug: string): Promise<Project | null> {
-    const doc = await this.collection.findOne({ tenantId, slug });
+  async findByTenantAndKey(tenantId: string, key: string): Promise<Project | null> {
+    const doc = await this.collection.findOne({ tenantId, key });
 
     return doc ? toDomain(doc) : null;
   }
 
-  async create(tenantId: string, input: { name: string; slug: string; description?: string }): Promise<Project> {
+  async create(tenantId: string, input: { key: string; name: string; description?: string }): Promise<Project> {
     const now = new Date();
     const doc: ProjectDocument = {
       id: randomUUID(),
       tenantId,
+      key: input.key,
       name: input.name,
-      slug: input.slug,
       description: input.description ?? null,
+      status: ProjectStatus.ACTIVE,
+      defaultStatusId: '',
+      defaultBoardId: '',
+      archiveReason: null,
+      deletionScheduledAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -69,12 +95,22 @@ export class ProjectRepository {
   }
 
   async update(
-    tenantId: string,
     id: string,
-    input: Partial<Pick<ProjectDocument, 'name' | 'slug' | 'description'>>,
+    input: Partial<
+      Pick<
+        ProjectDocument,
+        | 'name'
+        | 'description'
+        | 'status'
+        | 'defaultStatusId'
+        | 'defaultBoardId'
+        | 'archiveReason'
+        | 'deletionScheduledAt'
+      >
+    >,
   ): Promise<Project | null> {
     const result = await this.collection.findOneAndUpdate(
-      { id, tenantId },
+      { id },
       { $set: { ...input, updatedAt: new Date() } },
       { returnDocument: 'after' },
     );
@@ -82,13 +118,9 @@ export class ProjectRepository {
     return result ? toDomain(result) : null;
   }
 
-  async delete(tenantId: string, id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id, tenantId });
+  async delete(id: string): Promise<boolean> {
+    const result = await this.collection.deleteOne({ id });
 
     return result.deletedCount > 0;
-  }
-
-  async countByTenant(tenantId: string): Promise<number> {
-    return this.collection.countDocuments({ tenantId });
   }
 }

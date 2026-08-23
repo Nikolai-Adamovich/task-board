@@ -1,0 +1,127 @@
+/**
+ * Structured application error classes for the v5 error model.
+ *
+ * All errors produce `{ error: { code, message, details } }` JSON responses.
+ * Error codes and HTTP status codes match the technical specification §7.3.
+ */
+
+/** All v5 error codes from the technical specification §14.3. */
+export type ErrorCode =
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'VALIDATION_ERROR'
+  | 'CONFLICT'
+  | 'TASK_VERSION_CONFLICT'
+  | 'DUPLICATE_PROJECT_KEY'
+  | 'DUPLICATE_LABEL'
+  | 'DUPLICATE_STATUS'
+  | 'INVALID_STATUS_REPLACEMENT'
+  | 'INVALID_SPRINT_DATES'
+  | 'INVITATION_EXPIRED'
+  | 'INVITATION_REVOKED'
+  | 'INVITATION_ALREADY_ACCEPTED'
+  | 'PROJECT_ARCHIVED'
+  | 'TENANT_ARCHIVED'
+  | 'PROJECT_KEY_IMMUTABLE'
+  | 'TASK_TYPE_IN_USE'
+  | 'STATUS_IN_USE'
+  | 'INTERNAL_ERROR';
+
+// ─── Base Error ─────────────────────────────────────────────────────────────
+
+/**
+ * Base application error. Use subclasses for common HTTP errors.
+ * For domain-specific errors, construct directly with the appropriate ErrorCode.
+ *
+ * @example
+ * ```ts
+ * throw new AppError(409, 'TASK_VERSION_CONFLICT', 'Task was modified concurrently');
+ * ```
+ */
+export class AppError extends Error {
+  public readonly code: ErrorCode;
+  public readonly statusCode: number;
+  public readonly details?: unknown;
+
+  constructor(statusCode: number, code: ErrorCode, message: string, details?: unknown) {
+    super(message);
+    this.name = 'AppError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.details = details;
+  }
+}
+
+// ─── Subclasses ─────────────────────────────────────────────────────────────
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Authentication required') {
+    super(401, 'UNAUTHORIZED', message);
+    this.name = 'UnauthorizedError';
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'Insufficient permissions') {
+    super(403, 'FORBIDDEN', message);
+    this.name = 'ForbiddenError';
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(message = 'Resource not found') {
+    super(404, 'NOT_FOUND', message);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message = 'Validation failed', details?: unknown) {
+    super(400, 'VALIDATION_ERROR', message, details);
+    this.name = 'ValidationError';
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(
+    message = 'Resource conflict',
+    code: Extract<
+      ErrorCode,
+      | 'CONFLICT'
+      | 'TASK_VERSION_CONFLICT'
+      | 'DUPLICATE_PROJECT_KEY'
+      | 'DUPLICATE_LABEL'
+      | 'DUPLICATE_STATUS'
+      | 'INVITATION_ALREADY_ACCEPTED'
+      | 'TASK_TYPE_IN_USE'
+      | 'STATUS_IN_USE'
+    > = 'CONFLICT',
+  ) {
+    super(409, code, message);
+    this.name = 'ConflictError';
+  }
+}
+
+export class BadRequestError extends AppError {
+  constructor(
+    message = 'Bad request',
+    code: Extract<
+      ErrorCode,
+      'INVALID_STATUS_REPLACEMENT' | 'INVALID_SPRINT_DATES' | 'PROJECT_KEY_IMMUTABLE' | 'VALIDATION_ERROR'
+    > = 'VALIDATION_ERROR',
+  ) {
+    super(400, code, message);
+    this.name = 'BadRequestError';
+  }
+}
+
+export class GoneError extends AppError {
+  constructor(
+    message = 'Resource gone',
+    code: Extract<ErrorCode, 'INVITATION_EXPIRED' | 'INVITATION_REVOKED'> = 'INVITATION_EXPIRED',
+  ) {
+    super(410, code, message);
+    this.name = 'GoneError';
+  }
+}

@@ -1,6 +1,5 @@
 import { Component, inject, input, signal, OnInit, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
 import { PriorityDotColorMap, NeutralDotColor } from '@app/constants/priority';
 import { finalize } from 'rxjs';
@@ -16,9 +15,7 @@ import type { Task, Sprint } from '@task-board/shared';
 })
 export class SprintBacklog implements OnInit {
   private readonly taskClient = inject(TaskClient);
-  private readonly sprintClient = inject(SprintClient);
   readonly projectId = input.required<string>();
-  readonly boardId = input<string>('');
   readonly targetSprint = input<Sprint | null>(null);
   readonly taskAdded = output<string>();
   protected readonly backlogTasks = signal<Task[]>([]);
@@ -36,7 +33,7 @@ export class SprintBacklog implements OnInit {
     this.loading.set(true);
     // Load tasks with no sprint (backlog)
     this.taskClient
-      .list({ projectId: this.projectId(), sprintId: null, limit: 200 })
+      .list(this.projectId(), { sprintId: null, limit: 200 })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (res) => {
@@ -46,14 +43,14 @@ export class SprintBacklog implements OnInit {
       });
   }
 
-  protected addTaskToSprint(taskId: string): void {
+  protected addTaskToSprint(task: Task): void {
     const sprint = this.targetSprint();
 
     if (!sprint) return;
-    this.sprintClient.addTask(sprint.id, taskId).subscribe({
+    this.taskClient.update(task.id, { sprintId: sprint.id, version: task.version }).subscribe({
       next: () => {
-        this.backlogTasks.update((list) => list.filter((t) => t.id !== taskId));
-        this.taskAdded.emit(taskId);
+        this.backlogTasks.update((list) => list.filter((t) => t.id !== task.id));
+        this.taskAdded.emit(task.id);
       },
     });
   }

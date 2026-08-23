@@ -1,0 +1,196 @@
+<div class="mx-auto max-w-7xl">
+  <div class="mb-6 flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-foreground">{{ 'taskTable.title' | transloco }}</h2>
+    <div class="flex items-center gap-3">
+      <input
+        hlmInput
+        type="text"
+        class="w-64"
+        [placeholder]="'taskTable.searchPlaceholder' | transloco"
+        [value]="search()"
+        (input)="onSearch($event)"
+      />
+      <button hlmBtn variant="outline" size="sm" title="Filters" (click)="showFilterDialog.set(true)">
+        <ng-icon name="lucideFilter" />
+      </button>
+      <button hlmBtn size="sm" (click)="openCreateDialog()">
+        {{ 'taskTable.newTask' | transloco }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters Dialog -->
+  <hlm-dialog [state]="showFilterDialog() ? 'open' : 'closed'" (stateChanged)="onFilterDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'taskTable.filters' | transloco }}</h3>
+      </hlm-dialog-header>
+      <ui-filter-panel
+        [projectId]="projectId()"
+        [currentFilters]="currentFilters()"
+        [currentSort]="currentSort()"
+        (filterApplied)="onFilterApplied($event)"
+      />
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <div hlmTableContainer>
+    <table hlmTable>
+      <thead hlmTableHeader>
+        <tr hlmTableRow>
+          @for (col of taskColumns; track col.field) {
+            <th hlmTableHead [class]="col.width">
+              <div class="flex items-center gap-1">
+                <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort(col.field)">
+                  <span>{{ col.labelKey | transloco }}</span>
+                  <span class="inline-flex h-3 w-3 shrink-0">
+                    @if (sortField() === col.field) {
+                      <ng-icon
+                        [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'"
+                        class="h-3 w-3"
+                      />
+                    }
+                  </span>
+                </button>
+                @if (col.filterType !== 'none') {
+                  <hlm-popover sideOffset="4">
+                    <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                      <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="col.getFilterValue()" />
+                    </button>
+                    <hlm-popover-content *hlmPopoverPortal [class]="col.popoverWidth ?? 'w-48'">
+                      <div class="space-y-2">
+                        @if (col.filterType === 'text') {
+                          <input
+                            hlmInput
+                            type="text"
+                            class="h-8 w-full"
+                            [value]="col.getFilterValue()"
+                            (input)="col.setFilterValue!($any($event.target).value)"
+                            [placeholder]="col.placeholder ?? '' | transloco"
+                          />
+                        } @else if (col.staticOptions) {
+                          <hlm-select [value]="col.getFilterValue()" (valueChange)="col.setFilterValue!($any($event))">
+                            <hlm-select-trigger class="w-full" size="sm">
+                              <hlm-select-value [placeholder]="col.allLabelKey ? (col.allLabelKey | transloco) : ''" />
+                            </hlm-select-trigger>
+                            <hlm-select-content *hlmSelectPortal>
+                              <hlm-select-group>
+                                <hlm-select-item value="">{{ col.allLabelKey | transloco }}</hlm-select-item>
+                                @for (opt of col.staticOptions; track opt.value) {
+                                  <hlm-select-item [value]="opt.value">{{ opt.labelKey | transloco }}</hlm-select-item>
+                                }
+                              </hlm-select-group>
+                            </hlm-select-content>
+                          </hlm-select>
+                        } @else {
+                          <hlm-select
+                            [value]="col.getFilterValue()"
+                            (valueChange)="col.setFilterValue!($any($event))"
+                            [itemToString]="col.itemToString"
+                          >
+                            <hlm-select-trigger class="w-full" size="sm">
+                              <hlm-select-value [placeholder]="col.allLabelKey ? (col.allLabelKey | transloco) : ''" />
+                            </hlm-select-trigger>
+                            <hlm-select-content *hlmSelectPortal>
+                              <hlm-select-group>
+                                <hlm-select-item value="">{{ col.allLabelKey | transloco }}</hlm-select-item>
+                                @for (opt of col.getOptions!(); track opt.id) {
+                                  <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                                }
+                              </hlm-select-group>
+                            </hlm-select-content>
+                          </hlm-select>
+                        }
+                      </div>
+                    </hlm-popover-content>
+                  </hlm-popover>
+                }
+              </div>
+            </th>
+          }
+        </tr>
+      </thead>
+      <tbody hlmTableBody>
+        @for (task of tasks(); track task.id) {
+          <tr hlmTableRow class="cursor-pointer" (click)="goToTask(task)">
+            <td hlmTableCell class="font-mono text-xs text-muted-foreground">
+              @if (projectKey()) {
+                {{ projectKey() }}-{{ task.number }}
+              } @else {
+                #{{ task.number }}
+              }
+            </td>
+            <td hlmTableCell class="font-medium">{{ task.title }}</td>
+            <td hlmTableCell>
+              <span hlmBadge variant="secondary" class="text-xs">{{ typeMap()[task.typeId] || task.typeId }}</span>
+            </td>
+            <td hlmTableCell>
+              <span hlmBadge variant="outline" class="text-xs">{{ statusMap()[task.statusId] || task.statusId }}</span>
+            </td>
+            <td hlmTableCell>
+              <span hlmBadge variant="outline" class="text-xs">{{ task.priority }}</span>
+            </td>
+            <td hlmTableCell class="text-xs text-muted-foreground">
+              @if (task.assigneeSnapshot) {
+                {{ task.assigneeSnapshot.displayName }}
+              } @else {
+                {{ 'taskTable.unassigned' | transloco }}
+              }
+            </td>
+            <td hlmTableCell class="text-xs text-muted-foreground">
+              @if (task.reporterSnapshot) {
+                {{ task.reporterSnapshot.displayName }}
+              } @else {
+                {{ 'taskTable.unassigned' | transloco }}
+              }
+            </td>
+            <td hlmTableCell class="text-xs text-muted-foreground">
+              @if (task.sprintId) {
+                {{ sprintMap()[task.sprintId] || task.sprintId }}
+              }
+            </td>
+            <td hlmTableCell>
+              @if (task.labelIds && task.labelIds.length > 0) {
+                <div class="flex flex-wrap gap-1">
+                  @for (labelId of task.labelIds; track labelId) {
+                    <span hlmBadge variant="secondary" class="text-[10px]">{{ labelMap()[labelId] || labelId }}</span>
+                  }
+                </div>
+              }
+            </td>
+            <td hlmTableCell class="text-xs text-muted-foreground">{{ task.createdAt | date: 'short' }}</td>
+            <td hlmTableCell class="text-xs text-muted-foreground">{{ task.updatedAt | date: 'short' }}</td>
+          </tr>
+        } @empty {
+          <tr hlmTableRow>
+            <td hlmTableCell [attr.colspan]="COLUMN_COUNT" class="py-12 text-center">
+              <p class="text-sm text-muted-foreground">{{ 'taskTable.noTasks' | transloco }}</p>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <ui-pagination
+    [page]="page()"
+    [totalPages]="totalPages()"
+    [pageSize]="pageSize()"
+    [total]="total()"
+    (pageChange)="onPageChange($event)"
+    (pageSizeChange)="onPageSizeChange($event)"
+  />
+</div>
+
+<!-- Create Task Dialog -->
+<ui-create-task-dialog
+  [projectId]="projectId()"
+  [open]="showCreateDialog()"
+  [typeOptions]="typeOptions()"
+  [statusOptions]="statusOptions()"
+  [sprintOptions]="sprintOptions()"
+  [memberOptions]="memberOptions()"
+  [labelOptions]="labelOptions()"
+  (dialogClosed)="onCreateDialogClosed()"
+  (taskCreated)="onTaskCreated()"
+/>

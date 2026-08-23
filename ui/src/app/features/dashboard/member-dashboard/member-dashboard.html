@@ -18,14 +18,6 @@
     <hlm-card>
       <div hlmCardContent>
         <p class="text-xs font-medium uppercase text-muted-foreground">
-          {{ 'memberDashboard.totalTasks' | transloco }}
-        </p>
-        <p class="mt-1 text-3xl font-bold text-foreground">{{ tasks().length }}</p>
-      </div>
-    </hlm-card>
-    <hlm-card>
-      <div hlmCardContent>
-        <p class="text-xs font-medium uppercase text-muted-foreground">
           {{ 'memberDashboard.workspaces' | transloco }}
         </p>
         <p class="mt-1 text-3xl font-bold text-foreground">{{ tenants().length }}</p>
@@ -49,6 +41,7 @@
             <div>
               <h3 class="text-sm font-semibold text-foreground group-hover:text-primary">{{ tenant.name }}</h3>
               <span hlmBadge class="mt-0.5 bg-blue-100 text-blue-700">{{ tenant.role }}</span>
+              <span hlmBadge [class]="getStatusBadgeClass(tenant.status)" class="mt-0.5">{{ tenant.status }}</span>
             </div>
           </div>
         </a>

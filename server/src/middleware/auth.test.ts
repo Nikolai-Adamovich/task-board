@@ -67,9 +67,9 @@ describe('authMiddleware', () => {
 
     expect(res.status).toBe(401);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as { error: { code: string } };
 
-    expect(body.code).toBe('UNAUTHORIZED');
+    expect(json.error.code).toBe('UNAUTHORIZED');
   });
 
   it('returns 401 when Authorization header is not Bearer', async () => {
@@ -89,11 +89,7 @@ describe('authMiddleware', () => {
   });
 
   it('returns 401 when token is expired', async () => {
-    const token = await createTestToken(
-      { sub: 'user-1', email: 'test@example.com', tenantId: 't1', tenantRole: 'member' },
-      TEST_SECRET,
-      true,
-    );
+    const token = await createTestToken({ sub: 'user-1', email: 'test@example.com' }, TEST_SECRET, true);
     const res = await requestWithEnv(app, '/protected/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -102,10 +98,7 @@ describe('authMiddleware', () => {
   });
 
   it('returns 401 when token is signed with wrong secret', async () => {
-    const token = await createTestToken(
-      { sub: 'user-1', email: 'test@example.com', tenantId: 't1', tenantRole: 'member' },
-      'wrong-secret',
-    );
+    const token = await createTestToken({ sub: 'user-1', email: 'test@example.com' }, 'wrong-secret');
     const res = await requestWithEnv(app, '/protected/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -118,8 +111,6 @@ describe('authMiddleware', () => {
       sub: 'user-123',
       email: 'test@example.com',
       displayName: 'Test User',
-      tenantId: 'tenant-1',
-      tenantRole: 'member',
     });
     const res = await requestWithEnv(app, '/protected/me', {
       headers: { Authorization: `Bearer ${token}` },
@@ -133,5 +124,23 @@ describe('authMiddleware', () => {
     expect(body.user.id).toBe('user-123');
     expect(body.user.email).toBe('test@example.com');
     expect(body.user.displayName).toBe('Test User');
+  });
+
+  it('sets user with null avatarUrl by default', async () => {
+    const token = await createTestToken({
+      sub: 'user-456',
+      email: 'avatar@example.com',
+      displayName: 'Avatar User',
+    });
+    const res = await requestWithEnv(app, '/protected/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { user: { avatarUrl: string | null; deletedAt: string | null } };
+
+    expect(body.user.avatarUrl).toBeNull();
+    expect(body.user.deletedAt).toBeNull();
   });
 });

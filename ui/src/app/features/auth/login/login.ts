@@ -60,6 +60,9 @@ export class Login {
 
   private getErrorMessage(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
+      const userMsg = (err as HttpErrorResponse & { userMessage?: string }).userMessage;
+
+      if (userMsg) return userMsg;
       return err.error?.message ?? err.message;
     }
 

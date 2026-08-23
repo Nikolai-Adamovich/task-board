@@ -14,6 +14,7 @@
     <div class="mb-6 flex items-center justify-between">
       <div>
         <div class="flex items-center gap-3">
+          <span class="text-sm font-mono text-muted-foreground">{{ taskLabel() }}</span>
           <h2 class="text-xl font-bold text-foreground">{{ t.title }}</h2>
           <span
             hlmBadge
@@ -49,7 +50,9 @@
           </button>
         </div>
       } @else {
-        <button hlmBtn variant="outline" size="sm" (click)="startEdit()">{{ 'taskDetail.edit' | transloco }}</button>
+        @if (canEdit()) {
+          <button hlmBtn variant="outline" size="sm" (click)="startEdit()">{{ 'taskDetail.edit' | transloco }}</button>
+        }
       }
     </div>
 
@@ -66,14 +69,13 @@
                   <input hlmInput id="edit-title" type="text" [formField]="editForm.title" />
                 </hlm-field>
                 <hlm-field>
-                  <label hlmFieldLabel for="edit-description">{{ 'taskDetail.description' | transloco }}</label>
-                  <textarea
-                    hlmTextarea
-                    id="edit-description"
-                    [formField]="editForm.description"
-                    rows="6"
-                    [placeholder]="'taskDetail.descriptionPlaceholder' | transloco"
-                  ></textarea>
+                  <label hlmFieldLabel for="edit-description-milkdown">{{
+                    'taskDetail.description' | transloco
+                  }}</label>
+                  <ui-milkdown-editor
+                    [content]="editForm.description().value()"
+                    (contentChange)="onDescriptionChange($event)"
+                  />
                 </hlm-field>
               </form>
             } @else {
@@ -90,44 +92,206 @@
 
       <!-- Sidebar -->
       <div class="space-y-4">
+        <!-- Status -->
+        <hlm-card>
+          <div hlmCardContent>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">{{ 'taskDetail.status' | transloco }}</h4>
+            @if (canEdit() && statusOptions().length > 0) {
+              <hlm-select
+                [value]="t.statusId"
+                (valueChange)="updateField('statusId', $event)"
+                [itemToString]="statusItemToString"
+              >
+                <hlm-select-trigger class="mt-1 w-full">
+                  <hlm-select-value placeholder="Select status..." />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-group>
+                    @for (opt of statusOptions(); track opt.id) {
+                      <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                    }
+                  </hlm-select-group>
+                </hlm-select-content>
+              </hlm-select>
+            } @else {
+              <p class="mt-1 text-sm font-medium text-foreground">{{ statusName() || t.statusId }}</p>
+            }
+          </div>
+        </hlm-card>
+
         <!-- Priority -->
         <hlm-card>
           <div hlmCardContent>
             <h4 class="text-xs font-medium uppercase text-muted-foreground">{{ 'taskDetail.priority' | transloco }}</h4>
             @if (isEditing()) {
-              <select hlmNativeSelect class="mt-2" [formField]="editForm.priority">
-                <option value="low">{{ 'priority.low' | transloco }}</option>
-                <option value="medium">{{ 'priority.medium' | transloco }}</option>
-                <option value="high">{{ 'priority.high' | transloco }}</option>
-                <option value="critical">{{ 'priority.critical' | transloco }}</option>
-              </select>
+              <hlm-select class="mt-2" [value]="model().priority" (valueChange)="updateField('priority', $any($event))">
+                <hlm-select-trigger class="w-full" size="sm">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-group>
+                    <hlm-select-item value="LOW">{{ 'priority.low' | transloco }}</hlm-select-item>
+                    <hlm-select-item value="MEDIUM">{{ 'priority.medium' | transloco }}</hlm-select-item>
+                    <hlm-select-item value="HIGH">{{ 'priority.high' | transloco }}</hlm-select-item>
+                    <hlm-select-item value="CRITICAL">{{ 'priority.critical' | transloco }}</hlm-select-item>
+                  </hlm-select-group>
+                </hlm-select-content>
+              </hlm-select>
+            } @else if (canEdit()) {
+              <hlm-select class="mt-1" [value]="t.priority" (valueChange)="updateField('priority', $any($event))">
+                <hlm-select-trigger class="w-full" size="sm">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-group>
+                    <hlm-select-item value="LOW">{{ 'priority.low' | transloco }}</hlm-select-item>
+                    <hlm-select-item value="MEDIUM">{{ 'priority.medium' | transloco }}</hlm-select-item>
+                    <hlm-select-item value="HIGH">{{ 'priority.high' | transloco }}</hlm-select-item>
+                    <hlm-select-item value="CRITICAL">{{ 'priority.critical' | transloco }}</hlm-select-item>
+                  </hlm-select-group>
+                </hlm-select-content>
+              </hlm-select>
             } @else {
               <p class="mt-1 text-sm font-medium text-foreground">{{ t.priority }}</p>
             }
           </div>
         </hlm-card>
 
-        <!-- Assignees -->
+        <!-- Type -->
+        <hlm-card>
+          <div hlmCardContent>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">{{ 'taskDetail.type' | transloco }}</h4>
+            @if (canEdit() && typeOptions().length > 0) {
+              <hlm-select
+                class="mt-1"
+                [value]="t.typeId"
+                (valueChange)="updateField('typeId', $any($event))"
+                [itemToString]="typeItemToString"
+              >
+                <hlm-select-trigger class="w-full" size="sm">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-group>
+                    @for (opt of typeOptions(); track opt.id) {
+                      <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                    }
+                  </hlm-select-group>
+                </hlm-select-content>
+              </hlm-select>
+            } @else {
+              <p class="mt-1 text-sm font-medium text-foreground">{{ typeName() || t.typeId }}</p>
+            }
+          </div>
+        </hlm-card>
+
+        <!-- Reporter -->
         <hlm-card>
           <div hlmCardContent>
             <h4 class="text-xs font-medium uppercase text-muted-foreground">
-              {{ 'taskDetail.assignees' | transloco }}
+              {{ 'taskDetail.reporter' | transloco }}
             </h4>
-            <div class="mt-2 space-y-1">
-              @if (t.assigneeIds.length === 0) {
-                <p class="text-xs text-muted-foreground">{{ 'taskDetail.unassigned' | transloco }}</p>
+            <div class="mt-2 flex items-center gap-2">
+              @if (t.reporterSnapshot) {
+                <hlm-avatar class="h-6 w-6">
+                  <div hlmAvatarFallback class="text-[10px] font-medium">
+                    {{ t.reporterSnapshot.displayName.substring(0, 2).toUpperCase() }}
+                  </div>
+                </hlm-avatar>
+                <span class="text-xs text-foreground">{{ t.reporterSnapshot.displayName }}</span>
+              } @else {
+                <p class="text-xs text-muted-foreground">{{ 'taskDetail.unknown' | transloco }}</p>
               }
-              @for (assigneeId of t.assigneeIds; track assigneeId) {
+            </div>
+          </div>
+        </hlm-card>
+
+        <!-- Assignee -->
+        <hlm-card>
+          <div hlmCardContent>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">
+              {{ 'taskDetail.assignee' | transloco }}
+            </h4>
+            <div class="mt-2">
+              @if (canEdit() && memberOptions().length > 0) {
+                <hlm-select
+                  class="mt-1"
+                  [value]="t.assigneeId ?? ''"
+                  (valueChange)="updateField('assigneeId', $any($event) || null)"
+                  [itemToString]="assigneeItemToString"
+                >
+                  <hlm-select-trigger class="w-full" size="sm">
+                    <hlm-select-value [placeholder]="'taskDetail.unassigned' | transloco" />
+                  </hlm-select-trigger>
+                  <hlm-select-content *hlmSelectPortal>
+                    <hlm-select-group>
+                      @for (opt of memberOptions(); track opt.id) {
+                        <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                      }
+                    </hlm-select-group>
+                  </hlm-select-content>
+                </hlm-select>
+              } @else if (t.assigneeSnapshot) {
                 <div class="flex items-center gap-2">
                   <hlm-avatar class="h-6 w-6">
                     <div hlmAvatarFallback class="text-[10px] font-medium">
-                      {{ assigneeId.substring(0, 2).toUpperCase() }}
+                      {{ t.assigneeSnapshot.displayName.substring(0, 2).toUpperCase() }}
                     </div>
                   </hlm-avatar>
-                  <span class="text-xs text-foreground">{{ assigneeId }}</span>
+                  <span class="text-xs text-foreground">{{ t.assigneeSnapshot.displayName }}</span>
                 </div>
+              } @else {
+                <p class="text-xs text-muted-foreground">{{ 'taskDetail.unassigned' | transloco }}</p>
               }
             </div>
+          </div>
+        </hlm-card>
+
+        <!-- Labels -->
+        <hlm-card>
+          <div hlmCardContent>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">
+              {{ 'taskDetail.labels' | transloco }}
+            </h4>
+            <div class="mt-2 flex flex-wrap gap-1">
+              @for (label of labelNames(); track label; let idx = $index) {
+                <span hlmBadge variant="secondary" class="text-[10px]">{{ label }}</span>
+              } @empty {
+                <p class="text-xs text-muted-foreground">—</p>
+              }
+            </div>
+          </div>
+        </hlm-card>
+
+        <!-- Sprint -->
+        <hlm-card>
+          <div hlmCardContent>
+            <h4 class="text-xs font-medium uppercase text-muted-foreground">
+              {{ 'taskDetail.sprint' | transloco }}
+            </h4>
+            @if (canEdit() && sprintOptions().length > 0) {
+              <hlm-select
+                [value]="t.sprintId ?? ''"
+                (valueChange)="updateField('sprintId', $event || null)"
+                [itemToString]="sprintItemToString"
+              >
+                <hlm-select-trigger class="mt-1 w-full">
+                  <hlm-select-value placeholder="Backlog" />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-group>
+                    <hlm-select-item value="">Backlog</hlm-select-item>
+                    @for (opt of sprintOptions(); track opt.id) {
+                      <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                    }
+                  </hlm-select-group>
+                </hlm-select-content>
+              </hlm-select>
+            } @else if (t.sprintId) {
+              <p class="mt-1 text-sm font-medium text-foreground">{{ sprintName() || t.sprintId }}</p>
+            } @else {
+              <p class="mt-1 text-xs text-muted-foreground">Backlog</p>
+            }
           </div>
         </hlm-card>
 
@@ -147,11 +311,23 @@
       </div>
     </div>
 
+    <!-- Relationships & Comments -->
+    @if (task(); as t2) {
+      <div class="mt-6 grid gap-6 lg:grid-cols-3">
+        <div class="lg:col-span-2">
+          <ui-comment-thread [taskId]="taskId()" [currentUserId]="currentUserId()" [canEdit]="canEditComments()" />
+        </div>
+        <div>
+          <ui-task-relationships [taskId]="taskId()" [projectId]="t2.projectId" />
+        </div>
+      </div>
+    }
+
     <!-- Delete Confirmation Dialog -->
     <hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
       <hlm-dialog-content *hlmDialogPortal>
         <div class="space-y-4">
-          <h3 hlmDialogTitle>{{ 'taskDetail.deleteTitle' | transloco }}</h3>
+          <h3 hlmDialogTitle>{{ 'taskDetail.deleteTitle' | transloco: { key: taskLabel() } }}</h3>
           <p class="text-sm text-muted-foreground">
             {{ 'taskDetail.deleteConfirm' | transloco }}
           </p>
@@ -161,6 +337,26 @@
             </button>
             <button hlmBtn variant="destructive" (click)="deleteTask()">
               {{ 'taskDetail.confirmDelete' | transloco }}
+            </button>
+          </hlm-dialog-footer>
+        </div>
+      </hlm-dialog-content>
+    </hlm-dialog>
+
+    <!-- Conflict Resolution Dialog -->
+    <hlm-dialog [state]="showConflictDialog() ? 'open' : 'closed'" (stateChanged)="onConflictDialogStateChange($event)">
+      <hlm-dialog-content *hlmDialogPortal>
+        <div class="space-y-4">
+          <h3 hlmDialogTitle>{{ 'taskDetail.conflictTitle' | transloco }}</h3>
+          <p class="text-sm text-muted-foreground">
+            {{ conflictMessage() | transloco }}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            {{ 'taskDetail.conflictHint' | transloco }}
+          </p>
+          <hlm-dialog-footer>
+            <button hlmBtn (click)="reloadAfterConflict()">
+              {{ 'taskDetail.reloadTask' | transloco }}
             </button>
           </hlm-dialog-footer>
         </div>

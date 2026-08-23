@@ -2,12 +2,13 @@ import { Component, inject, input, signal, computed, OnInit } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
-import { lucidePlus, lucideUserPlus, lucideTrash2 } from '@ng-icons/lucide';
+import { lucidePlus, lucideTrash2, lucideArchive, lucideRotateCcw, lucideXCircle } from '@ng-icons/lucide';
 import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
 import { AuthStore } from '@stores/auth-store';
+import { ProjectStore } from '@stores/project-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -15,16 +16,16 @@ import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
-import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
-import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
+import { HlmCardImports } from '@spartan-ng/helm/card';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
-import { ProjectRole, TenantRole } from '@task-board/shared';
-import type { Project, Board, ProjectMember } from '@task-board/shared';
+import { TenantRole, ProjectRole, BoardType, ProjectStatus } from '@task-board/shared';
+import { ProjectStatusColorMap, NeutralColor } from '@app/constants/priority';
+import type { Project, Board, CreateBoard } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 interface BoardFormModel {
   name: string;
-  description: string;
+  type: string;
 }
 
 @Component({
@@ -40,37 +41,46 @@ interface BoardFormModel {
     HlmInputImports,
     HlmTextareaImports,
     HlmBadgeImports,
-    HlmAvatarImports,
-    HlmNativeSelectImports,
+    HlmCardImports,
     FormField,
     FormRoot,
   ],
-  providers: [provideIcons({ lucidePlus, lucideUserPlus, lucideTrash2 })],
+  providers: [provideIcons({ lucidePlus, lucideTrash2, lucideArchive, lucideRotateCcw, lucideXCircle })],
   templateUrl: './project-detail.html',
 })
 export class ProjectDetail implements OnInit {
   private readonly projectClient = inject(ProjectClient);
   private readonly boardClient = inject(BoardClient);
   private readonly authStore = inject(AuthStore);
-  /** Bound via withComponentInputBinding() */
-  readonly projectId = input.required<string>();
+  private readonly projectStore = inject(ProjectStore);
+  /** Bound via withComponentInputBinding() — now receives project key from route */
+  readonly projectKey = input.required<string>();
+  /** Resolved project UUID from the store */
+  protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
   protected readonly project = signal<Project | null>(null);
   protected readonly boards = signal<Board[]>([]);
-  protected readonly members = signal<ProjectMember[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
   protected readonly showCreateBoard = signal(false);
-  protected readonly showAddMember = signal(false);
-  protected readonly showRemoveConfirm = signal(false);
-  protected readonly memberToRemove = signal<ProjectMember | null>(null);
-  protected readonly projectRoles = Object.values(ProjectRole);
-  /** Whether the current user has admin/owner privileges */
+  protected readonly showDeleteConfirm = signal(false);
+  protected readonly deleteConfirmText = signal('');
+  protected readonly boardTypes = Object.values(BoardType);
+  protected readonly ProjectStatus = ProjectStatus;
+  /**
+   * Whether the current user has admin privileges.
+   * Tenant OWNER/ADMIN bypass project role checks.
+   * Project PROJECT_ADMIN can manage settings.
+   */
   protected readonly isAdmin = computed(() => {
-    const role = this.authStore.tenantRole();
+    const tenantRole = this.authStore.tenantRole();
 
-    return role === TenantRole.Owner || role === TenantRole.Admin;
+    if (tenantRole === TenantRole.OWNER || tenantRole === TenantRole.ADMIN) return true;
+
+    const projectRole = this.projectStore.projectRole();
+
+    return projectRole === ProjectRole.PROJECT_ADMIN;
   });
-  protected readonly boardModel = signal<BoardFormModel>({ name: '', description: '' });
+  protected readonly boardModel = signal<BoardFormModel>({ name: '', type: BoardType.KANBAN });
   protected readonly createBoardForm = form(
     this.boardModel,
     schema<BoardFormModel>((field) => {
@@ -81,11 +91,22 @@ export class ProjectDetail implements OnInit {
         action: async (f) => {
           this.error.set('');
 
-          this.boardClient.create(this.projectId(), this.boardModel()).subscribe({
+          const model = this.boardModel();
+          const boardData: CreateBoard = {
+            name: model.name,
+            type: model.type as BoardType,
+            columns: [
+              { statusIds: [], position: 0 },
+              { statusIds: [], position: 1 },
+              { statusIds: [], position: 2 },
+            ],
+          };
+
+          this.boardClient.create(this.projectId(), boardData).subscribe({
             next: (board) => {
               this.boards.update((list) => [...list, board]);
               this.showCreateBoard.set(false);
-              f().reset({ name: '', description: '' });
+              f().reset({ name: '', type: BoardType.KANBAN });
             },
             error: (err) => {
               this.error.set(this.getErrorMessage(err));
@@ -95,36 +116,10 @@ export class ProjectDetail implements OnInit {
       },
     },
   );
-  private readonly memberModel = signal<{ userId: string; role: string }>({
-    userId: '',
-    role: ProjectRole.Developer,
-  });
-  protected readonly addMemberForm = form(
-    this.memberModel,
-    schema<{ userId: string; role: string }>((field) => {
-      required(field.userId, { message: 'validation.userIdRequired' });
-    }),
-    {
-      submission: {
-        action: async (f) => {
-          this.error.set('');
 
-          this.projectClient
-            .addMember(this.projectId(), this.memberModel().userId, this.memberModel().role as ProjectRole)
-            .subscribe({
-              next: () => {
-                this.loadMembers();
-                this.showAddMember.set(false);
-                f().reset({ userId: '', role: ProjectRole.Developer });
-              },
-              error: (err) => {
-                this.error.set(this.getErrorMessage(err));
-              },
-            });
-        },
-      },
-    },
-  );
+  protected getStatusColor(status: string): string {
+    return (ProjectStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
+  }
 
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
@@ -132,17 +127,34 @@ export class ProjectDetail implements OnInit {
     }
   }
 
-  protected onAddMemberDialogStateChange(state: BrnDialogState): void {
+  protected onDeleteDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
-      this.showAddMember.set(false);
+      this.showDeleteConfirm.set(false);
+      this.deleteConfirmText.set('');
     }
   }
 
-  protected onRemoveDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
-      this.showRemoveConfirm.set(false);
-      this.memberToRemove.set(null);
-    }
+  /** Whether the project is archived — disables all write controls */
+  protected get isArchived(): boolean {
+    return this.project()?.status !== ProjectStatus.ACTIVE;
+  }
+
+  /** Whether the delete confirmation text matches the project key */
+  protected get canConfirmDelete(): boolean {
+    const p = this.project();
+
+    return p !== null && this.deleteConfirmText() === p.key;
+  }
+
+  protected requestDeleteProject(): void {
+    this.deleteConfirmText.set('');
+    this.showDeleteConfirm.set(true);
+  }
+
+  protected confirmDeleteProject(): void {
+    this.deleteProject();
+    this.showDeleteConfirm.set(false);
+    this.deleteConfirmText.set('');
   }
 
   ngOnInit(): void {
@@ -159,7 +171,6 @@ export class ProjectDetail implements OnInit {
         next: (project) => {
           this.project.set(project);
           this.loadBoards();
-          this.loadMembers();
         },
         error: (err) => {
           this.error.set(this.getErrorMessage(err));
@@ -169,40 +180,45 @@ export class ProjectDetail implements OnInit {
 
   private loadBoards(): void {
     this.boardClient.list(this.projectId()).subscribe({
-      next: (res) => this.boards.set(res.data),
+      next: (boards) => this.boards.set(boards),
     });
   }
 
-  private loadMembers(): void {
-    this.projectClient.listMembers(this.projectId()).subscribe({
-      next: (res) => this.members.set(res.data),
-    });
-  }
+  // ─── Project Lifecycle ────────────────────────────────────────────────────
 
-  protected onRoleChange(member: ProjectMember, newRole: string | null | undefined): void {
-    if (!newRole || newRole === member.role) return;
-    this.projectClient.updateMemberRole(this.projectId(), member.userId, newRole).subscribe({
-      next: () => this.loadMembers(),
-    });
-  }
-
-  protected confirmRemoveMember(member: ProjectMember): void {
-    this.memberToRemove.set(member);
-    this.showRemoveConfirm.set(true);
-  }
-
-  protected removeMember(): void {
-    const member = this.memberToRemove();
-
-    if (!member) return;
-
-    this.projectClient.removeMember(this.projectId(), member.userId).subscribe({
+  protected archiveProject(): void {
+    this.projectClient.archive(this.projectId()).subscribe({
       next: () => {
-        this.loadMembers();
-        this.showRemoveConfirm.set(false);
-        this.memberToRemove.set(null);
+        this.project.update((p) => (p ? { ...p, status: ProjectStatus.ARCHIVED } : p));
       },
-      error: (err) => console.error(err),
+      error: (err) => this.error.set(this.getErrorMessage(err)),
+    });
+  }
+
+  protected restoreProject(): void {
+    this.projectClient.restore(this.projectId()).subscribe({
+      next: () => {
+        this.project.update((p) => (p ? { ...p, status: ProjectStatus.ACTIVE, deletionScheduledAt: null } : p));
+      },
+      error: (err) => this.error.set(this.getErrorMessage(err)),
+    });
+  }
+
+  protected deleteProject(): void {
+    this.projectClient.delete(this.projectId()).subscribe({
+      next: () => {
+        this.project.update((p) => (p ? { ...p, status: ProjectStatus.DELETION_PENDING } : p));
+      },
+      error: (err) => this.error.set(this.getErrorMessage(err)),
+    });
+  }
+
+  protected cancelDeletion(): void {
+    this.projectClient.cancelDeletion(this.projectId()).subscribe({
+      next: () => {
+        this.project.update((p) => (p ? { ...p, status: ProjectStatus.ACTIVE, deletionScheduledAt: null } : p));
+      },
+      error: (err) => this.error.set(this.getErrorMessage(err)),
     });
   }
 

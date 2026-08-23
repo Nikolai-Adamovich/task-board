@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import { MemberStatus } from '@task-board/shared';
+import { MemberStatus, TenantRole } from '@task-board/shared';
 import { ForbiddenError, ValidationError } from './error-handler.js';
 import { getCollection } from '../db/mongo.js';
 import type { AppEnv } from '../types/context.js';
@@ -19,15 +19,16 @@ interface TenantMemberDocument {
  * Hono middleware that resolves the active tenant context.
  *
  * 1. Reads the `X-Tenant-Id` header.
- * 2. Validates the authenticated user is a member of that tenant.
- * 3. Sets `c.get('tenantId')` on the context.
+ * 2. Validates the authenticated user has an ACTIVE membership in that tenant.
+ * 3. Rejects ACCESS_REVOKED members with 403.
+ * 4. Sets `tenantId` and `tenantRole` on the context.
  *
  * Error responses:
- * - 400 if `X-Tenant-Id` header is missing
- * - 403 if the user is not a member of the specified tenant
+ * - 400 VALIDATION_ERROR if `X-Tenant-Id` header is missing
+ * - 403 FORBIDDEN if the user is not a member, or membership is ACCESS_REVOKED
  *
  * This middleware should be applied per-route, not globally,
- * so that auth routes can skip it.
+ * so that auth and invitation routes can skip it.
  */
 export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const tenantId = c.req.header('X-Tenant-Id');
@@ -53,20 +54,18 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
     throw new ForbiddenError('You are not a member of this tenant');
   }
 
-  // Check membership status
-  if (membership.status !== MemberStatus.Active) {
-    if (membership.status === MemberStatus.Pending) {
-      throw new ForbiddenError('Your membership is pending. Please accept the invitation first.');
-    }
-    if (membership.status === MemberStatus.Declined) {
-      throw new ForbiddenError('Your membership has been declined.');
-    }
+  // Check membership status — only ACTIVE and ACCESS_REVOKED per v5 spec
+  if (membership.status === MemberStatus.ACCESS_REVOKED) {
+    throw new ForbiddenError('Your access to this tenant has been revoked');
+  }
+
+  if (membership.status !== MemberStatus.ACTIVE) {
     throw new ForbiddenError('Your membership is not active');
   }
 
   // Set tenant context for downstream handlers
   c.set('tenantId', tenantId);
-  c.set('userRole', membership.role);
+  c.set('tenantRole', membership.role as TenantRole);
 
   await next();
 });

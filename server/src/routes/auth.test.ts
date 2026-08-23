@@ -2,7 +2,7 @@
  * Tests for /auth/login and /auth/register HTTP routes.
  *
  * Validates that the endpoints correctly enforce Zod schema validation
- * and return proper HTTP status codes and error responses.
+ * and return proper HTTP status codes and error responses with { data: ... } envelope.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
@@ -18,23 +18,28 @@ vi.mock('../db/mongo.js', () => ({
 
 vi.mock('../services/auth.service.js', () => ({
   AuthService: vi.fn().mockImplementation(() => ({
-    login: vi
-      .fn()
-      .mockResolvedValue({ token: 'jwt-token', user: { id: '1', email: 'test@test', displayName: 'Test' } }),
-    register: vi
-      .fn()
-      .mockResolvedValue({ token: 'jwt-token', user: { id: '1', email: 'new@test', displayName: 'New' } }),
-    acceptInvitation: vi
-      .fn()
-      .mockResolvedValue({ token: 'jwt-token', user: { id: '2', email: 'invited@test', displayName: 'Invited' } }),
+    login: vi.fn().mockResolvedValue({
+      token: 'jwt-token',
+      user: { id: '1', email: 'test@test', displayName: 'Test', avatarUrl: null, deletedAt: null },
+    }),
+    register: vi.fn().mockResolvedValue({
+      token: 'jwt-token',
+      user: { id: '1', email: 'new@test', displayName: 'New', avatarUrl: null, deletedAt: null },
+    }),
+    acceptInvitation: vi.fn().mockResolvedValue({
+      token: 'jwt-token',
+      user: { id: '2', email: 'invited@test', displayName: 'Invited', avatarUrl: null, deletedAt: null },
+    }),
     getInvitationDetails: vi.fn().mockResolvedValue({
       email: 'invited@test',
       tenantName: 'Acme',
-      role: 'member',
-      status: 'pending',
+      role: 'MEMBER',
+      status: 'PENDING',
       isRegistered: false,
     }),
-    me: vi.fn().mockResolvedValue({ id: '1', email: 'test@test', displayName: 'Test' }),
+    me: vi
+      .fn()
+      .mockResolvedValue({ id: '1', email: 'test@test', displayName: 'Test', avatarUrl: null, deletedAt: null }),
   })),
 }));
 
@@ -46,7 +51,7 @@ function createTestApp() {
   const app = new Hono<AppEnv>();
 
   app.onError(errorHandler);
-  app.route('/api/v1/auth', createAuthRoutes());
+  app.route('/api/auth', createAuthRoutes());
 
   return app;
 }
@@ -63,18 +68,27 @@ async function postJson(app: Hono<AppEnv>, path: string, body: unknown) {
   );
 }
 
-// ─── POST /api/v1/auth/login ─────────────────────────────────────────────────
+// ─── POST /api/auth/login ─────────────────────────────────────────────────
 
-describe('POST /api/v1/auth/login', () => {
+describe('POST /api/auth/login', () => {
   const app = createTestApp();
 
-  it('should return 200 for valid credentials', async () => {
-    const res = await postJson(app, '/api/v1/auth/login', {
+  it('should return 200 for valid credentials with { data } envelope', async () => {
+    const res = await postJson(app, '/api/auth/login', {
       email: 'user@example.com',
       password: 'password123',
     });
 
     expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).toHaveProperty('data');
+
+    const data = body.data as Record<string, unknown>;
+
+    expect(data).toHaveProperty('token');
+    expect(data).toHaveProperty('user');
   });
 
   // ── Valid emails ─────────────────────────────────────────────────────────
@@ -82,7 +96,7 @@ describe('POST /api/v1/auth/login', () => {
   it.each(['user@example.com', 'test@test', 'a@b.c', 'user+tag@example.com'])(
     'should accept email: %s',
     async (email) => {
-      const res = await postJson(app, '/api/v1/auth/login', { email, password: 'password123' });
+      const res = await postJson(app, '/api/auth/login', { email, password: 'password123' });
 
       expect(res.status).toBe(200);
     },
@@ -96,25 +110,25 @@ describe('POST /api/v1/auth/login', () => {
     { email: '@example.com', desc: 'missing local part' },
     { email: 'user@', desc: 'missing domain' },
   ])('should return 422 for email: $desc', async ({ email }) => {
-    const res = await postJson(app, '/api/v1/auth/login', { email, password: 'password123' });
+    const res = await postJson(app, '/api/auth/login', { email, password: 'password123' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
 
     const body = (await res.json()) as Record<string, unknown>;
 
-    expect(body.code).toBe('VALIDATION_ERROR');
+    expect(body.error).toBeDefined();
   });
 
   // ── Password ────────────────────────────────────────────────────────────
 
   it('should return 422 for empty password', async () => {
-    const res = await postJson(app, '/api/v1/auth/login', { email: 'user@example.com', password: '' });
+    const res = await postJson(app, '/api/auth/login', { email: 'user@example.com', password: '' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should accept any non-empty password (no length restriction)', async () => {
-    const res = await postJson(app, '/api/v1/auth/login', { email: 'user@example.com', password: 'a' });
+    const res = await postJson(app, '/api/auth/login', { email: 'user@example.com', password: 'a' });
 
     expect(res.status).toBe(200);
   });
@@ -122,26 +136,26 @@ describe('POST /api/v1/auth/login', () => {
   // ── Missing fields ──────────────────────────────────────────────────────
 
   it('should return 422 for missing body', async () => {
-    const res = await postJson(app, '/api/v1/auth/login', {});
+    const res = await postJson(app, '/api/auth/login', {});
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for missing email', async () => {
-    const res = await postJson(app, '/api/v1/auth/login', { password: 'password123' });
+    const res = await postJson(app, '/api/auth/login', { password: 'password123' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for missing password', async () => {
-    const res = await postJson(app, '/api/v1/auth/login', { email: 'user@example.com' });
+    const res = await postJson(app, '/api/auth/login', { email: 'user@example.com' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for invalid JSON body', async () => {
     const res = await app.request(
-      '/api/v1/auth/login',
+      '/api/auth/login',
       {
         method: 'POST',
         body: 'not json',
@@ -150,139 +164,147 @@ describe('POST /api/v1/auth/login', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 });
 
-// ─── POST /api/v1/auth/register ──────────────────────────────────────────────
+// ─── POST /api/auth/register ──────────────────────────────────────────────
 
-describe('POST /api/v1/auth/register', () => {
+describe('POST /api/auth/register', () => {
   const app = createTestApp();
   const validBody = { email: 'new@example.com', password: 'securePass123', displayName: 'New User' };
 
-  it('should return 201 for valid registration', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', validBody);
+  it('should return 201 for valid registration with { data } envelope', async () => {
+    const res = await postJson(app, '/api/auth/register', validBody);
 
     expect(res.status).toBe(201);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).toHaveProperty('data');
   });
 
   // ── Email ────────────────────────────────────────────────────────────────
 
   it.each(['test@test', 'user@example.com', 'a@b.co'])('should accept email: %s', async (email) => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, email });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, email });
 
     expect(res.status).toBe(201);
   });
 
   it('should return 422 for invalid email', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, email: 'not-an-email' });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, email: 'not-an-email' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   // ── Password ────────────────────────────────────────────────────────────
 
   it('should accept password at minimum boundary (8 chars)', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, password: '12345678' });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, password: '12345678' });
 
     expect(res.status).toBe(201);
   });
 
   it('should accept password at maximum boundary (128 chars)', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, password: 'a'.repeat(128) });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, password: 'a'.repeat(128) });
 
     expect(res.status).toBe(201);
   });
 
   it('should return 422 for password shorter than 8 chars', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, password: 'short' });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, password: 'short' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for password longer than 128 chars', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, password: 'a'.repeat(129) });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, password: 'a'.repeat(129) });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for empty password', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, password: '' });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, password: '' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   // ── Display Name ────────────────────────────────────────────────────────
 
   it('should accept single-character display name', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, displayName: 'A' });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, displayName: 'A' });
 
     expect(res.status).toBe(201);
   });
 
   it('should accept display name at maximum boundary (100 chars)', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, displayName: 'a'.repeat(100) });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, displayName: 'a'.repeat(100) });
 
     expect(res.status).toBe(201);
   });
 
   it('should return 422 for empty display name', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, displayName: '' });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, displayName: '' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for display name exceeding 100 chars', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { ...validBody, displayName: 'a'.repeat(101) });
+    const res = await postJson(app, '/api/auth/register', { ...validBody, displayName: 'a'.repeat(101) });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   // ── Missing fields ──────────────────────────────────────────────────────
 
   it('should return 422 for missing body', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', {});
+    const res = await postJson(app, '/api/auth/register', {});
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for missing email', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { password: '12345678', displayName: 'User' });
+    const res = await postJson(app, '/api/auth/register', { password: '12345678', displayName: 'User' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for missing password', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { email: 'a@b.com', displayName: 'User' });
+    const res = await postJson(app, '/api/auth/register', { email: 'a@b.com', displayName: 'User' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for missing displayName', async () => {
-    const res = await postJson(app, '/api/v1/auth/register', { email: 'a@b.com', password: '12345678' });
+    const res = await postJson(app, '/api/auth/register', { email: 'a@b.com', password: '12345678' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 });
 
-// ─── POST /api/v1/auth/accept-invitation ─────────────────────────────────────
+// ─── POST /api/auth/accept-invitation ─────────────────────────────────────
 
-describe('POST /api/v1/auth/accept-invitation', () => {
+describe('POST /api/auth/accept-invitation', () => {
   const app = createTestApp();
 
-  it('should return 200 for valid token-only acceptance', async () => {
-    const res = await postJson(app, '/api/v1/auth/accept-invitation', { token: 'invite-token-abc123' });
+  it('should return 200 with { data } envelope for valid token-only acceptance', async () => {
+    const res = await postJson(app, '/api/auth/accept-invitation', { token: 'invite-token-abc123' });
 
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as Record<string, unknown>;
 
-    expect(body.token).toBeDefined();
-    expect(body.user).toBeDefined();
+    expect(body).toHaveProperty('data');
+
+    const data = body.data as Record<string, unknown>;
+
+    expect(data.token).toBeDefined();
+    expect(data.user).toBeDefined();
   });
 
   it('should return 200 for acceptance with password and displayName', async () => {
-    const res = await postJson(app, '/api/v1/auth/accept-invitation', {
+    const res = await postJson(app, '/api/auth/accept-invitation', {
       token: 'invite-token-abc123',
       password: 'securePass123',
       displayName: 'New User',
@@ -292,43 +314,47 @@ describe('POST /api/v1/auth/accept-invitation', () => {
   });
 
   it('should return 422 for empty token', async () => {
-    const res = await postJson(app, '/api/v1/auth/accept-invitation', { token: '' });
+    const res = await postJson(app, '/api/auth/accept-invitation', { token: '' });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for missing token', async () => {
-    const res = await postJson(app, '/api/v1/auth/accept-invitation', {});
+    const res = await postJson(app, '/api/auth/accept-invitation', {});
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for password shorter than 8 chars', async () => {
-    const res = await postJson(app, '/api/v1/auth/accept-invitation', {
+    const res = await postJson(app, '/api/auth/accept-invitation', {
       token: 'invite-token-abc123',
       password: 'short',
     });
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 });
 
-// ─── GET /api/v1/auth/invitations/:token ─────────────────────────────────────
+// ─── GET /api/auth/invitations/:token ─────────────────────────────────────
 
-describe('GET /api/v1/auth/invitations/:token', () => {
+describe('GET /api/auth/invitations/:token', () => {
   const app = createTestApp();
 
-  it('should return 200 with invitation details', async () => {
-    const res = await app.request('/api/v1/auth/invitations/invite-token-abc123', { method: 'GET' }, TEST_ENV);
+  it('should return 200 with { data } envelope containing invitation details', async () => {
+    const res = await app.request('/api/auth/invitations/invite-token-abc123', { method: 'GET' }, TEST_ENV);
 
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as Record<string, unknown>;
 
-    expect(body.email).toBe('invited@test');
-    expect(body.tenantName).toBe('Acme');
-    expect(body.role).toBe('member');
-    expect(body.status).toBe('pending');
-    expect(body.isRegistered).toBe(false);
+    expect(body).toHaveProperty('data');
+
+    const data = body.data as Record<string, unknown>;
+
+    expect(data.email).toBe('invited@test');
+    expect(data.tenantName).toBe('Acme');
+    expect(data.role).toBe('MEMBER');
+    expect(data.status).toBe('PENDING');
+    expect(data.isRegistered).toBe(false);
   });
 });

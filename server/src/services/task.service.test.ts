@@ -1,285 +1,266 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TaskService } from './task.service.js';
+import type {
+  TaskServiceUserRepo,
+  TaskServiceSprintRepo,
+  TaskServiceCommentRepo,
+  TaskServiceRelationshipRepo,
+} from './task.service.js';
+import { TaskRepository } from '../repositories/task.repository.js';
+import { CounterService } from './counter.service.js';
+import { ProjectRepository } from '../repositories/project.repository.js';
+import { ProjectMemberRepository } from '../repositories/project-member.repository.js';
+import { StatusRepository } from '../repositories/status.repository.js';
+import { TaskTypeRepository } from '../repositories/task-type.repository.js';
+import type { AuditService } from './audit.service.js';
+import type { Task } from '@task-board/shared';
 
-// ─── Mock Factories ──────────────────────────────────────────────────────────
-
-function createMockTaskRepo() {
-  return {
-    findById: vi.fn(),
-    findByBoardAndColumn: vi.fn(),
-    findBySprint: vi.fn(),
-    findByProject: vi.fn(),
-    findByFilters: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    getMaxPosition: vi.fn(),
-  };
+function createMock<T>(methods: Record<string, unknown>): T {
+  return methods as unknown as T;
 }
 
-function createMockColumnRepo() {
-  return {
-    findById: vi.fn(),
-    findByBoard: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    reorder: vi.fn(),
-  };
-}
-
-const NOW = '2025-01-01T00:00:00.000Z';
-
-function makeTask(overrides: Record<string, unknown> = {}) {
+function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: 'task-1',
-    tenantId: 'tenant-1',
-    projectId: 'proj-1',
-    boardId: 'board-1',
-    columnId: 'col-1',
-    sprintId: null,
+    projectId: 'project-1',
+    number: 1,
+    typeId: 'type-1',
     title: 'Test Task',
-    description: 'A test task',
-    assigneeIds: [],
-    priority: 'medium',
-    position: 0,
-    createdBy: 'user-1',
-    createdAt: NOW,
-    updatedAt: NOW,
+    description: null,
+    statusId: 'status-1',
+    priority: 'MEDIUM',
+    reporterId: 'user-1',
+    reporterSnapshot: { displayName: 'Reporter' },
+    assigneeId: null,
+    assigneeSnapshot: null,
+    sprintId: null,
+    labelIds: [],
+    createdById: 'user-1',
+    createdBySnapshot: { displayName: 'Creator' },
+    version: 1,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
     ...overrides,
   };
 }
-
-function makeColumn(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'col-1',
-    boardId: 'board-1',
-    tenantId: 'tenant-1',
-    name: 'To Do',
-    position: 0,
-    isDefault: true,
-    createdAt: NOW,
-    ...overrides,
-  };
-}
-
-// ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('TaskService', () => {
-  let taskRepo: ReturnType<typeof createMockTaskRepo>;
-  let columnRepo: ReturnType<typeof createMockColumnRepo>;
+  let taskRepo: TaskRepository;
+  let counterService: CounterService;
+  let projectRepo: ProjectRepository;
+  let projectMemberRepo: ProjectMemberRepository;
+  let statusRepo: StatusRepository;
+  let taskTypeRepo: TaskTypeRepository;
+  let userRepo: TaskServiceUserRepo;
+  let sprintRepo: TaskServiceSprintRepo;
+  let commentRepo: TaskServiceCommentRepo;
+  let relationshipRepo: TaskServiceRelationshipRepo;
+  let auditService: AuditService;
   let service: TaskService;
 
   beforeEach(() => {
-    taskRepo = createMockTaskRepo();
-    columnRepo = createMockColumnRepo();
-    service = new TaskService(taskRepo as never, columnRepo as never, {} as never, {} as never, {} as never);
-  });
-
-  // ── listTasks ────────────────────────────────────────────────────────────
-
-  describe('listTasks', () => {
-    it('returns filtered tasks with pagination', async () => {
-      taskRepo.findByFilters.mockResolvedValue([makeTask(), makeTask({ id: 'task-2', title: 'Task 2' })]);
-
-      const result = await service.listTasks('tenant-1', {
-        boardId: 'board-1',
-        page: 1,
-        limit: 10,
-      });
-
-      expect(result.data).toHaveLength(2);
-      expect(result.total).toBe(2);
-      expect(result.page).toBe(1);
-      expect(result.limit).toBe(10);
-      expect(taskRepo.findByFilters).toHaveBeenCalledWith('tenant-1', {
-        boardId: 'board-1',
-        columnId: undefined,
-        projectId: undefined,
-        sprintId: undefined,
-        assigneeId: undefined,
-      });
-    });
-  });
-
-  // ── createTask ───────────────────────────────────────────────────────────
-
-  describe('createTask', () => {
-    it('creates a task with auto-assigned position', async () => {
-      columnRepo.findById.mockResolvedValue(makeColumn());
-      taskRepo.getMaxPosition.mockResolvedValue(2);
-      taskRepo.create.mockResolvedValue(makeTask({ position: 3 }));
-
-      const result = await service.createTask('tenant-1', 'user-1', {
-        title: 'New Task',
-        projectId: 'proj-1',
-        boardId: 'board-1',
-        columnId: 'col-1',
-        priority: 'high',
-        assigneeIds: [],
-      } as never);
-
-      expect(result.position).toBe(3);
-      expect(taskRepo.create).toHaveBeenCalledWith('tenant-1', {
-        projectId: 'proj-1',
-        boardId: 'board-1',
-        columnId: 'col-1',
-        sprintId: undefined,
-        title: 'New Task',
-        description: undefined,
-        assigneeIds: [],
-        priority: 'high',
-        position: 3,
-        createdBy: 'user-1',
-      });
+    taskRepo = createMock<TaskRepository>({
+      findById: vi.fn(),
+      findByProject: vi.fn(),
+      create: vi.fn(),
+      updateWithVersion: vi.fn(),
+      delete: vi.fn(),
+      countByStatus: vi.fn(),
+      updateManyByStatus: vi.fn(),
+      search: vi.fn(),
+      removeLabelFromAll: vi.fn(),
     });
 
-    it('throws NotFoundError when column does not exist', async () => {
-      columnRepo.findById.mockResolvedValue(null);
-
-      await expect(
-        service.createTask('tenant-1', 'user-1', {
-          title: 'Task',
-          projectId: 'proj-1',
-          boardId: 'board-1',
-          columnId: 'missing-col',
-          priority: 'medium',
-          assigneeIds: [],
-        } as never),
-      ).rejects.toThrow('Column not found');
+    counterService = createMock<CounterService>({
+      getNextTaskNumber: vi.fn().mockResolvedValue(1),
     });
+
+    projectRepo = createMock<ProjectRepository>({
+      findById: vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-1', status: 'ACTIVE' }),
+    });
+
+    projectMemberRepo = createMock<ProjectMemberRepository>({
+      findByUserAndProject: vi.fn().mockResolvedValue({ role: 'EDITOR' }),
+    });
+
+    statusRepo = createMock<StatusRepository>({
+      findById: vi.fn().mockResolvedValue({ id: 'status-1', projectId: 'project-1' }),
+    });
+
+    taskTypeRepo = createMock<TaskTypeRepository>({
+      findById: vi.fn().mockResolvedValue({ id: 'type-1', projectId: 'project-1' }),
+    });
+
+    userRepo = {
+      findById: vi.fn().mockResolvedValue({ id: 'user-1', displayName: 'Test User', email: 'test@test.com' }),
+    };
+
+    sprintRepo = {
+      findById: vi.fn().mockResolvedValue({ id: 'sprint-1', projectId: 'project-1' }),
+    };
+
+    commentRepo = {
+      deleteByTask: vi.fn().mockResolvedValue(undefined),
+    };
+
+    relationshipRepo = {
+      deleteByTask: vi.fn().mockResolvedValue(undefined),
+    };
+
+    auditService = createMock<AuditService>({
+      log: vi.fn().mockResolvedValue({}),
+      queryByProject: vi.fn(),
+      queryByTenant: vi.fn(),
+    });
+
+    service = new TaskService(
+      taskRepo,
+      counterService,
+      projectRepo,
+      projectMemberRepo,
+      statusRepo,
+      taskTypeRepo,
+      userRepo,
+      sprintRepo,
+      commentRepo,
+      relationshipRepo,
+      auditService,
+    );
   });
 
-  // ── getTask ──────────────────────────────────────────────────────────────
+  describe('getTasksByProject', () => {
+    it('returns paginated tasks', async () => {
+      taskRepo.findByProject = vi.fn().mockResolvedValue({
+        data: [makeTask()],
+        pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      });
+
+      const result = await service.getTasksByProject('project-1');
+
+      expect(result.data).toHaveLength(1);
+    });
+  });
 
   describe('getTask', () => {
-    it('returns the task', async () => {
-      taskRepo.findById.mockResolvedValue(makeTask());
+    it('returns task when found', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
 
-      const result = await service.getTask('tenant-1', 'task-1');
+      const result = await service.getTask('task-1');
 
-      expect(result.id).toBe('task-1');
-      expect(taskRepo.findById).toHaveBeenCalledWith('tenant-1', 'task-1');
+      expect(result.title).toBe('Test Task');
     });
 
-    it('throws NotFoundError when task does not exist', async () => {
-      taskRepo.findById.mockResolvedValue(null);
+    it('throws NOT_FOUND when not found', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(null);
 
-      await expect(service.getTask('tenant-1', 'missing')).rejects.toThrow('Task not found');
+      await expect(service.getTask('missing')).rejects.toThrow('Task not found');
     });
   });
 
-  // ── updateTask ───────────────────────────────────────────────────────────
+  describe('createTask', () => {
+    it('creates a task with sequential number and snapshots', async () => {
+      taskRepo.create = vi.fn().mockResolvedValue(makeTask());
 
-  describe('updateTask', () => {
-    it('allows admin to update any task', async () => {
-      taskRepo.findById.mockResolvedValue(makeTask({ createdBy: 'other-user' }));
-      taskRepo.update.mockResolvedValue(makeTask({ title: 'Updated' }));
+      const result = await service.createTask('project-1', 'user-1', 'OWNER', undefined, {
+        typeId: 'type-1',
+        title: 'New Task',
+        statusId: 'status-1',
+        priority: 'MEDIUM',
+      });
 
-      const result = await service.updateTask('tenant-1', 'user-1', 'task-1', { title: 'Updated' }, 'admin');
-
-      expect(result.title).toBe('Updated');
+      expect(result.title).toBe('Test Task');
+      expect(counterService.getNextTaskNumber).toHaveBeenCalledWith('project-1');
     });
 
-    it('allows member to update own task', async () => {
-      taskRepo.findById.mockResolvedValue(makeTask({ createdBy: 'user-1' }));
-      taskRepo.update.mockResolvedValue(makeTask({ title: 'Updated' }));
+    it('creates audit event on task creation', async () => {
+      taskRepo.create = vi.fn().mockResolvedValue(makeTask());
 
-      const result = await service.updateTask('tenant-1', 'user-1', 'task-1', { title: 'Updated' }, 'member');
+      await service.createTask('project-1', 'user-1', 'OWNER', undefined, {
+        typeId: 'type-1',
+        title: 'New Task',
+        statusId: 'status-1',
+        priority: 'MEDIUM',
+      });
 
-      expect(result.title).toBe('Updated');
-    });
-
-    it('prevents member from updating other user task', async () => {
-      taskRepo.findById.mockResolvedValue(makeTask({ createdBy: 'other-user' }));
-
-      await expect(service.updateTask('tenant-1', 'user-1', 'task-1', { title: 'Hacked' }, 'member')).rejects.toThrow(
-        'You can only edit your own tasks',
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 'tenant-1',
+          projectId: 'project-1',
+          entityType: 'TASK',
+          entityId: 'task-1',
+          action: 'CREATED',
+          actorId: 'user-1',
+        }),
       );
     });
   });
 
-  // ── deleteTask ───────────────────────────────────────────────────────────
+  describe('updateTask', () => {
+    it('updates task with matching version', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      taskRepo.updateWithVersion = vi.fn().mockResolvedValue(makeTask({ title: 'Updated', version: 2 }));
+
+      const result = await service.updateTask('task-1', { title: 'Updated', version: 1 }, 'user-1');
+
+      expect(result.title).toBe('Updated');
+    });
+
+    it('throws TASK_VERSION_CONFLICT on version mismatch', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+
+      await expect(service.updateTask('task-1', { title: 'X', version: 999 })).rejects.toThrow('concurrently');
+    });
+
+    it('creates audit event on task update with changes', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      taskRepo.updateWithVersion = vi.fn().mockResolvedValue(makeTask({ title: 'Updated', version: 2 }));
+
+      await service.updateTask('task-1', { title: 'Updated', version: 1 }, 'user-1');
+
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: 'TASK',
+          action: 'UPDATED',
+          actorId: 'user-1',
+          changes: expect.arrayContaining([
+            expect.objectContaining({ field: 'title', oldValue: 'Test Task', newValue: 'Updated' }),
+          ]),
+        }),
+      );
+    });
+  });
 
   describe('deleteTask', () => {
-    it('deletes the task when admin', async () => {
-      taskRepo.delete.mockResolvedValue(true);
+    it('cascades delete (comments, relationships, then task)', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      taskRepo.delete = vi.fn().mockResolvedValue(true);
 
-      await service.deleteTask('tenant-1', 'task-1', 'admin');
+      await service.deleteTask('task-1');
 
-      expect(taskRepo.delete).toHaveBeenCalledWith('tenant-1', 'task-1');
+      expect(commentRepo.deleteByTask).toHaveBeenCalledWith('task-1');
+      expect(relationshipRepo.deleteByTask).toHaveBeenCalledWith('task-1');
+      expect(taskRepo.delete).toHaveBeenCalledWith('task-1');
     });
 
-    it('throws ForbiddenError when user is member', async () => {
-      await expect(service.deleteTask('tenant-1', 'task-1', 'member')).rejects.toThrow('Only owner or admin');
-    });
+    it('creates audit event before task deletion', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      taskRepo.delete = vi.fn().mockResolvedValue(true);
 
-    it('throws NotFoundError when task not found', async () => {
-      taskRepo.delete.mockResolvedValue(false);
+      await service.deleteTask('task-1', 'user-1');
 
-      await expect(service.deleteTask('tenant-1', 'missing', 'admin')).rejects.toThrow('Task not found');
-    });
-  });
-
-  // ── moveTask ─────────────────────────────────────────────────────────────
-
-  describe('moveTask', () => {
-    it('moves task to a different column', async () => {
-      taskRepo.findById.mockResolvedValue(makeTask());
-      columnRepo.findById.mockResolvedValue(makeColumn({ id: 'col-2', boardId: 'board-1' }));
-      taskRepo.getMaxPosition.mockResolvedValue(1);
-      taskRepo.update.mockResolvedValue(makeTask({ columnId: 'col-2', position: 2 }));
-
-      const result = await service.moveTask('tenant-1', {
-        taskId: 'task-1',
-        targetColumnId: 'col-2',
-      });
-
-      expect(result.columnId).toBe('col-2');
-      expect(result.position).toBe(2);
-    });
-
-    it('throws ValidationError when target column is on different board', async () => {
-      taskRepo.findById.mockResolvedValue(makeTask({ boardId: 'board-1' }));
-      columnRepo.findById.mockResolvedValue(makeColumn({ id: 'col-2', boardId: 'board-2' }));
-
-      await expect(
-        service.moveTask('tenant-1', {
-          taskId: 'task-1',
-          targetColumnId: 'col-2',
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: 'TASK',
+          action: 'DELETED',
+          actorId: 'user-1',
         }),
-      ).rejects.toThrow('Target column must belong to the same board');
-    });
+      );
 
-    it('throws NotFoundError when target column does not exist', async () => {
-      taskRepo.findById.mockResolvedValue(makeTask());
-      columnRepo.findById.mockResolvedValue(null);
+      // Audit should be called before delete
+      const auditCallOrder = (auditService.log as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+      const deleteCallOrder = (taskRepo.delete as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
 
-      await expect(
-        service.moveTask('tenant-1', {
-          taskId: 'task-1',
-          targetColumnId: 'missing',
-        }),
-      ).rejects.toThrow('Target column not found');
-    });
-  });
-
-  // ── assignTask ───────────────────────────────────────────────────────────
-
-  describe('assignTask', () => {
-    it('updates assigneeIds', async () => {
-      taskRepo.findById.mockResolvedValue(makeTask());
-      taskRepo.update.mockResolvedValue(makeTask({ assigneeIds: ['user-2', 'user-3'] }));
-
-      const result = await service.assignTask('tenant-1', {
-        taskId: 'task-1',
-        assigneeIds: ['user-2', 'user-3'],
-      });
-
-      expect(result.assigneeIds).toEqual(['user-2', 'user-3']);
-      expect(taskRepo.update).toHaveBeenCalledWith('tenant-1', 'task-1', {
-        assigneeIds: ['user-2', 'user-3'],
-      });
+      expect(auditCallOrder).toBeLessThan(deleteCallOrder);
     });
   });
 });

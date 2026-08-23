@@ -1,14 +1,9 @@
 /**
  * Hono environment type defining Bindings (environment variables)
- * and Variables (request-scoped context) for the Task Board API.
+ * and Variables (request-scoped context) for the Task Board API v5.
  */
 
-/** Authenticated user info stored in Hono context variables */
-export interface ContextUser {
-  id: string;
-  email: string;
-  displayName: string;
-}
+import type { User, TenantRole, ProjectRole } from '@task-board/shared';
 
 /** Hono environment type for the Task Board API */
 export interface AppEnv {
@@ -20,9 +15,15 @@ export interface AppEnv {
     FRONTEND_URL?: string;
   };
   Variables: {
+    /** Authenticated user's ID (from JWT `sub` claim) */
     userId: string;
-    user: ContextUser;
+    /** Full authenticated user object */
+    user: User;
+    /** Active tenant ID (set by tenantContextMiddleware) */
     tenantId: string;
-    userRole: string;
+    /** User's role within the active tenant */
+    tenantRole: TenantRole;
+    /** User's role within the active project (set per-route when applicable) */
+    projectRole?: ProjectRole;
   };
 }

@@ -14,11 +14,12 @@ import { WelcomeView } from './welcome-view';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { MyInvitation, User } from '@task-board/shared';
+import type { User } from '@task-board/shared';
+import type { MyInvitation } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockInvitations: MyInvitation[] = [
-  { id: 'inv1', tenantId: 't1', tenantName: 'Acme', role: 'member', invitedEmail: 'a@b.com', invitedAt: NOW },
+  { id: 'inv1', tenantId: 't1', tenantName: 'Acme', role: 'MEMBER', invitedEmail: 'a@b.com', invitedAt: NOW },
 ];
 
 describe('WelcomeView', () => {

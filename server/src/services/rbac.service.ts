@@ -2,50 +2,96 @@ import { TenantRole, ProjectRole } from '@task-board/shared';
 
 // ─── Permission Actions ──────────────────────────────────────────────────────
 
+/**
+ * All permission actions in the v5 system.
+ * Derived from the spec §2.4 permission matrix.
+ */
 export type PermissionAction =
   | 'manage_tenant'
   | 'create_project'
-  | 'delete_project'
-  | 'crud_boards'
-  | 'crud_columns'
-  | 'create_task'
-  | 'edit_own_task'
-  | 'edit_any_task'
-  | 'move_task'
-  | 'assign_task'
+  | 'manage_project'
+  | 'manage_project_members'
   | 'create_sprint'
-  | 'manage_sprint'
-  | 'view_project'
-  | 'manage_project_members';
+  | 'change_sprint_status'
+  | 'edit_project_config'
+  | 'create_task'
+  | 'edit_task'
+  | 'delete_task'
+  | 'view_task'
+  | 'manage_labels'
+  | 'manage_statuses'
+  | 'manage_boards'
+  | 'create_comment'
+  | 'edit_comment'
+  | 'delete_comment'
+  | 'view_comment'
+  | 'manage_task_relationships'
+  | 'manage_filters'
+  | 'view_audit_events';
 
 // ─── Permission Matrix ───────────────────────────────────────────────────────
 
 /**
- * Permission matrix for tenant-only actions.
+ * Tenant-level-only permission matrix.
  * Maps action → allowed tenant roles.
+ *
+ * From spec §2.4:
+ * - Manage Tenant: Owner, Admin
+ * - Create Project: Owner, Admin
  */
 const tenantPermissions: Record<string, TenantRole[]> = {
-  manage_tenant: [TenantRole.Owner],
-  create_project: [TenantRole.Owner, TenantRole.Admin],
-  delete_project: [TenantRole.Owner, TenantRole.Admin],
-  create_sprint: [TenantRole.Owner, TenantRole.Admin],
-  manage_sprint: [TenantRole.Owner, TenantRole.Admin],
-  crud_boards: [TenantRole.Owner, TenantRole.Admin],
-  crud_columns: [TenantRole.Owner, TenantRole.Admin],
+  manage_tenant: [TenantRole.OWNER, TenantRole.ADMIN],
+  create_project: [TenantRole.OWNER, TenantRole.ADMIN],
 };
 /**
- * Permission matrix for project-level actions.
+ * Project-level permission matrix.
  * Maps action → allowed project roles.
- * Tenant owners and tenant admins bypass project-level restrictions.
+ *
+ * Tenant Owner/Admin bypass all project-level restrictions (see can() method).
+ *
+ * From spec §2.4 permission matrix:
+ *
+ * | Action                    | Project Admin | Editor | Viewer |
+ * |---------------------------|:---:|:---:|:---:|
+ * | manage_project            | Yes | No  | No  |
+ * | manage_project_members    | Yes | No  | No  |
+ * | create_sprint             | Yes | No  | No  |
+ * | change_sprint_status      | Yes | No  | No  |
+ * | edit_project_config       | Yes | No  | No  |
+ * | create_task / edit_task   | Yes | Yes | No  |
+ * | delete_task               | Yes | No  | No  |
+ * | view_task                 | Yes | Yes | Yes |
+ * | manage_labels             | Yes | Limited* | No  |
+ * | manage_statuses           | Yes | No  | No  |
+ * | manage_boards             | Yes | No  | No  |
+ * | create/edit/delete comment| Yes | Yes | No  |
+ * | view_comment              | Yes | Yes | Yes |
+ * | manage_task_relationships | Yes | Yes | No  |
+ * | manage_filters            | Yes | Yes | Yes |
+ * | view_audit_events         | Yes | No  | No  |
+ *
+ * *Limited = editors can create labels from task but not bulk-delete (enforced at service level)
  */
 const projectPermissions: Record<string, ProjectRole[]> = {
-  view_project: [ProjectRole.Admin, ProjectRole.Developer, ProjectRole.Viewer],
-  manage_project_members: [ProjectRole.Admin],
-  create_task: [ProjectRole.Admin, ProjectRole.Developer],
-  edit_own_task: [ProjectRole.Admin, ProjectRole.Developer],
-  edit_any_task: [ProjectRole.Admin],
-  move_task: [ProjectRole.Admin, ProjectRole.Developer],
-  assign_task: [ProjectRole.Admin, ProjectRole.Developer],
+  manage_project: [ProjectRole.PROJECT_ADMIN],
+  manage_project_members: [ProjectRole.PROJECT_ADMIN],
+  create_sprint: [ProjectRole.PROJECT_ADMIN],
+  change_sprint_status: [ProjectRole.PROJECT_ADMIN],
+  edit_project_config: [ProjectRole.PROJECT_ADMIN],
+  create_task: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR],
+  edit_task: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR],
+  delete_task: [ProjectRole.PROJECT_ADMIN],
+  view_task: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR, ProjectRole.VIEWER],
+  manage_labels: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR],
+  manage_statuses: [ProjectRole.PROJECT_ADMIN],
+  manage_boards: [ProjectRole.PROJECT_ADMIN],
+  create_comment: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR],
+  edit_comment: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR],
+  delete_comment: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR],
+  view_comment: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR, ProjectRole.VIEWER],
+  manage_task_relationships: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR],
+  manage_filters: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR, ProjectRole.VIEWER],
+  view_audit_events: [ProjectRole.PROJECT_ADMIN],
 };
 
 // ─── RBAC Service ────────────────────────────────────────────────────────────
@@ -53,17 +99,29 @@ const projectPermissions: Record<string, ProjectRole[]> = {
 /**
  * Evaluates permission based on tenant role and optional project role.
  *
- * Rules:
- * - Tenant owners bypass all project-level restrictions.
- * - Viewers cannot write (any write action is denied at project level).
- * - Members can only act on projects where they are members.
+ * Rules (from spec §2.4):
+ * - Tenant Owner and Admin bypass all project-level restrictions.
+ * - Viewers are strictly read-only for Tasks and related actions.
+ * - Editors can manage Labels within product-defined limits (enforced at service level).
+ * - All authorization is enforced server-side.
  */
 export class RbacService {
+  /**
+   * Get the effective role description for a user.
+   * Returns the tenant role (which supersedes project role when Owner/Admin).
+   */
+  getEffectiveRole(tenantRole: TenantRole, projectRole?: ProjectRole | null): string {
+    if (tenantRole === TenantRole.OWNER || tenantRole === TenantRole.ADMIN) {
+      return tenantRole;
+    }
+    return projectRole ?? 'MEMBER';
+  }
+
   /**
    * Check if the given role combination permits the specified action.
    *
    * @param tenantRole - The user's role within the tenant
-   * @param projectRole - The user's role within the project (optional; null if not a project member)
+   * @param projectRole - The user's role within the project (null if not a project member)
    * @param action - The permission action to check
    * @returns true if the action is permitted, false otherwise
    */
@@ -79,12 +137,12 @@ export class RbacService {
 
     // ── Project-level actions ──────────────────────────────────────────────
     // Tenant owners bypass all project-level restrictions
-    if (tenantRole === TenantRole.Owner) {
+    if (tenantRole === TenantRole.OWNER) {
       return true;
     }
 
     // Tenant admins bypass project-level restrictions
-    if (tenantRole === TenantRole.Admin) {
+    if (tenantRole === TenantRole.ADMIN) {
       return true;
     }
 
@@ -123,3 +181,6 @@ export class RbacService {
     return allowedRoles.includes(projectRole as ProjectRole);
   }
 }
+
+/** Singleton RBAC service instance */
+export const rbacService = new RbacService();

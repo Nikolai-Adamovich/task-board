@@ -13,152 +13,241 @@ describe('RbacService', () => {
   // ── Tenant-level actions ─────────────────────────────────────────────────
 
   describe('tenant-level actions', () => {
-    it('allows owner to manage_tenant', () => {
-      expect(service.can('owner', null, 'manage_tenant')).toBe(true);
+    it('allows OWNER to manage_tenant', () => {
+      expect(service.can('OWNER', null, 'manage_tenant')).toBe(true);
     });
 
-    it('denies admin from manage_tenant', () => {
-      expect(service.can('admin', null, 'manage_tenant')).toBe(false);
+    it('allows ADMIN to manage_tenant', () => {
+      expect(service.can('ADMIN', null, 'manage_tenant')).toBe(true);
     });
 
-    it('allows owner to create_project', () => {
-      expect(service.can('owner', null, 'create_project')).toBe(true);
+    it('denies MEMBER from manage_tenant', () => {
+      expect(service.can('MEMBER', null, 'manage_tenant')).toBe(false);
     });
 
-    it('allows admin to create_project', () => {
-      expect(service.can('admin', null, 'create_project')).toBe(true);
+    it('allows OWNER to create_project', () => {
+      expect(service.can('OWNER', null, 'create_project')).toBe(true);
     });
 
-    it('denies member from create_project', () => {
-      expect(service.can('member', null, 'create_project')).toBe(false);
+    it('allows ADMIN to create_project', () => {
+      expect(service.can('ADMIN', null, 'create_project')).toBe(true);
     });
 
-    it('allows admin to create_sprint', () => {
-      expect(service.can('admin', null, 'create_sprint')).toBe(true);
-    });
-
-    it('denies member from create_sprint', () => {
-      expect(service.can('member', null, 'create_sprint')).toBe(false);
-    });
-
-    it('allows admin to crud_boards', () => {
-      expect(service.can('admin', null, 'crud_boards')).toBe(true);
-    });
-
-    it('denies member from crud_boards', () => {
-      expect(service.can('member', null, 'crud_boards')).toBe(false);
+    it('denies MEMBER from create_project', () => {
+      expect(service.can('MEMBER', null, 'create_project')).toBe(false);
     });
   });
 
   // ── Project-level actions with owner bypass ──────────────────────────────
 
   describe('project-level actions — owner bypass', () => {
-    it('allows owner to create_task without project role', () => {
-      expect(service.can('owner', null, 'create_task')).toBe(true);
+    it('allows OWNER to create_task without project role', () => {
+      expect(service.can('OWNER', null, 'create_task')).toBe(true);
     });
 
-    it('allows owner to edit_any_task without project role', () => {
-      expect(service.can('owner', null, 'edit_any_task')).toBe(true);
+    it('allows OWNER to delete_task without project role', () => {
+      expect(service.can('OWNER', null, 'delete_task')).toBe(true);
     });
 
-    it('allows owner to manage_project_members without project role', () => {
-      expect(service.can('owner', null, 'manage_project_members')).toBe(true);
+    it('allows OWNER to manage_project_members without project role', () => {
+      expect(service.can('OWNER', null, 'manage_project_members')).toBe(true);
+    });
+
+    it('allows OWNER to view_audit_events without project role', () => {
+      expect(service.can('OWNER', null, 'view_audit_events')).toBe(true);
     });
   });
 
   // ── Project-level actions with admin bypass ──────────────────────────────
 
   describe('project-level actions — admin bypass', () => {
-    it('allows tenant admin to create_task without project role', () => {
-      expect(service.can('admin', null, 'create_task')).toBe(true);
+    it('allows ADMIN to create_task without project role', () => {
+      expect(service.can('ADMIN', null, 'create_task')).toBe(true);
     });
 
-    it('allows tenant admin to edit_any_task without project role', () => {
-      expect(service.can('admin', null, 'edit_any_task')).toBe(true);
+    it('allows ADMIN to delete_task without project role', () => {
+      expect(service.can('ADMIN', null, 'delete_task')).toBe(true);
+    });
+
+    it('allows ADMIN to manage_project without project role', () => {
+      expect(service.can('ADMIN', null, 'manage_project')).toBe(true);
     });
   });
 
   // ── Project-level actions with project roles ─────────────────────────────
 
   describe('project-level actions — project roles', () => {
-    it('allows project admin to create_task', () => {
-      expect(service.can('member', 'admin', 'create_task')).toBe(true);
+    it('allows PROJECT_ADMIN to create_task', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'create_task')).toBe(true);
     });
 
-    it('allows project developer to create_task', () => {
-      expect(service.can('member', 'developer', 'create_task')).toBe(true);
+    it('allows EDITOR to create_task', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'create_task')).toBe(true);
     });
 
-    it('denies project viewer from create_task', () => {
-      expect(service.can('member', 'viewer', 'create_task')).toBe(false);
+    it('denies VIEWER from create_task', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'create_task')).toBe(false);
     });
 
-    it('allows project developer to edit_own_task', () => {
-      expect(service.can('member', 'developer', 'edit_own_task')).toBe(true);
+    it('allows EDITOR to edit_task', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'edit_task')).toBe(true);
     });
 
-    it('denies project viewer from edit_own_task', () => {
-      expect(service.can('member', 'viewer', 'edit_own_task')).toBe(false);
+    it('denies VIEWER from edit_task', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'edit_task')).toBe(false);
     });
 
-    it('allows project admin to edit_any_task', () => {
-      expect(service.can('member', 'admin', 'edit_any_task')).toBe(true);
+    it('allows PROJECT_ADMIN to delete_task', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'delete_task')).toBe(true);
     });
 
-    it('denies project developer from edit_any_task', () => {
-      expect(service.can('member', 'developer', 'edit_any_task')).toBe(false);
+    it('denies EDITOR from delete_task', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'delete_task')).toBe(false);
     });
 
-    it('allows project developer to move_task', () => {
-      expect(service.can('member', 'developer', 'move_task')).toBe(true);
+    it('allows VIEWER to view_task', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'view_task')).toBe(true);
     });
 
-    it('allows project developer to assign_task', () => {
-      expect(service.can('member', 'developer', 'assign_task')).toBe(true);
+    it('allows EDITOR to view_task', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'view_task')).toBe(true);
     });
 
-    it('allows viewer to view_project', () => {
-      expect(service.can('member', 'viewer', 'view_project')).toBe(true);
+    it('allows PROJECT_ADMIN to manage_project_members', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'manage_project_members')).toBe(true);
     });
 
-    it('denies viewer from manage_project_members', () => {
-      expect(service.can('member', 'viewer', 'manage_project_members')).toBe(false);
+    it('denies EDITOR from manage_project_members', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'manage_project_members')).toBe(false);
     });
 
-    it('allows project admin to manage_project_members', () => {
-      expect(service.can('member', 'admin', 'manage_project_members')).toBe(true);
+    it('denies VIEWER from manage_project_members', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'manage_project_members')).toBe(false);
+    });
+
+    it('allows PROJECT_ADMIN to manage_project', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'manage_project')).toBe(true);
+    });
+
+    it('denies EDITOR from manage_project', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'manage_project')).toBe(false);
+    });
+
+    it('allows PROJECT_ADMIN to create_sprint', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'create_sprint')).toBe(true);
+    });
+
+    it('denies EDITOR from create_sprint', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'create_sprint')).toBe(false);
+    });
+
+    it('allows PROJECT_ADMIN to manage_boards', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'manage_boards')).toBe(true);
+    });
+
+    it('denies EDITOR from manage_boards', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'manage_boards')).toBe(false);
+    });
+
+    it('allows EDITOR to create_comment', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'create_comment')).toBe(true);
+    });
+
+    it('denies VIEWER from create_comment', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'create_comment')).toBe(false);
+    });
+
+    it('allows VIEWER to view_comment', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'view_comment')).toBe(true);
+    });
+
+    it('allows EDITOR to manage_task_relationships', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'manage_task_relationships')).toBe(true);
+    });
+
+    it('denies VIEWER from manage_task_relationships', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'manage_task_relationships')).toBe(false);
+    });
+
+    it('allows VIEWER to manage_filters', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'manage_filters')).toBe(true);
+    });
+
+    it('allows PROJECT_ADMIN to view_audit_events', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'view_audit_events')).toBe(true);
+    });
+
+    it('denies EDITOR from view_audit_events', () => {
+      expect(service.can('MEMBER', 'EDITOR', 'view_audit_events')).toBe(false);
+    });
+
+    it('denies VIEWER from view_audit_events', () => {
+      expect(service.can('MEMBER', 'VIEWER', 'view_audit_events')).toBe(false);
     });
   });
 
   // ── No project membership ────────────────────────────────────────────────
 
   describe('no project membership', () => {
-    it('denies member without project role from project-level actions', () => {
-      expect(service.can('member', null, 'create_task')).toBe(false);
-      expect(service.can('member', null, 'view_project')).toBe(false);
-      expect(service.can('member', null, 'move_task')).toBe(false);
+    it('denies MEMBER without project role from project-level actions', () => {
+      expect(service.can('MEMBER', null, 'create_task')).toBe(false);
+      expect(service.can('MEMBER', null, 'view_task')).toBe(false);
+      expect(service.can('MEMBER', null, 'manage_project')).toBe(false);
     });
 
-    it('denies member with undefined project role', () => {
-      expect(service.can('member', undefined, 'create_task')).toBe(false);
+    it('denies MEMBER with undefined project role', () => {
+      expect(service.can('MEMBER', undefined, 'create_task')).toBe(false);
     });
   });
 
   // ── Viewer cannot write ──────────────────────────────────────────────────
 
   describe('viewer cannot write', () => {
-    it('denies viewer from all write actions', () => {
+    it('denies VIEWER from all write actions', () => {
       const writeActions = [
         'create_task',
-        'edit_own_task',
-        'move_task',
-        'assign_task',
+        'edit_task',
+        'delete_task',
+        'manage_project',
         'manage_project_members',
+        'create_sprint',
+        'change_sprint_status',
+        'edit_project_config',
+        'manage_statuses',
+        'manage_boards',
+        'create_comment',
+        'edit_comment',
+        'delete_comment',
+        'view_audit_events',
       ] as const;
 
       for (const action of writeActions) {
-        expect(service.can('member', 'viewer', action)).toBe(false);
+        expect(service.can('MEMBER', 'VIEWER', action)).toBe(false);
       }
+    });
+  });
+
+  // ── getEffectiveRole ─────────────────────────────────────────────────────
+
+  describe('getEffectiveRole', () => {
+    it('returns OWNER for tenant owner', () => {
+      expect(service.getEffectiveRole('OWNER')).toBe('OWNER');
+    });
+
+    it('returns ADMIN for tenant admin', () => {
+      expect(service.getEffectiveRole('ADMIN')).toBe('ADMIN');
+    });
+
+    it('returns project role for tenant member', () => {
+      expect(service.getEffectiveRole('MEMBER', 'PROJECT_ADMIN')).toBe('PROJECT_ADMIN');
+    });
+
+    it('returns MEMBER when tenant member has no project role', () => {
+      expect(service.getEffectiveRole('MEMBER')).toBe('MEMBER');
+    });
+
+    it('returns MEMBER when tenant member has null project role', () => {
+      expect(service.getEffectiveRole('MEMBER', null)).toBe('MEMBER');
     });
   });
 });

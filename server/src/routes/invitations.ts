@@ -7,7 +7,7 @@ import { TenantMemberRepository } from '../repositories/tenant-member.repository
 import { UserRepository } from '../repositories/user.repository.js';
 import { EmailService, ConsoleEmailService } from '../services/email.service.js';
 import { getCollection } from '../db/mongo.js';
-import { NotFoundError } from '../middleware/error-handler.js';
+import { NotFoundError } from '../errors/app-error.js';
 import type { TenantDocument } from '../repositories/tenant.repository.js';
 import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
 import type { UserDocument } from '../repositories/user.repository.js';
@@ -17,9 +17,6 @@ import type { UserDocument } from '../repositories/user.repository.js';
 /**
  * Creates and returns the invitation Hono app with cross-tenant
  * invitation endpoints for the authenticated user.
- *
- * These routes require auth but do NOT require tenant context
- * (they are registered before tenantContextMiddleware in index.ts).
  */
 export function createInvitationRoutes(): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
@@ -29,7 +26,6 @@ export function createInvitationRoutes(): Hono<AppEnv> {
 
   /**
    * GET /invitations/my — pending invitations for the authenticated user.
-   * Looks up the user's email, then queries invitations across all tenants.
    */
   router.get('/my', async (c) => {
     const userId = c.get('userId');
@@ -43,21 +39,33 @@ export function createInvitationRoutes(): Hono<AppEnv> {
     const service = createTenantService(c);
     const invitations = await service.getMyInvitations(user.email);
 
-    return c.json({ data: invitations, total: invitations.length });
+    return c.json({ data: invitations });
   });
 
   /**
-   * DELETE /invitations/:invitationId — decline an invitation.
-   * Verifies the invitation belongs to the authenticated user.
+   * POST /invitations/:invitationId/accept — accept an invitation.
    */
-  router.delete('/:invitationId', async (c) => {
+  router.post('/:invitationId/accept', async (c) => {
     const userId = c.get('userId');
     const invitationId = c.req.param('invitationId');
-    const service = createTenantService(c);
+    const service = createTenantService();
+
+    await service.acceptInvitation(invitationId, userId);
+
+    return c.json({ data: { success: true } });
+  });
+
+  /**
+   * POST /invitations/:invitationId/decline — decline an invitation.
+   */
+  router.post('/:invitationId/decline', async (c) => {
+    const userId = c.get('userId');
+    const invitationId = c.req.param('invitationId');
+    const service = createTenantService();
 
     await service.declineInvitation(invitationId, userId);
 
-    return c.json({ success: true as const });
+    return c.json({ data: { success: true } });
   });
 
   return router;

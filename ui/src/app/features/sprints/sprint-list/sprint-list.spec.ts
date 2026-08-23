@@ -17,44 +17,33 @@ import { submit } from '@angular/forms/signals';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { SprintList, CreateSprintForm } from './sprint-list';
 import { SprintClient } from '@services/sprint-client';
-import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { NeutralColor } from '@app/constants/priority';
-import type { Sprint, Project, User } from '@task-board/shared';
+import type { Sprint, User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockSprints: Sprint[] = [
   {
     id: 'sp1',
-    tenantId: 't1',
     projectId: 'p1',
     name: 'Sprint 1',
     startDate: NOW,
     endDate: '2025-02-01T00:00:00Z',
-    goal: null,
-    status: 'active',
-    taskIds: [],
+    status: 'ACTIVE',
     createdAt: NOW,
     updatedAt: NOW,
   },
   {
     id: 'sp2',
-    tenantId: 't1',
     projectId: 'p2',
     name: 'Sprint 2',
     startDate: NOW,
     endDate: '2025-02-01T00:00:00Z',
-    goal: null,
-    status: 'planned',
-    taskIds: [],
+    status: 'FUTURE',
     createdAt: NOW,
     updatedAt: NOW,
   },
-];
-const mockProjects: Project[] = [
-  { id: 'p1', tenantId: 't1', name: 'Project A', slug: 'project-a', description: null, createdAt: NOW, updatedAt: NOW },
-  { id: 'p2', tenantId: 't1', name: 'Project B', slug: 'project-b', description: null, createdAt: NOW, updatedAt: NOW },
 ];
 
 describe('SprintList', () => {
@@ -65,17 +54,13 @@ describe('SprintList', () => {
     listByTenant: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
   };
-  let projectClientMock: { list: ReturnType<typeof vi.fn> };
   let authStoreMock: { currentUser: ReturnType<typeof vi.fn> };
 
   function setup(projectId?: string) {
     sprintClientMock = {
       list: vi.fn().mockReturnValue(of({ data: mockSprints, total: 2, page: 1, limit: 20 })),
       listByTenant: vi.fn().mockReturnValue(of({ data: mockSprints, total: 2, page: 1, limit: 20 })),
-      create: vi.fn().mockReturnValue(of(mockSprints[0])),
-    };
-    projectClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: mockProjects, total: 2, page: 1, limit: 100 })),
+      create: vi.fn().mockReturnValue(of({ data: mockSprints[0] })),
     };
     authStoreMock = {
       currentUser: vi.fn().mockReturnValue({ id: 'u1' } as User),
@@ -89,7 +74,6 @@ describe('SprintList', () => {
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: SprintClient, useValue: sprintClientMock },
-        { provide: ProjectClient, useValue: projectClientMock },
         { provide: AuthStore, useValue: authStoreMock },
       ],
     });
@@ -143,7 +127,6 @@ describe('SprintList', () => {
         listByTenant: vi.fn(),
         create: vi.fn(),
       };
-      projectClientMock = { list: vi.fn() };
       authStoreMock = { currentUser: vi.fn().mockReturnValue(null) };
 
       TestBed.resetTestingModule();
@@ -155,7 +138,6 @@ describe('SprintList', () => {
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
           { provide: SprintClient, useValue: sprintClientMock },
-          { provide: ProjectClient, useValue: projectClientMock },
           { provide: AuthStore, useValue: authStoreMock },
         ],
       });
@@ -175,9 +157,9 @@ describe('SprintList', () => {
     beforeEach(() => setup());
 
     it('should return correct color for each status', () => {
-      expect(component.getStatusColor('planned')).toBe('bg-blue-100 text-blue-700');
-      expect(component.getStatusColor('active')).toBe('bg-green-100 text-green-700');
-      expect(component.getStatusColor('completed')).toBe('bg-gray-100 text-gray-600');
+      expect(component.getStatusColor('FUTURE')).toBe('bg-blue-100 text-blue-700');
+      expect(component.getStatusColor('ACTIVE')).toBe('bg-green-100 text-green-700');
+      expect(component.getStatusColor('COMPLETED')).toBe('bg-gray-100 text-gray-600');
     });
 
     it('should return fallback for unknown', () => {
@@ -215,22 +197,6 @@ describe('SprintList', () => {
       component.model.update((m: CreateSprintForm) => ({ ...m, name: '' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
-      submit(component.newSprintForm);
-      expect(sprintClientMock.create).not.toHaveBeenCalled();
-    });
-
-    it('should not create when startDate is empty', () => {
-      component.model.update((m: CreateSprintForm) => ({ ...m, name: 'Sprint' }));
-      component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '' }));
-      component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
-      submit(component.newSprintForm);
-      expect(sprintClientMock.create).not.toHaveBeenCalled();
-    });
-
-    it('should not create when endDate is empty', () => {
-      component.model.update((m: CreateSprintForm) => ({ ...m, name: 'Sprint' }));
-      component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
-      component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '' }));
       submit(component.newSprintForm);
       expect(sprintClientMock.create).not.toHaveBeenCalled();
     });

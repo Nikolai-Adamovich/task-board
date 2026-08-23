@@ -6,6 +6,7 @@
  * - createTenant: adds to list and sets as active
  * - updateTenant: syncs active tenant and list
  * - deleteTenant: removes from list, reassigns active tenant
+ * - archiveTenant / restoreTenant / cancelDeletion: lifecycle status updates
  * - setActiveTenant: persists to localStorage
  */
 import { TestBed } from '@angular/core/testing';
@@ -13,7 +14,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TenantStore } from './tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { TenantWithRole, Tenant } from '@task-board/shared';
+import type { TenantWithRole } from '@app/types/frontend';
 
 const TENANT_KEY = 'taskboard_tenant_id';
 const NOW = '2025-01-01T00:00:00Z';
@@ -21,20 +22,20 @@ const mockTenants: TenantWithRole[] = [
   {
     id: 't1',
     name: 'Acme',
-    slug: 'acme',
     description: null,
-    subscription: 'free',
-    role: 'owner',
+    status: 'ACTIVE',
+    deletionScheduledAt: null,
+    role: 'OWNER',
     createdAt: NOW,
     updatedAt: NOW,
   },
   {
     id: 't2',
     name: 'Globex',
-    slug: 'globex',
     description: null,
-    subscription: 'free',
-    role: 'member',
+    status: 'ACTIVE',
+    deletionScheduledAt: null,
+    role: 'MEMBER',
     createdAt: NOW,
     updatedAt: NOW,
   },
@@ -138,24 +139,24 @@ describe('TenantStore', () => {
       httpMock.expectOne('http://localhost/api/tenants').flush({ data: [mockTenants[0]] });
       await loadPromise;
 
-      const newTenant: Tenant = {
+      const newTenant = {
         id: 't3',
         name: 'NewCo',
-        slug: 'newco',
         description: null,
-        subscription: 'free',
+        status: 'ACTIVE',
+        deletionScheduledAt: null,
         createdAt: '2025-06-01T00:00:00Z',
         updatedAt: '2025-06-01T00:00:00Z',
       };
-      const createPromise = store.createTenant({ name: 'NewCo', slug: 'newco', subscription: 'free' });
+      const createPromise = store.createTenant({ name: 'NewCo' });
       const req = httpMock.expectOne('http://localhost/api/tenants');
 
       expect(req.request.method).toBe('POST');
-      req.flush(newTenant);
+      req.flush({ data: newTenant });
 
       const result = await createPromise;
 
-      expect(result.role).toBe('owner');
+      expect(result.role).toBe('OWNER');
       expect(store.tenants()).toHaveLength(2);
       expect(store.activeTenant()?.id).toBe('t3');
     });
@@ -175,12 +176,12 @@ describe('TenantStore', () => {
 
       expect(store.activeTenant()?.name).toBe('Acme');
 
-      const updated: Tenant = { ...mockTenants[0], name: 'Acme Corp' };
+      const updated = { ...mockTenants[0], name: 'Acme Corp' };
       const updatePromise = store.updateTenant('t1', { name: 'Acme Corp' });
       const req = httpMock.expectOne('http://localhost/api/tenants/t1');
 
       expect(req.request.method).toBe('PATCH');
-      req.flush(updated);
+      req.flush({ data: updated });
 
       const result = await updatePromise;
 
@@ -208,7 +209,7 @@ describe('TenantStore', () => {
       const req = httpMock.expectOne('http://localhost/api/tenants/t1');
 
       expect(req.request.method).toBe('DELETE');
-      req.flush(null);
+      req.flush({ data: { success: true } });
 
       await deletePromise;
 
@@ -228,13 +229,90 @@ describe('TenantStore', () => {
 
       const deletePromise = store.deleteTenant('t1');
 
-      httpMock.expectOne('http://localhost/api/tenants/t1').flush(null);
+      httpMock.expectOne('http://localhost/api/tenants/t1').flush({ data: { success: true } });
 
       await deletePromise;
 
       expect(store.tenants()).toHaveLength(0);
       expect(store.activeTenant()).toBeNull();
       expect(localStorage.getItem(TENANT_KEY)).toBeNull();
+    });
+  });
+
+  // ── archiveTenant ───────────────────────────────────────────────────────
+
+  describe('archiveTenant', () => {
+    it('should update tenant status to ARCHIVED', async () => {
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+      const loadPromise = store.loadTenants();
+
+      httpMock.expectOne('http://localhost/api/tenants').flush({ data: [...mockTenants] });
+      await loadPromise;
+
+      const archivePromise = store.archiveTenant('t1');
+
+      httpMock.expectOne('http://localhost/api/tenants/t1/archive').flush({ data: { success: true } });
+
+      await archivePromise;
+
+      expect(store.tenants().find((t) => t.id === 't1')?.status).toBe('ARCHIVED');
+      expect(store.activeTenant()?.status).toBe('ARCHIVED');
+    });
+  });
+
+  // ── restoreTenant ───────────────────────────────────────────────────────
+
+  describe('restoreTenant', () => {
+    it('should update tenant status to ACTIVE', async () => {
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+      const loadPromise = store.loadTenants();
+
+      httpMock.expectOne('http://localhost/api/tenants').flush({ data: [...mockTenants] });
+      await loadPromise;
+
+      // First archive
+      const archivePromise = store.archiveTenant('t1');
+
+      httpMock.expectOne('http://localhost/api/tenants/t1/archive').flush({ data: { success: true } });
+
+      await archivePromise;
+
+      expect(store.activeTenant()?.status).toBe('ARCHIVED');
+
+      // Then restore
+      const restorePromise = store.restoreTenant('t1');
+
+      httpMock.expectOne('http://localhost/api/tenants/t1/restore').flush({ data: { success: true } });
+
+      await restorePromise;
+
+      expect(store.activeTenant()?.status).toBe('ACTIVE');
+    });
+  });
+
+  // ── cancelDeletion ──────────────────────────────────────────────────────
+
+  describe('cancelDeletion', () => {
+    it('should update tenant status to ACTIVE', async () => {
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+      const loadPromise = store.loadTenants();
+
+      httpMock.expectOne('http://localhost/api/tenants').flush({ data: [...mockTenants] });
+      await loadPromise;
+
+      const cancelPromise = store.cancelDeletion('t1');
+
+      httpMock.expectOne('http://localhost/api/tenants/t1/cancel-deletion').flush({ data: { success: true } });
+
+      await cancelPromise;
+
+      expect(store.activeTenant()?.status).toBe('ACTIVE');
     });
   });
 

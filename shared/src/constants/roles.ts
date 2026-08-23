@@ -3,13 +3,14 @@ import { valuesOf } from '../utils/values-of.js';
 /**
  * Type-safe enum-like constants.
  * Each constant provides the value object, the union type, and a values tuple.
+ * All values are UPPERCASE per v5 spec.
  */
 
 // ─── TenantRole ──────────────────────────────────────────────────────────────
 export const TenantRole = {
-  Owner: 'owner',
-  Admin: 'admin',
-  Member: 'member',
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN',
+  MEMBER: 'MEMBER',
 } as const;
 
 export type TenantRole = (typeof TenantRole)[keyof typeof TenantRole];
@@ -17,9 +18,9 @@ export const TenantRoleValues = valuesOf(TenantRole);
 
 // ─── ProjectRole ─────────────────────────────────────────────────────────────
 export const ProjectRole = {
-  Admin: 'admin',
-  Developer: 'developer',
-  Viewer: 'viewer',
+  PROJECT_ADMIN: 'PROJECT_ADMIN',
+  EDITOR: 'EDITOR',
+  VIEWER: 'VIEWER',
 } as const;
 
 export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole];
@@ -27,10 +28,10 @@ export const ProjectRoleValues = valuesOf(ProjectRole);
 
 // ─── TaskPriority ────────────────────────────────────────────────────────────
 export const TaskPriority = {
-  Low: 'low',
-  Medium: 'medium',
-  High: 'high',
-  Critical: 'critical',
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
 } as const;
 
 export type TaskPriority = (typeof TaskPriority)[keyof typeof TaskPriority];
@@ -38,9 +39,9 @@ export const TaskPriorityValues = valuesOf(TaskPriority);
 
 // ─── SprintStatus ────────────────────────────────────────────────────────────
 export const SprintStatus = {
-  Planned: 'planned',
-  Active: 'active',
-  Completed: 'completed',
+  FUTURE: 'FUTURE',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
 } as const;
 
 export type SprintStatus = (typeof SprintStatus)[keyof typeof SprintStatus];
@@ -48,20 +49,94 @@ export const SprintStatusValues = valuesOf(SprintStatus);
 
 // ─── MemberStatus ────────────────────────────────────────────────────────────
 export const MemberStatus = {
-  Active: 'active',
-  Pending: 'pending',
-  Declined: 'declined',
-  AccessRevoked: 'access_revoked',
+  ACTIVE: 'ACTIVE',
+  ACCESS_REVOKED: 'ACCESS_REVOKED',
 } as const;
 
 export type MemberStatus = (typeof MemberStatus)[keyof typeof MemberStatus];
 export const MemberStatusValues = valuesOf(MemberStatus);
 
-// ─── SubscriptionTier ────────────────────────────────────────────────────────
-export const SubscriptionTier = {
-  Free: 'free',
-  Premium: 'premium',
+// ─── InvitationStatus ────────────────────────────────────────────────────────
+export const InvitationStatus = {
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+  DECLINED: 'DECLINED',
+  REVOKED: 'REVOKED',
 } as const;
 
-export type SubscriptionTier = (typeof SubscriptionTier)[keyof typeof SubscriptionTier];
-export const SubscriptionTierValues = valuesOf(SubscriptionTier);
+export type InvitationStatus = (typeof InvitationStatus)[keyof typeof InvitationStatus];
+export const InvitationStatusValues = valuesOf(InvitationStatus);
+
+// ─── BoardType ───────────────────────────────────────────────────────────────
+export const BoardType = {
+  KANBAN: 'KANBAN',
+  SPRINT: 'SPRINT',
+} as const;
+
+export type BoardType = (typeof BoardType)[keyof typeof BoardType];
+export const BoardTypeValues = valuesOf(BoardType);
+
+// ─── TaskRelationshipType ────────────────────────────────────────────────────
+export const TaskRelationshipType = {
+  BLOCKS: 'BLOCKS',
+  RELATES_TO: 'RELATES_TO',
+  DUPLICATES: 'DUPLICATES',
+} as const;
+
+export type TaskRelationshipType = (typeof TaskRelationshipType)[keyof typeof TaskRelationshipType];
+export const TaskRelationshipTypeValues = valuesOf(TaskRelationshipType);
+
+// ─── TenantStatus ────────────────────────────────────────────────────────────
+export const TenantStatus = {
+  ACTIVE: 'ACTIVE',
+  ARCHIVED: 'ARCHIVED',
+  DELETION_PENDING: 'DELETION_PENDING',
+} as const;
+
+export type TenantStatus = (typeof TenantStatus)[keyof typeof TenantStatus];
+export const TenantStatusValues = valuesOf(TenantStatus);
+
+// ─── ProjectStatus ───────────────────────────────────────────────────────────
+export const ProjectStatus = {
+  ACTIVE: 'ACTIVE',
+  ARCHIVED: 'ARCHIVED',
+  DELETION_PENDING: 'DELETION_PENDING',
+} as const;
+
+export type ProjectStatus = (typeof ProjectStatus)[keyof typeof ProjectStatus];
+export const ProjectStatusValues = valuesOf(ProjectStatus);
+
+// ─── ArchiveReason ───────────────────────────────────────────────────────────
+export const ArchiveReason = {
+  TENANT_ARCHIVE: 'TENANT_ARCHIVE',
+  PROJECT_ARCHIVE: 'PROJECT_ARCHIVE',
+} as const;
+
+export type ArchiveReason = (typeof ArchiveReason)[keyof typeof ArchiveReason];
+export const ArchiveReasonValues = valuesOf(ArchiveReason);
+
+// ─── AuditAction ─────────────────────────────────────────────────────────────
+export const AuditAction = {
+  CREATED: 'CREATED',
+  UPDATED: 'UPDATED',
+  DELETED: 'DELETED',
+} as const;
+
+export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
+export const AuditActionValues = valuesOf(AuditAction);
+
+// ─── AuditEntityType ─────────────────────────────────────────────────────────
+export const AuditEntityType = {
+  TASK: 'TASK',
+  PROJECT: 'PROJECT',
+  SPRINT: 'SPRINT',
+  STATUS: 'STATUS',
+  BOARD: 'BOARD',
+  LABEL: 'LABEL',
+  TASK_TYPE: 'TASK_TYPE',
+  COMMENT: 'COMMENT',
+  TASK_RELATIONSHIP: 'TASK_RELATIONSHIP',
+} as const;
+
+export type AuditEntityType = (typeof AuditEntityType)[keyof typeof AuditEntityType];
+export const AuditEntityTypeValues = valuesOf(AuditEntityType);

@@ -1,3390 +1,2169 @@
-# Task Board MVP — Technical Specification
+# Technical Specification — Task Board
 
-> **Version:** 4.0.0 **Date:** 2026-07-29 **Status:** Approved **Scope:** MVP vertical slice — multi-tenant task board
-> with Kanban boards, tasks, sprints, RBAC, subscription tiers, email-based invitation system, and Jira-style adaptive
-> dashboard **Reference:** [project_description.md](../project_description.md)
+**Status:** Implementation-ready  
+**Date:** 2026-08-21  
+**Sources of truth:** `project-management-requirements.md`, `project-management-user-flows.md`  
+**Supplementary reference:** Classic Jira (old-school Atlassian) — used only where source docs are silent
+
+---
+
+## Table of Contents
+
+1. [Goal and Context](#1-goal-and-context)
+2. [Technical Stack](#2-technical-stack)
+3. [Users and Roles (RBAC)](#3-users-and-roles-rbac)
+4. [Domain Model](#4-domain-model)
+5. [API Contracts](#5-api-contracts)
+6. [Authorization Matrix](#6-authorization-matrix)
+7. [Business Rules](#7-business-rules)
+8. [Validation Rules](#8-validation-rules)
+9. [Concurrency Model](#9-concurrency-model)
+10. [Pagination](#10-pagination)
+11. [Seed Data](#11-seed-data)
+12. [Search and Filters](#12-search-and-filters)
+13. [Audit System](#13-audit-system)
+14. [Error Model](#14-error-model)
+15. [Frontend Screens](#15-frontend-screens)
+16. [User Journeys](#16-user-journeys)
+17. [Empty, Loading, and Error States](#17-empty-loading-and-error-states)
+18. [Functional Requirements](#18-functional-requirements)
+19. [Non-Functional Requirements](#19-non-functional-requirements)
+20. [Out of Scope](#20-out-of-scope)
+21. [Open Questions and Assumptions](#21-open-questions-and-assumptions)
 
 ---
 
 ## 1. Goal and Context
 
-### 1.1 What the MVP slice delivers
+Build a multi-tenant project management application with the following hierarchy:
 
-The MVP slice delivers a **fully functional, multi-tenant Kanban task board** with the following capabilities:
+```text
+User → Tenant → Project → Tasks, Sprints, Boards, Labels, Statuses, Task Types
+```
 
-- **Tenant isolation** — organizations (tenants) are the top-level boundary for all data.
-- **User management + RBAC** — users belong to tenants and projects with role-based permissions at two levels.
-- **Project CRUD** — create, read, update, delete projects scoped to a tenant.
-- **Boards with columns** — Kanban-style boards where columns represent task statuses.
-- **Task lifecycle** — create tasks, assign them to users, move them across columns/statuses, manage backlog.
-- **Sprints** — time-boxed containers that pull tasks from backlog into an active sprint.
-- **Collaboration** — assignees and role-based visibility control.
+The system supports:
 
-### 1.2 Boundaries
+- Multi-tenant organizations with role-based access control
+- Project-level task management with configurable workflows
+- Sprint-based planning with Board visualization
+- Historical identity preservation after user deletion
+- Optimistic concurrency for task mutations
+- URL-addressable filter/pagination state
 
-| In scope (MVP)                                      | Out of scope                              |
-| --------------------------------------------------- | ----------------------------------------- |
-| Tenant CRUD (org creation, user membership)         | Real billing / payment gateway (Stripe)   |
-| Subscription tier data model (free/premium)         | SSO / OAuth / SAML                        |
-| User registration + authentication (email/password) | Advanced analytics / reporting            |
-| RBAC at tenant and project level                    | Time tracking                             |
-| Project CRUD inside a tenant                        | Advanced analytics / reporting            |
-| Board CRUD with column/status definitions           | Knowledge base / wiki                     |
-| Task CRUD with assignee + status transitions        | External integrations (Jira, Slack, etc.) |
-| Sprint CRUD + backlog → sprint movement             | Advanced reporting                        |
-| Role-based visibility (viewer vs. editor)           | AI-assisted features                      |
-
-### 1.3 Architectural constraints (from project description)
-
-- **Monorepo** with npm workspaces: `server/`, `shared/`, `ui/`, `docs/`
-- **Frontend:** Angular 22+, standalone components, zoneless, signals, signal forms, Spartan UI, Tailwind CSS v4
-- **Backend:** Hono on Cloudflare Workers + MongoDB
-- **Shared package:** TypeScript types and constants (runtime-library free); Zod v4 schemas and API contracts in server
-  package
-- **Deployment:** Cloudflare Pages + Workers, MongoDB Atlas, Wrangler, GitHub Actions
-- **Style:** Feature-oriented modules, strong end-to-end type safety, cloud-native
-
-### 1.4 Technology versions
-
-All versions are pinned as of the spec date. The implementation should use these exact major.minor versions (patch
-upgrades are acceptable).
-
-| Technology                 | Version  | Notes                                                                                    |
-| -------------------------- | -------- | ---------------------------------------------------------------------------------------- |
-| **Angular**                | `22.0.8` | Signals stable, `resource()`, `linkedSignal()`, `httpResource()`, signal forms, `@defer` |
-| **TypeScript**             | `6.0.0`  | Latest stable; strict mode enabled                                                       |
-| **Node.js**                | `22.x`   | LTS release                                                                              |
-| **Hono**                   | `4.8.0`  | RPC client for type-safe API calls                                                       |
-| **MongoDB Node.js Driver** | `7.0.0`  | Async/await native API                                                                   |
-| **Zod**                    | `4.0.0`  | Server-only: `z.interface()` for schemas, validation middleware                          |
-| **Tailwind CSS**           | `4.1.0`  | CSS-first config via `@theme`, no `tailwind.config.js`                                   |
-| **Spartan UI**             | `0.12.0` | `@spartan-ng/brain` + `@spartan-ng/helm`                                                 |
-| **Vitest**                 | `4.0.0`  | Unit and integration tests                                                               |
-| **Playwright**             | `1.55.0` | E2E tests                                                                                |
-| **ESLint**                 | `9.x`    | Flat config (`eslint.config.js`)                                                         |
-| **Prettier**               | `3.x`    | Code formatting                                                                          |
-| **Wrangler**               | `4.x`    | Cloudflare dev/deploy CLI                                                                |
-| **bcrypt**                 | `6.x`    | Password hashing (server-side)                                                           |
-| **Resend**                 | `4.x`    | Transactional email (free tier: 3K/month); `resend` npm package                          |
-
-#### Key Angular 22 APIs used in this MVP
-
-| API                        | Purpose                                                      | Introduced |
-| -------------------------- | ------------------------------------------------------------ | ---------- |
-| `signal()`                 | Reactive primitive for component/service state               | Angular 16 |
-| `computed()`               | Derived signal value                                         | Angular 16 |
-| `effect()`                 | Side-effect on signal changes                                | Angular 16 |
-| `linkedSignal()`           | Writable derived signal (read + write)                       | Angular 19 |
-| `resource()`               | Async data loading with signal integration                   | Angular 19 |
-| `httpResource()`           | HTTP-specific resource with typed responses                  | Angular 19 |
-| `inject()`                 | Function-based dependency injection                          | Angular 14 |
-| `@if` / `@for` / `@switch` | Built-in control flow (replaces `*ngIf`, `*ngFor`)           | Angular 17 |
-| `@defer`                   | Lazy loading with trigger-based deferral                     | Angular 17 |
-| Signal forms               | Signal-based form model (replaces `FormGroup`/`FormControl`) | Angular 20 |
-| Standalone components      | Default component model; no NgModules                        | Angular 14 |
-| Zoneless change detection  | No Zone.js; signal-driven change detection                   | Angular 18 |
-
-#### Key Zod 4 changes from v3 (server-only)
-
-> **Note:** Zod is used exclusively in the server package. The shared package contains only plain TypeScript types with
-> no runtime validation dependency.
-
-| Aspect             | Zod 3                                         | Zod 4                                                                  |
-| ------------------ | --------------------------------------------- | ---------------------------------------------------------------------- |
-| Object schemas     | `z.object({...})`                             | `z.interface({...})` preferred (better perf); `z.object()` still works |
-| Tree-shaking       | Full bundle                                   | `zod/mini` for smaller bundles                                         |
-| Error messages     | `ZodError` with `.issues`                     | Improved error messages; `.issues` still available                     |
-| Type inference     | `z.infer<typeof schema>`                      | Unchanged                                                              |
-| Schema composition | `.extend()`, `.merge()`, `.pick()`, `.omit()` | Unchanged API                                                          |
-| Async refinements  | `.refineAsync()`                              | `.checkAsync()` (renamed)                                              |
+The application must be implementable from this specification alone, though the two source documents remain the
+authoritative reference.
 
 ---
 
-## 2. Domain Model
+## 2. Technical Stack
 
-### 2.1 Entities and attributes
+| Layer                   | Technology           | Notes                                                        |
+| ----------------------- | -------------------- | ------------------------------------------------------------ |
+| Backend framework       | Hono                 | Running on Cloudflare Workers                                |
+| Database                | MongoDB              | Document store                                               |
+| Backend validation      | Zod                  | Schema-based request validation                              |
+| Backend testing         | Vitest               | Unit and integration tests                                   |
+| Frontend framework      | Angular 22           | Zoneless (no Zone.js), standalone components                 |
+| UI component library    | Spartan UI           | `@spartan-ng/brain` (headless) + `@spartan-ng/helm` (styled) |
+| CSS                     | Tailwind CSS v4      | Utility-first styling                                        |
+| Task description editor | Milkdown WYSIWYG     | Markdown-based rich text                                     |
+| State management        | Signal-based stores  | `@Service()` decorator, `signal()`, `computed()`             |
+| i18n                    | Transloco            | 11 languages supported                                       |
+| Frontend unit testing   | Vitest               | Via `@angular/build:unit-test` builder                       |
+| E2E testing             | Playwright           | Cross-browser end-to-end tests                               |
+| Shared types            | `@task-board/shared` | TypeScript types and constants shared between server and UI  |
 
-#### Tenant (Organization / Workspace)
+### Angular 22 Specific Patterns
 
-| Field          | Type               | Description                                    |
-| -------------- | ------------------ | ---------------------------------------------- |
-| `_id`          | `ObjectId`         | MongoDB primary key                            |
-| `id`           | `string` (UUID)    | Public identifier                              |
-| `name`         | `string`           | Organization name (e.g. "Acme Corp")           |
-| `slug`         | `string`           | URL-friendly unique identifier                 |
-| `description`  | `string` \| `null` | Optional workspace description (max 500 chars) |
-| `subscription` | `SubscriptionTier` | `free` \| `premium` — workspace tier           |
-| `createdAt`    | `Date`             | Creation timestamp                             |
-| `updatedAt`    | `Date`             | Last modification timestamp                    |
-
-#### User
-
-| Field          | Type            | Description                     |
-| -------------- | --------------- | ------------------------------- |
-| `_id`          | `ObjectId`      | MongoDB primary key             |
-| `id`           | `string` (UUID) | Public identifier               |
-| `email`        | `string`        | Unique email (global)           |
-| `displayName`  | `string`        | User's display name             |
-| `passwordHash` | `string`        | Hashed password (bcrypt/argon2) |
-| `createdAt`    | `Date`          | Creation timestamp              |
-| `updatedAt`    | `Date`          | Last modification timestamp     |
-
-#### TenantMember (User ↔ Tenant relationship)
-
-| Field             | Type                      | Description                                             |
-| ----------------- | ------------------------- | ------------------------------------------------------- |
-| `_id`             | `ObjectId`                | MongoDB primary key                                     |
-| `userId`          | `string` (UUID) \| `null` | Reference to User (`null` for unregistered invitees)    |
-| `tenantId`        | `string` (UUID)           | Reference to Tenant                                     |
-| `role`            | `TenantRole`              | `owner` \| `admin` \| `member`                          |
-| `status`          | `MemberStatus`            | `active` \| `pending` \| `declined` \| `access_revoked` |
-| `invitedEmail`    | `string` \| `null`        | Email used for invitation (set for pending members)     |
-| `invitationToken` | `string` \| `null`        | Unique token for accepting invitation via email link    |
-| `invitedAt`       | `Date` \| `null`          | Timestamp when the invitation was sent                  |
-| `createdAt`       | `Date`                    | Creation timestamp                                      |
-
-#### Project
-
-| Field         | Type               | Description                       |
-| ------------- | ------------------ | --------------------------------- |
-| `_id`         | `ObjectId`         | MongoDB primary key               |
-| `id`          | `string` (UUID)    | Public identifier                 |
-| `tenantId`    | `string` (UUID)    | Owner tenant (tenant isolation)   |
-| `name`        | `string`           | Project name                      |
-| `slug`        | `string`           | URL-friendly unique within tenant |
-| `description` | `string` \| `null` | Optional description              |
-| `createdAt`   | `Date`             |                                   |
-| `updatedAt`   | `Date`             |                                   |
-
-#### ProjectMember (User ↔ Project relationship)
-
-| Field       | Type            | Description                        |
-| ----------- | --------------- | ---------------------------------- |
-| `_id`       | `ObjectId`      | MongoDB primary key                |
-| `userId`    | `string` (UUID) | Reference to User                  |
-| `projectId` | `string` (UUID) | Reference to Project               |
-| `role`      | `ProjectRole`   | `admin` \| `developer` \| `viewer` |
-| `createdAt` | `Date`          |                                    |
-
-#### Board
-
-| Field         | Type               | Description                      |
-| ------------- | ------------------ | -------------------------------- |
-| `_id`         | `ObjectId`         | MongoDB primary key              |
-| `id`          | `string` (UUID)    | Public identifier                |
-| `tenantId`    | `string` (UUID)    | Tenant isolation                 |
-| `projectId`   | `string` (UUID)    | Owning project                   |
-| `name`        | `string`           | Board name (e.g. "Sprint Board") |
-| `description` | `string` \| `null` | Optional                         |
-| `createdAt`   | `Date`             |                                  |
-| `updatedAt`   | `Date`             |                                  |
-
-#### Column
-
-| Field       | Type            | Description                                        |
-| ----------- | --------------- | -------------------------------------------------- |
-| `_id`       | `ObjectId`      | MongoDB primary key                                |
-| `id`        | `string` (UUID) | Public identifier                                  |
-| `boardId`   | `string` (UUID) | Owning board                                       |
-| `tenantId`  | `string` (UUID) | Denormalized for tenant isolation queries          |
-| `name`      | `string`        | Column title (e.g. "To Do", "In Progress", "Done") |
-| `position`  | `number`        | Ordering index within the board                    |
-| `isDefault` | `boolean`       | Whether this is a system default column            |
-| `createdAt` | `Date`          |                                                    |
-
-#### Task
-
-| Field         | Type                      | Description                               |
-| ------------- | ------------------------- | ----------------------------------------- |
-| `_id`         | `ObjectId`                | MongoDB primary key                       |
-| `id`          | `string` (UUID)           | Public identifier                         |
-| `tenantId`    | `string` (UUID)           | Tenant isolation                          |
-| `projectId`   | `string` (UUID)           | Owning project                            |
-| `boardId`     | `string` (UUID)           | Current board                             |
-| `columnId`    | `string` (UUID)           | Current column/status                     |
-| `sprintId`    | `string` (UUID) \| `null` | Sprint this task belongs to (nullable)    |
-| `title`       | `string`                  | Task title                                |
-| `description` | `string` \| `null`        | Optional detailed description             |
-| `assigneeIds` | `string[]` (UUID[])       | List of assigned user IDs                 |
-| `priority`    | `TaskPriority`            | `low` \| `medium` \| `high` \| `critical` |
-| `position`    | `number`                  | Ordering within the column                |
-| `createdBy`   | `string` (UUID)           | User who created the task                 |
-| `createdAt`   | `Date`                    |                                           |
-| `updatedAt`   | `Date`                    |                                           |
-
-#### Sprint
-
-| Field       | Type                | Description                          |
-| ----------- | ------------------- | ------------------------------------ |
-| `_id`       | `ObjectId`          | MongoDB primary key                  |
-| `id`        | `string` (UUID)     | Public identifier                    |
-| `tenantId`  | `string` (UUID)     | Tenant isolation                     |
-| `projectId` | `string` (UUID)     | Owning project                       |
-| `name`      | `string`            | Sprint name (e.g. "Sprint 1")        |
-| `startDate` | `Date`              | Sprint start                         |
-| `endDate`   | `Date`              | Sprint end                           |
-| `goal`      | `string` \| `null`  | Optional sprint goal                 |
-| `status`    | `SprintStatus`      | `active` \| `completed` \| `planned` |
-| `taskIds`   | `string[]` (UUID[]) | Tasks in this sprint                 |
-| `createdAt` | `Date`              |                                      |
-| `updatedAt` | `Date`              |                                      |
-
-### 2.2 Relationships
-
-```
-Tenant 1───* TenantMember *───1 User
-Tenant 1───* Project
-Project 1───* Board
-Board 1───* Column
-Project 1───* Task
-Board 1───* Task (task is on a board)
-Column 1───* Task (task is in a column)
-Sprint 1───* Task (task belongs to a sprint)
-Project 1───* Sprint
-Project 1───* ProjectMember *───1 User
-Tenant 1───* ProjectMember (via Project → Tenant)
-Task *───* User (via assigneeIds)
-```
-
-### 2.3 Tenant isolation invariant
-
-Every document that belongs to a tenant **must** carry `tenantId`. All queries and mutations are scoped by the active
-tenant context derived from the authenticated user's membership. No cross-tenant data leakage is permitted.
+- **Zoneless change detection**: No `zone.js` polyfill; all reactivity via signals
+- **Standalone components**: No NgModules; `imports` array on `@Component`
+- **Lazy loading**: `loadComponent()` in route definitions
+- **Component input binding**: `withComponentInputBinding()` for route params → component inputs
+- **Signal-based stores**: `@Service()` decorator with `signal()`, `computed()`, `effect()`
+- **HTTP interceptors**: Functional interceptors via `withInterceptors()`
+- **Guards**: Functional guards via `canActivate` array
 
 ---
 
-## 3. RBAC Model
+## 3. Users and Roles (RBAC)
 
-### 3.1 Tenant roles
+### 3.1 Tenant Roles
 
-| Role     | Description                                                                                                         |
-| -------- | ------------------------------------------------------------------------------------------------------------------- |
-| `owner`  | Full control of the tenant. Can manage members, projects, and all data. Only one owner per tenant.                  |
-| `admin`  | Can manage projects, boards, tasks, and sprints within the tenant. Can manage member roles (admin/member).          |
-| `member` | Can view and collaborate on projects they have access to. Can create/edit tasks assigned to them or their projects. |
+| Role     | Description                            |
+| -------- | -------------------------------------- |
+| `OWNER`  | Single tenant owner; highest authority |
+| `ADMIN`  | Tenant-level administrator             |
+| `MEMBER` | Regular tenant member                  |
 
-#### Member statuses
+### 3.2 Project Roles
 
-| Status           | Description                                                                                                      |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `active`         | Fully active member. Has the access defined by their role.                                                       |
-| `pending`        | Invited but not yet accepted. Appears in the member list but has **no access** to any tenant resources.          |
-| `declined`       | Invitation was declined by the user. No access.                                                                  |
-| `access_revoked` | Owner/admin revoked the user's access (soft-delete). No access. Remains in the member list for later management. |
+| Role            | Description                    |
+| --------------- | ------------------------------ |
+| `PROJECT_ADMIN` | Full project administration    |
+| `EDITOR`        | Edit permitted project content |
+| `VIEWER`        | Read-only access               |
 
-> **Rule:** Only `active` members can access tenant resources. `pending`, `declined`, and `access_revoked` members are
-> excluded from all permission checks. Owner/admin can later resend invitation (reset to `pending`) or hard-delete
-> `declined` / `access_revoked` members permanently.
+### 3.3 Role Hierarchy
 
-### 3.2 Project roles
+```text
+Tenant Owner
+    ↓
+Tenant Admin
+    ↓
+Project Admin
+    ↓
+Editor
+    ↓
+Viewer
+```
 
-| Role        | Description                                                                                |
-| ----------- | ------------------------------------------------------------------------------------------ |
-| `admin`     | Full control of the project: CRUD boards, columns, tasks, sprints; manage project members. |
-| `developer` | Can create/edit/assign tasks; move tasks across columns; participate in sprints.           |
-| `viewer`    | Read-only access to project boards, tasks, and sprints. Cannot modify anything.            |
+### 3.4 Implicit Access
 
-### 3.3 Permission matrix
+Tenant Owner and Tenant Admin retain tenant-level authority **without** requiring an explicit Project Membership record.
+They can access all projects within their tenant.
 
-| Action                            | Tenant: owner | Tenant: admin | Tenant: member | Project: admin | Project: developer | Project: viewer |
-| --------------------------------- | :-----------: | :-----------: | :------------: | :------------: | :----------------: | :-------------: |
-| Manage tenant (settings, members) |      ✅       |      ✅       |       ❌       |       —        |         —          |        —        |
-| Create project                    |      ✅       |      ✅       |       ❌       |       —        |         —          |        —        |
-| Delete project                    |      ✅       |      ✅       |       ❌       |       ✅       |         ❌         |       ❌        |
-| CRUD boards                       |      ✅       |      ✅       |       ❌       |       ✅       |         ❌         |       ❌        |
-| CRUD columns                      |      ✅       |      ✅       |       ❌       |       ✅       |         ❌         |       ❌        |
-| Create task                       |      ✅       |      ✅       |      ✅\*      |       ✅       |         ✅         |       ❌        |
-| Edit own task                     |      ✅       |      ✅       |      ✅\*      |       ✅       |         ✅         |       ❌        |
-| Edit any task                     |      ✅       |      ✅       |       ❌       |       ✅       |         ❌         |       ❌        |
-| Move task (column change)         |      ✅       |      ✅       |      ✅\*      |       ✅       |         ✅         |       ❌        |
-| Assign task                       |      ✅       |      ✅       |      ✅\*      |       ✅       |         ✅         |       ❌        |
-| Create sprint                     |      ✅       |      ✅       |       ❌       |       ✅       |         ❌         |       ❌        |
-| Manage sprint                     |      ✅       |      ✅       |       ❌       |       ✅       |         ❌         |       ❌        |
-| View all project data             |      ✅       |      ✅       |      ✅\*      |       ✅       |         ✅         |       ✅        |
-| Manage project members            |      ✅       |      ✅       |       ❌       |       ✅       |         ❌         |       ❌        |
+### 3.5 Membership Statuses
 
-\* Member can create/edit/move tasks only in projects where they are explicitly a member (via ProjectMember).
+| Status           | Meaning                            |
+| ---------------- | ---------------------------------- |
+| `ACTIVE`         | User has active access             |
+| `ACCESS_REVOKED` | Access has been revoked or expired |
 
-### 3.4 Permission resolution rules
+### 3.6 Invitation Statuses
 
-1. **Tenant context is mandatory** — every request must carry an active tenant. The tenant context is derived from the
-   user's `TenantMember` record with `status: 'active'`.
-2. **Project access is a subset of tenant access** — a user must first be an active tenant member, then be granted a
-   project role via `ProjectMember`.
-3. **Viewer cannot write** — project viewers can read but cannot create, update, or delete any entity.
-4. **Ownership overrides** — tenant owners bypass all project-level restrictions.
-5. **Tenant isolation is enforced at the data layer** — every query filters by `tenantId`.
-6. **Inactive members are excluded** — members with `status: 'pending'`, `status: 'declined'`, or
-   `status: 'access_revoked'` cannot access any tenant resource. The `TenantContextMiddleware` must check
-   `status === 'active'` when resolving tenant membership.
-7. **Subscription limits are enforced on write** — project creation and member addition are blocked when the tenant's
-   subscription tier limit is reached (see §14).
+| Status     | Meaning                              |
+| ---------- | ------------------------------------ |
+| `PENDING`  | Invitation sent, awaiting acceptance |
+| `EXPIRED`  | Invitation TTL exceeded              |
+| `DECLINED` | User declined the invitation         |
+| `REVOKED`  | Admin revoked the invitation         |
+
+### 3.7 Invitation Lifecycle
+
+```text
+[*] → PENDING → EXPIRED
+                → DECLINED
+                → REVOKED
+                → [*] (accepted: invitation = null, membership.status = ACTIVE)
+```
+
+**Expiration**: Derived from `invitedOn + INVITATION_TTL`. No persisted `expiresOn` field. Backend dynamically treats
+invitations as expired.
+
+**Re-invitation**: Old invitation is replaced; new token generated; `invitedBy` and `invitedOn` updated; old link
+immediately invalid; new email sent.
+
+**Acceptance**: Sets `invitation = null`, `membership.status = ACTIVE`. User must log in or register with the invited
+identity.
 
 ---
 
-## 4. API Contracts
+## 4. Domain Model
 
-All endpoints are RESTful under the base path `/api/v1`. Authentication is via Bearer JWT token in the `Authorization`
-header. Every request/response shape is validated with Zod v4 schemas in the server package.
+### 4.1 Entity Relationship Diagram
 
-### 4.1 Base URL and auth
-
+```text
+Tenant
+  ├── TenantMemberships (userId, role, status, invitation?)
+  └── Projects
+        ├── ProjectMemberships (userId, role)
+        ├── Tasks
+        │     ├── Comments
+        │     ├── TaskRelationships
+        │     └── Label associations (labelIds[])
+        ├── Sprints
+        ├── Boards (columns → statusIds[])
+        ├── Statuses
+        ├── Labels
+        └── TaskTypes
 ```
-Base URL: /api/v1
-Auth: Bearer <jwt>
-Tenant context: X-Tenant-Id header (derived from JWT claims)
-```
 
-### 4.2 Auth endpoints
-
-| Method | Path                      | Description                                              |
-| ------ | ------------------------- | -------------------------------------------------------- |
-| `POST` | `/auth/register`          | Register a new user (no tenant auto-created)             |
-| `POST` | `/auth/login`             | Authenticate and receive JWT                             |
-| `GET`  | `/auth/me`                | Get current user profile                                 |
-| `POST` | `/auth/switch-tenant`     | Switch active tenant context; returns new JWT            |
-| `POST` | `/auth/accept-invitation` | Accept a pending invitation; activates tenant membership |
-| `GET`  | `/invitations/:token`     | Get invitation details (public — no auth required)       |
-
-### 4.3 Tenant endpoints
-
-| Method   | Path                                 | Description                                                                  |
-| -------- | ------------------------------------ | ---------------------------------------------------------------------------- |
-| `GET`    | `/tenants`                           | List tenants the user belongs to with `role` field (active memberships only) |
-| `POST`   | `/tenants`                           | Create a new tenant/workspace (subject to subscription limits)               |
-| `GET`    | `/tenants/:tenantId`                 | Get tenant details                                                           |
-| `PATCH`  | `/tenants/:tenantId`                 | Update tenant (owner/admin only)                                             |
-| `POST`   | `/tenants/:tenantId/members`         | Invite member by email (supports unregistered users → pending)               |
-| `GET`    | `/tenants/:tenantId/members`         | List all members including pending invitations                               |
-| `PATCH`  | `/tenants/:tenantId/members/:userId` | Update member role                                                           |
-| `DELETE` | `/tenants/:tenantId/members/:userId` | Remove/cancel member invitation                                              |
-
-### 4.4 Project endpoints
-
-| Method   | Path                                   | Description                           |
-| -------- | -------------------------------------- | ------------------------------------- |
-| `GET`    | `/projects`                            | List projects in the active tenant    |
-| `POST`   | `/projects`                            | Create a project (tenant admin+ only) |
-| `GET`    | `/projects/:projectId`                 | Get project details                   |
-| `PATCH`  | `/projects/:projectId`                 | Update project (admin+ only)          |
-| `DELETE` | `/projects/:projectId`                 | Delete project (admin+ only)          |
-| `GET`    | `/projects/:projectId/members`         | List project members                  |
-| `POST`   | `/projects/:projectId/members`         | Add member to project                 |
-| `PATCH`  | `/projects/:projectId/members/:userId` | Update member project role            |
-| `DELETE` | `/projects/:projectId/members/:userId` | Remove member from project            |
-
-### 4.5 Board endpoints
-
-| Method   | Path               | Description                          |
-| -------- | ------------------ | ------------------------------------ |
-| `GET`    | `/boards`          | List boards in a project             |
-| `POST`   | `/boards`          | Create a board (project admin+ only) |
-| `GET`    | `/boards/:boardId` | Get board with columns               |
-| `PATCH`  | `/boards/:boardId` | Update board (project admin+ only)   |
-| `DELETE` | `/boards/:boardId` | Delete board (project admin+ only)   |
-
-### 4.6 Column endpoints
-
-| Method   | Path                                 | Description                           |
-| -------- | ------------------------------------ | ------------------------------------- |
-| `GET`    | `/boards/:boardId/columns`           | List columns for a board              |
-| `POST`   | `/boards/:boardId/columns`           | Create a column (project admin+ only) |
-| `PATCH`  | `/boards/:boardId/columns/:columnId` | Update column (project admin+ only)   |
-| `DELETE` | `/boards/:boardId/columns/:columnId` | Delete column (project admin+ only)   |
-| `PATCH`  | `/boards/:boardId/columns/reorder`   | Reorder columns (project admin+ only) |
-
-### 4.7 Task endpoints
-
-| Method   | Path                    | Description                                                       |
-| -------- | ----------------------- | ----------------------------------------------------------------- |
-| `GET`    | `/tasks`                | List tasks (filtered by project, board, column, sprint, assignee) |
-| `POST`   | `/tasks`                | Create a task (project member+ only)                              |
-| `GET`    | `/tasks/:taskId`        | Get task details with assignees                                   |
-| `PATCH`  | `/tasks/:taskId`        | Update task (assignee, status, priority, etc.)                    |
-| `DELETE` | `/tasks/:taskId`        | Delete task (project admin+ only)                                 |
-| `PATCH`  | `/tasks/:taskId/assign` | Assign/unassign users                                             |
-| `PATCH`  | `/tasks/:taskId/move`   | Move task to a different column                                   |
-
-### 4.8 Sprint endpoints
-
-| Method   | Path                               | Description                               |
-| -------- | ---------------------------------- | ----------------------------------------- |
-| `GET`    | `/sprints`                         | List sprints in a project                 |
-| `POST`   | `/sprints`                         | Create a sprint (project admin+ only)     |
-| `GET`    | `/sprints/:sprintId`               | Get sprint details with tasks             |
-| `PATCH`  | `/sprints/:sprintId`               | Update sprint (project admin+ only)       |
-| `DELETE` | `/sprints/:sprintId`               | Delete sprint (project admin+ only)       |
-| `POST`   | `/sprints/:sprintId/tasks`         | Add task(s) from backlog to sprint        |
-| `DELETE` | `/sprints/:sprintId/tasks/:taskId` | Remove task from sprint (back to backlog) |
-
-### 4.9 Request/response shape examples (Zod v4 schema references)
-
-All schemas are defined in the server package at `server/src/schemas/` using Zod v4 (`z.interface()` for object schemas
-— preferred over `z.object()` for better performance and type inference). Type definitions are in the shared package at
-`shared/src/types/`.
-
-#### Create Tenant Request
+### 4.2 User
 
 ```typescript
-// Zod v4 schema: CreateTenantSchema
-export const CreateTenantSchema = z.interface({
-  name: z.string().min(1).max(100),
-  slug: z
-    .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-z0-9-]+$/),
-  subscription: z.enum(['free', 'premium']).default('free'),
-});
-```
-
-#### Create Tenant Response
-
-```typescript
-// Zod v4 schema: TenantSchema
-export const TenantSchema = z.interface({
-  id: z.string().uuid(),
-  name: z.string(),
-  slug: z.string(),
-  subscription: z.enum(['free', 'premium']),
-  description: z.string().max(500).nullable().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-});
-```
-
-#### Invite Member Request
-
-```typescript
-// Zod v4 schema: InviteMemberSchema
-export const InviteMemberSchema = z.interface({
-  email: z.email(),
-  role: z.enum(['admin', 'member']),
-});
-```
-
-#### Accept Invitation Request
-
-```typescript
-// Zod v4 schema: AcceptInvitationSchema
-export const AcceptInvitationSchema = z.interface({
-  token: z.string().min(1),
-});
-```
-
-#### Invitation Details Response (public)
-
-```typescript
-// Zod v4 schema: InvitationDetailsSchema
-export const InvitationDetailsSchema = z.interface({
-  tenantName: z.string(),
-  invitedEmail: z.string(),
-  role: z.enum(['admin', 'member']),
-  status: z.enum(['pending', 'accepted', 'expired']),
-});
-```
-
-#### Create Project Request
-
-```typescript
-// Zod v4 schema: CreateProjectSchema
-export const CreateProjectSchema = z.interface({
-  name: z.string().min(1).max(200),
-  slug: z
-    .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-z0-9-]+$/),
-  description: z.string().max(1000).optional(),
-});
-```
-
-#### Create Board Request
-
-```typescript
-// Zod v4 schema: CreateBoardSchema
-export const CreateBoardSchema = z.interface({
-  name: z.string().min(1).max(200),
-  description: z.string().max(1000).optional(),
-  columnNames: z.array(z.string().min(1).max(100)).min(1).max(20),
-});
-```
-
-#### Create Task Request
-
-```typescript
-// Zod v4 schema: CreateTaskSchema
-export const CreateTaskSchema = z.interface({
-  title: z.string().min(1).max(200),
-  description: z.string().max(5000).optional(),
-  projectId: z.string().uuid(),
-  boardId: z.string().uuid(),
-  columnId: z.string().uuid(),
-  sprintId: z.string().uuid().optional(),
-  priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
-  assigneeIds: z.array(z.string().uuid()).optional(),
-});
-```
-
-#### Move Task Request
-
-```typescript
-// Zod v4 schema: MoveTaskSchema
-export const MoveTaskSchema = z.interface({
-  taskId: z.string().uuid(),
-  targetColumnId: z.string().uuid(),
-  targetSprintId: z.string().uuid().optional(),
-});
-```
-
-#### Create Sprint Request
-
-```typescript
-// Zod v4 schema: CreateSprintSchema
-export const CreateSprintSchema = z.interface({
-  name: z.string().min(1).max(200),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
-  goal: z.string().max(1000).optional(),
-});
-```
-
-#### Error response (standard)
-
-```typescript
-// Zod v4 schema: ErrorResponseSchema
-export const ErrorResponseSchema = z.interface({
-  code: z.string(), // e.g. "NOT_FOUND", "FORBIDDEN", "VALIDATION_ERROR"
-  message: z.string(),
-  details: z.record(z.string(), z.unknown()).optional(),
-});
-```
-
----
-
-## 5. Data Model (MongoDB)
-
-### 5.1 Collections
-
-| Collection        | Document type | Tenant isolation key                      |
-| ----------------- | ------------- | ----------------------------------------- |
-| `tenants`         | Tenant        | `_id` (tenant is the root entity)         |
-| `users`           | User          | N/A (global, but linked via TenantMember) |
-| `tenant_members`  | TenantMember  | `tenantId`                                |
-| `projects`        | Project       | `tenantId`                                |
-| `project_members` | ProjectMember | `tenantId` (via project)                  |
-| `boards`          | Board         | `tenantId`                                |
-| `columns`         | Column        | `tenantId`                                |
-| `tasks`           | Task          | `tenantId`                                |
-| `sprints`         | Sprint        | `tenantId`                                |
-
-### 5.2 Indexes per collection
-
-**tenants**
-
-- `{ slug: 1 }` — unique
-- `{ ownerId: 1 }` — for subscription limit checks (owner's workspace count)
-
-**users**
-
-- `{ email: 1 }` — unique
-
-**tenant_members**
-
-- `{ userId: 1, tenantId: 1 }` — unique compound (partial filter: `{ userId: { $ne: null } }`)
-- `{ tenantId: 1 }`
-- `{ invitationToken: 1 }` — unique, sparse (only documents where `invitationToken` exists)
-- `{ invitedEmail: 1, tenantId: 1 }` — unique, sparse (for deduplicating pending invitations)
-
-**projects**
-
-- `{ tenantId: 1, slug: 1 }` — unique compound
-- `{ tenantId: 1 }`
-
-**project_members**
-
-- `{ projectId: 1, userId: 1 }` — unique compound
-- `{ tenantId: 1 }` (denormalized for efficient queries)
-
-**boards**
-
-- `{ tenantId: 1, projectId: 1 }`
-- `{ tenantId: 1 }`
-
-**columns**
-
-- `{ boardId: 1, position: 1 }`
-- `{ tenantId: 1 }`
-
-**tasks**
-
-- `{ tenantId: 1, projectId: 1 }`
-- `{ tenantId: 1, boardId: 1, columnId: 1, position: 1 }`
-- `{ tenantId: 1, sprintId: 1 }`
-- `{ tenantId: 1 }`
-
-**sprints**
-
-- `{ tenantId: 1, projectId: 1 }`
-- `{ tenantId: 1 }`
-
-### 5.3 Tenant isolation enforcement
-
-- **Application layer:** Every service method receives `tenantId` from the request context and filters all queries by
-  it.
-- **Database layer:** All queries include `tenantId` in the filter object. No collection scan without `tenantId`.
-- **No cross-tenant references:** Foreign keys (e.g., `projectId` on a task) are always scoped within the same tenant.
-  The application validates this on write operations.
-
-### 5.4 Document examples
-
-**Project document:**
-
-```json
 {
-  "_id": "ObjectId(...)",
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "tenantId": "550e8400-e29b-41d4-a716-446655440001",
-  "name": "Website Redesign",
-  "slug": "website-redesign",
-  "description": "Redesign the company website",
-  "createdAt": "2026-07-28T08:00:00Z",
-  "updatedAt": "2026-07-28T08:00:00Z"
+  _id: ObjectId; // UUID v4
+  email: String; // normalized (lowercase), unique index
+  displayName: String;
+  avatarUrl: String | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null; // soft delete marker
 }
 ```
 
-**Task document:**
+**Indexes**: `unique: { email: 1 }`
 
-```json
+**Email normalization**: `John.Doe@Example.COM` → `john.doe@example.com`
+
+**Deletion**: Sets `deletedAt`. Removes live membership/access. Does NOT delete Tasks, Comments, or historical
+snapshots.
+
+### 4.3 Tenant
+
+```typescript
 {
-  "_id": "ObjectId(...)",
-  "id": "550e8400-e29b-41d4-a716-446655440010",
-  "tenantId": "550e8400-e29b-41d4-a716-446655440001",
-  "projectId": "550e8400-e29b-41d4-a716-446655440002",
-  "boardId": "550e8400-e29b-41d4-a716-446655440003",
-  "columnId": "550e8400-e29b-41d4-a716-446655440004",
-  "sprintId": null,
-  "title": "Implement login page",
-  "description": "Create the login page with email/password auth",
-  "assigneeIds": ["550e8400-e29b-41d4-a716-446655440020"],
-  "priority": "high",
-  "position": 0,
-  "createdBy": "550e8400-e29b-41d4-a716-446655440030",
-  "createdAt": "2026-07-28T08:00:00Z",
-  "updatedAt": "2026-07-28T08:00:00Z"
-}
-```
-
----
-
-## 6. Shared Package
-
-### 6.1 Location
-
-`shared/` — npm workspace package (runtime-library free, zero dependencies)
-
-### 6.2 Contents
-
-| Path             | Purpose                                                                |
-| ---------------- | ---------------------------------------------------------------------- |
-| `src/types/`     | Plain TypeScript interfaces for all domain objects                     |
-| `src/constants/` | Shared constants (role enums, HTTP methods, API paths, default values) |
-| `src/utils/`     | Utility helpers (`valuesOf()` for strongly-typed constant tuples)      |
-| `index.ts`       | Barrel exports for types, constants, `valuesOf`, `DEFAULT_THEME_ID`    |
-
-### 6.3 Key type definitions (file references)
-
-| Type file          | Types defined                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `types/tenant.ts`  | `Tenant`, `CreateTenant`, `UpdateTenant`, `TenantMember`, `InviteMember`, `TenantWithRole`                                      |
-| `types/user.ts`    | `User`, `CreateUser`                                                                                                            |
-| `types/project.ts` | `Project`, `CreateProject`, `UpdateProject`, `ProjectMember`                                                                    |
-| `types/board.ts`   | `Board`, `CreateBoard`, `UpdateBoard`, `Column`, `CreateColumn`                                                                 |
-| `types/task.ts`    | `Task`, `CreateTask`, `UpdateTask`, `MoveTask`, `AssignTask`, `MyTask`                                                          |
-| `types/sprint.ts`  | `Sprint`, `CreateSprint`, `UpdateSprint`                                                                                        |
-| `types/auth.ts`    | `LoginRequest`, `RegisterRequest`, `AuthResponse`, `AcceptInvitation`, `InvitationDetails`, `MyInvitation`, `PendingInvitation` |
-| `types/common.ts`  | `ThemeManifestItem`, `ErrorResponse`, `Pagination`, `ListQuery`, `UserPreferences`, `UpdateUserPreferences`, `SupportRequest`   |
-
-### 6.4 Type definition pattern (plain TypeScript interfaces)
-
-All TypeScript types in the shared package are plain interfaces with no runtime dependency:
-
-```typescript
-// Example: shared/src/types/project.ts
-export interface Project {
-  id: string;
-  tenantId: string;
-  name: string;
-  slug: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateProject {
-  name: string;
-  slug: string;
-  description?: string;
-}
-```
-
-### 6.5 Zod schemas and contracts (server package)
-
-Zod validation schemas and API contracts live in the server package:
-
-| Path                     | Purpose                                                             |
-| ------------------------ | ------------------------------------------------------------------- |
-| `server/src/schemas/`    | Zod v4 validation schemas for all API request/response shapes       |
-| `server/src/contracts/`  | API contract definitions (endpoint paths, HTTP methods, type pairs) |
-| `server/src/validators/` | Reusable Zod validator helpers (UUID, slug, pagination)             |
-
-```typescript
-// Example: server/src/schemas/project.ts
-import { z } from 'zod';
-import { TenantRoleValues } from '@task-board/shared';
-
-export const CreateProjectSchema = z.interface({
-  name: z.string().min(1).max(200),
-  slug: z
-    .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-z0-9-]+$/),
-  description: z.string().max(1000).optional(),
-});
-```
-
-```typescript
-// Example: server/src/contracts/project.contracts.ts
-import { HttpMethod } from '@task-board/shared';
-
-export const ProjectContracts = {
-  list: {
-    method: HttpMethod.GET,
-    path: '/projects',
-    query: { tenantId: 'string' },
-    response: PaginatedResponseSchema(ProjectSchema),
-  },
-  create: {
-    method: HttpMethod.POST,
-    path: '/projects',
-    body: CreateProjectSchema,
-    response: ProjectSchema,
-    errors: ['FORBIDDEN', 'VALIDATION_ERROR', 'CONFLICT'],
-  },
-} as const;
-```
-
-### 6.6 Enums and constants
-
-| Constant             | Values                                                    |
-| -------------------- | --------------------------------------------------------- |
-| `TenantRole`         | `'owner'`, `'admin'`, `'member'`                          |
-| `ProjectRole`        | `'admin'`, `'developer'`, `'viewer'`                      |
-| `TaskPriority`       | `'low'`, `'medium'`, `'high'`, `'critical'`               |
-| `SprintStatus`       | `'planned'`, `'active'`, `'completed'`                    |
-| `MemberStatus`       | `'active'`, `'pending'`, `'declined'`, `'access_revoked'` |
-| `SubscriptionTier`   | `'free'`, `'premium'`                                     |
-| `DefaultColumnNames` | `['Backlog', 'To Do', 'In Progress', 'Review', 'Done']`   |
-| `HttpMethod`         | `'GET'`, `'POST'`, `'PATCH'`, `'DELETE'`                  |
-
----
-
-## 7. Frontend Architecture
-
-### 7.1 Application shell
-
-The Angular 22 application is a standalone-based SPA with no NgModules. Change detection is **zoneless** (no `zone.js`);
-all reactivity flows through Angular Signals. Routing is handled via Angular's standalone router with functional guards
-and resolvers. The root component bootstraps the app with providers for auth, tenant context, and HTTP interceptors.
-
-```typescript
-// ui/src/app/app.config.ts
-import { provideRouter, withComponentInputBinding } from '@angular/router';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { routes } from './app.routes';
-import { authInterceptor, tenantInterceptor, errorInterceptor } from './core/interceptors';
-
-export const appConfig = {
-  providers: [
-    provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([authInterceptor, tenantInterceptor, errorInterceptor])),
-  ],
-};
-```
-
-### 7.2 Feature modules (standalone component groups)
-
-| Feature module | Path prefix  | Key components                                                                     | Description                                       |
-| -------------- | ------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `auth`         | `/auth`      | `LoginComponent`, `RegisterComponent`, `AuthGuard`                                 | Authentication flow                               |
-| `tenants`      | `/tenants`   | `TenantListComponent`, `TenantDetailComponent`, `TenantMemberListComponent`        | Tenant management                                 |
-| `projects`     | `/projects`  | `ProjectListComponent`, `ProjectDetailComponent`, `ProjectMemberListComponent`     | Project CRUD and member management                |
-| `boards`       | `/boards`    | `BoardListComponent`, `BoardViewComponent`, `ColumnComponent`, `TaskCardComponent` | Kanban board view and interaction                 |
-| `tasks`        | `/tasks`     | `TaskDetailComponent`, `TaskFormComponent`, `TaskListComponent`                    | Task CRUD and assignment                          |
-| `sprints`      | `/sprints`   | `SprintListComponent`, `SprintDetailComponent`, `SprintBacklogComponent`           | Sprint management and backlog                     |
-| `dashboard`    | `/dashboard` | `DashboardComponent`                                                               | Overview of projects, boards, and recent activity |
-| `layout`       | —            | `AppShellComponent`, `SidebarComponent`, `HeaderComponent`                         | Shell, navigation, tenant switcher                |
-
-### 7.3 Routing structure
-
-```
-/app
-  /auth
-    /login
-    /register
-  /tenants
-    /:tenantId
-      /projects
-        /:projectId
-          /boards
-            /:boardId
-          /sprints
-            /:sprintId
-          /tasks
-            /:taskId
-  /dashboard
-```
-
-- **Guards (functional):** `authGuard` (protects all app routes), `tenantGuard` (ensures user has access to the active
-  tenant), `projectGuard` (ensures user has a project role). All guards are standalone functions using `inject()`.
-- **Resolvers (functional):** `projectResolver` fetches project data via `resource()` before activating project routes.
-
-```typescript
-// Functional guard example
-// Auth is determined by the presence of `currentUser` (already loaded)
-// or `token` (restored from localStorage — guard awaits fetchCurrentUser
-// to validate the token before allowing navigation).
-export const authGuard: CanActivateFn = async () => {
-  const auth = inject(AuthStore);
-  const router = inject(Router);
-  if (auth.currentUser()) return true;
-  if (auth.token()) {
-    try {
-      await firstValueFrom(auth.fetchCurrentUser());
-      return true;
-    } catch {
-      return router.parseUrl('/auth/login');
-    }
-  }
-  return router.parseUrl('/auth/login');
-};
-```
-
-### 7.4 State management
-
-All state is signal-based. Stores are plain Angular services using `signal()`, `computed()`, `linkedSignal()`, and
-`resource()` — no external state management library.
-
-| Concern         | Mechanism                              | Key APIs                                                                                                                                                                 |
-| --------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Auth state      | `inject(AuthStore)` — signal store     | `currentUser = signal<User \| null>(null)`, `token = signal<string \| null>(null)` — guard checks `currentUser()` first, then validates `token` via `fetchCurrentUser()` |
-| Tenant context  | `inject(TenantService)` — signal store | `activeTenant = linkedSignal(() => this.tenants()[0])`, `tenants = resource({ loader: () => this.fetchTenants() })`                                                      |
-| Project data    | `inject(ProjectStore)` — signal store  | `projects = resource({ loader: () => this.fetchProjects() })`, `currentProject = linkedSignal(() => this.projects()[0])`                                                 |
-| Board/Task data | `inject(BoardStore)` — signal store    | `board = resource({ params: () => ({ id: this.boardId() }), loader: ({ params }) => this.fetchBoard(params.id) })`                                                       |
-| UI state        | Component-level signals                | `showSidebar = signal(true)`, `selectedFilter = linkedSignal(() => FILTER_OPTIONS[0])`                                                                                   |
-
-**`resource()` pattern** — replaces manual `HttpClient` subscription for data fetching:
-
-```typescript
-// Example: ProjectStore
-@Injectable({ providedIn: 'root' })
-export class ProjectStore {
-  private readonly http = inject(HttpClient);
-  private readonly tenant = inject(TenantService);
-
-  readonly projects = resource({
-    params: () => ({ tenantId: this.tenant.activeTenant()?.id }),
-    loader: async ({ params }) => {
-      if (!params.tenantId) return [];
-      return firstValueFrom(
-        this.http.get<Project[]>(`/api/v1/projects`, {
-          headers: { 'X-Tenant-Id': params.tenantId },
-        }),
-      );
-    },
-  });
-
-  readonly currentProject = linkedSignal(() => this.projects.value()?.[0] ?? null);
-}
-```
-
-**`linkedSignal()` pattern** — writable derived signal for user-selectable values:
-
-```typescript
-// Example: tenant switcher
-readonly activeTenant = linkedSignal(() => this.tenants.value()?.[0] ?? null);
-
-// User can explicitly set it (e.g. from a dropdown)
-switchTenant(tenant: Tenant) {
-  this.activeTenant.set(tenant);
-}
-```
-
-### 7.5 Key components and their responsibilities
-
-| Component          | Selector                | Responsibilities                                                 |
-| ------------------ | ----------------------- | ---------------------------------------------------------------- |
-| `app-shell`        | `<app-shell>`           | Root layout with sidebar, header, outlet                         |
-| `board-view`       | `<app-board-view>`      | Renders the Kanban board with drag-and-drop column support       |
-| `column-component` | `<app-column>`          | Renders a single column with its tasks                           |
-| `task-card`        | `<app-task-card>`       | Displays task summary; click opens task detail                   |
-| `task-form`        | `<app-task-form>`       | Create/edit task with assignee picker, priority, sprint selector |
-| `sprint-backlog`   | `<app-sprint-backlog>`  | Shows backlog tasks and allows moving them into a sprint         |
-| `tenant-switcher`  | `<app-tenant-switcher>` | Dropdown to switch active tenant                                 |
-| `project-sidebar`  | `<app-project-sidebar>` | Lists project members, boards, sprints                           |
-
-### 7.6 UI library and styling
-
-- **Spartan UI** (`@spartan-ng/brain` + `@spartan-ng/helm` v0.12.0) for headless primitives and styled components
-- **Tailwind CSS v4.1.0** — CSS-first configuration; no `tailwind.config.js`
-- **Angular Signals** for reactive state; `@if`, `@for`, `@switch`, `@defer` for control flow
-- **Signal Forms** (`@angular/forms` signal-based API) for form state management in task create/edit forms
-
-#### Tailwind CSS v4 configuration
-
-Tailwind v4 uses CSS-first configuration. Instead of `tailwind.config.js`, configure the theme directly in CSS:
-
-```css
-/* ui/src/styles.css */
-@import 'tailwindcss';
-
-@theme {
-  --color-primary: oklch(0.623 0.214 259.815);
-  --color-secondary: oklch(0.65 0.15 180);
-  --color-accent: oklch(0.7 0.18 85);
-  --font-sans: 'Inter', system-ui, sans-serif;
-}
-
-/* Component styles use standard Tailwind utilities */
-```
-
-No `content` configuration is needed — Tailwind v4 auto-detects source files.
-
-### 7.7 HTTP layer
-
-- `HttpClient` with functional interceptors for:
-  - Attaching `Authorization: Bearer <token>` header
-  - Attaching `X-Tenant-Id` header from the active tenant context
-  - Global error handling (401 → redirect to login, 403 → show permission denied, 422 → show validation errors)
-- Data fetching uses `resource()` / `httpResource()` which wraps `HttpClient` with signal integration — see Section 7.4
-- Fallback: direct `HttpClient` calls return typed observables derived from shared package types when `resource()` is
-  not suitable (e.g. fire-and-forget mutations)
-
-**`httpResource()` pattern** — for simple typed HTTP GET resources:
-
-```typescript
-// Example: fetch a single project by ID
-projectResource = httpResource(() => `/api/v1/projects/${this.projectId()}`, {
-  defaultValue: null as Project | null,
-  // parse handled by server-side validation
-});
-```
-
-**Mutations** use direct `HttpClient` calls with signals for loading/error state:
-
-```typescript
-// Example: create a project
-createProject(input: CreateProjectInput) {
-  this.loading.set(true);
-  return this.http.post<Project>('/api/v1/projects', input, {
-    headers: { 'X-Tenant-Id': this.tenant.activeTenant()!.id },
-  }).pipe(
-    tap({
-      next: (project) => { this.projects.update(list => [...list, project]); },
-      error: (err) => { this.error.set(err.message); },
-      finalize: () => { this.loading.set(false); },
-    }),
-  );
-}
-```
-
----
-
-## 8. Backend Architecture
-
-### 8.1 Hono route structure
-
-```
-server/src/
-├── index.ts                    # Hono app bootstrap
-├── middleware/
-│   ├── auth.ts                 # JWT verification middleware
-│   ├── tenant-context.ts       # Extracts tenantId from JWT, attaches to context
-│   ├── rbac.ts                 # Role-based access control middleware
-│   ├── validation.ts           # Zod v4 request body/query/param validation (schemas in server/src/schemas/)
-│   └── error-handler.ts        # Global error handler → standardized error responses
-├── routes/
-│   ├── auth.ts                 # POST /auth/register, POST /auth/login, GET /auth/me
-│   ├── tenants.ts              # CRUD for tenants and tenant members
-│   ├── projects.ts             # CRUD for projects and project members
-│   ├── boards.ts               # CRUD for boards
-│   ├── columns.ts              # CRUD for columns + reorder
-│   ├── tasks.ts                # CRUD for tasks + move + assign
-│   ├── sprints.ts              # CRUD for sprints + add/remove tasks
-│   └── index.ts                # Route aggregation and prefix mounting
-├── services/
-│   ├── auth.service.ts         # Registration, login, JWT issuance
-│   ├── tenant.service.ts       # Tenant and tenant member business logic
-│   ├── project.service.ts      # Project and project member business logic
-│   ├── board.service.ts        # Board and column business logic
-│   ├── task.service.ts         # Task CRUD, status transitions, assignment
-│   ├── sprint.service.ts       # Sprint CRUD, task assignment to sprints
-│   └── rbac.service.ts         # Permission checking utility
-├── repositories/
-│   ├── tenant.repository.ts    # MongoDB operations for tenants
-│   ├── user.repository.ts      # MongoDB operations for users
-│   ├── project.repository.ts   # MongoDB operations for projects
-│   ├── board.repository.ts     # MongoDB operations for boards/columns
-│   ├── task.repository.ts      # MongoDB operations for tasks
-│   └── sprint.repository.ts    # MongoDB operations for sprints
-├── db/
-│   └── mongo.ts                # MongoDB connection and client setup
-└── types/
-    └── context.ts              # Hono context type extensions (tenantId, userId, etc.)
-```
-
-### 8.2 Middleware pipeline
-
-Every request flows through this middleware chain:
-
-```
-Request → ErrorHandler → AuthMiddleware → TenantContextMiddleware → RBACMiddleware → ValidationMiddleware → RouteHandler
-```
-
-1. **ErrorHandler** — catches unhandled errors and returns standardized JSON error responses
-2. **AuthMiddleware** — verifies JWT from `Authorization: Bearer <token>` header; sets `c.get('userId')` and
-   `c.get('user')`
-3. **TenantContextMiddleware** — resolves the active tenant from the user's `TenantMember` records; sets
-   `c.get('tenantId')`. For routes that don't require a tenant (e.g., login), this is skipped.
-4. **RBACMiddleware** — checks the user's role against the required permission for the route. Uses `rbac.service` to
-   evaluate. Sets `c.get('userRole')`.
-5. **ValidationMiddleware** — validates request body, query params, and path params against Zod v4 schemas from the
-   server's `src/schemas/` directory. Uses `z.interface().parse()` / `.safeParse()`. Returns 422 with structured
-   validation errors on failure.
-6. **RouteHandler** — the actual endpoint handler, which delegates to the appropriate service.
-
-### 8.3 Service layer design
-
-Each service is a plain TypeScript class (no framework dependency) that:
-
-- Receives `tenantId` as its first parameter on every method
-- Delegates persistence to the corresponding repository
-- Enforces business rules (e.g., only project admin can delete a board, only members can create tasks)
-- Returns typed results that map directly to shared package types
-
-**Example — `task.service.ts` method:**
-
-```typescript
-class TaskService {
-  async moveTask(tenantId: string, userId: string, input: MoveTaskInput): Promise<Task> {
-    // 1. Verify user has write access to the project
-    // 2. Verify task belongs to the tenant
-    // 3. Verify target column belongs to the same board
-    // 4. Update task columnId, sprintId (if provided), and position
-    // 5. Return updated task
-  }
-}
-```
-
-### 8.4 Repository layer design
-
-Each repository:
-
-- Receives a `MongoCollection` reference from the MongoDB Node.js Driver v7.0.0 (injected via factory or DI)
-- Provides typed CRUD methods scoped by `tenantId`
-- Handles MongoDB-specific concerns (ObjectId ↔ UUID conversion, projection, sorting)
-- Returns plain TypeScript objects (no MongoDB driver types leak to services)
-- Uses the driver's native async/await API (no callback patterns)
-
-> **MongoDB Driver v7 note:** The v7 driver drops legacy callback APIs entirely. All operations return promises. Use
-> `findOne()`, `insertOne()`, `updateOne()`, `deleteOne()`, `aggregate()` with `await` directly. The `Collection<T>`
-> generic provides full type safety.
-
-### 8.5 Auth and JWT
-
-- **Registration:** `POST /auth/register` creates a user, hashes the password with bcrypt, and returns a JWT. **No
-  tenant is auto-created.** The user starts with no tenants and must explicitly create or join a workspace.
-- **Login:** `POST /auth/login` verifies credentials and returns a JWT. If the user has active tenant memberships, the
-  JWT includes the first tenant's context. If the user has no tenants, the JWT is issued without tenant context
-  (`tenantId: null`, `tenantRole: null`).
-- **JWT payload (with tenant context):**
-
-```json
-{
-  "sub": "550e8400-e29b-41d4-a716-446655440030",
-  "email": "user@example.com",
-  "tenantId": "550e8400-e29b-41d4-a716-446655440001",
-  "tenantRole": "admin",
-  "iat": 1719567600,
-  "exp": 1719654000
-}
-```
-
-- **JWT payload (without tenant context — new user with no workspaces):**
-
-```json
-{
-  "sub": "550e8400-e29b-41d4-a716-446655440030",
-  "email": "user@example.com",
-  "tenantId": null,
-  "tenantRole": null,
-  "iat": 1719567600,
-  "exp": 1719654000
-}
-```
-
-- **Token strategy:** Access-token-only with 24-hour expiry. No refresh tokens in MVP. The frontend re-authenticates on
-  401 by redirecting to login.
-- **Signing:** HS256 with a secret stored in environment variables (`JWT_SECRET`).
-- **Multi-tenant context:** The JWT contains the `tenantId` for the user's current active tenant. When the user switches
-  tenants on the frontend, a new JWT is issued via `POST /auth/switch-tenant` (returns a new token with updated
-  `tenantId` and `tenantRole` claims).
-- **Accept invitation:** `POST /auth/accept-invitation` accepts a pending invitation by token. If the inviting email
-  matches the authenticated user's email, the `TenantMember` record is updated: `userId` is set, `status` becomes
-  `'active'`, and `invitationToken` is cleared. Returns a new JWT with the tenant context.
-
-> **MVP decision (blocking question resolved):** JWT refresh strategy is access-token-only with 24h expiry. Refresh
-> tokens are out of scope. If the token expires, the user is redirected to login. This is acceptable for an educational
-> MVP.
-
-### 8.6 Tenant context propagation
-
-The `X-Tenant-Id` header is used by the frontend to indicate the active tenant. The backend middleware validates that
-the authenticated user is an **active** member of the specified tenant (via `TenantMember` lookup with
-`status: 'active'`). If the user is not an active member of the tenant, the request is rejected with 403. Users with
-`status: 'declined'` or `status: 'access_revoked'` also receive 403. Users with no tenant context in their JWT can only
-access tenant-independent endpoints (auth, invitation acceptance, workspace creation).
-
----
-
-## 9. Acceptance Criteria
-
-### 9.1 Functional acceptance criteria
-
-| #     | Criterion                                                                     | Verification                                                                                  |
-| ----- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| AC-1  | A user can register with email and password; **no tenant is auto-created**    | `POST /auth/register` returns 201 with user + JWT (no tenant in response)                     |
-| AC-2  | A user can log in and receive a JWT                                           | `POST /auth/login` returns 200 with JWT; invalid credentials return 401                       |
-| AC-3  | A user can create a workspace and become its owner                            | `POST /tenants` returns 201; user is auto-added as `owner` with `status: 'active'`            |
-| AC-3a | A free user cannot create a second free workspace                             | `POST /tenants` with `subscription: 'free'` returns 403 when user already owns a free one     |
-| AC-3b | Creating a workspace beyond the free limit requires `subscription: 'premium'` | `POST /tenants` with `subscription: 'premium'` succeeds                                       |
-| AC-4  | A user can list their tenants (active memberships only)                       | `GET /tenants` returns 200 with array of tenant objects                                       |
-| AC-5  | A tenant owner can invite a registered user by email                          | `POST /tenants/:tenantId/members` with registered email → `status: 'active'`                  |
-| AC-5a | A tenant owner can invite an **unregistered** user by email                   | `POST /tenants/:tenantId/members` with new email → `status: 'pending'`, invitation email sent |
-| AC-5b | An invited unregistered user can accept invitation after registering          | Register → `POST /auth/accept-invitation` with token → membership becomes `active`            |
-| AC-5c | `GET /invitations/:token` returns invitation details without authentication   | Public endpoint returns tenant name, email, role, status                                      |
-| AC-6  | A tenant admin can create a project                                           | `POST /projects` returns 201; project has `tenantId`                                          |
-| AC-6a | A free workspace cannot exceed 3 projects                                     | 4th `POST /projects` on a free tenant returns 403 with `SUBSCRIPTION_LIMIT_EXCEEDED`          |
-| AC-6b | A premium workspace has no project limit                                      | `POST /projects` on a premium tenant succeeds regardless of count                             |
-| AC-7  | A project admin can create a board with custom columns                        | `POST /boards` creates board + columns; `GET /boards/:boardId` returns board with columns     |
-| AC-8  | A developer can create a task in a project                                    | `POST /tasks` returns 201; task has `tenantId`, `projectId`, `boardId`, `columnId`            |
-| AC-9  | A developer can move a task between columns                                   | `PATCH /tasks/:taskId/move` updates `columnId` and `position`                                 |
-| AC-10 | A developer can assign users to a task                                        | `PATCH /tasks/:taskId/assign` updates `assigneeIds`                                           |
-| AC-11 | A project admin can create a sprint                                           | `POST /sprints` returns 201                                                                   |
-| AC-12 | A project admin can move a task from backlog into a sprint                    | `POST /sprints/:sprintId/tasks` adds task to sprint; task's `sprintId` is updated             |
-| AC-13 | A viewer cannot create, edit, or delete tasks                                 | `POST /tasks` returns 403 for viewer role                                                     |
-| AC-14 | A user from tenant A cannot access data from tenant B                         | `GET /projects` with tenant B's ID returns 403 or empty list                                  |
-| AC-15 | All API responses conform to shared types                                     | Integration tests validate response shapes against server schemas                             |
-| AC-16 | The frontend renders a Kanban board with columns and tasks                    | Board view displays columns in order; tasks are draggable between columns                     |
-| AC-17 | The frontend enforces RBAC in the UI                                          | Viewers see read-only views; unauthorized actions are hidden/disabled                         |
-| AC-18 | Tenant isolation is enforced at the database level                            | All MongoDB queries include `tenantId` filter; no cross-tenant data is returned               |
-| AC-19 | A `pending` member cannot access any tenant resource                          | API calls with pending membership JWT return 403                                              |
-| AC-20 | A free workspace cannot exceed 10 users per project                           | 11th member addition to a project in a free tenant returns 403                                |
-
-### 9.2 Non-functional acceptance criteria
-
-| #    | Criterion                          | Target                                                                                                                                            |
-| ---- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| NF-1 | API response time                  | < 200ms for CRUD operations (p95)                                                                                                                 |
-| NF-2 | Tenant isolation query performance | Queries with `tenantId` index scan complete in < 50ms for up to 10K documents                                                                     |
-| NF-3 | Test coverage                      | ≥ 80% unit test coverage on services and repositories                                                                                             |
-| NF-4 | E2E tests                          | Critical user journeys (register → create tenant → create project → create board → create task → move task → create sprint) covered by Playwright |
-| NF-5 | Linting and formatting             | ESLint + Prettier pass with zero errors                                                                                                           |
-| NF-6 | Type safety                        | Zero TypeScript errors in the monorepo (`tsc --noEmit`)                                                                                           |
-| NF-7 | Build                              | Frontend and backend build successfully via `npm run build`                                                                                       |
-
----
-
-## 10. Vertical Slice Plan
-
-The first deployable slice delivers the **core Kanban flow** end-to-end: auth → tenant → project → board → tasks →
-sprints, with RBAC enforced throughout.
-
-### 10.1 Slice breakdown
-
-| Step | Feature                            | Backend work                                                                               | Frontend work                                                                          |
-| ---- | ---------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| 1    | **Auth**                           | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`; JWT issuance; password hashing  | Login/Register pages; auth state store; auth guard                                     |
-| 2    | **Tenant context**                 | `GET /tenants`, `POST /tenants`; tenant member resolution middleware                       | Tenant switcher in header; tenant guard                                                |
-| 3    | **Project CRUD**                   | `GET/POST /projects`, `GET/PATCH/DELETE /projects/:id`; project member management          | Project list page; project creation modal; project detail page                         |
-| 4    | **Board + Columns**                | `GET/POST /boards`, `GET/PATCH/DELETE /boards/:id`; column CRUD; column reorder            | Board view with columns; column creation; task cards in columns                        |
-| 5    | **Task CRUD + Move**               | `GET/POST /tasks`, `GET/PATCH/DELETE /tasks/:id`; move task endpoint; assign task endpoint | Task creation modal; task detail panel; drag-and-drop between columns; assignee picker |
-| 6    | **Sprint CRUD + Backlog → Sprint** | `GET/POST /sprints`, `GET/PATCH/DELETE /sprints/:id`; add/remove tasks from sprint         | Sprint list; sprint creation; backlog view; move tasks from backlog to sprint          |
-| 7    | **RBAC enforcement**               | Role-check middleware on all routes; permission service                                    | UI hides/disabled unauthorized actions; role-based visibility                          |
-
-### 10.2 Deployment order
-
-1. **Shared package** — types, constants (foundation for both frontend and backend)
-2. **Backend skeleton** — Hono app, middleware pipeline, error handler, MongoDB connection
-3. **Auth + Tenant** — register, login, tenant CRUD, tenant context middleware
-4. **Project + Board** — project CRUD, board + column CRUD
-5. **Task** — task CRUD, move, assign
-6. **Sprint** — sprint CRUD, backlog → sprint movement
-7. **RBAC** — permission middleware, role checks on all endpoints
-8. **Frontend** — Angular app shell, auth pages, tenant switcher, project pages, board view, task forms, sprint views
-9. **Integration** — connect frontend to backend, end-to-end testing
-10. **Hardening** — linting, tests, CI/CD pipeline
-
-### 10.3 Key integration points
-
-- **Shared package** is the single source of truth for types and validation. Both frontend and backend import from it.
-- **Tenant context** flows from JWT → backend middleware → service layer → repository layer. On the frontend, it flows
-  from auth store → HTTP interceptor → API calls.
-- **RBAC** is enforced on the backend for all write operations and all read operations that expose data the user
-  shouldn't see. The frontend uses RBAC to conditionally render UI elements.
-
----
-
-## 11. Resolved Blocking Questions
-
-The following blocking questions from the initial draft have been resolved with sensible defaults:
-
-| #          | Question                                                                                                                                                                | Resolution                                                                                                                                                                                                                                                                                                               |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BQ-1       | What JWT refresh strategy is acceptable for MVP?                                                                                                                        | **Access-token-only with 24h expiry.** No refresh tokens. The frontend re-authenticates on 401. See §8.5.                                                                                                                                                                                                                |
-| BQ-2       | Should default column names be configurable per board or fixed?                                                                                                         | **Configurable.** `CreateBoardSchema.columnNames` accepts an array of column names. `DefaultColumnNames` constant (`['Backlog', 'To Do', 'In Progress', 'Review', 'Done']`) is used as a fallback when no columns are specified. See §6.6.                                                                               |
-| BQ-3       | Is there a requirement for task comments or activity logs in MVP?                                                                                                       | **Out of scope.** Task comments and activity logs are excluded from the MVP vertical slice. They may be added in a future iteration.                                                                                                                                                                                     |
-| BQ-4       | What password reset / email verification flow is expected?                                                                                                              | **Out of scope for MVP.** Basic email/password auth without password reset or email verification. Users register and log in directly. These features may be added post-MVP.                                                                                                                                              |
-| BQ-5       | Should registration auto-create a tenant?                                                                                                                               | **No.** Registration creates only the user. The user must explicitly create a workspace via `POST /tenants`. A newly registered user starts with zero tenants. See §8.5.                                                                                                                                                 |
-| BQ-6       | How are subscription tiers modeled for MVP (without billing)?                                                                                                           | **Simple field on Tenant.** `Tenant.subscription` is `'free'` or `'premium'`. Free users can own one free workspace. Premium workspaces are unlimited. For MVP, subscription upgrade uses a **mock payment page** (no real payment processing). See §14.5.                                                               |
-| BQ-7       | How do invitations work for unregistered users?                                                                                                                         | **TenantMember with nullable userId.** A pending `TenantMember` record is created with `invitedEmail`, `invitationToken`, and `status: 'pending'`. On registration + acceptance, `userId` is set and `status` becomes `'active'`. See §14.                                                                               |
-| BQ-EMAIL-1 | What email delivery infrastructure is used for invitation emails?                                                                                                       | **Resend (free tier).** 3,000 emails/month, 100/day. Simple REST API via `resend` npm package. `RESEND_API_KEY` stored as Cloudflare Worker secret. Console-logging adapter used in development. See §14.4.                                                                                                              |
-| BQ-DASH-1  | The `GET /tenants` endpoint returns `Tenant[]` without the user's role per tenant. The dashboard state detection (State 3 vs State 4) requires knowing the user's role. | **Resolved:** Extend `GET /tenants` response to include `role` field per tenant. The endpoint queries `tenant_members` for the current user and joins with `tenants`. See §4.3.                                                                                                                                          |
-| BQ-DASH-2  | The decline invitation flow needs a product decision on soft-delete vs hard-delete.                                                                                     | **Resolved:** Soft-delete for declining (`status: 'declined'`). Additionally, add `'access_revoked'` status for owner/admin revocation. Both `declined` and `access_revoked` members remain in the member list but have no access. Owner/admin can resend invitation (→ `pending`) or hard-delete permanently. See §3.1. |
-| BQ-DASH-3  | The `GET /tasks/my` cross-tenant endpoint joins tasks with multiple collections. Should denormalized fields be stored on the Task document or joined at query time?     | **Resolved:** Application-level aggregation. Different tenants could theoretically be in different databases, so cross-tenant aggregation must happen at the application level. See §15.10.2.                                                                                                                            |
-
----
-
-## 12. Missing UI Features
-
-> **Status:** To be implemented. Backend APIs are fully deployed; frontend UI is missing. **Date added:** 2026-07-29
-
-This section covers UI features that have working backend endpoints but no corresponding Angular frontend
-implementation. Each subsection defines the scope, user stories, acceptance criteria, component design, route structure,
-and API integration details.
-
-### 12.1 Tenant Member Management
-
-**Current state:** The backend exposes `POST /tenants/:tenantId/members`, `PATCH /tenants/:tenantId/members/:userId`,
-and `DELETE /tenants/:tenantId/members/:userId`. The [`TenantClient`](ui/src/app/services/tenant-client.ts:13) service
-only has [`loadTenants()`](ui/src/app/services/tenant-client.ts:28) and
-[`setActiveTenant()`](ui/src/app/services/tenant-client.ts:52) — no member management methods exist.
-
-#### 12.1.1 User stories
-
-| #    | As a…         | I want to…                                              | So that…                                            |
-| ---- | ------------- | ------------------------------------------------------- | --------------------------------------------------- |
-| TM-1 | Tenant owner  | Invite a user by email with a role                      | New team members can join my organization           |
-| TM-2 | Tenant owner  | View a list of all tenant members with their roles      | I know who has access                               |
-| TM-3 | Tenant owner  | Change a member's role (admin ↔ member)                 | I can adjust permissions as responsibilities change |
-| TM-4 | Tenant owner  | Remove a member from the tenant                         | I can revoke access for departed users              |
-| TM-5 | Tenant admin  | Invite members and manage member roles (but not owners) | Admins can help manage the team                     |
-| TM-6 | Tenant member | View the member list (read-only)                        | I can see who is in my organization                 |
-
-#### 12.1.2 Acceptance criteria
-
-| #        | Criterion                                                                                              | Verification                                                                    |
-| -------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| AC-TM-1  | A tenant owner/admin sees an "Invite Member" button on the tenant settings or a dedicated members page | Button is visible; clicking opens an invite dialog                              |
-| AC-TM-2  | The invite dialog accepts an email and a role (`owner` / `admin` / `member`) dropdown                  | Form submits `POST /tenants/:tenantId/members` with `{ email, role }`           |
-| AC-TM-3  | After a successful invite, the member list refreshes and shows the new member                          | New member appears in the list with correct role badge                          |
-| AC-TM-4  | A member list displays each member with avatar fallback, user ID (or email if resolved), and role      | Visual layout matches the project member list pattern                           |
-| AC-TM-5  | An owner/admin can change a member's role via a `NativeSelect` dropdown inline in the member row       | Selecting a new role calls `PATCH /tenants/:tenantId/members/:userId`           |
-| AC-TM-6  | An owner/admin can remove a member via a delete button with a confirmation dialog                      | Confirming calls `DELETE /tenants/:tenantId/members/:userId`; member removed    |
-| AC-TM-7  | The owner cannot be removed or have their role changed                                                 | Remove/edit controls are disabled or hidden for the owner row                   |
-| AC-TM-8  | An admin cannot promote someone to `owner` or remove the owner                                         | API returns 403; UI disables `owner` option in the role selector for non-owners |
-| AC-TM-9  | A tenant member (non-admin) sees the member list but no invite/edit/remove controls                    | Read-only view; no action buttons rendered                                      |
-| AC-TM-10 | Error states (invalid email, user not found, duplicate membership) are displayed inline                | Error message shown below the invite form or as a toast                         |
-
-#### 12.1.3 `TenantClient` extension
-
-The [`TenantClient`](ui/src/app/services/tenant-client.ts:13) service must be extended with the following methods. Types
-[`TenantMember`](shared/src/types/tenant.ts:14) and [`TenantRole`](shared/src/constants/roles.ts:2) are already defined
-in the shared package.
-
-```typescript
-// Methods to add to TenantClient:
-
-/** List members of a tenant */
-listMembers(tenantId: string): Observable<{ data: TenantMember[] }>
-
-/** Invite a member by email with a role */
-inviteMember(tenantId: string, email: string, role: TenantRole): Observable<TenantMember>
-
-/** Update a member's role */
-updateMemberRole(tenantId: string, userId: string, role: TenantRole): Observable<TenantMember>
-
-/** Remove a member from the tenant */
-removeMember(tenantId: string, userId: string): Observable<void>
-```
-
-> **Note:** The backend invite endpoint (`POST /tenants/:tenantId/members`) accepts `{ email, role }` in the body (not
-> `userId`). This is different from the project member add endpoint which accepts `{ userId, role }`.
-
-#### 12.1.4 UI component design
-
-**New component: `TenantMemberListComponent`**
-
-| Aspect           | Detail                                                                            |
-| ---------------- | --------------------------------------------------------------------------------- |
-| **Selector**     | `ui-tenant-member-list`                                                           |
-| **Location**     | `ui/src/app/features/tenants/tenant-member-list/tenant-member-list.ts`            |
-| **Standalone**   | Yes                                                                               |
-| **Dependencies** | `TenantClient`, `AuthStore` (to check current user's tenant role for RBAC gating) |
-
-**Spartan UI components used:**
-
-| Component                | Usage                                                                         |
-| ------------------------ | ----------------------------------------------------------------------------- |
-| `HlmButtonImports`       | "Invite Member" button; "Remove" action button; dialog confirm/cancel buttons |
-| `HlmDialogImports`       | Invite member dialog; remove confirmation dialog                              |
-| `HlmFieldImports`        | Form field wrappers for email input and role select                           |
-| `HlmInputImports`        | Email input field in invite dialog                                            |
-| `HlmNativeSelectImports` | Role dropdown (`owner`/`admin`/`member`) in invite dialog and inline in rows  |
-| `HlmBadgeImports`        | Role badge next to each member                                                |
-| `HlmAvatarImports`       | Avatar fallback with user initials                                            |
-| `HlmSpinnerImports`      | Loading state while fetching members                                          |
-
-**Template structure:**
-
-```
-<div>
-  <!-- Header with invite button (visible only for owner/admin) -->
-  <div class="flex items-center justify-between">
-    <h3>Members</h3>
-    @if (canManageMembers()) {
-      <button hlmBtn (click)="showInviteDialog.set(true)">Invite Member</button>
-    }
-  </div>
-
-  <!-- Member list -->
-  @if (loading()) {
-    <hlm-spinner />
-  } @else {
-    <div class="rounded-lg border">
-      @for (member of members(); track member.userId) {
-        <div class="flex items-center justify-between px-4 py-3">
-          <!-- Avatar + user info -->
-          <div class="flex items-center gap-3">
-            <hlm-avatar><div hlmAvatarFallback>{{ initials(member) }}</div></hlm-avatar>
-            <span>{{ member.userId }}</span>
-          </div>
-          <!-- Role control -->
-          @if (canManageMembers() && !isOwner(member)) {
-            <hlm-native-select [value]="member.role" (valueChange)="changeRole(member, $event)">
-              @for (role of availableRoles(); track role) {
-                <option [value]="role">{{ role }}</option>
-              }
-            </hlm-native-select>
-            <button hlmBtn variant="destructive" size="sm" (click)="confirmRemove(member)">Remove</button>
-          } @else {
-            <span hlmBadge variant="secondary">{{ member.role }}</span>
-          }
-        </div>
-      }
-    </div>
-  }
-</div>
-
-<!-- Invite Dialog -->
-<hlm-dialog ...>
-  <hlm-dialog-content *hlmDialogPortal>
-    <hlm-dialog-header><h3 hlmDialogTitle>Invite Member</h3></hlm-dialog-header>
-    <form>
-      <hlm-field>
-        <label hlmFieldLabel>Email</label>
-        <input hlmInput type="email" [(ngModel)]="inviteEmail" />
-      </hlm-field>
-      <hlm-field>
-        <label hlmFieldLabel>Role</label>
-        <hlm-native-select [(ngModel)]="inviteRole">
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
-        </hlm-native-select>
-      </hlm-field>
-    </form>
-    <hlm-dialog-footer>
-      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-      <button hlmBtn (click)="inviteMember()" [disabled]="inviting()">
-        @if (inviting()) { <hlm-spinner /> Inviting... } @else { Invite }
-      </button>
-    </hlm-dialog-footer>
-  </hlm-dialog-content>
-</hlm-dialog>
-
-<!-- Remove Confirmation Dialog -->
-<hlm-dialog ...>
-  <hlm-dialog-content *hlmDialogPortal>
-    <hlm-dialog-header><h3 hlmDialogTitle>Remove Member</h3></hlm-dialog-header>
-    <p>Are you sure you want to remove this member?</p>
-    <hlm-dialog-footer>
-      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-      <button hlmBtn variant="destructive" (click)="removeMember()">Remove</button>
-    </hlm-dialog-footer>
-  </hlm-dialog-content>
-</hlm-dialog>
-```
-
-#### 12.1.5 Route structure
-
-| Option              | Route                                 | Description                              |
-| ------------------- | ------------------------------------- | ---------------------------------------- |
-| **A (recommended)** | `/tenants/:tenantId/settings/members` | Nested under tenant settings (see §12.2) |
-| B                   | `/tenants/:tenantId/members`          | Standalone route at tenant level         |
-
-Option A is recommended because tenant member management is a tenant-level administrative action and belongs alongside
-tenant settings (name, slug, delete). This avoids adding a top-level navigation item.
-
-#### 12.1.6 Angular 22 patterns
-
-- **Signals:** `members = signal<TenantMember[]>([])`, `loading = signal(false)`, `showInviteDialog = signal(false)`
-- **`computed()`:**
-  `canManageMembers = computed(() => { const role = this.currentUserTenantRole(); return role === 'owner' || role === 'admin'; })`
-- **`@if` / `@for` control flow** for conditional rendering and list iteration
-- **`inject()`** for dependency injection of `TenantClient` and `AuthStore`
-- **Standalone component** — no NgModule
-- **`FormsModule`** with `ngModel` for form bindings in the invite dialog
-
-#### 12.1.7 Blocking question
-
-> **BQ-TM-1:** The server [`tenants.ts`](server/src/routes/tenants.ts:94) route file does not include a
-> `GET /:tenantId/members` endpoint (to list tenant members), although the server contract
-> [`tenant.contracts.ts`](server/src/contracts/tenant.contracts.ts:74) defines it as `listMembers`. This endpoint must
-> be verified as deployed or added to the backend before the member list UI can function. **This is a blocking
-> dependency.**
-
----
-
-### 12.2 Tenant Settings Page
-
-**Current state:** The backend exposes `PATCH /tenants/:tenantId` (update name/slug) and `DELETE /tenants/:tenantId`
-(delete tenant). No settings UI exists anywhere in the frontend.
-
-#### 12.2.1 User stories
-
-| #    | As a…         | I want to…                             | So that…                                        |
-| ---- | ------------- | -------------------------------------- | ----------------------------------------------- |
-| TS-1 | Tenant owner  | View and edit the tenant name and slug | I can correct typos or rebrand the organization |
-| TS-2 | Tenant owner  | Delete the tenant with confirmation    | I can permanently remove an unused organization |
-| TS-3 | Tenant admin  | View and edit the tenant name and slug | Admins can manage basic tenant info             |
-| TS-4 | Tenant member | View the tenant settings (read-only)   | I can see the organization details              |
-
-#### 12.2.2 Acceptance criteria
-
-| #       | Criterion                                                                                    | Verification                                                                        |
-| ------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| AC-TS-1 | A tenant settings page is accessible at `/tenants/:tenantId/settings`                        | Route loads; page renders with current tenant name and slug                         |
-| AC-TS-2 | The page displays the tenant name and slug in editable input fields                          | Fields are pre-populated with current values from `TenantClient.activeTenant()`     |
-| AC-TS-3 | An owner/admin can edit the name and slug and save changes                                   | "Save" button calls `PATCH /tenants/:tenantId` with updated fields                  |
-| AC-TS-4 | After a successful update, the tenant list and active tenant in `TenantClient` are refreshed | `activeTenant()` signal reflects the new name/slug                                  |
-| AC-TS-5 | A "Delete Tenant" button is visible only to the owner                                        | Button is hidden for admin and member roles                                         |
-| AC-TS-6 | Clicking "Delete Tenant" opens a confirmation dialog requiring the tenant name to be typed   | Prevents accidental deletion; confirmation input must match tenant name             |
-| AC-TS-7 | Confirming deletion calls `DELETE /tenants/:tenantId` and redirects to the dashboard         | User lands on `/dashboard`; deleted tenant is removed from `TenantClient.tenants()` |
-| AC-TS-8 | Validation errors (e.g., slug already taken) are displayed inline                            | Error message appears below the slug field                                          |
-| AC-TS-9 | Members see the settings page in read-only mode (inputs disabled, no delete button)          | Fields are disabled; save/delete buttons are hidden                                 |
-
-#### 12.2.3 `TenantClient` extension
-
-```typescript
-// Methods to add to TenantClient:
-
-/** Update tenant name/slug */
-updateTenant(tenantId: string, data: UpdateTenant): Observable<Tenant>
-
-/** Delete a tenant */
-deleteTenant(tenantId: string): Observable<void>
-```
-
-Type [`UpdateTenant`](shared/src/types/tenant.ts:11) is already defined in the shared package.
-
-#### 12.2.4 UI component design
-
-**New component: `TenantSettingsComponent`**
-
-| Aspect           | Detail                                                           |
-| ---------------- | ---------------------------------------------------------------- |
-| **Selector**     | `ui-tenant-settings`                                             |
-| **Location**     | `ui/src/app/features/tenants/tenant-settings/tenant-settings.ts` |
-| **Standalone**   | Yes                                                              |
-| **Dependencies** | `TenantClient`, `AuthStore`, `Router`                            |
-
-**Spartan UI components used:**
-
-| Component           | Usage                                                 |
-| ------------------- | ----------------------------------------------------- |
-| `HlmButtonImports`  | "Save" button; "Delete Tenant" button; dialog buttons |
-| `HlmDialogImports`  | Delete confirmation dialog                            |
-| `HlmFieldImports`   | Field wrappers for name and slug inputs               |
-| `HlmInputImports`   | Text inputs for tenant name and slug                  |
-| `HlmSpinnerImports` | Loading state; saving state                           |
-
-**Template structure:**
-
-```
-<div class="mx-auto max-w-2xl">
-  <h2>Tenant Settings</h2>
-
-  @if (loading()) {
-    <hlm-spinner />
-  } @else {
-    <!-- Edit form -->
-    <form (ngSubmit)="save()" class="space-y-4">
-      <hlm-field>
-        <label hlmFieldLabel>Name</label>
-        <input hlmInput [(ngModel)]="form.name" name="name" [disabled]="!canEdit()" />
-      </hlm-field>
-      <hlm-field>
-        <label hlmFieldLabel>Slug</label>
-        <input hlmInput [(ngModel)]="form.slug" name="slug" [disabled]="!canEdit()" />
-      </hlm-field>
-      @if (error()) {
-        <p class="text-sm text-destructive">{{ error() }}</p>
-      }
-      @if (canEdit()) {
-        <button hlmBtn (click)="save()" [disabled]="saving()">
-          @if (saving()) { <hlm-spinner /> Saving... } @else { Save Changes }
-        </button>
-      }
-    </form>
-
-    <!-- Danger zone -->
-    @if (isOwner()) {
-      <div class="mt-8 rounded-lg border border-destructive/30 p-4">
-        <h3 class="text-destructive font-semibold">Danger Zone</h3>
-        <p class="text-sm text-muted-foreground mt-1">
-          Deleting a tenant is permanent and cannot be undone.
-        </p>
-        <button hlmBtn variant="destructive" class="mt-3" (click)="showDeleteDialog.set(true)">
-          Delete Tenant
-        </button>
-      </div>
-    }
-  }
-</div>
-
-<!-- Delete Confirmation Dialog -->
-<hlm-dialog ...>
-  <hlm-dialog-content *hlmDialogPortal>
-    <hlm-dialog-header><h3 hlmDialogTitle>Delete Tenant</h3></hlm-dialog-header>
-    <p>Type the tenant name <strong>{{ tenantName() }}</strong> to confirm:</p>
-    <input hlmInput [(ngModel)]="confirmName" placeholder="Type tenant name..." />
-    <hlm-dialog-footer>
-      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-      <button hlmBtn variant="destructive" [disabled]="confirmName !== tenantName()" (click)="deleteTenant()">
-        @if (deleting()) { <hlm-spinner /> Deleting... } @else { Delete Permanently }
-      </button>
-    </hlm-dialog-footer>
-  </hlm-dialog-content>
-</hlm-dialog>
-```
-
-#### 12.2.5 Route structure
-
-```
-/tenants/:tenantId
-  /settings                  ← TenantSettingsComponent (new)
-    /members                 ← TenantMemberListComponent (new, see §12.1)
-```
-
-Both routes are children of the existing `tenants/:tenantId` route in [`app.routes.ts`](ui/src/app/app.routes.ts:27) and
-rendered inside the [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts) outlet.
-
-```typescript
-// Addition to app.routes.ts children array:
-{
-  path: 'settings',
-  loadComponent: () => import('./features/tenants/tenant-settings/tenant-settings').then(m => m.TenantSettings),
-},
-{
-  path: 'settings/members',
-  loadComponent: () => import('./features/tenants/tenant-member-list/tenant-member-list').then(m => m.TenantMemberList),
-},
-```
-
-#### 12.2.6 Sidebar navigation
-
-The [`SidebarComponent`](ui/src/app/shell/sidebar/sidebar.html) should include a "Settings" link that navigates to
-`/tenants/:tenantId/settings`. This link should be visible to all tenant members but the settings content enforces its
-own RBAC (read-only for members, editable for admin/owner, deletable for owner only).
-
----
-
-### 12.3 Project Member Management
-
-**Current state:** [`ProjectClient`](ui/src/app/services/project-client.ts:16) already has
-[`listMembers()`](ui/src/app/services/project-client.ts:48), [`addMember()`](ui/src/app/services/project-client.ts:53),
-[`updateMemberRole()`](ui/src/app/services/project-client.ts:58), and
-[`removeMember()`](ui/src/app/services/project-client.ts:63). The
-[`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38) component loads and displays members
-with avatar + role badge in [`project-detail.html`](ui/src/app/features/projects/project-detail/project-detail.html:54),
-but **no UI exists for adding, removing, or changing roles**.
-
-#### 12.3.1 User stories
-
-| #    | As a…             | I want to…                                              | So that…                                          |
-| ---- | ----------------- | ------------------------------------------------------- | ------------------------------------------------- |
-| PM-1 | Project admin     | Add a tenant member to the project with a specific role | I can grant project access to specific people     |
-| PM-2 | Project admin     | Change a project member's role                          | I can adjust their permissions within the project |
-| PM-3 | Project admin     | Remove a member from the project                        | I can revoke project-level access                 |
-| PM-4 | Project developer | View the member list (read-only)                        | I can see who is on the project                   |
-| PM-5 | Project viewer    | View the member list (read-only)                        | I can see who is on the project                   |
-
-#### 12.3.2 Acceptance criteria
-
-| #       | Criterion                                                                                        | Verification                                                            |
-| ------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| AC-PM-1 | The project detail page shows an "Add Member" button for project admins                          | Button visible only when current user has `project:admin` role          |
-| AC-PM-2 | Clicking "Add Member" opens a dialog with a user picker and role selector                        | Dialog renders with tenant members as selectable options                |
-| AC-PM-3 | Submitting the add-member form calls `POST /projects/:projectId/members` with `{ userId, role }` | New member appears in the list after refresh                            |
-| AC-PM-4 | A project admin can change a member's role inline via a `NativeSelect` dropdown                  | Selecting a new role calls `PATCH /projects/:projectId/members/:userId` |
-| AC-PM-5 | A project admin can remove a member with a confirmation step                                     | Confirming calls `DELETE /projects/:projectId/members/:userId`          |
-| AC-PM-6 | Non-admin users see the member list but no add/edit/remove controls                              | Read-only view; action buttons hidden                                   |
-| AC-PM-7 | The project admin cannot remove themselves if they are the last admin                            | API returns 403; UI disables remove for the last admin                  |
-| AC-PM-8 | Error states are displayed inline (e.g., user already a member)                                  | Error message shown in the dialog or as a toast                         |
-
-#### 12.3.3 UI component design
-
-**Approach:** Extend the existing [`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38)
-component rather than creating a separate component. The member section already exists in
-[`project-detail.html`](ui/src/app/features/projects/project-detail/project-detail.html:54) — it needs to be augmented
-with action controls.
-
-**Changes to [`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38):**
-
-| Aspect            | Change                                                                                                                                            |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **New signals**   | `showAddMember = signal(false)`, `addingMember = signal(false)`, `selectedUserId = signal('')`, `selectedRole = signal<ProjectRole>('developer')` |
-| **New inputs**    | Tenant member list fetched via `TenantClient.listMembers()` for the user picker                                                                   |
-| **New imports**   | `HlmNativeSelectImports` for role dropdown; extend existing `HlmDialogImports`                                                                    |
-| **RBAC computed** | `canManageMembers = computed(() => currentUserProjectRole() === 'admin')`                                                                         |
-
-**Spartan UI components used (additional to existing):**
-
-| Component                | Usage                                                            |
-| ------------------------ | ---------------------------------------------------------------- |
-| `HlmNativeSelectImports` | Role dropdown in add-member dialog and inline role selector      |
-| `HlmDialogImports`       | Add-member dialog; remove confirmation dialog (already imported) |
-| `HlmButtonImports`       | "Add Member" button; remove action button (already imported)     |
-
-**Template changes to the members section:**
-
-```
-<!-- Members section (enhanced) -->
-<section>
-  <div class="flex items-center justify-between mb-4">
-    <h3 class="text-lg font-semibold text-foreground">Members</h3>
-    @if (canManageMembers()) {
-      <button hlmBtn size="sm" (click)="showAddMember.set(true)">
-        <ng-icon name="lucidePlus" class="mr-1" /> Add Member
-      </button>
-    }
-  </div>
-
-  @if (members().length === 0) {
-    <p class="text-sm text-muted-foreground">No members yet.</p>
-  } @else {
-    <div class="rounded-lg border border-border">
-      @for (member of members(); track member.userId) {
-        <div class="flex items-center justify-between border-b border-border px-4 py-3 last:border-b-0">
-          <div class="flex items-center gap-3">
-            <hlm-avatar class="h-8 w-8">
-              <div hlmAvatarFallback class="text-xs font-medium">
-                {{ member.userId.substring(0, 2).toUpperCase() }}
-              </div>
-            </hlm-avatar>
-            <span class="text-sm text-foreground">{{ member.userId }}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            @if (canManageMembers()) {
-              <hlm-native-select [value]="member.role" (valueChange)="changeProjectRole(member, $event)">
-                @for (role of projectRoles; track role) {
-                  <option [value]="role">{{ role }}</option>
-                }
-              </hlm-native-select>
-              <button hlmBtn variant="destructive" size="sm" (click)="confirmRemoveProjectMember(member)">
-                Remove
-              </button>
-            } @else {
-              <span hlmBadge variant="secondary">{{ member.role }}</span>
-            }
-          </div>
-        </div>
-      }
-    </div>
-  }
-</section>
-
-<!-- Add Member Dialog -->
-<hlm-dialog [state]="showAddMember() ? 'open' : 'closed'" (stateChanged)="onAddMemberDialogStateChange($event)">
-  <hlm-dialog-content *hlmDialogPortal>
-    <hlm-dialog-header><h3 hlmDialogTitle>Add Member</h3></hlm-dialog-header>
-    <form class="space-y-4">
-      <hlm-field>
-        <label hlmFieldLabel>User</label>
-        <hlm-native-select [(ngModel)]="selectedUserId" name="userId">
-          <option value="" disabled>Select a user...</option>
-          @for (user of tenantMembers(); track user.userId) {
-            <option [value]="user.userId">{{ user.userId }}</option>
-          }
-        </hlm-native-select>
-      </hlm-field>
-      <hlm-field>
-        <label hlmFieldLabel>Role</label>
-        <hlm-native-select [(ngModel)]="selectedRole" name="role">
-          <option value="admin">Admin</option>
-          <option value="developer">Developer</option>
-          <option value="viewer">Viewer</option>
-        </hlm-native-select>
-      </hlm-field>
-    </form>
-    <hlm-dialog-footer>
-      <button hlmBtn variant="outline" hlmDialogClose>Cancel</button>
-      <button hlmBtn (click)="addProjectMember()" [disabled]="addingMember()">
-        @if (addingMember()) { <hlm-spinner /> Adding... } @else { Add Member }
-      </button>
-    </hlm-dialog-footer>
-  </hlm-dialog-content>
-</hlm-dialog>
-```
-
-#### 12.3.4 API integration
-
-All methods already exist on [`ProjectClient`](ui/src/app/services/project-client.ts:16):
-
-| Action        | Method                                                                                  | API call                                      |
-| ------------- | --------------------------------------------------------------------------------------- | --------------------------------------------- |
-| List members  | [`listMembers(projectId)`](ui/src/app/services/project-client.ts:48)                    | `GET /projects/:projectId/members`            |
-| Add member    | [`addMember(projectId, userId, role)`](ui/src/app/services/project-client.ts:53)        | `POST /projects/:projectId/members`           |
-| Update role   | [`updateMemberRole(projectId, userId, role)`](ui/src/app/services/project-client.ts:58) | `PATCH /projects/:projectId/members/:userId`  |
-| Remove member | [`removeMember(projectId, userId)`](ui/src/app/services/project-client.ts:63)           | `DELETE /projects/:projectId/members/:userId` |
-
-The tenant member list (for the user picker in the add-member dialog) must be fetched from `TenantClient.listMembers()`
-(new method, see §12.1.3).
-
-#### 12.3.5 Route structure
-
-No new routes. This feature is an enhancement to the existing
-[`ProjectDetail`](ui/src/app/features/projects/project-detail/project-detail.ts:38) component at
-`/tenants/:tenantId/projects/:projectId`.
-
----
-
-### 12.4 Cross-cutting requirements
-
-#### 12.4.1 Angular 22 patterns (applies to all features above)
-
-| Pattern                             | Requirement                                                                             |
-| ----------------------------------- | --------------------------------------------------------------------------------------- |
-| **Signals**                         | All state managed via `signal()`, `computed()`, `linkedSignal()`                        |
-| **`resource()` / `httpResource()`** | Use for data fetching where appropriate; fall back to direct `HttpClient` for mutations |
-| **`@if` / `@for` / `@switch`**      | Built-in control flow only; no `*ngIf`, `*ngFor`, `ngSwitch`                            |
-| **`inject()`**                      | Function-based DI; no constructor injection                                             |
-| **Standalone components**           | All new components are standalone; no NgModules                                         |
-| **`FormsModule`**                   | Signal forms or `ngModel` for form bindings                                             |
-| **`@defer`**                        | Lazy-load heavy dialogs or secondary content where beneficial                           |
-
-#### 12.4.2 Spartan UI components (maximal usage required)
-
-All new UI must use Spartan UI (`@spartan-ng/helm`) components. The following are available in the project:
-
-| Component     | Import                   | Usage in this spec                                 |
-| ------------- | ------------------------ | -------------------------------------------------- |
-| Button        | `HlmButtonImports`       | All action buttons, dialog triggers                |
-| Dialog        | `HlmDialogImports`       | Invite/add member, delete confirmation, all modals |
-| Field + Label | `HlmFieldImports`        | Form field wrappers with labels and error messages |
-| Input         | `HlmInputImports`        | Text inputs (email, name, slug)                    |
-| Textarea      | `HlmTextareaImports`     | Description fields                                 |
-| NativeSelect  | `HlmNativeSelectImports` | Role dropdowns in member lists and invite dialogs  |
-| Badge         | `HlmBadgeImports`        | Role badges in member lists                        |
-| Avatar        | `HlmAvatarImports`       | User avatar fallbacks in member lists              |
-| Spinner       | `HlmSpinnerImports`      | Loading and submitting states                      |
-| Separator     | `HlmSeparatorImports`    | Visual separation between sections                 |
-
-#### 12.4.3 RBAC visibility rules
-
-| UI Element                  | Tenant: owner | Tenant: admin | Tenant: member | Project: admin | Project: developer | Project: viewer |
-| --------------------------- | :-----------: | :-----------: | :------------: | :------------: | :----------------: | :-------------: |
-| Tenant settings page (edit) |      ✅       |      ✅       |       👁️       |       —        |         —          |        —        |
-| Tenant delete button        |      ✅       |      ❌       |       ❌       |       —        |         —          |        —        |
-| Tenant member invite        |      ✅       |      ✅       |       ❌       |       —        |         —          |        —        |
-| Tenant member role change   |      ✅       |     ✅\*      |       ❌       |       —        |         —          |        —        |
-| Tenant member remove        |      ✅       |     ✅\*      |       ❌       |       —        |         —          |        —        |
-| Project member add          |       —       |       —       |       —        |       ✅       |         ❌         |       ❌        |
-| Project member role change  |       —       |       —       |       —        |       ✅       |         ❌         |       ❌        |
-| Project member remove       |       —       |       —       |       —        |       ✅       |         ❌         |       ❌        |
-
-\* Admin cannot change the owner's role or remove the owner.
-
-#### 12.4.4 Error handling
-
-All new components must integrate with the existing
-[`error.interceptor.ts`](ui/src/app/interceptors/error.interceptor.ts) pattern:
-
-- **401** → redirect to `/auth/login`
-- **403** → display "Permission denied" message; disable the action that triggered it
-- **422** → display validation errors inline (below the relevant form field)
-- **409 (conflict)** → display "Already exists" or similar message (e.g., user is already a member)
-- **500** → display generic error toast
-
-#### 12.4.5 Testing requirements
-
-| Layer           | Requirement                                                                            |
-| --------------- | -------------------------------------------------------------------------------------- |
-| **Unit**        | Each new component must have a `.spec.ts` with ≥ 80% coverage                          |
-| **Unit**        | `TenantClient` member methods must have tests                                          |
-| **Integration** | Member invite/remove flows tested with mocked HTTP                                     |
-| **E2E**         | Playwright tests for: tenant member invite → project member add → role change → remove |
-
----
-
-## 13. Updated Registration Flow (v3.0.0)
-
-> **Date added:** 2026-07-29 **Replaces:** The auto-tenant creation in §8.5 registration flow.
-
-### 13.1 What changed
-
-In v2.0.0, `AuthService.register()` automatically created a personal tenant and added the user as owner. In v3.0.0,
-registration creates **only the user**. The user starts with zero tenants and must explicitly create a workspace.
-
-### 13.2 Registration flow (step by step)
-
-```
-1. Client sends POST /auth/register { email, password, displayName }
-2. Server validates input (Zod schema)
-3. Server checks email uniqueness
-4. Server hashes password (bcrypt)
-5. Server creates User document
-6. Server generates JWT WITHOUT tenant context (tenantId: null, tenantRole: null)
-7. Server returns { token, user }
-```
-
-### 13.3 Post-registration state
-
-After registration, the user:
-
-- Has a valid JWT (can call `/auth/me`, `/tenants`, `POST /tenants`)
-- Has **no** tenant memberships
-- Cannot access any tenant-scoped resources until they create or join a workspace
-- The frontend should redirect to a "Create Workspace" or "Accept Invitation" screen
-
-### 13.4 Workspace creation flow
-
-```
-1. Authenticated user sends POST /tenants { name, slug, subscription }
-2. Server validates subscription limits (see §14)
-3. Server creates Tenant document with the specified subscription tier
-4. Server creates TenantMember { userId, tenantId, role: 'owner', status: 'active' }
-5. Server returns Tenant
-6. Frontend calls POST /auth/switch-tenant to get a JWT with tenant context
-```
-
-### 13.5 Login flow for users with no tenants
-
-```
-1. Client sends POST /auth/login { email, password }
-2. Server verifies credentials
-3. Server looks up user's TenantMember records
-4. If no active memberships: JWT issued with tenantId: null
-5. If memberships exist: JWT issued with first active tenant's context
-6. Frontend checks tenantId in JWT; if null, redirects to workspace creation
-```
-
----
-
-## 14. Subscription Tiers & Invitation System
-
-> **Date added:** 2026-07-29 **Status:** Defined for implementation.
-
-### 14.1 Subscription tiers
-
-| Tier      | Workspaces allowed | Projects per workspace | Users per project |
-| --------- | ------------------ | ---------------------- | ----------------- |
-| `free`    | 1 (owned by user)  | 3                      | 10                |
-| `premium` | Unlimited          | Unlimited              | Unlimited         |
-
-### 14.2 Subscription enforcement rules
-
-| Rule # | Rule                                                                                                        | Enforcement point                |
-| ------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| SE-1   | A user can own at most **one** free workspace                                                               | `TenantService.createTenant()`   |
-| SE-2   | A user can own **unlimited** premium workspaces                                                             | `TenantService.createTenant()`   |
-| SE-3   | A free workspace can have at most **3** projects                                                            | `ProjectService.createProject()` |
-| SE-4   | A premium workspace has **no** project limit                                                                | N/A (always passes)              |
-| SE-5   | A project in a free workspace can have at most **10** members (tenant members who are also project members) | `ProjectService.addMember()`     |
-| SE-6   | A project in a premium workspace has **no** member limit                                                    | N/A (always passes)              |
-| SE-7   | Subscription limits return error code `SUBSCRIPTION_LIMIT_EXCEEDED` with HTTP 403                           | All enforcement points           |
-
-### 14.3 Invitation system
-
-#### 14.3.1 Invitation flow for registered users
-
-```
-1. Owner/admin sends POST /tenants/:tenantId/members { email: "user@example.com", role: "member" }
-2. Server looks up User by email → user found
-3. Server checks: is user already an active member? → reject with 409
-4. Server creates TenantMember { userId: user.id, tenantId, role, status: 'active', invitedEmail: email }
-5. Server returns TenantMember with status: 'active'
-```
-
-#### 14.3.2 Invitation flow for unregistered users
-
-```
-1. Owner/admin sends POST /tenants/:tenantId/members { email: "new@example.com", role: "member" }
-2. Server looks up User by email → user NOT found
-3. Server generates a unique invitationToken (crypto.randomUUID)
-4. Server creates TenantMember {
-     userId: null,
-     tenantId,
-     role,
-     status: 'pending',
-     invitedEmail: "new@example.com",
-     invitationToken: "<token>",
-     invitedAt: new Date()
-   }
-5. Server sends invitation email with link: {FRONTEND_URL}/auth/accept-invitation?token=<token>
-6. Server returns TenantMember with status: 'pending'
-```
-
-#### 14.3.3 Invitation acceptance flow
-
-```
-1. Invited person clicks email link → navigates to /auth/accept-invitation?token=<token>
-2. Frontend calls GET /invitations/:token (public, no auth) → shows invitation details
-3. If user is not registered:
-   a. User registers via POST /auth/register
-   b. Frontend stores the invitation token
-4. If user is already registered:
-   a. User logs in (if not already)
-5. Authenticated user calls POST /auth/accept-invitation { token }
-6. Server validates:
-   a. Token exists and status is 'pending'
-   b. Authenticated user's email matches invitedEmail
-7. Server updates TenantMember: { userId: user.id, status: 'active', invitationToken: null }
-8. Server returns updated TenantMember
-9. Frontend calls POST /auth/switch-tenant to get JWT with new tenant context
-```
-
-#### 14.3.4 Invitation cancellation
-
-```
-1. Owner/admin sends DELETE /tenants/:tenantId/members/:memberId
-2. If the member is pending (status: 'pending'), the invitation is cancelled
-3. The TenantMember document is deleted
-```
-
-#### 14.3.5 Duplicate invitation prevention
-
-- If a `pending` invitation already exists for `(invitedEmail, tenantId)`, the server returns 409 Conflict
-- If the invited email already belongs to an `active` member, the server returns 409 Conflict
-- If a `pending` invitation exists for an email that is now registered, the server may optionally convert it to `active`
-  (auto-link)
-
-### 14.4 Email delivery (MVP)
-
-> **BQ-EMAIL-1 resolved:** Invitation emails are sent via **Resend** (free tier: 3,000 emails/month, 100/day). Resend
-> provides a simple REST API with excellent developer experience. The `resend` npm package is used server-side.
-
-- **Development:** Invitation link is logged to the server console (Resend API key not required in dev)
-- **Production:** Resend REST API (`POST https://api.resend.com/emails`) sends the invitation email
-- **Email content:** Plain text with the invitation link, tenant name, and assigned role
-- **No email verification** is required beyond the invitation token
-- **Configuration:** `RESEND_API_KEY` environment variable (stored as a Cloudflare Worker secret)
-- **From address:** `noreply@<configured-domain>` (domain must be verified in Resend dashboard)
-
-#### Email service adapter
-
-The backend defines an `EmailService` interface in the service layer. The Resend implementation calls the Resend REST
-API using the `resend` npm package:
-
-```typescript
-// server/src/services/email.service.ts
-import { Resend } from 'resend';
-
-interface EmailPayload {
-  to: string;
-  subject: string;
-  text: string;
-}
-
-interface EmailService {
-  send(payload: EmailPayload): Promise<void>;
-}
-
-class ResendEmailService implements EmailService {
-  private resend: Resend;
-
-  constructor(apiKey: string) {
-    this.resend = new Resend(apiKey);
-  }
-
-  async send(payload: EmailPayload): Promise<void> {
-    await this.resend.emails.send({
-      from: 'noreply@taskboard.example.com',
-      to: payload.to,
-      subject: payload.subject,
-      text: payload.text,
-    });
-  }
-}
-```
-
-> **Assumption:** The `resend` npm package is added as a server dependency. The `RESEND_API_KEY` is stored as a
-> Cloudflare Worker secret. In development, a console-logging adapter is used as a fallback.
-
-### 14.5 Mock payment page (MVP)
-
-> **Decision:** For MVP, subscription upgrade uses a simulated payment page. No real payment processing (Stripe, etc.)
-> is integrated. The user clicks "Upgrade to Premium", sees a mock payment form, and upon "payment" the tenant's
-> subscription is upgraded directly.
-
-#### 14.5.1 Upgrade flow
-
-```
-1. User clicks "Upgrade to Premium" on tenant settings page
-2. Frontend navigates to /tenants/:tenantId/upgrade
-3. Mock payment page displays:
-   - Plan summary (Premium features: unlimited projects, unlimited members)
-   - Simulated price (e.g., "$9.99/month")
-   - "Pay Now" button
-4. User clicks "Pay Now"
-5. Frontend calls PATCH /tenants/:tenantId { subscription: 'premium' }
-6. Backend updates Tenant.subscription to 'premium'
-7. Frontend shows success message and redirects to tenant settings
-```
-
-#### 14.5.2 Backend change
-
-The existing `PATCH /tenants/:tenantId` endpoint already supports updating the `subscription` field. No new endpoint is
-needed. The backend must allow `subscription` to be upgraded from `'free'` to `'premium'` via this endpoint (tenant
-owner/admin only).
-
-#### 14.5.3 Frontend component
-
-| Aspect           | Detail                                                        |
-| ---------------- | ------------------------------------------------------------- |
-| **Route**        | `/tenants/:tenantId/upgrade`                                  |
-| **Component**    | `UpgradeComponent` (new)                                      |
-| **Location**     | `ui/src/app/features/tenants/upgrade/upgrade.ts`              |
-| **Description**  | Mock payment page with plan summary and "Pay Now" button      |
-| **Dependencies** | `TenantClient` (to call `PATCH /tenants/:tenantId`), `Router` |
-
-**Spartan UI components used:**
-
-| Component           | Usage                                 |
-| ------------------- | ------------------------------------- |
-| `HlmButtonImports`  | "Pay Now" button; "Cancel" button     |
-| `HlmCardImports`    | Plan summary card; payment form card  |
-| `HlmSpinnerImports` | Processing state while "payment" runs |
-
-#### 14.5.4 Acceptance criteria
-
-| #        | Criterion                                                                                   | Verification                                                                |
-| -------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| AC-PAY-1 | A free-tier tenant owner sees an "Upgrade to Premium" button on tenant settings             | Button visible when `tenant.subscription === 'free'`                        |
-| AC-PAY-2 | Clicking "Upgrade to Premium" navigates to the mock payment page                            | Route `/tenants/:tenantId/upgrade` loads; page shows plan summary and price |
-| AC-PAY-3 | Clicking "Pay Now" calls `PATCH /tenants/:tenantId` with `{ subscription: 'premium' }`      | Backend returns updated tenant with `subscription: 'premium'`               |
-| AC-PAY-4 | After successful upgrade, the user is redirected to tenant settings with success message    | Tenant settings now shows "Premium" badge; "Upgrade" button is hidden       |
-| AC-PAY-5 | A premium tenant shows "Premium" badge on tenant settings and sidebar tenant switcher       | Visual indicator present                                                    |
-| AC-PAY-6 | The mock payment page clearly indicates it is a simulation (e.g., "Demo — no real payment") | Page contains a disclaimer that no real payment is processed                |
-| AC-PAY-7 | Only tenant owner/admin can upgrade; members see no upgrade option                          | `PATCH /tenants/:tenantId` returns 403 for member role                      |
-
-### 14.6 Data model additions
-
-#### TenantMember document (updated)
-
-```json
-{
-  "_id": "ObjectId(...)",
-  "userId": null,
-  "tenantId": "550e8400-e29b-41d4-a716-446655440001",
-  "role": "member",
-  "status": "pending",
-  "invitedEmail": "new@example.com",
-  "invitationToken": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "invitedAt": "2026-07-29T10:00:00Z",
-  "createdAt": "2026-07-29T10:00:00Z"
-}
-```
-
-#### Tenant document (updated)
-
-```json
-{
-  "_id": "ObjectId(...)",
-  "id": "550e8400-e29b-41d4-a716-446655440001",
-  "name": "Acme Corp",
-  "slug": "acme-corp",
-  "subscription": "free",
-  "createdAt": "2026-07-29T10:00:00Z",
-  "updatedAt": "2026-07-29T10:00:00Z"
-}
-```
-
-### 14.7 Service layer changes
-
-#### `AuthService.register()` — updated
-
-- **Remove:** Auto-tenant creation, slug generation, TenantMember creation
-- **Keep:** Email uniqueness check, password hashing, user creation, JWT generation
-- **Change:** JWT issued with `tenantId: null`, `tenantRole: null`
-
-#### `AuthService.login()` — updated
-
-- **Change:** If user has no active memberships, JWT is issued with `tenantId: null`
-- **Keep:** Password verification, JWT generation
-
-#### `AuthService.acceptInvitation()` — new
-
-- Validates invitation token
-- Checks authenticated user's email matches `invitedEmail`
-- Updates TenantMember: sets `userId`, `status: 'active'`, clears `invitationToken`
-- Returns updated TenantMember
-
-#### `TenantService.createTenant()` — updated
-
-- **Add:** Subscription limit check (SE-1, SE-2)
-- **Keep:** Slug uniqueness check, tenant creation, owner membership creation
-- **Change:** `subscription` field is set on the Tenant document
-
-#### `TenantService.inviteMember()` — updated
-
-- **Change:** If user not found by email, create pending invitation instead of throwing error
-- **Add:** Generate `invitationToken`, set `status: 'pending'`, `invitedEmail`
-- **Add:** Delegate email sending to email service adapter
-- **Keep:** Duplicate membership check, role assignment
-
-#### `ProjectService.createProject()` — updated
-
-- **Add:** Subscription limit check (SE-3): count projects in tenant, reject if free tier limit reached
-
-#### `ProjectService.addMember()` — updated
-
-- **Add:** Subscription limit check (SE-5): count project members, reject if free tier limit reached
-
----
-
-## 15. Jira-Style Dashboard (Phase 11)
-
-> **Date added:** 2026-07-29 **Status:** Defined for implementation. **Replaces:** The simple dashboard at
-> [`ui/src/app/features/dashboard/dashboard.ts`](ui/src/app/features/dashboard/dashboard.ts).
-
-### 15.1 Goal
-
-Replace the current simple dashboard (which only shows projects for the active tenant) with a **smart landing page**
-that adapts its content based on the user's authentication status and workspace membership state. The dashboard is the
-first page every user sees — it must guide them to the correct action without requiring them to understand the
-application's internal model.
-
-### 15.2 Context
-
-**Current state:**
-
-- The root route (`/`) is protected by [`authGuard`](ui/src/app/guards/auth.guard.ts:24), which redirects
-  unauthenticated users to `/auth/login`.
-- The [`Dashboard`](ui/src/app/features/dashboard/dashboard.ts:17) component loads tenants via
-  [`TenantClient.loadTenants()`](ui/src/app/services/tenant-client.ts:30) and then projects for the active tenant.
-- There is no visitor landing page, no pending-invitation view, and no cross-tenant "my tasks" view.
-- The [`AuthStore`](ui/src/app/stores/auth-store.ts:21) exposes `isAuthenticated`, `hasTenant`, and `needsWorkspace`
-  computed signals.
-
-**Target state:**
-
-- The root route (`/`) renders a single [`Dashboard`](ui/src/app/features/dashboard/dashboard.ts:17) component that
-  internally detects the user's state and renders the appropriate sub-view (State 0–4).
-- Unauthenticated visitors see a static landing page (no backend calls).
-- Authenticated users see one of four personalized views based on their workspace membership and invitation status.
-
-### 15.3 Dashboard states overview
-
-| State | Name                | Auth required | Condition                                                    | Primary CTA                                 |
-| ----- | ------------------- | :-----------: | ------------------------------------------------------------ | ------------------------------------------- |
-| 0     | Visitor             |      No       | `isAuthenticated() === false`                                | Register / Login                            |
-| 1     | New User            |      Yes      | Authenticated, zero tenants, zero pending invitations        | "Create your first workspace"               |
-| 2     | Pending Invitations |      Yes      | Authenticated, zero tenants, ≥ 1 pending invitation          | Accept/Decline invitations                  |
-| 3     | Member              |      Yes      | Authenticated, ≥ 1 tenant as `member` or `admin` (not owner) | View workspaces and recent tasks            |
-| 4     | Owner               |      Yes      | Authenticated, ≥ 1 tenant as `owner`                         | Manage workspaces, view pending invitations |
-
-### 15.4 State detection logic
-
-The [`Dashboard`](ui/src/app/features/dashboard/dashboard.ts:17) component executes the following logic in
-[`ngOnInit()`](ui/src/app/features/dashboard/dashboard.ts:24). The state is exposed as a signal
-`dashboardState = signal<DashboardState>('loading')` where `DashboardState` is a union type:
-
-```typescript
-type DashboardState = 'loading' | 'visitor' | 'new-user' | 'pending-invitations' | 'member' | 'owner';
-```
-
-**Detection algorithm:**
-
-```
-1. dashboardState.set('loading')
-
-2. IF authStore.isAuthenticated() === false:
-     → dashboardState = 'visitor'
-     → STOP (no API calls)
-
-3. Load tenants: await tenantClient.loadTenants()
-   Load pending invitations: await invitationClient.getMyInvitations()
-
-4. IF tenants.length === 0 AND pendingInvitations.length === 0:
-     → dashboardState = 'new-user'
-     → STOP
-
-5. IF tenants.length === 0 AND pendingInvitations.length > 0:
-     → dashboardState = 'pending-invitations'
-     → STOP
-
-6. IF user owns at least one tenant (check membership role === 'owner'):
-     → dashboardState = 'owner'
-     → Load additional data: pending sent invitations, recent tasks
-
-7. ELSE (user is member/admin but not owner of any tenant):
-     → dashboardState = 'member'
-     → Load additional data: recent tasks across all tenants
-```
-
-**Owner detection:** The [`TenantClient`](ui/src/app/services/tenant-client.ts:23) must expose the user's role per
-tenant. The existing `loadTenants()` returns `Tenant[]` which does not include the user's role. A new method or
-augmented response is needed — see §15.8.1.
-
-### 15.5 State 0: Visitor (not logged in)
-
-| Aspect        | Detail                                                                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Condition** | `authStore.isAuthenticated() === false`                                                                                                          |
-| **Route**     | `/` (root)                                                                                                                                       |
-| **Guard**     | None — the root route must NOT use `authGuard` (see §15.7.1)                                                                                     |
-| **Backend**   | None — purely static content                                                                                                                     |
-| **No shell**  | The visitor view does NOT render inside [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts); it renders the full page including its own header |
-
-#### 15.5.1 UI description
-
-The visitor landing page is a marketing-style page with the following sections:
-
-1. **Hero section**
-   - Headline: "Task Board — Simple, powerful project management"
-   - Subheadline: Brief product description (1–2 sentences)
-   - CTA buttons: "Get Started" (→ `/auth/register`) and "Log In" (→ `/auth/login`)
-
-2. **Features section** — 3–4 feature cards with icons:
-   - Kanban boards with drag-and-drop
-   - Sprint management
-   - Team collaboration with role-based access
-   - Multi-workspace support
-
-3. **Free plan callout** — highlights free tier limits:
-   - 1 workspace, 3 projects, 10 users per project
-
-4. **Footer CTA** — "Ready to get started? Create your free account"
-
-#### 15.5.2 Spartan UI components
-
-| Component          | Usage         |
-| ------------------ | ------------- |
-| `HlmButtonImports` | CTA buttons   |
-| `HlmCardImports`   | Feature cards |
-
-No `HlmSpinnerImports` needed — no loading state for static content.
-
-### 15.6 State 1: New User (authenticated, no workspace, no memberships)
-
-| Aspect            | Detail                                                                         |
-| ----------------- | ------------------------------------------------------------------------------ |
-| **Condition**     | `isAuthenticated() && tenants.length === 0 && pendingInvitations.length === 0` |
-| **Backend calls** | `GET /tenants` (existing), `GET /invitations/my` (new — §15.8.1)               |
-
-#### 15.6.1 UI description
-
-1. **Welcome header**: "Welcome to Task Board, {displayName}!"
-2. **CTA card** — prominent card with:
-   - "Create your first workspace" button → navigates to `/workspace/create`
-   - Brief explanation of what a workspace is
-3. **Free plan info** card:
-   - Limits: 1 workspace, 3 projects, 10 users
-   - Link: "Learn about Premium" (text only, no navigation in MVP — or links to `/upgrade` info)
-4. **Check for invitations**:
-   - On load, the component calls `GET /invitations/my` to check for pending invitations by email.
-   - If invitations are found, the state transitions to State 2 instead.
-
-#### 15.6.2 Acceptance criteria
-
-| #         | Criterion                                                                          | Verification                                                         |
-| --------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| AC-DASH-1 | An authenticated user with zero tenants and zero invitations sees the welcome view | Dashboard renders welcome header + "Create your first workspace" CTA |
-| AC-DASH-2 | Clicking "Create your first workspace" navigates to `/workspace/create`            | Router navigates to the create workspace page                        |
-| AC-DASH-3 | Free plan limits (1 workspace, 3 projects, 10 users) are displayed                 | Info card shows correct limits                                       |
-| AC-DASH-4 | The component calls `GET /invitations/my` on init to check for pending invitations | Network tab shows the request                                        |
-
-### 15.7 State 2: Pending Invitations (authenticated, no tenants, has invitations)
-
-| Aspect            | Detail                                                                       |
-| ----------------- | ---------------------------------------------------------------------------- |
-| **Condition**     | `isAuthenticated() && tenants.length === 0 && pendingInvitations.length > 0` |
-| **Backend calls** | `GET /tenants` (existing), `GET /invitations/my` (new — §15.8.1)             |
-
-#### 15.7.1 UI description
-
-1. **Header**: "You have pending invitations"
-2. **Invitation cards** — one card per pending invitation, each showing:
-   - Workspace name (from invitation details)
-   - Invited role (badge: `owner` / `admin` / `member`)
-   - Inviter email or name
-   - "Accept" button → calls `POST /auth/accept-invitation` with the invitation token
-   - "Decline" button → calls `DELETE /invitations/:id` (new — §15.8.1) or a new decline endpoint
-3. **Secondary CTA**: "Or create your own workspace" → `/workspace/create`
-4. **After accepting**: The component reloads tenants and transitions to State 3 or 4 based on the new membership.
-
-#### 15.7.2 Acceptance criteria
-
-| #         | Criterion                                                                                    | Verification                                                   |
-| --------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| AC-DASH-5 | A user with pending invitations sees invitation cards with workspace name, role, and actions | Cards render with correct data from `GET /invitations/my`      |
-| AC-DASH-6 | Clicking "Accept" calls `POST /auth/accept-invitation` and transitions to State 3/4          | API call succeeds; dashboard re-renders with workspace view    |
-| AC-DASH-7 | Clicking "Decline" removes the invitation from the list                                      | Invitation card disappears; if no invitations remain → State 1 |
-| AC-DASH-8 | The "Create your own workspace" link navigates to `/workspace/create`                        | Router navigates correctly                                     |
-
-### 15.8 State 3: Member (authenticated, belongs to workspaces, not owner)
-
-| Aspect            | Detail                                                                       |
-| ----------------- | ---------------------------------------------------------------------------- |
-| **Condition**     | `isAuthenticated() && tenants.length > 0 && user is NOT owner of any tenant` |
-| **Backend calls** | `GET /tenants` (existing), `GET /tasks/my` (new — §15.8.2)                   |
-
-#### 15.8.1 UI description
-
-1. **Header**: "Welcome back, {displayName}"
-2. **"My Workspaces" section** — cards for each workspace the user belongs to:
-   - Workspace name
-   - User's role (badge)
-   - Project count (requires tenant metadata — see §15.9.1)
-   - Click → navigates to the tenant's project list (`/tenants/:tenantId/projects`)
-3. **"My Recent Tasks" section** — tasks assigned to the user across all workspaces:
-   - Task title, priority badge, project name, column name
-   - Sorted by `updatedAt` descending, limit 10
-   - Click → navigates to task detail (`/tenants/:tenantId/projects/:projectId/tasks/:taskId`)
-4. **"Quick Stats" section** — summary cards:
-   - Total tasks assigned to me
-   - Tasks by priority breakdown (low / medium / high / critical)
-
-#### 15.8.2 Acceptance criteria
-
-| #          | Criterion                                                                              | Verification                                              |
-| ---------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| AC-DASH-9  | A member sees "My Workspaces" cards with workspace name, role badge, and project count | Cards render with data from `GET /tenants`                |
-| AC-DASH-10 | Clicking a workspace card navigates to that tenant's project list                      | Router navigates to `/tenants/:tenantId/projects`         |
-| AC-DASH-11 | "My Recent Tasks" shows up to 10 tasks assigned to the user across all tenants         | Tasks fetched via `GET /tasks/my`; list renders correctly |
-| AC-DASH-12 | "Quick Stats" shows total assigned task count and priority breakdown                   | Stats computed from `GET /tasks/my` response              |
-| AC-DASH-13 | Clicking a task in "My Recent Tasks" navigates to the task detail page                 | Router navigates to correct tenant/project/task URL       |
-
-### 15.9 State 4: Owner (authenticated, owns one or more workspaces)
-
-| Aspect            | Detail                                                                                         |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| **Condition**     | `isAuthenticated() && user is owner of at least one tenant`                                    |
-| **Backend calls** | `GET /tenants` (existing), `GET /tasks/my` (new), `GET /tenants/:id/invitations/pending` (new) |
-
-#### 15.9.1 UI description
-
-Includes everything from State 3, **plus**:
-
-1. **"Pending Invitations Sent" section** — shows invitations the owner sent that are still pending:
-   - Invitee email, role, invited date
-   - "Resend" button (re-triggers invitation email) and "Cancel" button (deletes the invitation)
-   - Only shown for owned tenants
-2. **Workspace management links** per owned workspace:
-   - Settings → `/tenants/:tenantId/settings`
-   - Members → `/tenants/:tenantId/settings/members`
-   - Upgrade (if free tier) → `/tenants/:tenantId/upgrade`
-3. **"Create another workspace" button** — shown if the user is under the subscription limit (1 free workspace):
-   - Navigates to `/workspace/create`
-
-#### 15.9.2 Acceptance criteria
-
-| #          | Criterion                                                                                    | Verification                                                  |
-| ---------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| AC-DASH-14 | An owner sees "Pending Invitations Sent" with invitee email, role, and action buttons        | Data fetched via `GET /tenants/:tenantId/invitations/pending` |
-| AC-DASH-15 | Clicking "Cancel" on a pending invitation calls `DELETE /tenants/:tenantId/members/:userId`  | Invitation removed from list                                  |
-| AC-DASH-16 | Workspace management links (Settings, Members, Upgrade) are visible for owned workspaces     | Links navigate to correct routes                              |
-| AC-DASH-17 | "Create another workspace" is visible only when the user has not reached the free tier limit | Button hidden if user already owns 1 free workspace           |
-| AC-DASH-18 | Owner sees all State 3 content (My Workspaces, My Recent Tasks, Quick Stats)                 | All State 3 sections render correctly                         |
-
-### 15.10 New API endpoints
-
-#### 15.10.1 `GET /invitations/my` — Pending invitations for the authenticated user
-
-| Aspect             | Detail                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------- |
-| **Method**         | `GET`                                                                                       |
-| **Path**           | `/api/v1/invitations/my`                                                                    |
-| **Auth**           | Required (Bearer JWT)                                                                       |
-| **Tenant context** | **Not required** — cross-tenant query                                                       |
-| **Description**    | Returns all pending invitations where `invitedEmail` matches the authenticated user's email |
-
-**Query parameters:** None.
-
-**Response (200):**
-
-```typescript
-// Zod v4 schema
-export const MyInvitationSchema = z.interface({
-  id: z.string().uuid(), // TenantMember ID
-  tenantId: z.string().uuid(),
-  tenantName: z.string(), // Denormalized from Tenant collection
-  role: z.enum(['owner', 'admin', 'member']),
-  invitedAt: z.string().datetime().nullable(),
-});
-
-export const MyInvitationsResponseSchema = z.interface({
-  data: z.array(MyInvitationSchema),
-  total: z.number().int().nonnegative(),
-});
-```
-
-**Implementation notes:**
-
-- Query `tenant_members` collection: `{ invitedEmail: user.email, status: 'pending' }`
-- Join with `tenants` collection to get `tenantName` for each result
-- This endpoint requires a new route file or addition to the auth routes (since it's cross-tenant)
-- The [`TenantMemberRepository`](server/src/repositories/tenant-member.repository.ts:65) already has
-  [`findPendingByEmail()`](server/src/repositories/tenant-member.repository.ts:65) which returns the raw
-  `TenantMemberDocument[]`
-
-#### 15.10.2 `GET /tasks/my` — Tasks assigned to the authenticated user across all tenants
-
-| Aspect             | Detail                                                                                                      |
-| ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| **Method**         | `GET`                                                                                                       |
-| **Path**           | `/api/v1/tasks/my`                                                                                          |
-| **Auth**           | Required (Bearer JWT)                                                                                       |
-| **Tenant context** | **Not required** — cross-tenant query                                                                       |
-| **Description**    | Returns tasks where the authenticated user's ID is in `assigneeIds`, across all tenants the user belongs to |
-
-**Query parameters:**
-
-| Parameter  | Type     | Default | Description               |
-| ---------- | -------- | ------- | ------------------------- |
-| `page`     | `number` | `1`     | Page number               |
-| `limit`    | `number` | `10`    | Results per page (max 50) |
-| `priority` | `string` | —       | Filter by priority        |
-
-**Response (200):**
-
-```typescript
-export const MyTasksResponseSchema = z.interface({
-  data: z.array(
-    TaskSchema.extend({
-      tenantName: z.string(), // Denormalized
-      projectName: z.string(), // Denormalized
-      columnTitle: z.string(), // Column name
-    }),
-  ),
-  total: z.number().int().nonnegative(),
-  page: z.number().int().positive(),
-  limit: z.number().int().positive(),
-});
-```
-
-**Implementation notes:**
-
-1. Get user's active tenant memberships: `tenant_members` where `{ userId, status: 'active' }`
-2. Extract `tenantId` list from memberships
-3. Query `tasks` where `{ tenantId: { $in: tenantIds }, assigneeIds: userId }`
-4. Sort by `updatedAt` descending
-5. Paginate
-6. Join with `tenants`, `projects`, and `columns` collections for display names
-7. This is a new route — register at the app level (not under tenant-scoped router)
-
-**MongoDB index required:**
-
-```
-{ tenantId: 1, assigneeIds: 1, updatedAt: -1 }
-```
-
-This compound index enables efficient cross-tenant assignment queries. The existing `{ tenantId: 1 }` index alone is not
-sufficient for the `assigneeIds` array match.
-
-#### 15.10.3 `GET /tenants/:tenantId/invitations/pending` — Pending invitations sent by a tenant
-
-| Aspect             | Detail                                                   |
-| ------------------ | -------------------------------------------------------- |
-| **Method**         | `GET`                                                    |
-| **Path**           | `/api/v1/tenants/:tenantId/invitations/pending`          |
-| **Auth**           | Required (Bearer JWT)                                    |
-| **Tenant context** | Required — tenant-scoped                                 |
-| **RBAC**           | Owner or admin only                                      |
-| **Description**    | Returns all pending invitations for the specified tenant |
-
-**Response (200):**
-
-```typescript
-export const PendingInvitationSchema = z.interface({
-  id: z.string().uuid(), // TenantMember ID
-  invitedEmail: z.string().email(),
-  role: z.enum(['owner', 'admin', 'member']),
-  invitedAt: z.string().datetime().nullable(),
-});
-
-export const PendingInvitationsResponseSchema = z.interface({
-  data: z.array(PendingInvitationSchema),
-  total: z.number().int().nonnegative(),
-});
-```
-
-**Implementation notes:**
-
-- The [`TenantMemberRepository`](server/src/repositories/tenant-member.repository.ts:91) already has
-  [`findPendingByTenant()`](server/src/repositories/tenant-member.repository.ts:91)
-- Add a service method in [`TenantService`](server/src/services/tenant.service.ts:13) that wraps this with RBAC check
-  (owner/admin only)
-- Add a route in [`tenants.ts`](server/src/routes/tenants.ts:25)
-
-#### 15.10.4 `DELETE /invitations/:invitationId` — Decline a pending invitation (by invitee)
-
-| Aspect             | Detail                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| **Method**         | `DELETE`                                                                              |
-| **Path**           | `/api/v1/invitations/:invitationId`                                                   |
-| **Auth**           | Required (Bearer JWT)                                                                 |
-| **Tenant context** | **Not required** — cross-tenant action                                                |
-| **Description**    | Allows an authenticated user to decline a pending invitation addressed to their email |
-
-**Implementation notes:**
-
-- Validate that the authenticated user's email matches `invitedEmail` on the invitation
-- Validate that the invitation status is `'pending'`
-- Update the invitation status to `'declined'` (soft-delete — preserves audit trail)
-- `declined` and `access_revoked` members do NOT appear in `GET /tenants` and have no tenant access
-- Owner/admin can later resend invitation (reset to `'pending'`) or hard-delete the member permanently
-- Return 204 No Content
-
-### 15.11 Shared package additions
-
-#### 15.11.1 New schemas
-
-| Schema file         | New schemas                                                                                                        |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `schemas/tenant.ts` | `MyInvitationSchema`, `MyInvitationsResponseSchema`, `PendingInvitationSchema`, `PendingInvitationsResponseSchema` |
-| `schemas/task.ts`   | `MyTaskSchema` (extends `TaskSchema` with `tenantName`, `projectName`, `columnTitle`), `MyTasksResponseSchema`     |
-
-#### 15.11.2 New contracts
-
-| Contract file         | New contracts                           |
-| --------------------- | --------------------------------------- |
-| `contracts/auth.ts`   | `getMyInvitations`, `declineInvitation` |
-| `contracts/task.ts`   | `getMyTasks`                            |
-| `contracts/tenant.ts` | `getPendingInvitations`                 |
-
-#### 15.11.3 New types
-
-| Type file         | New types                           |
-| ----------------- | ----------------------------------- |
-| `types/tenant.ts` | `MyInvitation`, `PendingInvitation` |
-| `types/task.ts`   | `MyTask`                            |
-
-### 15.12 Frontend service extensions
-
-#### 15.12.1 `TenantClient` additions
-
-```typescript
-// Add to TenantClient:
-
-/** Get pending invitations for the current user's email (cross-tenant) */
-getMyInvitations(): Observable<{ data: MyInvitation[]; total: number }>
-
-/** Get pending invitations sent by a tenant (owner/admin only) */
-getPendingInvitations(tenantId: string): Observable<{ data: PendingInvitation[]; total: number }>
-```
-
-#### 15.12.2 New `InvitationClient` service (or extend `TenantClient`)
-
-```typescript
-/** Decline a pending invitation */
-declineInvitation(invitationId: string): Observable<void>
-```
-
-This can be added to [`TenantClient`](ui/src/app/services/tenant-client.ts:23) or extracted into a dedicated
-`InvitationClient` service. Recommendation: add to `TenantClient` since invitation logic is already partially there (see
-[`getInvitationDetails()`](ui/src/app/services/tenant-client.ts:125) and
-[`acceptInvitation()`](ui/src/app/services/tenant-client.ts:130)).
-
-#### 15.12.3 New `TaskClient` method (or new cross-tenant method)
-
-```typescript
-// Add to TaskClient:
-
-/** Get tasks assigned to the current user across all tenants */
-getMyTasks(page?: number, limit?: number): Observable<MyTasksResponse>
-```
-
-### 15.13 Frontend routing changes
-
-#### 15.13.1 Root route guard change
-
-The root route (`/`) currently uses [`authGuard`](ui/src/app/guards/auth.guard.ts:24) which redirects unauthenticated
-users to `/auth/login`. This must change to allow unauthenticated visitors to see the landing page.
-
-**Option A (recommended):** Remove `authGuard` from the root route. The
-[`Dashboard`](ui/src/app/features/dashboard/dashboard.ts:17) component internally handles all states including the
-visitor state. Authenticated data loading only happens when `isAuthenticated()` is true.
-
-```typescript
-// app.routes.ts — changed root route
-{
-  path: '',
-  // NO canActivate — the dashboard handles visitor state internally
-  loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
-},
-```
-
-**Option B:** Create a `softAuthGuard` that does not redirect but instead sets a signal indicating auth status. This
-adds complexity without clear benefit — Option A is simpler.
-
-**Impact on existing routes:** All other routes (`/workspace/create`, `/tenants/:tenantId/*`) retain their `authGuard` —
-only the root `/` changes.
-
-#### 15.13.2 Dashboard component structure
-
-The [`Dashboard`](ui/src/app/features/dashboard/dashboard.ts:17) component becomes a stateful orchestrator that
-delegates to child sub-views:
-
-```
-ui/src/app/features/dashboard/
-├── dashboard.ts                     # Main orchestrator (state detection)
-├── dashboard.html                   # @switch on dashboardState
-├── visitor/
-│   └── landing-page.ts              # State 0: static marketing page
-├── new-user/
-│   └── welcome-view.ts              # State 1: create workspace CTA
-├── pending-invitations/
-│   └── invitation-view.ts           # State 2: invitation cards
-├── member/
-│   └── member-dashboard.ts          # State 3: workspaces + tasks
-└── owner/
-    └── owner-dashboard.ts           # State 4: full dashboard
-```
-
-**Template pattern:**
-
-```html
-<!-- dashboard.html -->
-@switch (dashboardState()) { @case ('loading') {
-<div class="flex items-center justify-center py-20">
-  <hlm-spinner />
-</div>
-} @case ('visitor') {
-<ui-landing-page />
-} @case ('new-user') {
-<ui-welcome-view />
-} @case ('pending-invitations') {
-<ui-invitation-view [invitations]="pendingInvitations()" />
-} @case ('member') {
-<ui-member-dashboard [tenants]="tenants()" [tasks]="myTasks()" [stats]="taskStats()" />
-} @case ('owner') {
-<ui-owner-dashboard
-  [tenants]="tenants()"
-  [tasks]="myTasks()"
-  [stats]="taskStats()"
-  [pendingInvitations]="sentInvitations()"
-/>
-} }
-```
-
-#### 15.13.3 Angular 22 patterns
-
-| Pattern                         | Usage in Dashboard                                                                         |
-| ------------------------------- | ------------------------------------------------------------------------------------------ |
-| `signal()`                      | `dashboardState`, `tenants`, `myTasks`, `pendingInvitations`, `sentInvitations`, `loading` |
-| `computed()`                    | `isOwner`, `isMember`, `hasInvitations`, `taskStats`                                       |
-| `effect()`                      | Trigger data loading when state transitions                                                |
-| `resource()` / `httpResource()` | Data fetching for tasks and invitations with signal integration                            |
-| `@if` / `@for` / `@switch`      | Control flow in all sub-view templates                                                     |
-| `inject()`                      | DI of `AuthStore`, `TenantClient`, `TaskClient`, `Router`                                  |
-| Standalone components           | All sub-views are standalone                                                               |
-
-### 15.14 Existing `email.service.ts` changes
-
-The [`EmailService`](server/src/services/email.service.ts:9) does not need changes for the dashboard feature. However,
-the invitation email content should be reviewed to ensure it includes:
-
-- Accept link with token
-- Decline link (optional — can be handled in-app)
-- Workspace name and role
-
-The existing implementation at [`sendInvitationEmail()`](server/src/services/email.service.ts:20) already includes the
-accept URL. A decline URL is not needed if declining is handled in the dashboard UI (State 2).
-
-### 15.15 Cross-cutting requirements
-
-#### 15.15.1 RBAC visibility
-
-| UI Element                        | Visitor | New User | Pending Invitee | Member | Owner |
-| --------------------------------- | :-----: | :------: | :-------------: | :----: | :---: |
-| Landing page content              |   ✅    |    ❌    |       ❌        |   ❌   |  ❌   |
-| "Create workspace" CTA            |   ❌    |    ✅    |       ✅        |   ❌   |  ✅   |
-| Invitation cards (accept/decline) |   ❌    |    ❌    |       ✅        |   ❌   |  ❌   |
-| "My Workspaces" section           |   ❌    |    ❌    |       ❌        |   ✅   |  ✅   |
-| "My Recent Tasks" section         |   ❌    |    ❌    |       ❌        |   ✅   |  ✅   |
-| "Pending Invitations Sent"        |   ❌    |    ❌    |       ❌        |   ❌   |  ✅   |
-| Workspace management links        |   ❌    |    ❌    |       ❌        |   ❌   |  ✅   |
-
-#### 15.15.2 Error handling
-
-| Scenario                             | Behavior                                                      |
-| ------------------------------------ | ------------------------------------------------------------- |
-| `GET /tenants` fails                 | Show error state with retry button                            |
-| `GET /invitations/my` fails          | Treat as zero invitations (non-blocking)                      |
-| `GET /tasks/my` fails                | Show "Unable to load tasks" with retry; other sections render |
-| `POST /auth/accept-invitation` fails | Show error toast; invitation card remains                     |
-| `DELETE /invitations/:id` fails      | Show error toast; invitation card remains                     |
-
-#### 15.15.3 Testing requirements
-
-| Layer           | Requirement                                                                                            |
-| --------------- | ------------------------------------------------------------------------------------------------------ |
-| **Unit**        | Dashboard component state detection logic — all 5 states with mocked stores                            |
-| **Unit**        | Each sub-view component (landing, welcome, invitation, member, owner)                                  |
-| **Unit**        | New service methods (`getMyInvitations`, `getMyTasks`, `getPendingInvitations`)                        |
-| **Integration** | State transitions: visitor → register → new user → create workspace → owner                            |
-| **Integration** | Invitation flow: invite → pending view → accept → member view                                          |
-| **E2E**         | Full journey: visit `/` as visitor → register → create workspace → invite member → see owner dashboard |
-
-### 15.16 MongoDB index additions
-
-| Collection       | Index                                            | Purpose                                      |
-| ---------------- | ------------------------------------------------ | -------------------------------------------- |
-| `tasks`          | `{ tenantId: 1, assigneeIds: 1, updatedAt: -1 }` | Efficient `GET /tasks/my` cross-tenant query |
-| `tenant_members` | `{ invitedEmail: 1, status: 1 }`                 | Efficient `GET /invitations/my` query        |
-
-The existing `{ invitedEmail: 1, tenantId: 1 }` sparse unique index on `tenant_members` does not cover the `status`
-filter. A new index `{ invitedEmail: 1, status: 1 }` is recommended for the dashboard invitation lookup.
-
----
-
-## 16. Workspace Detail Page (Phase 12)
-
-> **Date added:** 2026-07-30 **Status:** Defined for implementation. **Depends on:** §15 (Jira-Style Dashboard).
-
-### 16.1 Goal
-
-Add a **Workspace Detail** page at `/tenants/:tenantId` that serves as the default landing page when a user navigates
-into a workspace. This page provides an at-a-glance view of the workspace — its name, the user's role, an optional
-description, quick-action buttons, and a collapsible project list — replacing the current behavior where navigating to
-`/tenants/:tenantId` with an empty child path renders only the [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts)
-header and sidebar with no content.
-
-### 16.2 Context
-
-**Current state:**
-
-- The [`app.routes.ts`](ui/src/app/app.routes.ts:34) tenant route group at `tenants/:tenantId` uses
-  [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts) as the parent component with child routes for `settings`,
-  `settings/members`, `upgrade`, `projects`, `sprints`, and project detail — but **no default (empty path) child
-  route**.
-- Navigating to `/tenants/:tenantId` renders the [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts) with an empty
-  `<router-outlet>`.
-- The [`TenantSchema`](server/src/schemas/tenant.ts:8) has **no `description` field** — only `id`, `name`, `slug`,
-  `subscription`, `createdAt`, `updatedAt`.
-- Owner dashboard ([`owner-dashboard.html`](ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html:48))
-  workspace cards show the tenant name as plain text with separate action buttons (Projects, Settings, Members,
-  Upgrade).
-- Member dashboard ([`member-dashboard.html`](ui/src/app/features/dashboard/member-dashboard/member-dashboard.html:34))
-  workspace cards link directly to `/tenants/:tenantId/projects`.
-- The [`TenantWithRoleSchema`](server/src/schemas/tenant.ts:107) extends
-  [`TenantSchema`](server/src/schemas/tenant.ts:8) with a `role` field — already available from the tenant list
-  endpoint.
-
-**Target state:**
-
-- `/tenants/:tenantId` (empty child path) renders a new `WorkspaceDetail` component inside the
-  [`AppShell`](ui/src/app/shell/app-shell/app-shell.ts).
-- The [`TenantSchema`](server/src/schemas/tenant.ts:8) includes an optional `description` field (max 500 characters,
-  nullable).
-- Dashboard workspace card titles link to `/tenants/:tenantId` (the workspace detail page) instead of directly to
-  projects or showing only plain text.
-
-### 16.3 Functional requirements
-
-| #        | Requirement                                                                                                                                                                                                                                                                                                               | Priority |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------: |
-| FR-16.1  | Add `description` field (`string`, max 500, nullable/optional) to [`TenantSchema`](server/src/schemas/tenant.ts:8)                                                                                                                                                                                                        |   High   |
-| FR-16.2  | Add `description` to [`CreateTenantSchema`](server/src/schemas/tenant.ts:33) (optional) and [`UpdateTenantSchema`](server/src/schemas/tenant.ts:50) (optional)                                                                                                                                                            |   High   |
-| FR-16.3  | Update [`TenantDocument`](server/src/repositories/tenant.repository.ts:11) interface to include `description: string \| null`                                                                                                                                                                                             |   High   |
-| FR-16.4  | Update [`TenantRepository`](server/src/repositories/tenant.repository.ts:36) — [`create()`](server/src/repositories/tenant.repository.ts:57) and [`update()`](server/src/repositories/tenant.repository.ts:72) methods and [`toDomain()`](server/src/repositories/tenant.repository.ts:23) mapper to handle `description` |   High   |
-| FR-16.5  | Update [`TenantService.updateTenant()`](server/src/services/tenant.service.ts:96) to pass `description` through to the repository                                                                                                                                                                                         |   High   |
-| FR-16.6  | Update [`TenantClient.updateTenant()`](ui/src/app/services/tenant-client.ts:38) signature to accept `description` in the data parameter                                                                                                                                                                                   |   High   |
-| FR-16.7  | Update [`TenantStore.updateTenant()`](ui/src/app/stores/tenant-store.ts:53) signature to accept `description` in the data parameter                                                                                                                                                                                       |   High   |
-| FR-16.8  | Register a default (empty path `''`) child route in [`app.routes.ts`](ui/src/app/app.routes.ts:37) inside the `tenants/:tenantId` children array                                                                                                                                                                          |   High   |
-| FR-16.9  | Create `WorkspaceDetail` component at `ui/src/app/features/tenants/workspace-detail/`                                                                                                                                                                                                                                     |   High   |
-| FR-16.10 | Display workspace name as `<h1>`                                                                                                                                                                                                                                                                                          |   High   |
-| FR-16.11 | Display user's role badge (owner/admin/member) using [`HlmBadge`](ui/libs/ui/badge/src/lib/hlm-badge.ts)                                                                                                                                                                                                                  |   High   |
-| FR-16.12 | Display workspace description text (or a placeholder like "No description" when null/empty)                                                                                                                                                                                                                               |   High   |
-| FR-16.13 | Display action buttons block (medium size): Settings, Members, Upgrade                                                                                                                                                                                                                                                    |   High   |
-| FR-16.14 | Action buttons are **only visible** to users with `owner` or `admin` tenant role                                                                                                                                                                                                                                          |   High   |
-| FR-16.15 | **Upgrade** button is **only visible** when user is `owner` **and** tenant subscription is `free`                                                                                                                                                                                                                         |   High   |
-| FR-16.16 | Display a collapsible project list below the action buttons using [`HlmCollapsible`](ui/libs/ui/collapsible/src/lib/hlm-collapsible.ts)                                                                                                                                                                                   |   High   |
-| FR-16.17 | For `owner`/`admin`: project list shows **all projects** in the workspace (via [`ProjectClient.list()`](ui/src/app/services/project-client.ts:21))                                                                                                                                                                        |   High   |
-| FR-16.18 | For `member`: project list shows **only projects the member is added to** (requires a filtered API or client-side filter)                                                                                                                                                                                                 |   High   |
-| FR-16.19 | On [`owner-dashboard.html`](ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html:48), make the workspace card title (`tenant.name`) a link to `/tenants/:tenantId`                                                                                                                                          |  Medium  |
-| FR-16.20 | On [`member-dashboard.html`](ui/src/app/features/dashboard/member-dashboard/member-dashboard.html:34), change the workspace card link target from `/tenants/:tenantId/projects` to `/tenants/:tenantId`                                                                                                                   |  Medium  |
-
-### 16.4 Non-functional requirements
-
-| #     | Requirement                                                                                                                       | Target                     |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| NFR-1 | Workspace Detail page loads within 2 seconds on 3G connection                                                                     | Performance                |
-| NFR-2 | Collapsible project list uses `@defer` for lazy rendering                                                                         | Performance                |
-| NFR-3 | All new components are standalone (no NgModules)                                                                                  | Architecture consistency   |
-| NFR-4 | All new components use signals (no RxJS subscriptions in components)                                                              | Architecture consistency   |
-| NFR-5 | New/modified schemas use Zod v4 `z.object()` (matching existing code)                                                             | Shared package consistency |
-| NFR-6 | Backward compatibility — existing tenants with no `description` field in MongoDB must render gracefully (null → placeholder text) | Data migration             |
-
-### 16.5 User stories / scenarios
-
-#### US-16.1: View workspace detail as owner
-
-**As an** owner of a workspace, **I want to** navigate to `/tenants/:tenantId` and see a summary of my workspace, **so
-that** I can quickly understand the workspace state and take action.
-
-**Acceptance:**
-
-- Page displays workspace name as `<h1>`, role badge "owner", and description (or "No description" placeholder).
-- Action buttons (Settings, Members, Upgrade) are visible because the user is owner on a free plan.
-- Collapsible project list shows all projects in the workspace.
-
-#### US-16.2: View workspace detail as admin
-
-**As an** admin of a workspace, **I want to** see the workspace detail page with management action buttons, **so that**
-I can manage the workspace without navigating through the dashboard.
-
-**Acceptance:**
-
-- Page displays workspace name, role badge "admin", and description.
-- Settings and Members buttons are visible; Upgrade button is **not** visible (admin is not owner).
-- Project list shows all projects.
-
-#### US-16.3: View workspace detail as member
-
-**As a** member of a workspace, **I want to** see the workspace detail page with only relevant information, **so that**
-I can find my projects without seeing admin-only controls.
-
-**Acceptance:**
-
-- Page displays workspace name, role badge "member", and description.
-- Action buttons (Settings, Members, Upgrade) are **not** visible.
-- Project list shows **only** projects the member is added to.
-
-#### US-16.4: Navigate from dashboard to workspace detail
-
-**As a** user viewing the dashboard, **I want to** click on a workspace card title to navigate to the workspace detail
-page, **so that** I can quickly access workspace information.
-
-**Acceptance:**
-
-- Owner dashboard: workspace card `tenant.name` is a link to `/tenants/:tenantId`.
-- Member dashboard: workspace card links to `/tenants/:tenantId` (instead of `/tenants/:tenantId/projects`).
-
-#### US-16.5: Empty description graceful handling
-
-**As a** user viewing a workspace that has no description set, **I want to** see a placeholder message instead of broken
-layout, **so that** the page remains usable.
-
-**Acceptance:**
-
-- When `description` is `null` or empty string, the description area shows "No description provided." in muted text.
-
-#### US-16.6: Collapse/expand project list
-
-**As a** user viewing the workspace detail page, **I want to** collapse and expand the project list, **so that** I can
-focus on the workspace overview when I don't need the project list.
-
-**Acceptance:**
-
-- Project list is rendered inside a collapsible container.
-- Default state: expanded.
-- Clicking the collapse trigger hides the project list; clicking again shows it.
-- The collapse trigger shows the project count (e.g., "Projects (5)").
-
-### 16.6 Acceptance criteria
-
-| #     | Criterion                                                                                                                                  | Verification method                                                                 |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| AC-1  | [`TenantSchema`](server/src/schemas/tenant.ts:8) includes `description: z.string().max(500).nullable().optional()`                         | Unit test: schema parses `{ id, name, slug, subscription, description: null, ... }` |
-| AC-2  | [`CreateTenantSchema`](server/src/schemas/tenant.ts:33) accepts optional `description` field                                               | Unit test: schema parses `{ name, slug, description: "text" }` and `{ name, slug }` |
-| AC-3  | [`UpdateTenantSchema`](server/src/schemas/tenant.ts:50) accepts optional `description` field                                               | Unit test: schema parses `{ description: "new desc" }`                              |
-| AC-4  | [`TenantDocument`](server/src/repositories/tenant.repository.ts:11) has `description: string \| null`                                      | TypeScript compilation — no type errors                                             |
-| AC-5  | [`TenantRepository.create()`](server/src/repositories/tenant.repository.ts:57) stores `description` in MongoDB                             | Integration test: create tenant with description, read back                         |
-| AC-6  | [`TenantRepository.update()`](server/src/repositories/tenant.repository.ts:72) accepts and persists `description`                          | Integration test: update description, verify persistence                            |
-| AC-7  | [`TenantRepository.toDomain()`](server/src/repositories/tenant.repository.ts:23) maps `description` correctly (null → undefined if needed) | Unit test: mapper output matches [`TenantSchema`](server/src/schemas/tenant.ts:8)   |
-| AC-8  | `PATCH /api/v1/tenants/:tenantId` accepts `{ description: "..." }` in request body                                                         | Integration test: HTTP PATCH with description body                                  |
-| AC-9  | `GET /api/v1/tenants/:tenantId` returns `description` in response                                                                          | Integration test: HTTP GET returns description field                                |
-| AC-10 | Route `''` (empty path) is registered as first child of `tenants/:tenantId` in [`app.routes.ts`](ui/src/app/app.routes.ts:37)              | Unit test: route inspection; navigating to `/tenants/:id` loads WorkspaceDetail     |
-| AC-11 | [`WorkspaceDetail`](ui/src/app/features/tenants/workspace-detail/) renders workspace name as `<h1>`                                        | Unit test: component fixture contains `<h1>` with tenant name                       |
-| AC-12 | Role badge displays correct role text (owner/admin/member)                                                                                 | Unit test: badge text matches input role                                            |
-| AC-13 | Description text renders when present; placeholder renders when null/empty                                                                 | Unit test: two component fixture variants                                           |
-| AC-14 | Settings, Members, Upgrade buttons visible for owner on free plan                                                                          | Unit test: button presence with role=owner, subscription=free                       |
-| AC-15 | Settings, Members buttons visible for admin; Upgrade hidden                                                                                | Unit test: button presence with role=admin                                          |
-| AC-16 | All action buttons hidden for member                                                                                                       | Unit test: button presence with role=member                                         |
-| AC-17 | Upgrade button hidden for owner on premium plan                                                                                            | Unit test: button presence with role=owner, subscription=premium                    |
-| AC-18 | Collapsible project list renders projects for owner/admin (all projects)                                                                   | Unit test: project list items match mock data                                       |
-| AC-19 | Collapsible project list renders only member's projects for member role                                                                    | Unit test: project list items filtered for member                                   |
-| AC-20 | Owner dashboard workspace card title is a `<a>` link to `/tenants/:tenantId`                                                               | Unit test: `href` or `routerLink` inspection                                        |
-| AC-21 | Member dashboard workspace card links to `/tenants/:tenantId` (not `/tenants/:tenantId/projects`)                                          | Unit test: `routerLink` inspection                                                  |
-| AC-22 | E2E: navigating to `/tenants/:tenantId` renders workspace name, role, description, action buttons (as owner)                               | Playwright E2E test                                                                 |
-| AC-23 | E2E: as member, action buttons are not visible on workspace detail page                                                                    | Playwright E2E test                                                                 |
-
-### 16.7 Data model changes
-
-#### 16.7.1 Server package — [`TenantSchema`](server/src/schemas/tenant.ts:8)
-
-Add `description` field:
-
-```typescript
-// In server/src/schemas/tenant.ts — TenantSchema
-export const TenantSchema = z.object({
-  id: z.uuid(),
-  name: z.string().min(1).max(100),
-  slug: z
-    .string()
-    .min(2)
-    .max(80)
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
-  subscription: z.enum(SubscriptionTier),
-  description: z.string().max(500).nullable().optional(), // NEW
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
-```
-
-#### 16.7.2 Server package — [`CreateTenantSchema`](server/src/schemas/tenant.ts:33)
-
-Add optional `description`:
-
-```typescript
-export const CreateTenantSchema = z.object({
-  name: z.string().min(1, 'Tenant name is required').max(100),
-  slug: z
-    .string()
-    .min(2)
-    .max(80)
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/),
-  subscription: z.enum(SubscriptionTier).default('free'),
-  description: z.string().max(500).optional(), // NEW
-});
-```
-
-#### 16.7.3 Server package — [`UpdateTenantSchema`](server/src/schemas/tenant.ts:50)
-
-Add optional `description`:
-
-```typescript
-export const UpdateTenantSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  slug: z
-    .string()
-    .min(2)
-    .max(80)
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/)
-    .optional(),
-  description: z.string().max(500).optional(), // NEW
-});
-```
-
-#### 16.7.4 Server — [`TenantDocument`](server/src/repositories/tenant.repository.ts:11)
-
-Add `description` to the MongoDB document interface:
-
-```typescript
-export interface TenantDocument {
-  _id?: import('mongodb').ObjectId;
-  id: string;
-  name: string;
-  slug: string;
-  subscription: string;
-  description: string | null; // NEW
+  _id: ObjectId;
+  name: String;
+  description: String | null;
+  status: 'ACTIVE' | 'ARCHIVED' | 'DELETION_PENDING';
+  deletionScheduledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
 ```
 
-#### 16.7.5 Server — [`TenantRepository`](server/src/repositories/tenant.repository.ts:36)
+**Status transitions**:
 
-Update [`toDomain()`](server/src/repositories/tenant.repository.ts:23) mapper:
-
-```typescript
-function toDomain(doc: TenantDocument): Tenant {
-  return {
-    id: doc.id,
-    name: doc.name,
-    slug: doc.slug,
-    subscription: doc.subscription as Tenant['subscription'],
-    description: doc.description ?? undefined, // NEW — null → undefined for schema compat
-    createdAt: doc.createdAt.toISOString(),
-    updatedAt: doc.updatedAt.toISOString(),
-  };
-}
+```text
+ACTIVE → ARCHIVED → ACTIVE (restore)
+ACTIVE → DELETION_PENDING → permanent deletion
+DELETION_PENDING → ACTIVE (cancel deletion)
 ```
 
-Update [`create()`](server/src/repositories/tenant.repository.ts:57) input type:
+**Archive behavior**: Archiving a Tenant automatically archives its Projects with `archiveReason = TENANT_ARCHIVE`.
+Projects already archived before the tenant archive retain their original `archiveReason` and are NOT accidentally
+restored.
+
+**Restore behavior**: Restoring a Tenant restores only Projects archived due to `TENANT_ARCHIVE`. Projects independently
+archived remain archived.
+
+### 4.4 Tenant Membership
 
 ```typescript
-async create(input: { name: string; slug: string; subscription?: string; description?: string }): Promise<Tenant> {
-  // ...
-  description: input.description ?? null,
-  // ...
-}
-```
-
-Update [`update()`](server/src/repositories/tenant.repository.ts:72) input type:
-
-```typescript
-async update(id: string, input: Partial<Pick<TenantDocument, 'name' | 'slug' | 'description'>>): Promise<Tenant | null> {
-  // unchanged logic — $set already handles arbitrary fields
-}
-```
-
-#### 16.7.6 Server — [`TenantService`](server/src/services/tenant.service.ts)
-
-Update [`createTenant()`](server/src/services/tenant.service.ts:32) to pass `description`:
-
-```typescript
-const tenant = await this.tenantRepo.create({ ...input, subscription, description: input.description });
-```
-
-Update [`updateTenant()`](server/src/services/tenant.service.ts:96) — the `input` type already flows from
-[`UpdateTenantSchema`](server/src/schemas/tenant.ts:50) through to the repository. No code change needed beyond the
-schema change if the service passes `input` directly to `this.tenantRepo.update(id, input)`. Verify this is the case; if
-the service destructures fields explicitly, add `description` to the destructure.
-
-#### 16.7.7 Server — [`TenantRepository`](server/src/repositories/tenant.repository.ts:36) type export
-
-If [`TenantRepository.update()`](server/src/repositories/tenant.repository.ts:72) uses an explicit `Pick` type, update
-it to include `'description'`:
-
-```typescript
-async update(id: string, input: Partial<Pick<TenantDocument, 'name' | 'slug' | 'description'>>): Promise<Tenant | null>
-```
-
-### 16.8 Frontend changes
-
-#### 16.8.1 New route — [`app.routes.ts`](ui/src/app/app.routes.ts:37)
-
-Add an empty-path child route as the **first** child (before `settings`):
-
-```typescript
-// In the children array of 'tenants/:tenantId'
 {
-  path: '',
-  loadComponent: () =>
-    import('./features/tenants/workspace-detail/workspace-detail').then((m) => m.WorkspaceDetail),
-},
+  _id: ObjectId;
+  tenantId: ObjectId;
+  userId: ObjectId;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  status: "ACTIVE" | "ACCESS_REVOKED";
+  invitation: {
+    status: "PENDING" | "EXPIRED" | "DECLINED" | "REVOKED";
+    tokenHash: String;
+    invitedBy: ObjectId;
+    invitedOn: Date;
+  } | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 ```
 
-> **Note:** The empty path must be the first child to avoid route matching conflicts. Angular matches routes in order;
-> placing it first ensures `/tenants/:tenantId` resolves to `WorkspaceDetail` rather than falling through to another
-> child or showing an empty outlet.
+**Indexes**: `unique: { tenantId: 1, userId: 1 }`
 
-#### 16.8.2 New component — `ui/src/app/features/tenants/workspace-detail/`
+**Owner constraint**: Exactly one `OWNER` per Tenant. Ownership transfer is an explicit administrative operation.
 
-**Files:**
-
-```
-ui/src/app/features/tenants/workspace-detail/
-├── workspace-detail.ts      # Component class
-└── workspace-detail.html    # Template
-```
-
-**Component class** (`workspace-detail.ts`):
+### 4.5 Project
 
 ```typescript
-import { Component, inject, computed, signal, OnInit } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { TenantStore } from '@stores/tenant-store';
-import { AuthStore } from '@stores/auth-store';
-import { ProjectClient } from '@services/project-client';
-import { HlmBadgeImports } from '@spartan-ng/helm/badge';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmCardImports } from '@spartan-ng/helm/card';
-import { HlmCollapsibleImports } from '@spartan-ng/helm/collapsible';
-import { provideIcons, NgIcon } from '@ng-icons/core';
-import { lucideSettings, lucideUsers, lucideCreditCard, lucideChevronDown, lucideFolder } from '@ng-icons/lucide';
-import type { Project } from '@task-board/shared';
-import { firstValueFrom } from 'rxjs';
+{
+  _id: ObjectId;
+  tenantId: ObjectId;
+  key: String; // 2-10 chars, starts with letter, A-Z + 0-9 only
+  name: String;
+  description: String | null;
+  status: 'ACTIVE' | 'ARCHIVED' | 'DELETION_PENDING';
+  defaultStatusId: ObjectId;
+  defaultBoardId: ObjectId;
+  archiveReason: 'TENANT_ARCHIVE' | 'PROJECT_ARCHIVE' | null;
+  deletionScheduledAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
 
-@Component({
-  selector: 'ui-workspace-detail',
-  imports: [RouterLink, HlmBadgeImports, HlmButtonImports, HlmCardImports, HlmCollapsibleImports, NgIcon],
-  providers: [provideIcons({ lucideSettings, lucideUsers, lucideCreditCard, lucideChevronDown, lucideFolder })],
-  templateUrl: './workspace-detail.html',
-})
-export class WorkspaceDetail implements OnInit {
-  private readonly tenantStore = inject(TenantStore);
-  private readonly authStore = inject(AuthStore);
-  private readonly projectClient = inject(ProjectClient);
+**Indexes**: `unique: { tenantId: 1, key: 1 }`
 
-  protected readonly tenant = computed(() => this.tenantStore.activeTenant());
-  protected readonly role = computed(() => this.authStore.tenantRole());
-  protected readonly description = computed(() => this.tenant()?.description ?? '');
-  protected readonly projects = signal<Project[]>([]);
-  protected readonly loadingProjects = signal(true);
-  protected readonly projectsExpanded = signal(true);
+**Key immutability**: Project key becomes immutable after the first Task is created.
 
-  protected readonly isOwnerOrAdmin = computed(() => {
-    const r = this.role();
-    return r === 'owner' || r === 'admin';
-  });
+**Status transitions**:
 
-  protected readonly showUpgrade = computed(() => {
-    return this.role() === 'owner' && this.tenant()?.subscription === 'free';
-  });
+```text
+ACTIVE → ARCHIVED → ACTIVE (restore)
+ACTIVE → DELETION_PENDING → permanent deletion
+DELETION_PENDING → ACTIVE (cancel deletion)
+```
 
-  async ngOnInit(): Promise<void> {
-    try {
-      const res = await firstValueFrom(this.projectClient.list(1, 100));
-      this.projects.set(res.data);
-    } catch {
-      // Non-blocking — projects section shows empty state
-    } finally {
-      this.loadingProjects.set(false);
+**Archive**: Makes project read-only. Internal entities do not need independent archive states.
+
+**Permanent deletion cascade**: Tasks, Comments, Sprints, Boards, Labels, Statuses, Task Types, Relationships, Project
+Memberships, Preferences, Filters, Project-specific audit records.
+
+### 4.6 Project Membership
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  userId: ObjectId;
+  role: 'PROJECT_ADMIN' | 'EDITOR' | 'VIEWER';
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Indexes**: `unique: { projectId: 1, userId: 1 }`
+
+**Removal behavior**: Removes project access. User remains in Tenant. Tasks and Comments are NOT deleted. User can be
+re-added later; existing work remains associated.
+
+### 4.7 Task
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  number: Number;              // sequential per project, displayed as PROJ-1, PROJ-2, etc.
+  typeId: ObjectId;            // references TaskType
+  title: String;               // required, max 255 chars
+  description: String | null;  // Markdown, max 10000 chars
+  statusId: ObjectId;          // references Status
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  reporterId: ObjectId | null;
+  reporterSnapshot: { displayName: String } | null;
+  assigneeId: ObjectId | null;
+  assigneeSnapshot: { displayName: String } | null;
+  sprintId: ObjectId | null;   // null = backlog task
+  labelIds: [ObjectId];
+  createdById: ObjectId | null;
+  createdBySnapshot: { displayName: String };
+  version: Number;             // optimistic concurrency
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Indexes**:
+
+```text
+{ projectId: 1, number: -1 }
+{ projectId: 1, createdAt: -1 }
+{ projectId: 1, updatedAt: -1 }
+{ projectId: 1, statusId: 1, number: -1 }
+{ projectId: 1, sprintId: 1, number: -1 }
+{ projectId: 1, assigneeId: 1, number: -1 }
+{ projectId: 1, reporterId: 1, number: -1 }
+{ projectId: 1, priority: 1, number: -1 }
+{ projectId: 1, typeId: 1, number: -1 }
+```
+
+**Task number**: Atomic MongoDB counter (`$inc`) per project. Stored as numeric `number`. Displayed as
+`{PROJECT_KEY}-{number}`.
+
+**Backlog semantics**: `sprintId = null` means the task is in the backlog. This is NOT a separate entity.
+
+**Deletion**: Hard delete. Cascade-deletes Comments, Task Relationships, and Label associations. Audit event created
+before deletion.
+
+### 4.8 Counter
+
+```typescript
+{
+  _id: String; // counter key (e.g., project ID)
+  value: Number; // current sequence value
+}
+```
+
+Used for atomic task number generation via MongoDB `$inc`.
+
+### 4.9 Task Type
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  key: String; // immutable after creation
+  name: String; // editable display name
+  icon: String | null;
+  position: Number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Indexes**: `unique: { projectId: 1, key: 1 }`
+
+**Initial types**: `TASK`, `BUG`, `STORY`
+
+**Key immutability**: The `key` field cannot be changed after creation. The `name` field is editable.
+
+**Deletion with usage**: If a Task Type is in use by Tasks, a replacement Task Type must be specified. All affected
+Tasks are updated to the replacement.
+
+### 4.10 Status
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  name: String;
+  normalizedName: String; // lowercase, for case-insensitive uniqueness
+  position: Number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Indexes**: `unique: { projectId: 1, normalizedName: 1 }`
+
+**Initial statuses**: `TODO`, `IN_PROGRESS`, `IN_REVIEW`, `REOPENED`, `DONE`
+
+**Case insensitivity**: `In Progress` = `in progress` = `IN PROGRESS`
+
+**Deletion rules**:
+
+1. **Used by Tasks**: Replacement Status is mandatory. All affected Tasks AND Board column references are updated to the
+   replacement.
+2. **Not used by Tasks, but used by Boards**: Warn user which Boards reference it. Offer replacement or
+   deletion-without-replacement. If deleted without replacement, the Board column reference becomes invalid (not
+   displayed in Board view; shown in red in Board editor).
+
+### 4.11 Board
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  name: String;
+  type: "KANBAN" | "SPRINT";
+  columns: [
+    {
+      id: String;          // UUID
+      statusIds: [ObjectId];
+      position: Number;
     }
+  ];
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Indexes**: `{ projectId: 1 }`
+
+**Key rules**:
+
+- A Board belongs to a Project, NOT a Sprint
+- A column may contain multiple statuses
+- No `isDefault` field; `Project.defaultBoardId` is the source of truth
+- Only one Board displayed at a time in the UI
+- User's selected Board is a per-user/per-project preference
+
+**Default Board columns**:
+
+```text
+Column 1: TODO, REOPENED
+Column 2: IN_PROGRESS
+Column 3: IN_REVIEW
+Column 4: DONE
+```
+
+**Invalid references**: If a Status is deleted without replacement, the Board column referencing it is not rendered in
+Board view. In Board editor, it shows as a red warning so the admin can repair it.
+
+### 4.12 User Project Board Preference
+
+```typescript
+{
+  _id: ObjectId;
+  userId: ObjectId;
+  projectId: ObjectId;
+  defaultBoardId: ObjectId | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Indexes**: `unique: { userId: 1, projectId: 1 }`
+
+Board selection is a user/project preference. Changing one user's selection does NOT affect other users.
+
+### 4.13 Sprint
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  name: String;
+  status: 'FUTURE' | 'ACTIVE' | 'COMPLETED';
+  startDate: Date | null;
+  endDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Indexes**:
+
+```text
+{ projectId: 1, status: 1 }
+{ projectId: 1, startDate: 1 }
+```
+
+**Status transitions**: Unrestricted. Any status can transition to any other status, including `COMPLETED → ACTIVE`.
+
+**Date rules**:
+
+| Scenario                          | Behavior                        |
+| --------------------------------- | ------------------------------- |
+| Future Sprint with no dates       | Allowed                         |
+| Start without `startDate`         | `startDate = now`               |
+| Start with predefined `startDate` | Preserve predefined date        |
+| Start without `endDate`           | `endDate = now`                 |
+| Start with predefined `endDate`   | Preserve predefined date        |
+| Complete without `endDate`        | `endDate = now`                 |
+| Complete with existing `endDate`  | Preserve existing date          |
+| Both dates exist                  | `endDate >= startDate` required |
+| `endDate` reached                 | Does NOT auto-complete sprint   |
+
+**Deletion**: Does NOT delete Tasks. All affected Tasks have `sprintId` set to `null`. Sprint is then hard-deleted.
+
+### 4.14 Label
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  name: String;
+  normalizedName: String; // lowercase, for case-insensitive uniqueness
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**Indexes**: `unique: { projectId: 1, normalizedName: 1 }`
+
+**Case insensitivity**: `Bug` = `bug` = `BUG`. If `Bug` exists, typing `bug` selects the existing label.
+
+**Creation from Task**: When a label is first created from a Task, it is added to the project's global label list.
+
+**Deletion**: Removes all Task-label associations for that Label.
+
+### 4.15 Comment
+
+```typescript
+{
+  _id: ObjectId;
+  taskId: ObjectId;
+  authorId: ObjectId | null;
+  authorSnapshot: {
+    displayName: String;
   }
+  body: String; // Markdown
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
-**Template** (`workspace-detail.html`):
+**Indexes**: `{ taskId: 1, createdAt: 1 }`
 
-```html
-<div class="mx-auto max-w-3xl py-8">
-  <!-- Header -->
-  <div class="mb-6">
-    <h1 class="text-2xl font-bold text-foreground">{{ tenant()?.name }}</h1>
-    <div class="mt-2 flex items-center gap-3">
-      <span hlmBadge class="bg-purple-100 text-purple-700">{{ role() }}</span>
-    </div>
-  </div>
+**Author deletion**: `authorId = null`, `authorSnapshot.displayName` preserved. UI continues to display historical
+author name.
 
-  <!-- Description -->
-  <div class="mb-6">
-    @if (description()) {
-    <p class="text-sm text-muted-foreground">{{ description() }}</p>
-    } @else {
-    <p class="text-sm text-muted-foreground italic">No description provided.</p>
-    }
-  </div>
+**Authorization**: Viewer cannot create, edit, or delete comments. Editor and above can create comments. Only the
+comment author can edit/delete their own comment. Project Admin and above can delete any comment. **[Jira convention:
+source docs are silent on admin delete-any-comment; defaulting to Jira behavior where project admins can delete any
+comment.]**
 
-  <!-- Action Buttons (owner/admin only) -->
-  @if (isOwnerOrAdmin()) {
-  <div class="mb-6 flex flex-wrap gap-2">
-    <a hlmBtn variant="outline" size="md" [routerLink]="['/tenants', tenant()?.id, 'settings']">
-      <ng-icon name="lucideSettings" class="mr-1.5 h-4 w-4" />
-      Settings
-    </a>
-    <a hlmBtn variant="outline" size="md" [routerLink]="['/tenants', tenant()?.id, 'settings/members']">
-      <ng-icon name="lucideUsers" class="mr-1.5 h-4 w-4" />
-      Members
-    </a>
-    @if (showUpgrade()) {
-    <a hlmBtn variant="outline" size="md" [routerLink]="['/tenants', tenant()?.id, 'upgrade']">
-      <ng-icon name="lucideCreditCard" class="mr-1.5 h-4 w-4" />
-      Upgrade
-    </a>
-    }
-  </div>
+### 4.16 Task Relationship
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  sourceTaskId: ObjectId;
+  targetTaskId: ObjectId;
+  type: 'BLOCKS' | 'RELATES_TO' | 'DUPLICATES';
+  createdById: ObjectId;
+  createdAt: Date;
+}
+```
+
+Both Tasks must belong to the same Project. Ordinary external URLs are NOT represented by this entity; they are Markdown
+links in the Task description.
+
+### 4.17 Filter (Saved)
+
+```typescript
+{
+  _id: ObjectId;
+  projectId: ObjectId;
+  userId: ObjectId;
+  name: String;
+  filters: {
+    search: String | null;
+    statusIds: [ObjectId];
+    priority: [String];
+    typeIds: [ObjectId];
+    assigneeIds: [ObjectId];
+    reporterIds: [ObjectId];
+    sprintIds: [ObjectId | null]; // null = backlog filter
+    labelIds: [ObjectId];
   }
-
-  <!-- Collapsible Project List -->
-  <hlm-collapsible [open]="projectsExpanded()" (openChange)="projectsExpanded.set($event)">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-foreground">Projects ({{ projects().length }})</h2>
-      <button hlmCollapsibleTrigger size="sm" variant="ghost">
-        <ng-icon
-          name="lucideChevronDown"
-          class="h-4 w-4 transition-transform"
-          [class.rotate-180]="projectsExpanded()"
-        />
-      </button>
-    </div>
-
-    <div hlmCollapsibleContent>
-      @if (loadingProjects()) {
-      <div class="py-4 text-center text-sm text-muted-foreground">Loading projects…</div>
-      } @else if (projects().length === 0) {
-      <div class="rounded-lg border border-dashed border-border py-8 text-center">
-        <p class="text-sm text-muted-foreground">No projects yet.</p>
-      </div>
-      } @else {
-      <div class="mt-4 space-y-2">
-        @for (project of projects(); track project.id) {
-        <a
-          [routerLink]="['/tenants', tenant()?.id, 'projects', project.id]"
-          class="flex items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
-        >
-          <ng-icon name="lucideFolder" class="h-4 w-4 text-muted-foreground" />
-          <div>
-            <p class="text-sm font-medium text-foreground">{{ project.name }}</p>
-            @if (project.description) {
-            <p class="text-xs text-muted-foreground">{{ project.description }}</p>
-            }
-          </div>
-        </a>
-        }
-      </div>
-      }
-    </div>
-  </hlm-collapsible>
-</div>
-```
-
-#### 16.8.3 [`TenantClient`](ui/src/app/services/tenant-client.ts) update
-
-Update [`updateTenant()`](ui/src/app/services/tenant-client.ts:38) signature:
-
-```typescript
-updateTenant(tenantId: string, data: { name?: string; slug?: string; description?: string }): Observable<Tenant> {
-  return this.http.patch<Tenant>(`${this.apiBaseUrl}/tenants/${tenantId}`, data);
+  sort: String; // e.g., "createdAt:desc"
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
-#### 16.8.4 [`TenantStore`](ui/src/app/stores/tenant-store.ts) update
+**Indexes**: `unique: { userId: 1, projectId: 1, name: 1 }`
 
-Update [`updateTenant()`](ui/src/app/stores/tenant-store.ts:53) signature:
+Saved filters are user/project-specific. Opening one restores its query state.
+
+### 4.18 Audit Event
 
 ```typescript
-async updateTenant(tenantId: string, data: { name?: string; slug?: string; description?: string }): Promise<Tenant> {
-  // unchanged body — data is passed through to tenantClient.updateTenant()
+{
+  _id: ObjectId;
+  tenantId: ObjectId;
+  projectId: ObjectId | null;
+  entityType: String;       // TASK, PROJECT, SPRINT, STATUS, BOARD, LABEL, TASK_TYPE, COMMENT, TASK_RELATIONSHIP
+  entityId: ObjectId;
+  action: String;           // CREATED, UPDATED, DELETED
+  actor: {
+    userId: ObjectId | null;
+    displayName: String;
+  };
+  changes: [
+    {
+      field: String;
+      oldValue: Mixed;
+      newValue: Mixed;
+    }
+  ];
+  createdAt: Date;
 }
 ```
 
-#### 16.8.5 [`TenantStore`](ui/src/app/stores/tenant-store.ts) — active tenant type
+**Indexes**:
 
-The [`TenantStore`](ui/src/app/stores/tenant-store.ts:14) stores `Tenant` objects. After the
-[`TenantSchema`](server/src/schemas/tenant.ts:8) change (§16.7.1), the `Tenant` type will include `description`. No
-store code changes needed — the type flows automatically.
-
-#### 16.8.6 Dashboard changes
-
-**[`owner-dashboard.html`](ui/src/app/features/dashboard/owner-dashboard/owner-dashboard.html:48)** — Make the workspace
-name a link:
-
-```html
-<!-- Current: plain text -->
-<h3 class="text-sm font-semibold text-foreground">{{ tenant.name }}</h3>
-
-<!-- New: link to workspace detail -->
-<a [routerLink]="['/tenants', tenant.id]" class="text-sm font-semibold text-foreground hover:text-primary">
-  {{ tenant.name }}
-</a>
+```text
+{ tenantId: 1, createdAt: -1 }
+{ projectId: 1, createdAt: -1 }
+{ entityType: 1, entityId: 1, createdAt: -1 }
 ```
 
-**[`member-dashboard.html`](ui/src/app/features/dashboard/member-dashboard/member-dashboard.html:34)** — Change link
-target from projects to workspace detail:
+Actor snapshots remain meaningful after User deletion. Permanent Project deletion removes project-specific audit data.
 
-```html
-<!-- Current: links to projects -->
-<a [routerLink]="['/tenants', tenant.id, 'projects']" ...>
-  <!-- New: links to workspace detail -->
-  <a [routerLink]="['/tenants', tenant.id]" ...></a
-></a>
+### 4.19 Identity Snapshot
+
+```typescript
+{
+  displayName: String;
+}
 ```
 
-### 16.9 RBAC visibility matrix
+Used in: `Task.reporterSnapshot`, `Task.assigneeSnapshot`, `Task.createdBySnapshot`, `Comment.authorSnapshot`,
+`AuditEvent.actor.displayName`.
 
-| UI Element                  | Owner (free) | Owner (premium) | Admin | Member |
-| --------------------------- | :----------: | :-------------: | :---: | :----: |
-| Workspace name (`<h1>`)     |      ✅      |       ✅        |  ✅   |   ✅   |
-| Role badge                  |      ✅      |       ✅        |  ✅   |   ✅   |
-| Description text            |      ✅      |       ✅        |  ✅   |   ✅   |
-| Settings button             |      ✅      |       ✅        |  ✅   |   ❌   |
-| Members button              |      ✅      |       ✅        |  ✅   |   ❌   |
-| Upgrade button              |      ✅      |       ❌        |  ❌   |   ❌   |
-| Project list (all projects) |      ✅      |       ✅        |  ✅   |   ❌   |
-| Project list (own projects) |      ❌      |       ❌        |  ❌   |   ✅   |
-
-### 16.10 Out of scope
-
-- Editing workspace description inline on the workspace detail page (description is edited via Settings page).
-- Workspace avatar / logo upload.
-- Recent activity feed on the workspace detail page.
-- Project creation from the workspace detail page (existing flow via `/tenants/:tenantId/projects`).
-- Drag-and-drop reordering of projects in the list.
-- Workspace analytics or statistics on the detail page.
-
-### 16.11 Open questions / assumptions
-
-#### Blocking questions
-
-| #       | Question                                                                                                                                                                                                                                                                                                                                                                  | Impact                               |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| BQ-16.1 | The [`GET /projects`](server/src/routes/projects.ts) endpoint returns all projects for the active tenant. For `member` role, does the server already filter by project membership, or does the client need to filter? If the server returns all projects regardless of project membership, a new query parameter or endpoint is needed for member-scoped project listing. | FR-16.18 — member project visibility |
-| BQ-16.2 | Does [`TenantRepository.update()`](server/src/repositories/tenant.repository.ts:72) need an explicit migration for existing documents that lack the `description` field, or does MongoDB handle missing fields gracefully as `null`/`undefined`?                                                                                                                          | AC-6 — backward compatibility        |
-
-#### Assumptions
-
-| #   | Assumption                                                                                                                                                                                    |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A-1 | MongoDB documents without a `description` field will return `undefined` when accessed, which maps to `null` in the domain model — no migration needed                                         |
-| A-2 | The [`HlmCollapsible`](ui/libs/ui/collapsible/src/lib/hlm-collapsible.ts) Spartan UI component is already installed and available in the project                                              |
-| A-3 | The [`ProjectClient.list()`](ui/src/app/services/project-client.ts:21) method uses the active tenant context (via `X-Tenant-Id` header interceptor) to scope results                          |
-| A-4 | For member role, the current `GET /projects` endpoint returns all tenant projects; client-side filtering by project membership will be used as an interim solution pending BQ-16.1 resolution |
-| A-5 | The empty-path child route does not conflict with wildcard redirects since Angular resolves child routes before the parent's wildcard                                                         |
+Snapshots are NOT updated if the User later changes their name.
 
 ---
 
-## Summary
+## 5. API Contracts
+
+### 5.1 Conventions
+
+- **Base path**: `/api`
+- **Content type**: `application/json`
+- **Authentication**: JWT Bearer token in `Authorization` header
+- **Tenant context**: `X-Tenant-Id` header for tenant-scoped operations
+- **IDs**: UUID v4 format (not MongoDB ObjectId in API layer)
+- **Timestamps**: ISO 8601 format
+
+### 5.2 Authentication
+
+| Method | Path                 | Description       |
+| ------ | -------------------- | ----------------- |
+| `POST` | `/api/auth/register` | Register new user |
+| `POST` | `/api/auth/login`    | Login             |
+| `GET`  | `/api/auth/me`       | Get current user  |
+
+**Register request**:
+
+```typescript
+{
+  email: string;
+  password: string;
+  displayName: string;
+}
+```
+
+**Login request**:
+
+```typescript
+{
+  email: string;
+  password: string;
+}
+```
+
+**Auth response**:
+
+```typescript
+{
+  token: string; // JWT
+  user: User;
+}
+```
+
+### 5.3 Tenants
+
+| Method   | Path                     | Description                      |
+| -------- | ------------------------ | -------------------------------- |
+| `GET`    | `/api/tenants`           | List tenants for current user    |
+| `POST`   | `/api/tenants`           | Create tenant                    |
+| `GET`    | `/api/tenants/:tenantId` | Get tenant details               |
+| `PATCH`  | `/api/tenants/:tenantId` | Update tenant                    |
+| `DELETE` | `/api/tenants/:tenantId` | Delete tenant (DELETION_PENDING) |
+
+**Create request**:
+
+```typescript
+{
+  name: string;
+  description?: string;
+}
+```
+
+**Update request**:
+
+```typescript
+{
+  name?: string;
+  description?: string;
+}
+```
+
+### 5.4 Tenant Memberships
+
+| Method   | Path                                       | Description         |
+| -------- | ------------------------------------------ | ------------------- |
+| `GET`    | `/api/tenants/:tenantId/members`           | List tenant members |
+| `PATCH`  | `/api/tenants/:tenantId/members/:memberId` | Update member role  |
+| `DELETE` | `/api/tenants/:tenantId/members/:memberId` | Remove member       |
+
+### 5.5 Invitations
+
+| Method   | Path                                               | Description            |
+| -------- | -------------------------------------------------- | ---------------------- |
+| `POST`   | `/api/tenants/:tenantId/invitations`               | Send invitation        |
+| `GET`    | `/api/invitations/:token`                          | Get invitation details |
+| `POST`   | `/api/invitations/:token/accept`                   | Accept invitation      |
+| `POST`   | `/api/invitations/:token/decline`                  | Decline invitation     |
+| `DELETE` | `/api/tenants/:tenantId/invitations/:invitationId` | Revoke invitation      |
+
+**Send invitation request**:
+
+```typescript
+{
+  email: string;
+  role: TenantRole;
+}
+```
+
+**Accept invitation request**:
+
+```typescript
+{
+  token: string;
+  password?: string;      // if user needs to register
+  displayName?: string;   // if user needs to register
+}
+```
+
+### 5.6 Projects
+
+| Method   | Path                              | Description                       |
+| -------- | --------------------------------- | --------------------------------- |
+| `GET`    | `/api/tenants/:tenantId/projects` | List projects                     |
+| `POST`   | `/api/tenants/:tenantId/projects` | Create project                    |
+| `GET`    | `/api/projects/:projectId`        | Get project details               |
+| `PATCH`  | `/api/projects/:projectId`        | Update project                    |
+| `DELETE` | `/api/projects/:projectId`        | Delete project (DELETION_PENDING) |
+
+**Create request**:
+
+```typescript
+{
+  key: string;
+  name: string;
+  description?: string;
+}
+```
+
+**Update request**:
+
+```typescript
+{
+  name?: string;
+  description?: string;
+}
+```
+
+### 5.7 Project Memberships
+
+| Method   | Path                                         | Description                |
+| -------- | -------------------------------------------- | -------------------------- |
+| `GET`    | `/api/projects/:projectId/members`           | List project members       |
+| `POST`   | `/api/projects/:projectId/members`           | Add member to project      |
+| `PATCH`  | `/api/projects/:projectId/members/:memberId` | Update member role         |
+| `DELETE` | `/api/projects/:projectId/members/:memberId` | Remove member from project |
+
+### 5.8 Tasks
+
+| Method   | Path                             | Description                        |
+| -------- | -------------------------------- | ---------------------------------- |
+| `GET`    | `/api/projects/:projectId/tasks` | List tasks (paginated, filterable) |
+| `POST`   | `/api/projects/:projectId/tasks` | Create task                        |
+| `GET`    | `/api/tasks/:taskId`             | Get task details                   |
+| `PATCH`  | `/api/tasks/:taskId`             | Update task (requires `version`)   |
+| `DELETE` | `/api/tasks/:taskId`             | Delete task                        |
+
+**Create request**:
+
+```typescript
+{
+  typeId: string;
+  title: string;
+  description?: string;
+  statusId: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  assigneeId?: string;
+  sprintId?: string;
+  labelIds?: string[];
+}
+```
+
+**Update request** (all fields optional except `version`):
+
+```typescript
+{
+  title?: string;
+  description?: string;
+  statusId?: string;
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  assigneeId?: string | null;
+  typeId?: string;
+  sprintId?: string | null;
+  labelIds?: string[];
+  version: number;    // required for optimistic concurrency
+}
+```
+
+**Query parameters**:
+
+```typescript
+{
+  page?: number;        // default: 1
+  limit?: number;       // default: 20, max: 100
+  sort?: string;        // e.g., "createdAt:desc"
+  search?: string;      // free-text search
+  statusId?: string;
+  priority?: string;
+  typeId?: string;
+  assigneeId?: string;
+  reporterId?: string;
+  sprintId?: string;
+  labelId?: string;
+}
+```
+
+### 5.9 Sprints
+
+| Method   | Path                               | Description                              |
+| -------- | ---------------------------------- | ---------------------------------------- |
+| `GET`    | `/api/projects/:projectId/sprints` | List sprints                             |
+| `POST`   | `/api/projects/:projectId/sprints` | Create sprint                            |
+| `PATCH`  | `/api/sprints/:sprintId`           | Update sprint (including status changes) |
+| `DELETE` | `/api/sprints/:sprintId`           | Delete sprint                            |
+
+**Create request**:
+
+```typescript
+{
+  name: string;
+  startDate?: string;   // ISO 8601 date
+  endDate?: string;     // ISO 8601 date
+}
+```
+
+**Update request**:
+
+```typescript
+{
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: "FUTURE" | "ACTIVE" | "COMPLETED";
+}
+```
+
+### 5.10 Boards
+
+| Method   | Path                              | Description  |
+| -------- | --------------------------------- | ------------ |
+| `GET`    | `/api/projects/:projectId/boards` | List boards  |
+| `POST`   | `/api/projects/:projectId/boards` | Create board |
+| `PATCH`  | `/api/boards/:boardId`            | Update board |
+| `DELETE` | `/api/boards/:boardId`            | Delete board |
+
+**Create request**:
+
+```typescript
+{
+  name: string;
+  type: "KANBAN" | "SPRINT";
+  columns: { statusIds: string[]; position: number }[];
+}
+```
+
+**Update request**:
+
+```typescript
+{
+  name?: string;
+  columns?: { id?: string; statusIds: string[]; position: number }[];
+}
+```
+
+### 5.11 Statuses
+
+| Method   | Path                                | Description   |
+| -------- | ----------------------------------- | ------------- |
+| `GET`    | `/api/projects/:projectId/statuses` | List statuses |
+| `POST`   | `/api/projects/:projectId/statuses` | Create status |
+| `PATCH`  | `/api/statuses/:statusId`           | Update status |
+| `DELETE` | `/api/statuses/:statusId`           | Delete status |
+
+**Create request**:
+
+```typescript
+{
+  name: string;
+}
+```
+
+**Delete request** (when used by Tasks):
+
+```typescript
+{
+  replacementStatusId: string; // mandatory when status is in use
+}
+```
+
+### 5.12 Labels
+
+| Method   | Path                              | Description  |
+| -------- | --------------------------------- | ------------ |
+| `GET`    | `/api/projects/:projectId/labels` | List labels  |
+| `POST`   | `/api/projects/:projectId/labels` | Create label |
+| `PATCH`  | `/api/labels/:labelId`            | Update label |
+| `DELETE` | `/api/labels/:labelId`            | Delete label |
+
+**Create/Update request**:
+
+```typescript
+{
+  name: string;
+}
+```
+
+### 5.13 Task Types
+
+| Method   | Path                                  | Description                  |
+| -------- | ------------------------------------- | ---------------------------- |
+| `GET`    | `/api/projects/:projectId/task-types` | List task types              |
+| `POST`   | `/api/projects/:projectId/task-types` | Create task type             |
+| `PATCH`  | `/api/task-types/:taskTypeId`         | Update task type (name only) |
+| `DELETE` | `/api/task-types/:taskTypeId`         | Delete task type             |
+
+**Create request**:
+
+```typescript
+{
+  key: string;
+  name: string;
+  icon?: string;
+}
+```
+
+**Update request**:
+
+```typescript
+{
+  name: string; // only name is editable; key is immutable
+}
+```
+
+### 5.14 Comments
+
+| Method   | Path                          | Description    |
+| -------- | ----------------------------- | -------------- |
+| `GET`    | `/api/tasks/:taskId/comments` | List comments  |
+| `POST`   | `/api/tasks/:taskId/comments` | Create comment |
+| `PATCH`  | `/api/comments/:commentId`    | Update comment |
+| `DELETE` | `/api/comments/:commentId`    | Delete comment |
+
+**Create/Update request**:
+
+```typescript
+{
+  body: string; // Markdown
+}
+```
+
+### 5.15 Task Relationships
+
+| Method   | Path                                      | Description         |
+| -------- | ----------------------------------------- | ------------------- |
+| `GET`    | `/api/tasks/:taskId/relationships`        | List relationships  |
+| `POST`   | `/api/tasks/:taskId/relationships`        | Create relationship |
+| `DELETE` | `/api/task-relationships/:relationshipId` | Delete relationship |
+
+**Create request**:
+
+```typescript
+{
+  targetTaskId: string;
+  type: 'BLOCKS' | 'RELATES_TO' | 'DUPLICATES';
+}
+```
+
+### 5.16 Filters (Saved)
+
+| Method   | Path                               | Description         |
+| -------- | ---------------------------------- | ------------------- |
+| `GET`    | `/api/projects/:projectId/filters` | List saved filters  |
+| `POST`   | `/api/projects/:projectId/filters` | Create saved filter |
+| `PATCH`  | `/api/filters/:filterId`           | Update saved filter |
+| `DELETE` | `/api/filters/:filterId`           | Delete saved filter |
+
+**Create request**:
+
+```typescript
+{
+  name: string;
+  filters: FilterCriteria;
+  sort: FilterSort;
+}
+```
+
+### 5.17 User Preferences
+
+| Method  | Path               | Description                  |
+| ------- | ------------------ | ---------------------------- |
+| `GET`   | `/api/preferences` | Get current user preferences |
+| `PATCH` | `/api/preferences` | Update preferences           |
+
+**Update request**:
+
+```typescript
+{
+  zoom?: number;
+  theme?: string;
+  language?: string;
+}
+```
+
+### 5.18 User Project Board Preference
+
+| Method | Path                                        | Description                 |
+| ------ | ------------------------------------------- | --------------------------- |
+| `GET`  | `/api/projects/:projectId/board-preference` | Get user's board preference |
+| `PUT`  | `/api/projects/:projectId/board-preference` | Set user's board preference |
+
+**Set request**:
+
+```typescript
+{
+  defaultBoardId: string;
+}
+```
+
+### 5.19 Audit
+
+| Method | Path                             | Description                   |
+| ------ | -------------------------------- | ----------------------------- |
+| `GET`  | `/api/projects/:projectId/audit` | List audit events for project |
+| `GET`  | `/api/tenants/:tenantId/audit`   | List audit events for tenant  |
+
+**Query parameters**:
+
+```typescript
+{
+  page?: number;
+  limit?: number;
+  entityType?: string;
+  entityId?: string;
+}
+```
+
+---
+
+## 6. Authorization Matrix
+
+### 6.1 Tenant Operations
+
+| Operation             | Owner | Tenant Admin | Member |
+| --------------------- | :---: | :----------: | :----: |
+| Create Tenant         |  ✅   |      ✅      |   ✅   |
+| View Tenant           |  ✅   |      ✅      |   ✅   |
+| Update Tenant         |  ✅   |      ✅      |   ❌   |
+| Delete Tenant         |  ✅   |      ❌      |   ❌   |
+| Manage Tenant Members |  ✅   |      ✅      |   ❌   |
+| Send Invitations      |  ✅   |      ✅      |   ❌   |
+| Revoke Invitations    |  ✅   |      ✅      |   ❌   |
+| Change Member Roles   |  ✅   |      ✅      |   ❌   |
+| View Audit Log        |  ✅   |      ✅      |   ❌   |
+
+### 6.2 Project Operations
+
+| Operation              | Owner | Tenant Admin | Project Admin | Editor | Viewer |
+| ---------------------- | :---: | :----------: | :-----------: | :----: | :----: |
+| Create Project         |  ✅   |      ✅      |      ❌       |   ❌   |   ❌   |
+| View Project           |  ✅   |      ✅      |      ✅       |   ✅   |   ✅   |
+| Update Project         |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Delete Project         |  ✅   |      ✅      |      ❌       |   ❌   |   ❌   |
+| Archive Project        |  ✅   |      ✅      |      ❌       |   ❌   |   ❌   |
+| Restore Project        |  ✅   |      ✅      |      ❌       |   ❌   |   ❌   |
+| Manage Project Members |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Manage Statuses        |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Manage Task Types      |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Manage Boards          |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Manage Labels          |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Create Sprint          |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Change Sprint Status   |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Delete Sprint          |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| View Audit Log         |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+
+### 6.3 Task Operations
+
+| Operation            | Owner | Tenant Admin | Project Admin | Editor | Viewer |
+| -------------------- | :---: | :----------: | :-----------: | :----: | :----: |
+| Create Task          |  ✅   |      ✅      |      ✅       |   ✅   |   ❌   |
+| View Tasks           |  ✅   |      ✅      |      ✅       |   ✅   |   ✅   |
+| Edit Task            |  ✅   |      ✅      |      ✅       |   ✅   |   ❌   |
+| Delete Task          |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Create Comment       |  ✅   |      ✅      |      ✅       |   ✅   |   ❌   |
+| Edit Own Comment     |  ✅   |      ✅      |      ✅       |   ✅   |   ❌   |
+| Delete Own Comment   |  ✅   |      ✅      |      ✅       |   ✅   |   ❌   |
+| Delete Any Comment   |  ✅   |      ✅      |      ✅       |   ❌   |   ❌   |
+| Create Relationship  |  ✅   |      ✅      |      ✅       |   ✅   |   ❌   |
+| Delete Relationship  |  ✅   |      ✅      |      ✅       |   ✅   |   ❌   |
+| Manage Saved Filters |  ✅   |      ✅      |      ✅       |   ✅   |   ✅   |
+
+### 6.4 Implicit Access Rule
+
+Tenant Owner and Tenant Admin have implicit access to all projects within their tenant, regardless of whether they have
+an explicit Project Membership record. Their effective project role is at least `PROJECT_ADMIN` for authorization
+purposes.
+
+---
+
+## 7. Business Rules
+
+### 7.1 Tenant Lifecycle
+
+1. **Creation**: User becomes Owner. Tenant status is `ACTIVE`.
+2. **Archive**: All projects archived with `archiveReason = TENANT_ARCHIVE`. Projects already archived retain their
+   original reason.
+3. **Restore**: Only projects with `archiveReason = TENANT_ARCHIVE` are restored.
+4. **Deletion**: `ACTIVE → DELETION_PENDING → permanent deletion`. Grace period allows cancellation.
+
+### 7.2 Project Lifecycle
+
+1. **Creation**: Automatically seeds Task Types, Statuses, and default Board (see
+   [Section 11: Seed Data](#11-seed-data)).
+2. **Archive**: Project becomes read-only. Write controls disabled.
+3. **Restore**: `ARCHIVED → ACTIVE`.
+4. **Deletion**: `ACTIVE → DELETION_PENDING → permanent deletion`. Grace period allows cancellation. Permanent deletion
+   cascades to all owned entities.
+
+### 7.3 Task Lifecycle
+
+1. **Creation**: Receives project's `defaultStatusId` by default. User may select another status. Task number is
+   atomically assigned.
+2. **Editing**: Fields are edited independently (Jira-style). Each UI save changes one field per API call.
+3. **Deletion**: Hard delete. Cascade-deletes Comments, Relationships, Label associations. Audit event created before
+   deletion.
+
+### 7.4 Sprint Lifecycle
+
+1. **Creation**: Status defaults to `FUTURE`. Dates are optional.
+2. **Start**: `FUTURE → ACTIVE`. If no `startDate`, set to `now`. If no `endDate`, set to `now`. Predefined dates are
+   preserved.
+3. **Complete**: `ACTIVE → COMPLETED`. If no `endDate`, set to `now`. Existing `endDate` preserved.
+4. **Reopen**: `COMPLETED → ACTIVE`. Dates preserved.
+5. **Deletion**: Tasks have `sprintId` set to `null`. Sprint is hard-deleted.
+
+### 7.5 Invitation Lifecycle
+
+1. **Send**: Creates membership with `invitation.status = PENDING`. Email sent.
+2. **Re-send**: Old invitation replaced. New token. Old link invalidated. New email sent.
+3. **Accept**: `invitation = null`, `membership.status = ACTIVE`.
+4. **Expire**: Derived from `invitedOn + INVITATION_TTL`. Backend dynamically checks.
+5. **Revoke**: `invitation.status = REVOKED`.
+6. **Decline**: `invitation.status = DECLINED`.
+
+### 7.6 Membership Lifecycle
+
+1. **Active**: User has access.
+2. **Revoked**: `membership.status = ACCESS_REVOKED`. If invitation existed, `invitation = null`.
+3. **Restored**: `ACCESS_REVOKED → ACTIVE`. Pending invitations cannot be bypassed; user must accept invitation.
+
+### 7.7 User Deletion
+
+1. Removes live membership/access from all Tenants and Projects.
+2. Does NOT delete Tasks, Comments, or historical data.
+3. Snapshots (`createdBySnapshot`, `reporterSnapshot`, `assigneeSnapshot`, `authorSnapshot`) preserved.
+4. Search continues to find historical records by stored display name.
+
+### 7.8 Automatic Behaviors
+
+| Behavior                       | Trigger                 |
+| ------------------------------ | ----------------------- |
+| Project seed data creation     | Project creation        |
+| Default status on new Task     | Task creation           |
+| Case-insensitive Label reuse   | Label selection         |
+| Missing `startDate` populated  | Sprint start            |
+| Missing `endDate` populated    | Sprint start / complete |
+| Invitation replacement         | Re-send invitation      |
+| Historical snapshots preserved | User deletion           |
+| Task `sprintId = null`         | Sprint deletion         |
+
+### 7.9 Explicitly NOT Automatic
+
+| Non-behavior                        | Explanation                  |
+| ----------------------------------- | ---------------------------- |
+| Sprint auto-completion on `endDate` | Must be explicitly triggered |
+| Task deletion on member removal     | Tasks remain                 |
+| Task deletion on user deletion      | Tasks remain                 |
+| Board change for other users        | Per-user preference          |
+| Task deletion on Sprint deletion    | Tasks move to backlog        |
+| Task deletion on Board deletion     | Tasks unaffected             |
+
+---
+
+## 8. Validation Rules
+
+### 8.1 Field-Level Validation
+
+| Field            | Rule                                                                              |
+| ---------------- | --------------------------------------------------------------------------------- |
+| User email       | Valid email format, normalized to lowercase, unique                               |
+| User displayName | Required, non-empty                                                               |
+| User password    | Minimum 8 characters **[Jira convention: source docs silent on password policy]** |
+| Tenant name      | Required, non-empty                                                               |
+| Project key      | 2–10 characters, starts with letter, `[A-Z0-9]` only, unique per tenant           |
+| Project name     | Required, non-empty                                                               |
+| Task title       | Required, max 255 characters                                                      |
+| Task description | Optional, max 10000 characters, Markdown format                                   |
+| Task priority    | One of: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`                                       |
+| Sprint name      | Required, non-empty                                                               |
+| Sprint dates     | `endDate >= startDate` when both exist                                            |
+| Status name      | Required, non-empty, case-insensitive unique per project                          |
+| Label name       | Required, non-empty, case-insensitive unique per project                          |
+| Task Type key    | Required, immutable after creation, unique per project                            |
+| Task Type name   | Required, non-empty                                                               |
+| Board name       | Required, non-empty                                                               |
+| Comment body     | Required, non-empty                                                               |
+| Filter name      | Required, non-empty, unique per user/project                                      |
+
+### 8.2 Cross-Field Validation
+
+| Rule                                  | Description                                                                                  |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Entity belongs to Project             | Status, Label, Task Type, Sprint, Board referenced by a Task must belong to the same Project |
+| Replacement Status belongs to Project | When deleting a Status with replacement                                                      |
+| Both tasks same Project               | Task relationships require both tasks in the same Project                                    |
+| Sprint date constraint                | `endDate >= startDate` when both dates exist                                                 |
+| Project key immutability              | Cannot change key after first Task exists                                                    |
+| Optimistic concurrency                | `version` must match stored version                                                          |
+
+### 8.3 Server-Side Enforcement
+
+All validation must be enforced server-side. Client-side validation is a UX convenience, not a security boundary.
+
+---
+
+## 9. Concurrency Model
+
+### 9.1 Optimistic Locking
+
+Tasks use optimistic concurrency via a `version` field.
+
+**Update flow**:
+
+1. Client reads Task with `version: 12`
+2. Client sends update with `version: 12`
+3. Server checks: stored version == 12?
+   - **Yes**: Update succeeds, version becomes 13
+   - **No**: Return `TASK_VERSION_CONFLICT` error with `currentVersion`
+
+**Request example**:
+
+```json
+{
+  "title": "New title",
+  "version": 12
+}
+```
+
+**Conflict response**:
+
+```json
+{
+  "error": {
+    "code": "TASK_VERSION_CONFLICT",
+    "message": "The task was modified by another user.",
+    "details": {
+      "currentVersion": 13
+    }
+  }
+}
+```
+
+### 9.2 Multi-Field Patches
+
+For operations where multiple fields can be patched simultaneously, conflict handling should compare the changed fields.
+A three-way merge is preferred where practical:
+
+1. Compare client's changed fields against the server's current state
+2. If different fields were changed by different users, merge non-conflicting changes
+3. If the same field was changed, return conflict
+
+### 9.3 UI Behavior on Conflict
+
+The UI must NOT silently overwrite another user's change. On conflict:
+
+1. Display conflict message: "The task was modified by another user. Reload it and try again."
+2. Offer to reload the latest version
+3. Preserve the user's local changes for manual merge
+
+---
+
+## 10. Pagination
+
+### 10.1 Request Model
+
+```text
+?page=1&limit=30&sort=createdAt:desc
+```
+
+| Parameter | Type    | Default | Constraints                                                     |
+| --------- | ------- | ------- | --------------------------------------------------------------- |
+| `page`    | integer | 1       | ≥ 1                                                             |
+| `limit`   | integer | 20      | 1–100                                                           |
+| `sort`    | string  | varies  | `field:direction` format (e.g., `createdAt:desc`, `number:asc`) |
+
+### 10.2 Response Model
+
+```json
+{
+  "data": [],
+  "pagination": {
+    "page": 1,
+    "limit": 30,
+    "total": 10352,
+    "totalPages": 346
+  }
+}
+```
+
+### 10.3 URL State
+
+Pagination state is URL-addressable for bookmarking and sharing:
+
+```text
+/projects/PROJ/tasks?page=345&limit=30&sort=createdAt:desc&statusId=abc123
+```
+
+### 10.4 Invalid Page Handling
+
+If a requested page becomes invalid because records were deleted, move to the nearest valid page instead of showing a
+broken table.
+
+### 10.5 Sort Fields
+
+Supported sort fields for Tasks:
+
+- `number` (default: desc)
+- `createdAt`
+- `updatedAt`
+- `priority`
+- `title`
+- `statusId`
+
+---
+
+## 11. Seed Data
+
+### 11.1 Project Creation Seed
+
+Creating a Project must execute a logically atomic initialization. Use a MongoDB transaction where the deployment
+topology supports transactions.
+
+**Step 1: Create Task Types**
+
+| Key     | Name  | Position |
+| ------- | ----- | -------- |
+| `TASK`  | Task  | 0        |
+| `BUG`   | Bug   | 1        |
+| `STORY` | Story | 2        |
+
+**Step 2: Create Statuses**
+
+| Name          | Normalized Name | Position |
+| ------------- | --------------- | -------- |
+| `TODO`        | `todo`          | 0        |
+| `IN_PROGRESS` | `in_progress`   | 1        |
+| `IN_REVIEW`   | `in_review`     | 2        |
+| `REOPENED`    | `reopened`      | 3        |
+| `DONE`        | `done`          | 4        |
+
+**Step 3: Create Default Board**
+
+| Column   | Statuses       | Position |
+| -------- | -------------- | -------- |
+| Column 1 | TODO, REOPENED | 0        |
+| Column 2 | IN_PROGRESS    | 1        |
+| Column 3 | IN_REVIEW      | 2        |
+| Column 4 | DONE           | 3        |
+
+**Step 4: Set Project References**
+
+```text
+Project.defaultStatusId = TODO status ID
+Project.defaultBoardId = created default Board ID
+```
+
+**Atomicity**: Project creation must not leave a partially initialized Project visible to users.
+
+---
+
+## 12. Search and Filters
+
+### 12.1 Task Search Scope
+
+Free-text search covers:
+
+- Task number (e.g., `PROJ-123`)
+- Task title
+- Task description
+- Historical reporter name (`reporterSnapshot.displayName`)
+- Historical assignee name (`assigneeSnapshot.displayName`)
+- Historical creator name (`createdBySnapshot.displayName`)
+
+Search is case-insensitive. Deleted users are still discoverable through historical snapshots.
+
+### 12.2 Structured Filters
+
+Filters are combined with AND logic:
+
+| Filter       | Type             | Description                       |
+| ------------ | ---------------- | --------------------------------- |
+| `statusId`   | ObjectId         | Filter by status                  |
+| `priority`   | String           | Filter by priority                |
+| `typeId`     | ObjectId         | Filter by task type               |
+| `assigneeId` | ObjectId         | Filter by assignee                |
+| `reporterId` | ObjectId         | Filter by reporter                |
+| `sprintId`   | ObjectId \| null | Filter by sprint (null = backlog) |
+| `labelId`    | ObjectId         | Filter by label                   |
+
+### 12.3 Saved Filters
+
+Users can save frequently used filter configurations per project:
+
+```typescript
+{
+  name: "My Open Bugs";
+  filters: {
+    typeIds: ["BUG_TYPE_ID"],
+    assigneeIds: ["CURRENT_USER_ID"],
+    statusIds: ["TODO_ID", "IN_PROGRESS_ID", "IN_REVIEW_ID", "REOPENED_ID"]
+  };
+  sort: "createdAt:desc";
+}
+```
+
+Opening a saved filter restores its complete query state.
+
+### 12.4 URL Addressability
+
+Filter state is represented in the URL where practical:
+
+```text
+/projects/PROJ/tasks?search=login+bug&typeId=BUG&assigneeId=me&page=1
+```
+
+---
+
+## 13. Audit System
+
+### 13.1 Event Structure
+
+```typescript
+{
+  id: string;
+  tenantId: string;
+  projectId: string | null;
+  entityType: "TASK" | "PROJECT" | "SPRINT" | "STATUS" | "BOARD" | "LABEL" | "TASK_TYPE" | "COMMENT" | "TASK_RELATIONSHIP";
+  entityId: string;
+  action: "CREATED" | "UPDATED" | "DELETED";
+  actor: {
+    userId: string | null;
+    displayName: string;
+  };
+  changes: [
+    {
+      field: string;
+      oldValue: unknown;
+      newValue: unknown;
+    }
+  ];
+  createdAt: string;
+}
+```
+
+### 13.2 Actor Snapshots
+
+Actor identity is snapshotted at the time of the action. If the User is later deleted or changes their name, the audit
+record retains the original display name.
+
+### 13.3 Audit Scope
+
+| Entity Type       | Audited Actions           |
+| ----------------- | ------------------------- |
+| Task              | Created, Updated, Deleted |
+| Project           | Created, Updated, Deleted |
+| Sprint            | Created, Updated, Deleted |
+| Status            | Created, Updated, Deleted |
+| Board             | Created, Updated, Deleted |
+| Label             | Created, Updated, Deleted |
+| Task Type         | Created, Updated, Deleted |
+| Comment           | Created, Updated, Deleted |
+| Task Relationship | Created, Deleted          |
+
+### 13.4 Retention
+
+Permanent Project deletion removes project-specific audit data. If long-term audit preservation is required, archive the
+Project instead of permanently deleting it.
+
+---
+
+## 14. Error Model
+
+### 14.1 Response Structure
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable message",
+    "details": {
+      "additional": "context"
+    }
+  }
+}
+```
+
+### 14.2 HTTP Status Codes
+
+| Code | Usage                                |
+| ---- | ------------------------------------ |
+| 200  | Success                              |
+| 201  | Created                              |
+| 204  | Deleted (no content)                 |
+| 400  | Validation error                     |
+| 401  | Unauthorized (not authenticated)     |
+| 403  | Forbidden (insufficient permissions) |
+| 404  | Not found                            |
+| 409  | Conflict                             |
+| 500  | Internal server error                |
+
+### 14.3 Error Codes
+
+| Code                          | HTTP Status | Description                                                   |
+| ----------------------------- | ----------- | ------------------------------------------------------------- |
+| `UNAUTHORIZED`                | 401         | Missing or invalid authentication                             |
+| `FORBIDDEN`                   | 403         | Insufficient permissions for the operation                    |
+| `NOT_FOUND`                   | 404         | Requested entity does not exist                               |
+| `VALIDATION_ERROR`            | 400         | Request body or parameters failed validation                  |
+| `CONFLICT`                    | 409         | General conflict (e.g., duplicate constraint)                 |
+| `TASK_VERSION_CONFLICT`       | 409         | Optimistic concurrency conflict on Task                       |
+| `DUPLICATE_PROJECT_KEY`       | 409         | Project key already exists in tenant                          |
+| `DUPLICATE_LABEL`             | 409         | Label name already exists in project (case-insensitive)       |
+| `DUPLICATE_STATUS`            | 409         | Status name already exists in project (case-insensitive)      |
+| `INVALID_STATUS_REPLACEMENT`  | 400         | Replacement status is invalid or belongs to different project |
+| `INVALID_SPRINT_DATES`        | 400         | `endDate < startDate`                                         |
+| `INVITATION_EXPIRED`          | 410         | Invitation has expired                                        |
+| `INVITATION_REVOKED`          | 410         | Invitation has been revoked                                   |
+| `INVITATION_ALREADY_ACCEPTED` | 409         | Invitation was already accepted                               |
+| `PROJECT_ARCHIVED`            | 403         | Attempt to modify an archived project                         |
+| `TENANT_ARCHIVED`             | 403         | Attempt to modify an archived tenant                          |
+| `PROJECT_KEY_IMMUTABLE`       | 400         | Attempt to change project key after tasks exist               |
+| `TASK_TYPE_IN_USE`            | 409         | Cannot delete task type that is in use without replacement    |
+| `STATUS_IN_USE`               | 409         | Cannot delete status that is in use without replacement       |
+
+---
+
+## 15. Frontend Screens
+
+### 15.1 Screen Inventory
+
+| Screen            | Route                                                        | Description                           |
+| ----------------- | ------------------------------------------------------------ | ------------------------------------- |
+| Landing Page      | `/`                                                          | Public page for logged-out users      |
+| Login             | `/auth/login`                                                | Email/password login                  |
+| Register          | `/auth/register`                                             | User registration                     |
+| Accept Invitation | `/auth/accept-invitation`                                    | Invitation acceptance flow            |
+| Dashboard         | `/`                                                          | Main dashboard (authenticated)        |
+| Create Workspace  | `/workspace/create`                                          | First tenant onboarding               |
+| Workspace Detail  | `/tenants/:tenantId`                                         | Tenant dashboard                      |
+| Tenant Settings   | `/tenants/:tenantId/settings`                                | Tenant administration                 |
+| Tenant Members    | `/tenants/:tenantId/settings/members`                        | Tenant member management              |
+| Project List      | `/tenants/:tenantId/projects`                                | List of projects                      |
+| Project Detail    | `/tenants/:tenantId/projects/:projectId`                     | Project overview                      |
+| Board View        | `/tenants/:tenantId/projects/:projectId/boards/:boardId`     | Kanban/Sprint board                   |
+| Task Table        | `/tenants/:tenantId/projects/:projectId/tasks`               | Searchable task list                  |
+| Task Detail       | `/tenants/:tenantId/projects/:projectId/tasks/:taskId`       | Task detail/edit                      |
+| Sprint List       | `/tenants/:tenantId/projects/:projectId/sprints`             | Sprint management                     |
+| Sprint Detail     | `/tenants/:tenantId/projects/:projectId/sprints/:sprintId`   | Sprint detail/board                   |
+| Project Members   | `/tenants/:tenantId/projects/:projectId/members`             | Project member management             |
+| Status Manager    | `/tenants/:tenantId/projects/:projectId/settings/statuses`   | Status CRUD                           |
+| Task Type Manager | `/tenants/:tenantId/projects/:projectId/settings/task-types` | Task type CRUD                        |
+| Label Manager     | `/tenants/:tenantId/projects/:projectId/settings/labels`     | Label CRUD                            |
+| Audit Log         | `/tenants/:tenantId/projects/:projectId/audit`               | Audit event viewer                    |
+| Filter Panel      | `/tenants/:tenantId/projects/:projectId/filters`             | Saved filter management               |
+| Settings          | `/settings`                                                  | User settings (theme, language, zoom) |
+| FAQ               | `/faq`                                                       | Help: FAQ                             |
+| Docs              | `/docs`                                                      | Help: Documentation                   |
+| Support           | `/support`                                                   | Help: Support request                 |
+
+### 15.2 Navigation Structure
+
+**Global navigation** (always visible):
+
+```text
+Tenant Switcher → Project Switcher → Current Feature
+```
+
+**Project navigation**:
+
+```text
+Project
+├── Overview
+├── Board
+├── Tasks
+├── Sprints
+├── Members
+└── Settings
+    ├── General
+    ├── Members
+    ├── Task Types
+    ├── Statuses
+    ├── Labels
+    ├── Boards
+    └── Danger Zone
+```
+
+**Tenant navigation**:
+
+```text
+Tenant
+├── Projects
+├── Settings
+│   ├── General
+│   ├── Members
+│   ├── Invitations
+│   ├── Projects
+│   ├── Plan / Billing
+│   └── Danger Zone
+└── Profile / Logout
+```
+
+### 15.3 Screen Details
+
+#### Landing Page
+
+- Sign Up button
+- Log In button
+- No Tenant or Project context required
+
+#### Login Screen
+
+- Email field
+- Password field
+- Forgot password link
+- Register link
+- After login: redirect based on account state (no tenant → onboarding, one tenant → that tenant, multiple → selector)
+
+#### Registration Screen
+
+- Email field
+- Password field
+- Confirm Password field
+- Display Name field
+- Client and server validation
+- Does NOT automatically create a Tenant
+
+#### Onboarding (Create Workspace)
+
+- Workspace name field
+- Mock plan selection (Free, $0)
+- Mock checkout step
+- Confirmation
+- Result: Tenant created, user becomes Owner
+
+#### Tenant Dashboard
+
+- Tenant name
+- Project list
+- Create Project button
+- Members link
+- Tenant Settings link
+- Plan/Billing link
+- Profile/Logout
+
+#### Project Overview
+
+- Project name/key
+- Description
+- Active Sprint
+- Task summary
+- Recent Tasks
+- Members
+- Shortcuts to Board and Tasks
+
+#### Board View
+
+- Single Board displayed at a time
+- Columns with Tasks
+- Board selector (user preference)
+- Sprint filter (for Sprint Boards)
+- Drag-and-drop Task movement between columns
+- Multi-status columns require status selection on drop
+
+#### Task Table
+
+- Columns: Key, Title, Type, Status, Priority, Assignee, Reporter, Sprint, Labels, Created, Updated
+- Search bar
+- Filter controls
+- Sort controls
+- Pagination
+- URL-addressable state
+
+#### Task Detail
+
+- Task key (e.g., PROJ-123)
+- Title (editable inline)
+- Type selector
+- Status selector
+- Priority selector
+- Assignee selector
+- Reporter (read-only after creation)
+- Sprint selector
+- Label selector (autocomplete/tag)
+- Description (Milkdown WYSIWYG editor)
+- Relationships section
+- Comments section
+- Audit history section
+
+#### Sprint List
+
+- Grouped by: Future, Active, Completed
+- Create Sprint button
+- Start/Complete/Reopen actions per sprint
+
+#### Members Screen
+
+- User, Email, Role, Access status, Invitation status
+- Invite button
+- Role change controls
+- Remove/Restore access controls
+
+### 15.4 Role-Based UI Behavior
+
+| Role          | UI Behavior                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| Viewer        | All write controls hidden or disabled. Can read, search, filter.                           |
+| Editor        | Can create/edit Tasks, comment, manage own comments. No admin controls.                    |
+| Project Admin | Full project administration. Can manage members, statuses, types, labels, boards, sprints. |
+| Tenant Admin  | All Project Admin abilities + tenant-level administration.                                 |
+| Owner         | All Tenant Admin abilities + tenant deletion, ownership transfer.                          |
+
+---
+
+## 16. User Journeys
+
+### 16.1 First User Journey
+
+```text
+1. Open landing page
+2. Click Sign Up
+3. Enter email, password, confirm password, display name
+4. Complete email verification (if enabled)
+5. Application detects no Tenant
+6. Open onboarding
+7. Enter workspace name
+8. Choose Free plan
+9. Complete mock checkout
+10. Tenant created → user becomes Owner
+11. Tenant dashboard opens (empty)
+12. Click Create Project
+13. Enter project name and key
+14. Project initializes automatically (Task Types, Statuses, Board)
+15. Open Project
+16. Create first Task
+17. TODO status already selected
+18. Start working
+```
+
+### 16.2 Invite Collaborator Journey
+
+```text
+1. Admin opens Members
+2. Click Invite
+3. Enter email and select role
+4. Invitation created (PENDING)
+5. Email sent with secure link
+6. Collaborator opens link
+7. Collaborator logs in or registers
+8. Invitation validated (token, expiration, revocation)
+9. Collaborator accepts
+10. Membership becomes ACTIVE
+11. Invitation data removed
+12. Collaborator lands in the relevant workspace
+```
+
+### 16.3 Re-invite Journey
+
+```text
+1. Admin sends invitation
+2. User does not accept
+3. Admin sends invitation again
+4. Existing invitation replaced
+5. New token/link generated
+6. invitedBy and invitedOn updated
+7. Old link becomes invalid immediately
+8. New email sent
+9. User accepts new invitation
+```
+
+### 16.4 Project Work Journey
+
+```text
+1. User opens Project
+2. User opens Tasks or Board
+3. User creates Task
+4. TODO selected automatically
+5. User optionally chooses another Status
+6. User writes description via Milkdown WYSIWYG
+7. User assigns Type, Priority, Assignee, Sprint, Labels
+8. Task created
+9. User opens Task detail
+10. User edits fields independently (Jira-style inline editing)
+11. User adds comments
+12. User changes Status
+13. Board reflects new Status
+14. User can later assign Task to a Sprint
+```
+
+### 16.5 Sprint Workflow Journey
+
+```text
+1. Admin creates Sprint 12 (FUTURE, no dates)
+2. Admin creates future Sprints ahead of time
+3. Current Sprint completed
+4. Admin starts Sprint 12
+5. startDate preserved or set to now
+6. Sprint becomes ACTIVE
+7. Sprint Board displays only Sprint 12 Tasks
+8. Admin completes Sprint 12
+9. Missing endDate becomes now
+10. Sprint becomes COMPLETED
+```
+
+### 16.6 Remove and Restore Project Access Journey
+
+```text
+1. Admin removes User from Project
+2. User loses Project access
+3. User remains in Tenant
+4. Existing Tasks/Comments remain
+5. User is later added again
+6. Existing work remains associated with User
+7. With Editor+ access, permitted content can be edited again
+```
+
+### 16.7 Delete User Journey
+
+```text
+1. User is deleted
+2. Live membership/access disappears
+3. Tasks remain
+4. Comments remain
+5. Historical snapshots remain
+6. Audit identity remains
+7. Search still finds historical Tasks by stored display name
+```
+
+### 16.8 Delete Status Journey
+
+```text
+1. Admin selects Status deletion
+2. System checks Task usage
+3. If Tasks use it → replacement is mandatory
+4. Replacement applied to all affected Tasks
+5. Replacement applied to Board references
+6. Old Status deleted
+
+If no Tasks use it but Boards do:
+7. Show affected Boards
+8. Admin chooses Replace or Delete Anyway
+9. Missing references handled as invalid Board configuration
+10. Board view hides nonexistent column
+11. Board editor marks it red
+```
+
+### 16.9 Archive Project Journey
+
+```text
+1. Admin selects Archive
+2. Project becomes ARCHIVED
+3. Project remains readable
+4. Editing controls disabled
+5. Historical data remains available
+6. Admin may restore the Project
+```
+
+### 16.10 Delete Project Journey
+
+```text
+1. Admin opens Danger Zone
+2. Selects Delete Project
+3. UI explains permanent consequences
+4. Admin explicitly confirms (type project name/key)
+5. Project enters DELETION_PENDING
+6. Grace period begins
+7. Admin may cancel
+8. If not cancelled, Project permanently deleted
+9. Direct Project URLs no longer resolve
+```
+
+### 16.11 Board Task Movement Journey
+
+```text
+1. User drags Task from one column to another
+2. If destination column has one Status → apply directly
+3. If destination column has multiple Statuses → prompt user to select
+4. Backend stores the Status, not the visual column
+5. Board reflects the change
+```
+
+---
+
+## 17. Empty, Loading, and Error States
+
+### 17.1 Empty States
+
+| Screen            | Empty State Message                                         |
+| ----------------- | ----------------------------------------------------------- |
+| No Projects       | "No projects yet. Create your first project."               |
+| No Tasks          | "No tasks found. Create a task or change your filters."     |
+| No Sprints        | "No sprints yet. Create a future sprint to start planning." |
+| No Comments       | "No comments yet. Start the discussion."                    |
+| No Members        | "No additional members yet. Invite someone to collaborate." |
+| No Labels         | "No labels yet. Create a label to categorize tasks."        |
+| No Audit Events   | "No activity recorded yet."                                 |
+| No Saved Filters  | "No saved filters. Save a filter for quick access."         |
+| No Search Results | "No results found for your search."                         |
+
+### 17.2 Loading States
+
+- Show loading indicators while data is being fetched
+- Do NOT display "No Tasks" while a Task request is still loading
+- Distinguish between: Loading → Empty → Error → Content
+
+### 17.3 Error States
+
+| State                | Display                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| Network error        | "Unable to connect. Please check your connection and try again."  |
+| Server error         | "Something went wrong. Please try again later."                   |
+| Not found            | "The requested resource was not found."                           |
+| Forbidden            | "You don't have permission to access this resource."              |
+| Session expired      | Redirect to Login with return URL                                 |
+| Concurrency conflict | "The task was modified by another user. Reload it and try again." |
+
+### 17.4 Special States
+
+| State                   | Display                                                                    |
+| ----------------------- | -------------------------------------------------------------------------- |
+| Archived Project        | "This project is archived and is read-only." with visible `ARCHIVED` badge |
+| Archived Tenant         | "This workspace is archived." with disabled write controls                 |
+| Deletion Pending        | "This resource is scheduled for deletion." with cancel option              |
+| Invalid Board reference | "⚠ Missing status" in Board editor; column hidden in Board view            |
+
+### 17.5 State Distinction Rules
+
+The frontend must visually distinguish:
+
+```text
+Loading → spinner/skeleton
+Empty → message + CTA
+Error → error message + retry
+Forbidden → access denied message
+Not Found → 404 message
+Archived/Read-only → badge + disabled controls
+```
+
+Do NOT show raw database/API exceptions to users.
+
+---
+
+## 18. Functional Requirements
+
+| ID     | Requirement                                                          | Source             |
+| ------ | -------------------------------------------------------------------- | ------------------ |
+| FR-001 | Users can register with email, password, and display name            | User Flows §2.2    |
+| FR-002 | Users can log in with email and password                             | User Flows §2.3    |
+| FR-003 | After login, redirect based on tenant count                          | User Flows §2.3    |
+| FR-004 | New users without tenants see onboarding flow                        | User Flows §3      |
+| FR-005 | Onboarding includes mock plan/checkout step                          | User Flows §3.1    |
+| FR-006 | Tenant creation makes user the Owner                                 | User Flows §3.2    |
+| FR-007 | Users can create Projects with name, key, description                | User Flows §5      |
+| FR-008 | Project creation auto-seeds Task Types, Statuses, Board              | Requirements §7.2  |
+| FR-009 | Tasks have sequential numbers per project (PROJ-1, PROJ-2)           | Requirements §9.1  |
+| FR-010 | Tasks support Markdown descriptions via Milkdown WYSIWYG             | Requirements §9.4  |
+| FR-011 | Tasks default to project's default status                            | Requirements §9.5  |
+| FR-012 | Task fields are edited independently (Jira-style)                    | Requirements §9.6  |
+| FR-013 | Tasks use optimistic concurrency with version field                  | Requirements §34   |
+| FR-014 | Backlog is represented by sprintId = null                            | Requirements §10   |
+| FR-015 | Sprint status transitions are unrestricted                           | Requirements §16.1 |
+| FR-016 | Starting a Sprint sets startDate if missing                          | Requirements §16.3 |
+| FR-017 | Completing a Sprint sets endDate if missing                          | Requirements §16.4 |
+| FR-018 | endDate does not auto-complete a Sprint                              | Requirements §16.3 |
+| FR-019 | Boards belong to Projects, not Sprints                               | Requirements §13   |
+| FR-020 | Board columns can contain multiple statuses                          | Requirements §13   |
+| FR-021 | User board selection is a per-user/per-project preference            | Requirements §15   |
+| FR-022 | Labels are case-insensitive and project-level                        | Requirements §18   |
+| FR-023 | Comments preserve historical author identity                         | Requirements §19   |
+| FR-024 | Task relationships: BLOCKS, RELATES_TO, DUPLICATES                   | Requirements §20   |
+| FR-025 | Saved filters are user/project-specific                              | Requirements §21   |
+| FR-026 | Task search covers number, title, description, historical names      | Requirements §22   |
+| FR-027 | Pagination is URL-addressable                                        | Requirements §23   |
+| FR-028 | Audit events preserve actor snapshots                                | Requirements §24   |
+| FR-029 | Tenant archive cascades to projects                                  | Requirements §3.1  |
+| FR-030 | Tenant restore only restores TENANT_ARCHIVE projects                 | Requirements §3.1  |
+| FR-031 | Project deletion uses grace period                                   | Requirements §25   |
+| FR-032 | Task deletion is hard delete with cascade                            | Requirements §26   |
+| FR-033 | Sprint deletion moves tasks to backlog                               | Requirements §27   |
+| FR-034 | Status deletion requires replacement when in use                     | Requirements §12.1 |
+| FR-035 | User deletion preserves historical snapshots                         | Requirements §31   |
+| FR-036 | Invitation lifecycle: send, re-send, accept, expire, revoke, decline | Requirements §5.3  |
+| FR-037 | Membership can be revoked and restored                               | Requirements §6    |
+| FR-038 | Viewer role is strictly read-only                                    | Requirements §32   |
+| FR-039 | Tenant Owner/Admin have implicit project access                      | Requirements §8.1  |
+| FR-040 | Project key is immutable after first task                            | Requirements §7.1  |
+| FR-041 | Drag-and-drop on Board changes task status                           | User Flows §18     |
+| FR-042 | Multi-status column drop requires status selection                   | User Flows §18     |
+| FR-043 | Sprint Board shows only tasks for selected sprint                    | User Flows §19     |
+| FR-044 | Archived projects are read-only with visible badge                   | User Flows §33     |
+| FR-045 | Project deletion requires explicit confirmation                      | User Flows §34     |
+| FR-046 | Status deletion UX shows usage count and replacement                 | User Flows §37     |
+| FR-047 | Task deletion requires confirmation dialog                           | User Flows §45     |
+| FR-048 | Invalid board references shown in red in editor                      | User Flows §46     |
+| FR-049 | Direct URLs work with authentication and authorization               | User Flows §41     |
+| FR-050 | Tenant/Project switching preserves authentication                    | User Flows §7      |
+
+---
+
+## 19. Non-Functional Requirements
+
+| ID      | Requirement                      | Details                                                        |
+| ------- | -------------------------------- | -------------------------------------------------------------- |
+| NFR-001 | Backend is authoritative         | All authorization and business rules enforced server-side      |
+| NFR-002 | URL-addressable state            | Pagination, filters, and sort state in URL for bookmarking     |
+| NFR-003 | Optimistic concurrency           | Tasks use version-based conflict detection                     |
+| NFR-004 | Atomic operations                | Task number generation uses MongoDB `$inc`                     |
+| NFR-005 | Transactional project creation   | Seed data created atomically (MongoDB transaction)             |
+| NFR-006 | Case-insensitive uniqueness      | Labels and Statuses use normalized names                       |
+| NFR-007 | Historical identity preservation | Snapshots survive user deletion                                |
+| NFR-008 | Graceful degradation             | Distinguish loading, empty, error, forbidden, not-found states |
+| NFR-009 | No raw errors to users           | API/database exceptions must not be shown raw                  |
+| NFR-010 | Responsive UI                    | Spartan UI + Tailwind CSS for consistent styling               |
+| NFR-011 | i18n support                     | 11 languages via Transloco                                     |
+| NFR-012 | Theme support                    | Light/dark themes with CSS custom properties                   |
+| NFR-013 | Lazy loading                     | All feature modules lazy-loaded via `loadComponent()`          |
+| NFR-014 | Zoneless Angular                 | No Zone.js; all reactivity via signals                         |
+| NFR-015 | Shared types                     | `@task-board/shared` package for type safety across server/UI  |
+
+---
+
+## 20. Out of Scope
+
+The following are explicitly deferred and NOT part of the initial implementation:
+
+| Item                             | Reason                                            |
+| -------------------------------- | ------------------------------------------------- |
+| Real file attachments            | No file uploads or physical storage initially     |
+| Separate TaskLink entity         | URLs are Markdown text in task descriptions       |
+| Separate Backlog entity          | Backlog = `sprintId = null`                       |
+| Custom workflow engine           | Statuses are configurable but no transition graph |
+| Sprint-owned Boards              | Boards belong to Projects                         |
+| Simultaneous multi-Board display | One Board at a time                               |
+| Viewer write operations          | Viewer is read-only                               |
+| Automatic Sprint completion      | `endDate` does not auto-trigger completion        |
+| Real payment processing          | Mock checkout only                                |
+| Full notification center         | Lightweight feedback only                         |
+| Advanced full-text search        | MongoDB Atlas Search deferred                     |
+| Bulk Task operations             | Not implemented initially                         |
+| Project templates                | Not implemented initially                         |
+| Custom Task Type workflows       | Not implemented initially                         |
+
+---
+
+## 21. Open Questions and Assumptions
+
+### Assumptions (filled from Jira conventions where source docs are silent)
+
+| ID    | Assumption                                              | Rationale                                                                               |
+| ----- | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| A-001 | Password minimum length is 8 characters                 | Classic Jira convention; source docs silent                                             |
+| A-002 | Comment body max length is 10000 characters             | Matches task description limit                                                          |
+| A-003 | Project Admin can delete any comment in their project   | Classic Jira convention; source docs only say Viewer cannot comment                     |
+| A-004 | Label has no color field initially                      | Source docs silent; can be added later                                                  |
+| A-005 | Task has no position/order field within a status column | Source docs silent; tasks ordered by sort field                                         |
+| A-006 | Invitation TTL is 7 days                                | Classic Jira convention; source docs reference `INVITATION_TTL` but don't specify value |
+| A-007 | Deletion grace period is 30 days                        | Classic Jira convention; source docs don't specify duration                             |
+| A-008 | Max 50 members per tenant on Free plan                  | Classic Jira convention; mock billing only                                              |
+| A-009 | JWT token expiration is 24 hours                        | Standard practice; source docs silent                                                   |
+| A-010 | Sort default for tasks is `number:desc` (newest first)  | Classic Jira convention                                                                 |
+
+### Blocking Questions
+
+None identified. All required information has been extracted from the source documents and supplemented with Jira
+conventions where needed.
+
+---
+
+## JSON Summary
 
 ```json
 {
   "tz_file": "docs/implementation/technical_specification.md",
-  "blocking_questions": [
-    "BQ-TM-1: The server tenants.ts route file does not include a GET /:tenantId/members endpoint (to list tenant members), although the shared contract tenant.contracts.ts defines it as listMembers. This endpoint must be verified as deployed or added to the backend before the tenant member list UI can function.",
-    "BQ-16.1: Does GET /projects filter by project membership for 'member' tenant role, or does it return all tenant projects? A new query parameter or endpoint may be needed for member-scoped project listing.",
-    "BQ-16.2: Does TenantRepository.update() need a migration for existing documents lacking the 'description' field, or does MongoDB handle missing fields gracefully?"
-  ],
+  "blocking_questions": [],
   "assumptions": [
-    "JWT is the sole authentication mechanism; no OAuth, no SSO.",
-    "MongoDB Atlas is the only data store; no relational database.",
-    "All API communication is over HTTPS; no WebSocket or real-time subscriptions in MVP.",
-    "The shared package is published locally via npm workspaces; no private registry needed.",
-    "Drag-and-drop on the frontend uses native HTML5 drag-and-drop or a lightweight library; no heavy dependency.",
-    "Registration does NOT auto-create a tenant. Users must explicitly create a workspace after registration.",
-    "User emails are globally unique across all tenants.",
-    "The `X-Tenant-Id` header is the mechanism for frontend to declare active tenant; the backend validates active membership (status: 'active').",
-    "Password hashing uses bcryptjs (pure JS, Workers-compatible); no native bcrypt or argon2.",
-    "Zod v4 is used in the server package for validation; `z.interface()` preferred for object schemas. The shared package is runtime-library free (no Zod dependency).",
-    "Angular 22 zoneless mode is the default; no `zone.js` dependency.",
-    "Tailwind CSS v4 CSS-first configuration; no `tailwind.config.js`.",
-    "Hono RPC client is available for type-safe frontend→backend calls but the explicit shared-package contract approach is used as the primary pattern.",
-    "The tenant member invite endpoint (POST /tenants/:tenantId/members) accepts { email, role } in the body. It supports both registered and unregistered users.",
-    "TenantClient needs to be extended with member management, tenant update/delete, and invitation acceptance methods.",
-    "The existing error interceptor (error.interceptor.ts) handles 401/403/422 globally; new components integrate with this pattern.",
-    "Subscription tiers are enforced at the service layer. For MVP, subscription upgrade uses a mock payment page (no real Stripe/payment integration). The tenant's `subscription` field is updated directly via `PATCH /tenants/:tenantId`.",
-    "Invitation tokens are UUIDs stored on the TenantMember document. The frontend invitation acceptance URL is {FRONTEND_URL}/auth/accept-invitation?token=<token>.",
-    "Inactive members (status: 'pending', 'declined', 'access_revoked') have no access to any tenant resource. Only 'active' members can access tenant-scoped endpoints. 'declined' and 'access_revoked' members remain in the member list visible to owner/admin for later management (resend or hard-delete).",
-    "Free workspace limits: 1 workspace per user, 3 projects per workspace, 10 users per project. Premium: unlimited.",
-    "A newly registered user with no tenants receives a JWT with tenantId: null. The frontend must handle this state by showing a workspace creation or invitation acceptance screen.",
-    "Invitation emails are sent via Resend (free tier: 3,000/month, 100/day). The `resend` npm package is a server dependency. `RESEND_API_KEY` is a Cloudflare Worker secret. In dev, a console-logging adapter logs invitation links.",
-    "The root route (/) removes the authGuard to allow unauthenticated visitors to see the landing page. All other authenticated routes retain their guards.",
-    "Cross-tenant endpoints (GET /invitations/my, GET /tasks/my) do not require the X-Tenant-Id header. They are registered at the app level outside the tenant-scoped router.",
-    "The dashboard component handles all state detection internally via signals — no separate route guards for each dashboard state.",
-    "GET /tasks/my returns tasks enriched with denormalized tenantName, projectName, and columnTitle for display. Application-level aggregation is used (not DB-level), since tenants could be in different databases.",
-    "Declining an invitation sets the TenantMember status to 'declined' (soft delete) rather than deleting the record, to preserve audit trail.",
-    "Owner/admin revoking access sets the TenantMember status to 'access_revoked' (soft delete). Owner/admin can later resend invitation (→ 'pending') or hard-delete permanently.",
-    "GET /tenants response includes a 'role' field per tenant, derived from the tenant_members join.",
-    "MongoDB documents without a 'description' field return undefined when accessed — no migration needed for existing tenant documents.",
-    "The HlmCollapsible Spartan UI component is already installed and available in the project.",
-    "ProjectClient.list() uses the active tenant context (X-Tenant-Id header) to scope results.",
-    "For member role, client-side filtering of projects by project membership is used as an interim solution until a server-side filter endpoint is available.",
-    "The empty-path child route does not conflict with wildcard redirects since Angular resolves child routes before the parent's wildcard."
+    "A-001: Password minimum length is 8 characters (Jira convention)",
+    "A-002: Comment body max length is 10000 characters",
+    "A-003: Project Admin can delete any comment in their project (Jira convention)",
+    "A-004: Label has no color field initially",
+    "A-005: Task has no position/order field within a status column",
+    "A-006: Invitation TTL is 7 days (Jira convention)",
+    "A-007: Deletion grace period is 30 days (Jira convention)",
+    "A-008: Max 50 members per tenant on Free plan (Jira convention)",
+    "A-009: JWT token expiration is 24 hours",
+    "A-010: Sort default for tasks is number:desc (Jira convention)"
   ]
 }
 ```

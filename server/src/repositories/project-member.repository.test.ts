@@ -23,11 +23,12 @@ function createMockCollection() {
 
 function makeDoc(overrides: Partial<ProjectMemberDocument> = {}): ProjectMemberDocument {
   return {
+    id: 'pmember-1',
     userId: 'user-1',
     projectId: 'project-1',
-    tenantId: 'tenant-1',
-    role: 'owner',
+    role: 'PROJECT_ADMIN',
     createdAt: new Date('2025-01-01T00:00:00Z'),
+    updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
   };
 }
@@ -41,25 +42,27 @@ describe('ProjectMemberRepository', () => {
     repo = new ProjectMemberRepository(collection);
   });
 
-  describe('findByProjectAndUser', () => {
+  describe('findByUserAndProject', () => {
     it('returns a mapped member when found', async () => {
       collection.findOne.mockResolvedValue(makeDoc());
 
-      const result = await repo.findByProjectAndUser('project-1', 'user-1');
+      const result = await repo.findByUserAndProject('user-1', 'project-1');
 
       expect(collection.findOne).toHaveBeenCalledWith({ userId: 'user-1', projectId: 'project-1' });
       expect(result).toEqual({
+        id: 'pmember-1',
         userId: 'user-1',
         projectId: 'project-1',
-        tenantId: 'tenant-1',
-        role: 'owner',
+        role: 'PROJECT_ADMIN',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
       });
     });
 
     it('returns null when not found', async () => {
       collection.findOne.mockResolvedValue(null);
 
-      const result = await repo.findByProjectAndUser('project-1', 'missing');
+      const result = await repo.findByUserAndProject('project-1', 'missing');
 
       expect(result).toBeNull();
     });
@@ -70,8 +73,8 @@ describe('ProjectMemberRepository', () => {
       const toArray = vi
         .fn()
         .mockResolvedValue([
-          makeDoc({ userId: 'user-1', role: 'owner' }),
-          makeDoc({ userId: 'user-2', role: 'member' }),
+          makeDoc({ userId: 'user-1', role: 'PROJECT_ADMIN' }),
+          makeDoc({ id: 'pm-2', userId: 'user-2', role: 'EDITOR' }),
         ]);
 
       collection.find.mockReturnValue({ toArray });
@@ -80,22 +83,22 @@ describe('ProjectMemberRepository', () => {
 
       expect(collection.find).toHaveBeenCalledWith({ projectId: 'project-1' });
       expect(result).toHaveLength(2);
-      expect(result[0]?.role).toBe('owner');
-      expect(result[1]?.role).toBe('member');
+      expect(result[0]?.role).toBe('PROJECT_ADMIN');
+      expect(result[1]?.role).toBe('EDITOR');
     });
   });
 
   describe('findByUser', () => {
-    it('returns all project memberships for a user within a tenant', async () => {
+    it('returns all project memberships for a user', async () => {
       const toArray = vi
         .fn()
-        .mockResolvedValue([makeDoc({ projectId: 'p1' }), makeDoc({ projectId: 'p2', role: 'member' })]);
+        .mockResolvedValue([makeDoc({ projectId: 'p1' }), makeDoc({ projectId: 'p2', role: 'VIEWER' })]);
 
       collection.find.mockReturnValue({ toArray });
 
-      const result = await repo.findByUser('user-1', 'tenant-1');
+      const result = await repo.findByUser('user-1');
 
-      expect(collection.find).toHaveBeenCalledWith({ userId: 'user-1', tenantId: 'tenant-1' });
+      expect(collection.find).toHaveBeenCalledWith({ userId: 'user-1' });
       expect(result).toHaveLength(2);
     });
   });
@@ -107,8 +110,7 @@ describe('ProjectMemberRepository', () => {
       const result = await repo.create({
         userId: 'user-1',
         projectId: 'project-1',
-        tenantId: 'tenant-1',
-        role: 'member',
+        role: 'PROJECT_ADMIN',
       });
 
       expect(collection.insertOne).toHaveBeenCalledTimes(1);
@@ -117,34 +119,36 @@ describe('ProjectMemberRepository', () => {
 
       expect(insertedDoc.userId).toBe('user-1');
       expect(insertedDoc.projectId).toBe('project-1');
-      expect(insertedDoc.tenantId).toBe('tenant-1');
-      expect(insertedDoc.role).toBe('member');
+      expect(insertedDoc.role).toBe('PROJECT_ADMIN');
       expect(insertedDoc.createdAt).toBeInstanceOf(Date);
+      expect(insertedDoc.updatedAt).toBeInstanceOf(Date);
+      expect(insertedDoc.id).toBeDefined();
 
-      expect(result.role).toBe('member');
+      expect(result.role).toBe('PROJECT_ADMIN');
+      expect(typeof result.createdAt).toBe('string');
     });
   });
 
   describe('updateRole', () => {
     it('returns the updated member', async () => {
-      const updated = makeDoc({ role: 'admin' });
+      const updated = makeDoc({ role: 'VIEWER' });
 
       collection.findOneAndUpdate.mockResolvedValue(updated);
 
-      const result = await repo.updateRole('project-1', 'user-1', 'admin');
+      const result = await repo.updateRole('project-1', 'user-1', 'VIEWER');
 
       expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: 'user-1', projectId: 'project-1' },
-        { $set: { role: 'admin' } },
+        { $set: { role: 'VIEWER', updatedAt: expect.any(Date) } },
         { returnDocument: 'after' },
       );
-      expect(result?.role).toBe('admin');
+      expect(result?.role).toBe('VIEWER');
     });
 
     it('returns null when member not found', async () => {
       collection.findOneAndUpdate.mockResolvedValue(null);
 
-      const result = await repo.updateRole('project-1', 'missing', 'admin');
+      const result = await repo.updateRole('project-1', 'missing', 'VIEWER');
 
       expect(result).toBeNull();
     });

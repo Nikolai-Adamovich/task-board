@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { requireRole } from './rbac.js';
+import { requireRole, requirePermission } from './rbac.js';
 import { errorHandler } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';
 import type { TenantRole } from '@task-board/shared';
@@ -10,11 +10,11 @@ function createTestAppWithRoles(roles: TenantRole[]) {
 
   app.onError(errorHandler);
 
-  // Simulate auth + tenant context setting userRole
+  // Simulate auth + tenant context setting tenantRole
   app.use('/test/*', async (c, next) => {
-    const role = c.req.header('X-Test-Role') ?? 'member';
+    const role = (c.req.header('X-Test-Role') ?? 'MEMBER') as TenantRole;
 
-    c.set('userRole', role);
+    c.set('tenantRole', role);
     await next();
   });
 
@@ -27,9 +27,9 @@ function createTestAppWithRoles(roles: TenantRole[]) {
 
 describe('requireRole middleware', () => {
   it('allows access when user has the required role', async () => {
-    const app = createTestAppWithRoles(['admin', 'member']);
+    const app = createTestAppWithRoles(['ADMIN', 'MEMBER']);
     const res = await app.request('/test/resource', {
-      headers: { 'X-Test-Role': 'admin' },
+      headers: { 'X-Test-Role': 'ADMIN' },
     });
 
     expect(res.status).toBe(200);
@@ -40,37 +40,107 @@ describe('requireRole middleware', () => {
   });
 
   it('denies access when user role is not in the allowed list', async () => {
-    const app = createTestAppWithRoles(['owner', 'admin']);
+    const app = createTestAppWithRoles(['OWNER', 'ADMIN']);
     const res = await app.request('/test/resource', {
-      headers: { 'X-Test-Role': 'member' },
+      headers: { 'X-Test-Role': 'MEMBER' },
     });
 
     expect(res.status).toBe(403);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as { error: { code: string } };
 
-    expect(body.code).toBe('FORBIDDEN');
+    expect(json.error.code).toBe('FORBIDDEN');
   });
 
   it('allows owner to bypass all role restrictions', async () => {
-    const app = createTestAppWithRoles(['admin']);
+    const app = createTestAppWithRoles(['ADMIN']);
     const res = await app.request('/test/resource', {
-      headers: { 'X-Test-Role': 'owner' },
+      headers: { 'X-Test-Role': 'OWNER' },
     });
 
     expect(res.status).toBe(200);
   });
 
-  it('returns 403 when no userRole is set', async () => {
+  it('returns 403 when no tenantRole is set', async () => {
     const app = new Hono<AppEnv>();
 
     app.onError(errorHandler);
-    app.get('/test/resource', requireRole('admin'), (c) => {
+    app.get('/test/resource', requireRole('ADMIN'), (c) => {
       return c.json({ message: 'access granted' });
     });
 
     const res = await app.request('/test/resource');
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe('requirePermission middleware', () => {
+  function createPermissionTestApp(action: string, projectLevel = false) {
+    const app = new Hono<AppEnv>();
+
+    app.onError(errorHandler);
+
+    app.use('/test/*', async (c, next) => {
+      const tenantRole = (c.req.header('X-Tenant-Role') ?? 'MEMBER') as TenantRole;
+      const projectRole = c.req.header('X-Project-Role') ?? undefined;
+
+      c.set('tenantRole', tenantRole);
+      if (projectRole) {
+        c.set('projectRole', projectRole as 'PROJECT_ADMIN' | 'EDITOR' | 'VIEWER');
+      }
+      await next();
+    });
+
+    app.get('/test/resource', requirePermission(action as 'manage_tenant', projectLevel), (c) =>
+      c.json({ message: 'access granted' }),
+    );
+
+    return app;
+  }
+
+  it('allows OWNER to manage_tenant', async () => {
+    const app = createPermissionTestApp('manage_tenant');
+    const res = await app.request('/test/resource', {
+      headers: { 'X-Tenant-Role': 'OWNER' },
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('denies MEMBER from manage_tenant', async () => {
+    const app = createPermissionTestApp('manage_tenant');
+    const res = await app.request('/test/resource', {
+      headers: { 'X-Tenant-Role': 'MEMBER' },
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('allows EDITOR to create_task (project-level)', async () => {
+    const app = createPermissionTestApp('create_task', true);
+    const res = await app.request('/test/resource', {
+      headers: { 'X-Tenant-Role': 'MEMBER', 'X-Project-Role': 'EDITOR' },
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('denies VIEWER from create_task (project-level)', async () => {
+    const app = createPermissionTestApp('create_task', true);
+    const res = await app.request('/test/resource', {
+      headers: { 'X-Tenant-Role': 'MEMBER', 'X-Project-Role': 'VIEWER' },
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('allows ADMIN to bypass project-level checks', async () => {
+    const app = createPermissionTestApp('create_task', true);
+    const res = await app.request('/test/resource', {
+      headers: { 'X-Tenant-Role': 'ADMIN' },
+    });
+
+    expect(res.status).toBe(200);
   });
 });

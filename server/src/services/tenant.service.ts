@@ -1,21 +1,35 @@
-import { MemberStatus, SubscriptionTier, TenantRole } from '@task-board/shared';
-import type {
-  Tenant,
-  TenantMember,
-  TenantWithRole,
-  CreateTenant,
-  UpdateTenant,
-  MyInvitation,
-  PendingInvitation,
-} from '@task-board/shared';
-import { ConflictError, ForbiddenError, NotFoundError } from '../middleware/error-handler.js';
+import { randomUUID, createHash } from 'node:crypto';
+import { MemberStatus, TenantRole, TenantStatus, InvitationStatus } from '@task-board/shared';
+import type { Tenant, TenantMember, CreateTenant, UpdateTenant } from '@task-board/shared';
+import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
 import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
 import { UserRepository } from '../repositories/user.repository.js';
+import type { InvitationDocument } from '../repositories/tenant-member.repository.js';
 import type { EmailService } from './email.service.js';
+import type { AuditService } from './audit.service.js';
 
 /** Structural type that both EmailService and ConsoleEmailService satisfy */
 type EmailSender = Pick<EmailService, 'sendInvitationEmail'>;
+
+/** Minimal project repository interface for tenant cascade operations */
+export interface TenantServiceProjectRepo {
+  findByTenant(tenantId: string): Promise<{ id: string; status: string; archiveReason: string | null }[]>;
+  update(id: string, data: Record<string, unknown>): Promise<unknown>;
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+/** Grace period before permanent deletion (30 days) */
+const DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+/** Invitation TTL (7 days) */
+const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 // ─── Tenant Service ──────────────────────────────────────────────────────────
 
@@ -25,49 +39,43 @@ export class TenantService {
     private readonly tenantMemberRepo: TenantMemberRepository,
     private readonly userRepo: UserRepository,
     private readonly emailService: EmailSender,
+    private readonly projectRepo?: TenantServiceProjectRepo,
+    private readonly auditService?: AuditService,
   ) {}
 
-  /**
-   * Create a new tenant and add the creating user as owner.
-   */
+  // ─── Tenant CRUD ──────────────────────────────────────────────────────────
+
   async createTenant(userId: string, input: CreateTenant): Promise<Tenant> {
-    // Check subscription limit: free plan allows only one owned workspace
-    const ownedCount = await this.tenantMemberRepo.countOwnedTenants(userId);
-    const subscription = input.subscription ?? SubscriptionTier.Free;
+    const tenant = await this.tenantRepo.create({ ...input });
 
-    if (ownedCount >= 1 && subscription === SubscriptionTier.Free) {
-      throw new ForbiddenError('Free plan allows only one workspace. Upgrade to premium for more.');
-    }
-
-    // Check slug uniqueness
-    const existing = await this.tenantRepo.findBySlug(input.slug);
-
-    if (existing) {
-      throw new ConflictError(`Tenant with slug "${input.slug}" already exists`);
-    }
-
-    const tenant = await this.tenantRepo.create({ ...input, subscription });
-
-    // Add the creator as owner
     await this.tenantMemberRepo.create({
       userId,
       tenantId: tenant.id,
-      role: TenantRole.Owner,
-      status: MemberStatus.Active,
+      role: TenantRole.OWNER,
+      status: MemberStatus.ACTIVE,
     });
+
+    // Audit side effect
+    if (this.auditService) {
+      await this.auditService.log({
+        tenantId: tenant.id,
+        projectId: null,
+        entityType: 'PROJECT', // closest entity type for tenant-level
+        entityId: tenant.id,
+        action: 'CREATED',
+        actorId: userId,
+      });
+    }
 
     return tenant;
   }
 
-  /**
-   * List all tenants where the user is an active member.
-   */
   async listTenantsForUser(userId: string): Promise<Tenant[]> {
     const memberships = await this.tenantMemberRepo.findByUser(userId);
     const tenants: Tenant[] = [];
 
     for (const membership of memberships) {
-      if (membership.status !== MemberStatus.Active) continue;
+      if (membership.status !== MemberStatus.ACTIVE) continue;
 
       const tenant = await this.tenantRepo.findById(membership.tenantId);
 
@@ -79,9 +87,23 @@ export class TenantService {
     return tenants;
   }
 
-  /**
-   * Get a tenant by ID.
-   */
+  async listTenantsWithRole(userId: string): Promise<(Tenant & { role: string })[]> {
+    const memberships = await this.tenantMemberRepo.findByUser(userId);
+    const result: (Tenant & { role: string })[] = [];
+
+    for (const m of memberships) {
+      if (m.status !== MemberStatus.ACTIVE) continue;
+
+      const tenant = await this.tenantRepo.findById(m.tenantId);
+
+      if (tenant) {
+        result.push({ ...tenant, role: m.role });
+      }
+    }
+
+    return result;
+  }
+
   async getTenant(id: string): Promise<Tenant> {
     const tenant = await this.tenantRepo.findById(id);
 
@@ -91,24 +113,14 @@ export class TenantService {
     return tenant;
   }
 
-  /**
-   * Update a tenant. Only owner or admin can update.
-   */
   async updateTenant(userId: string, id: string, input: UpdateTenant): Promise<Tenant> {
     const membership = await this.requireMembership(userId, id);
 
-    if (membership.role !== TenantRole.Owner && membership.role !== TenantRole.Admin) {
+    if (membership.role !== TenantRole.OWNER && membership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can update the tenant');
     }
 
-    // Check slug uniqueness if slug is being changed
-    if (input.slug) {
-      const existing = await this.tenantRepo.findBySlug(input.slug);
-
-      if (existing && existing.id !== id) {
-        throw new ConflictError(`Tenant with slug "${input.slug}" already exists`);
-      }
-    }
+    this.requireNotArchived(await this.getTenant(id));
 
     const tenant = await this.tenantRepo.update(id, input);
 
@@ -119,124 +131,248 @@ export class TenantService {
     return tenant;
   }
 
-  /**
-   * Delete a tenant. Only owner can delete.
-   */
+  // ─── Tenant Lifecycle ─────────────────────────────────────────────────────
+
   async deleteTenant(userId: string, id: string): Promise<void> {
     const membership = await this.requireMembership(userId, id);
 
-    if (membership.role !== TenantRole.Owner) {
+    if (membership.role !== TenantRole.OWNER) {
       throw new ForbiddenError('Only the owner can delete the tenant');
     }
 
-    const deleted = await this.tenantRepo.delete(id);
+    this.requireNotArchived(await this.getTenant(id));
 
-    if (!deleted) {
-      throw new NotFoundError('Tenant not found');
+    const deletionScheduledAt = new Date(Date.now() + DELETION_GRACE_PERIOD_MS);
+
+    await this.tenantRepo.update(id, {
+      status: TenantStatus.DELETION_PENDING,
+      deletionScheduledAt,
+    });
+  }
+
+  async archiveTenant(userId: string, id: string): Promise<void> {
+    const membership = await this.requireMembership(userId, id);
+
+    if (membership.role !== TenantRole.OWNER && membership.role !== TenantRole.ADMIN) {
+      throw new ForbiddenError('Only owner or admin can archive the tenant');
     }
 
-    // Clean up all memberships for this tenant
-    const members = await this.tenantMemberRepo.findByTenant(id);
+    const tenant = await this.getTenant(id);
 
-    for (const member of members) {
-      if (member.userId) {
-        await this.tenantMemberRepo.delete(id, member.userId);
+    this.requireNotArchived(tenant);
+
+    // Archive tenant
+    await this.tenantRepo.update(id, { status: TenantStatus.ARCHIVED });
+
+    // Archive all non-archived projects with TENANT_ARCHIVE reason
+    if (this.projectRepo) {
+      const projects = await this.projectRepo.findByTenant(id);
+
+      for (const project of projects) {
+        if (project.status !== 'ARCHIVED') {
+          await this.projectRepo.update(project.id, {
+            status: 'ARCHIVED',
+            archiveReason: 'TENANT_ARCHIVE',
+          });
+        }
       }
     }
   }
 
+  async restoreTenant(userId: string, id: string): Promise<void> {
+    const membership = await this.requireMembership(userId, id);
+
+    if (membership.role !== TenantRole.OWNER && membership.role !== TenantRole.ADMIN) {
+      throw new ForbiddenError('Only owner or admin can restore the tenant');
+    }
+
+    await this.tenantRepo.update(id, {
+      status: TenantStatus.ACTIVE,
+      deletionScheduledAt: null,
+    });
+
+    // Restore only projects archived due to TENANT_ARCHIVE
+    if (this.projectRepo) {
+      const projects = await this.projectRepo.findByTenant(id);
+
+      for (const project of projects) {
+        if (project.status === 'ARCHIVED' && project.archiveReason === 'TENANT_ARCHIVE') {
+          await this.projectRepo.update(project.id, {
+            status: 'ACTIVE',
+            archiveReason: null,
+          });
+        }
+      }
+    }
+  }
+
+  async cancelDeletion(userId: string, id: string): Promise<void> {
+    const membership = await this.requireMembership(userId, id);
+
+    if (membership.role !== TenantRole.OWNER) {
+      throw new ForbiddenError('Only the owner can cancel deletion');
+    }
+
+    await this.tenantRepo.update(id, {
+      status: TenantStatus.ACTIVE,
+      deletionScheduledAt: null,
+    });
+  }
+
+  async permanentDelete(id: string): Promise<void> {
+    const tenant = await this.getTenant(id);
+
+    if (tenant.status !== TenantStatus.DELETION_PENDING) {
+      throw new AppError(400, 'CONFLICT', 'Tenant must be in DELETION_PENDING status');
+    }
+
+    // Remove all memberships
+    const members = await this.tenantMemberRepo.findByTenant(id);
+
+    for (const member of members) {
+      await this.tenantMemberRepo.delete(id, member.userId);
+    }
+
+    await this.tenantRepo.delete(id);
+  }
+
   // ─── Member Management ─────────────────────────────────────────────────────
 
-  /**
-   * Invite (add) a member to a tenant by email.
-   * Supports unregistered users — creates a pending invitation and sends an email.
-   * Only owner or admin can invite.
-   */
-  async inviteMember(requesterId: string, tenantId: string, email: string, role: string): Promise<TenantMember> {
-    // 1. Check requester is owner/admin
+  async getTenantMembers(tenantId: string): Promise<TenantMember[]> {
+    const members = await this.tenantMemberRepo.findByTenant(tenantId);
+    const enriched: TenantMember[] = [];
+
+    for (const member of members) {
+      const user = member.userId ? await this.userRepo.findById(member.userId) : null;
+
+      enriched.push({
+        ...member,
+        displayName: user?.displayName ?? null,
+        email: user?.email ?? null,
+      });
+    }
+    return enriched;
+  }
+
+  async inviteUser(requesterId: string, tenantId: string, email: string, role: string): Promise<TenantMember> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
+    if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can invite members');
     }
 
-    // 2. Check subscription limit (max 10 active users per workspace for free tier)
-    const tenant = await this.tenantRepo.findById(tenantId);
+    const tenant = await this.getTenant(tenantId);
 
-    if (!tenant) throw new NotFoundError('Tenant not found');
+    this.requireNotArchived(tenant);
 
-    if (tenant.subscription === SubscriptionTier.Free) {
-      const activeCount = await this.tenantMemberRepo.countActiveByTenant(tenantId);
-
-      if (activeCount >= 10) {
-        throw new ForbiddenError('Free plan allows max 10 members per workspace. Upgrade to premium for unlimited.');
-      }
-    }
-
-    // 3. Check if invitation already exists for this email + tenant
-    const existingInvite = await this.tenantMemberRepo.findByInvitedEmailAndTenant(email, tenantId);
-
-    if (existingInvite) {
-      throw new ConflictError('An invitation for this email already exists');
-    }
-
-    // 4. Check if user is already an active member
+    // Check if user is already an active member
     const existingUser = await this.userRepo.findByEmail(email);
 
     if (existingUser) {
       const existingMember = await this.tenantMemberRepo.findByUserAndTenant(existingUser.id, tenantId);
 
-      if (existingMember && existingMember.status === MemberStatus.Active) {
+      if (existingMember && existingMember.status === MemberStatus.ACTIVE) {
         throw new ConflictError('User is already a member of this tenant');
       }
     }
 
-    // 5. Generate invitation token
-    const { randomUUID } = await import('node:crypto');
-    const invitationToken = randomUUID();
-    // 6. Create pending tenant member
+    // Generate invitation token and hash
+    const token = randomUUID();
+    const tokenHash = hashToken(token);
+    const invitationDoc: InvitationDocument = {
+      status: InvitationStatus.PENDING,
+      tokenHash,
+      invitedBy: requesterId,
+      invitedOn: new Date(),
+    };
+    // If user doesn't exist, create a placeholder user
+    let userId = existingUser?.id;
+
+    if (!userId) {
+      const placeholderUser = await this.userRepo.create({
+        email,
+        displayName: email.split('@')[0] ?? email,
+        passwordHash: '', // no password yet
+      });
+
+      userId = placeholderUser.id;
+    }
+
+    // Check for existing pending invitation — replace it instead of throwing
+    const existingMember = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
+
+    if (existingMember && existingMember.invitation?.status === InvitationStatus.PENDING) {
+      // Replace existing invitation with new token
+      const invitationDoc: InvitationDocument = {
+        status: InvitationStatus.PENDING,
+        tokenHash,
+        invitedBy: requesterId,
+        invitedOn: new Date(),
+      };
+
+      await this.tenantMemberRepo.update(existingMember.id, {
+        role,
+        invitation: invitationDoc,
+      });
+
+      // Send new invitation email
+      try {
+        const inviter = await this.userRepo.findById(requesterId);
+
+        await this.emailService.sendInvitationEmail({
+          to: email,
+          inviterName: inviter?.displayName ?? 'A team member',
+          tenantName: tenant.name,
+          role,
+          token,
+        });
+      } catch (err) {
+        console.error('Failed to send re-invitation email:', err);
+      }
+
+      return {
+        ...existingMember,
+        role,
+        invitation: { ...invitationDoc, invitedOn: invitationDoc.invitedOn.toISOString() },
+      } as unknown as TenantMember;
+    }
+
     const member = await this.tenantMemberRepo.create({
-      userId: existingUser?.id ?? null,
+      userId,
       tenantId,
       role,
-      status: MemberStatus.Pending,
-      invitedEmail: email,
-      invitationToken,
+      status: MemberStatus.ACTIVE, // Member doc is ACTIVE; invitation tracks the pending state
+      invitation: invitationDoc,
     });
-    // 7. Get inviter details for email
-    const inviter = await this.userRepo.findById(requesterId);
 
-    // 8. Send invitation email (fire and forget - don't fail if email fails)
+    // Send invitation email (fire and forget)
     try {
+      const inviter = await this.userRepo.findById(requesterId);
+
       await this.emailService.sendInvitationEmail({
         to: email,
         inviterName: inviter?.displayName ?? 'A team member',
         tenantName: tenant.name,
         role,
-        token: invitationToken,
+        token, // plaintext token sent in email
       });
     } catch (err) {
       console.error('Failed to send invitation email:', err);
-      // Don't throw - invitation is created, email is best-effort
     }
 
     return member;
   }
 
-  /**
-   * Update a member's role. Only owner or admin can update roles.
-   */
   async updateMemberRole(requesterId: string, tenantId: string, userId: string, role: string): Promise<TenantMember> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
+    if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can update member roles');
     }
 
-    // Cannot change the owner's role
     const targetMembership = await this.requireMembership(userId, tenantId);
 
-    if (targetMembership.role === TenantRole.Owner) {
+    if (targetMembership.role === TenantRole.OWNER) {
       throw new ForbiddenError("Cannot change the owner's role");
     }
 
@@ -249,134 +385,162 @@ export class TenantService {
     return updated;
   }
 
-  /**
-   * Remove a member from a tenant. Only owner or admin can remove members.
-   * Cannot remove the owner.
-   */
   async removeMember(requesterId: string, tenantId: string, userId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
+    if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can remove members');
     }
 
-    // Cannot remove the owner
     const targetMembership = await this.requireMembership(userId, tenantId);
 
-    if (targetMembership.role === TenantRole.Owner) {
+    if (targetMembership.role === TenantRole.OWNER) {
       throw new ForbiddenError('Cannot remove the owner from the tenant');
     }
 
     await this.tenantMemberRepo.delete(tenantId, userId);
   }
 
-  /**
-   * List all members of a tenant (including pending invitations).
-   */
-  async getTenantMembers(tenantId: string): Promise<TenantMember[]> {
-    return this.tenantMemberRepo.findByTenant(tenantId);
-  }
+  // ─── Invitation Lifecycle ──────────────────────────────────────────────────
 
-  /**
-   * List all tenants where the user is an active member, including their role.
-   */
-  async listTenantsWithRole(userId: string): Promise<TenantWithRole[]> {
-    const memberships = await this.tenantMemberRepo.findByUser(userId);
-    const result: TenantWithRole[] = [];
+  async acceptInvitation(memberId: string): Promise<void> {
+    const member = await this.tenantMemberRepo.findById(memberId);
 
-    for (const m of memberships) {
-      if (m.status !== MemberStatus.Active) continue;
-
-      const tenant = await this.tenantRepo.findById(m.tenantId);
-
-      if (tenant) {
-        result.push({ ...tenant, role: m.role as TenantWithRole['role'] });
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Get pending invitations for the given email across all tenants.
-   */
-  async getMyInvitations(email: string): Promise<MyInvitation[]> {
-    const memberships = await this.tenantMemberRepo.findByInvitedEmail(email);
-    const result: MyInvitation[] = [];
-
-    for (const m of memberships) {
-      if (m.status !== MemberStatus.Pending) continue;
-
-      const tenant = await this.tenantRepo.findById(m.tenantId);
-
-      if (tenant) {
-        result.push({
-          id: m.id,
-          tenantId: m.tenantId,
-          tenantName: tenant.name,
-          role: m.role as MyInvitation['role'],
-          invitedEmail: m.invitedEmail ?? '',
-          invitedAt: m.invitedAt ? m.invitedAt.toISOString() : null,
-        });
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Owner/admin can see all pending invitations for their tenant.
-   */
-  async getPendingInvitationsByTenant(requesterId: string, tenantId: string): Promise<PendingInvitation[]> {
-    const requesterMembership = await this.requireMembership(requesterId, tenantId);
-
-    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
-      throw new ForbiddenError('Only owner or admin can view pending invitations');
-    }
-
-    const pendingDocs = await this.tenantMemberRepo.findPendingByTenant(tenantId);
-
-    return pendingDocs.map((doc) => ({
-      id: doc.id,
-      tenantId: doc.tenantId,
-      userId: doc.userId,
-      invitedEmail: doc.invitedEmail,
-      role: doc.role as PendingInvitation['role'],
-      status: doc.status as PendingInvitation['status'],
-      invitedAt: doc.invitedAt ? doc.invitedAt.toISOString() : null,
-    }));
-  }
-
-  /**
-   * Decline an invitation. Sets status to 'declined'.
-   * Verifies the invitation belongs to the user (by email or userId).
-   */
-  async declineInvitation(invitationId: string, userId: string): Promise<void> {
-    const membership = await this.tenantMemberRepo.findById(invitationId);
-
-    if (!membership) {
+    if (!member) {
       throw new NotFoundError('Invitation not found');
     }
 
-    if (membership.status !== MemberStatus.Pending) {
+    if (!member.invitation || member.invitation.status !== InvitationStatus.PENDING) {
+      throw new NotFoundError('Invitation is no longer pending');
+    }
+
+    // Check TTL expiration
+    const invitedOn = new Date(member.invitation.invitedOn).getTime();
+
+    if (Date.now() - invitedOn > INVITATION_TTL_MS) {
+      await this.tenantMemberRepo.update(memberId, {
+        invitation: { ...member.invitation, status: InvitationStatus.EXPIRED },
+      });
+      throw new AppError(410, 'INVITATION_EXPIRED', 'Invitation has expired');
+    }
+
+    await this.tenantMemberRepo.update(memberId, {
+      invitation: null,
+      status: MemberStatus.ACTIVE,
+    });
+  }
+
+  async declineInvitation(memberId: string, userId: string): Promise<void> {
+    const member = await this.tenantMemberRepo.findById(memberId);
+
+    if (!member) {
+      throw new NotFoundError('Invitation not found');
+    }
+
+    if (!member.invitation || member.invitation.status !== InvitationStatus.PENDING) {
       throw new ConflictError('Invitation is no longer pending');
     }
 
-    // Verify ownership: the invitation must belong to the user
-    if (membership.userId !== userId) {
+    if (member.userId !== userId) {
       throw new ForbiddenError('You can only decline your own invitations');
     }
 
-    await this.tenantMemberRepo.updateStatusById(invitationId, MemberStatus.Declined);
+    await this.tenantMemberRepo.update(memberId, {
+      invitation: { ...member.invitation, status: InvitationStatus.DECLINED },
+    });
   }
 
-  /**
-   * Owner/admin revokes a member's access. Sets status to 'access_revoked'.
-   */
+  async revokeInvitation(requesterId: string, tenantId: string, memberId: string): Promise<void> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+
+    if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
+      throw new ForbiddenError('Only owner or admin can revoke invitations');
+    }
+
+    const member = await this.tenantMemberRepo.findById(memberId);
+
+    if (!member || member.tenantId !== tenantId) {
+      throw new NotFoundError('Invitation not found in this tenant');
+    }
+
+    if (!member.invitation || member.invitation.status !== InvitationStatus.PENDING) {
+      throw new ConflictError('Invitation is no longer pending');
+    }
+
+    await this.tenantMemberRepo.update(memberId, {
+      invitation: { ...member.invitation, status: InvitationStatus.REVOKED },
+    });
+  }
+
+  async reinviteUser(requesterId: string, tenantId: string, memberId: string): Promise<void> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+
+    if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
+      throw new ForbiddenError('Only owner or admin can reinvite users');
+    }
+
+    const member = await this.tenantMemberRepo.findById(memberId);
+
+    if (!member || member.tenantId !== tenantId) {
+      throw new NotFoundError('Member not found in this tenant');
+    }
+
+    // Generate new token
+    const token = randomUUID();
+    const tokenHash = hashToken(token);
+    const invitationDoc: InvitationDocument = {
+      status: InvitationStatus.PENDING,
+      tokenHash,
+      invitedBy: requesterId,
+      invitedOn: new Date(),
+    };
+
+    await this.tenantMemberRepo.update(memberId, { invitation: invitationDoc });
+
+    // Send email
+    try {
+      const user = await this.userRepo.findById(member.userId);
+      const tenant = await this.getTenant(tenantId);
+      const inviter = await this.userRepo.findById(requesterId);
+
+      if (user) {
+        await this.emailService.sendInvitationEmail({
+          to: user.email,
+          inviterName: inviter?.displayName ?? 'A team member',
+          tenantName: tenant.name,
+          role: member.role,
+          token,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to send reinvitation email:', err);
+    }
+  }
+
+  async restoreMembership(requesterId: string, tenantId: string, memberId: string): Promise<void> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+
+    if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
+      throw new ForbiddenError('Only owner or admin can restore memberships');
+    }
+
+    const member = await this.tenantMemberRepo.findById(memberId);
+
+    if (!member || member.tenantId !== tenantId) {
+      throw new NotFoundError('Member not found in this tenant');
+    }
+
+    if (member.status !== MemberStatus.ACCESS_REVOKED) {
+      throw new ConflictError('Only ACCESS_REVOKED memberships can be restored');
+    }
+
+    await this.tenantMemberRepo.update(memberId, { status: MemberStatus.ACTIVE });
+  }
+
   async revokeAccess(requesterId: string, tenantId: string, memberId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
+    if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can revoke access');
     }
 
@@ -386,68 +550,17 @@ export class TenantService {
       throw new NotFoundError('Member not found in this tenant');
     }
 
-    // Cannot revoke the owner's access
-    if (membership.role === TenantRole.Owner) {
+    if (membership.role === TenantRole.OWNER) {
       throw new ForbiddenError("Cannot revoke the owner's access");
     }
 
-    await this.tenantMemberRepo.updateStatusById(memberId, MemberStatus.AccessRevoked);
+    await this.tenantMemberRepo.update(memberId, { status: MemberStatus.ACCESS_REVOKED });
   }
 
-  /**
-   * Owner/admin resends an invitation. Resets status to 'pending',
-   * generates a new token, and sends the email.
-   */
-  async resendInvitation(requesterId: string, tenantId: string, memberId: string): Promise<void> {
-    const requesterMembership = await this.requireMembership(requesterId, tenantId);
-
-    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
-      throw new ForbiddenError('Only owner or admin can resend invitations');
-    }
-
-    const membership = await this.tenantMemberRepo.findById(memberId);
-
-    if (!membership || membership.tenantId !== tenantId) {
-      throw new NotFoundError('Invitation not found in this tenant');
-    }
-
-    // Generate new invitation token
-    const { randomUUID } = await import('node:crypto');
-    const invitationToken = randomUUID();
-
-    // Update the membership with new token and reset to pending
-    await this.tenantMemberRepo.updateStatusById(memberId, MemberStatus.Pending);
-
-    // Note: We also need to update the invitationToken — using the raw collection approach
-    // For now, we'll re-create the logic inline. In a real app, you'd add an updateToken method.
-    const tenant = await this.tenantRepo.findById(tenantId);
-
-    if (!tenant) throw new NotFoundError('Tenant not found');
-
-    if (membership.invitedEmail) {
-      try {
-        const inviter = await this.userRepo.findById(requesterId);
-
-        await this.emailService.sendInvitationEmail({
-          to: membership.invitedEmail,
-          inviterName: inviter?.displayName ?? 'A team member',
-          tenantName: tenant.name,
-          role: membership.role,
-          token: invitationToken,
-        });
-      } catch (err) {
-        console.error('Failed to resend invitation email:', err);
-      }
-    }
-  }
-
-  /**
-   * Owner/admin permanently removes a member. Hard-deletes the membership record.
-   */
   async hardDeleteMember(requesterId: string, tenantId: string, memberId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
-    if (requesterMembership.role !== TenantRole.Owner && requesterMembership.role !== TenantRole.Admin) {
+    if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can permanently remove members');
     }
 
@@ -457,20 +570,81 @@ export class TenantService {
       throw new NotFoundError('Member not found in this tenant');
     }
 
-    // Cannot hard-delete the owner
-    if (membership.role === TenantRole.Owner) {
+    if (membership.role === TenantRole.OWNER) {
       throw new ForbiddenError('Cannot permanently remove the owner');
     }
 
     await this.tenantMemberRepo.deleteById(memberId);
   }
 
+  async getMyInvitations(email: string): Promise<TenantMember[]> {
+    const memberships = await this.tenantMemberRepo.findPendingByEmail(email);
+
+    return memberships.map((doc) => ({
+      id: doc.id,
+      tenantId: doc.tenantId,
+      userId: doc.userId,
+      role: doc.role as TenantMember['role'],
+      status: doc.status as TenantMember['status'],
+      invitation: doc.invitation
+        ? {
+            status: doc.invitation.status as TenantMember['invitation'] extends infer I
+              ? I extends { status: infer S }
+                ? S
+                : never
+              : never,
+            tokenHash: doc.invitation.tokenHash,
+            invitedBy: doc.invitation.invitedBy,
+            invitedOn: doc.invitation.invitedOn.toISOString(),
+          }
+        : null,
+      createdAt: doc.createdAt.toISOString(),
+      updatedAt: doc.updatedAt.toISOString(),
+    }));
+  }
+
+  // ─── User Deletion ─────────────────────────────────────────────────────────
+
+  /**
+   * Soft-delete a user. Removes all tenant memberships but preserves
+   * historical snapshots in tasks/comments.
+   */
+  async deleteUser(requesterId: string, userId: string): Promise<void> {
+    // Only tenant owners can delete users
+    // The requester must be a tenant owner somewhere
+    const requester = await this.userRepo.findById(requesterId);
+
+    if (!requester) {
+      throw new NotFoundError('Requester not found');
+    }
+
+    const targetUser = await this.userRepo.findById(userId);
+
+    if (!targetUser) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Cannot delete yourself
+    if (requesterId === userId) {
+      throw new ForbiddenError('Cannot delete your own account');
+    }
+
+    // Soft-delete the user
+    await this.userRepo.softDelete(userId);
+  }
+
   // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  private requireNotArchived(tenant: Tenant): void {
+    if (tenant.status === TenantStatus.ARCHIVED) {
+      throw new AppError(409, 'TENANT_ARCHIVED', 'Tenant is archived and cannot be modified');
+    }
+  }
 
   private async requireMembership(userId: string, tenantId: string): Promise<TenantMember> {
     const membership = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
 
-    if (!membership || membership.status !== MemberStatus.Active) {
+    if (!membership || membership.status !== MemberStatus.ACTIVE) {
       throw new ForbiddenError('You are not a member of this tenant');
     }
     return membership;

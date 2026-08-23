@@ -20,7 +20,6 @@
     <div class="px-2 py-1.5">
       <p class="text-sm font-medium text-foreground">{{ user()?.email }}</p>
       <p class="text-xs text-muted-foreground">{{ roleLabel() }}</p>
-      <span hlmBadge variant="secondary" class="mt-1">{{ subscription() }}</span>
     </div>
 
     <hlm-dropdown-menu-separator />
@@ -56,10 +55,8 @@
   </hlm-dropdown-menu>
 </ng-template>
 
+<ui-user-menu-theme-sheet [(open)]="themeSheetOpen" />
+
 <ng-template #languageMenu>
   <ui-language-switcher />
 </ng-template>
-
-@defer (on idle) {
-  <ui-user-menu-theme-sheet [open]="themeSheetOpen()" (openChange)="themeSheetOpen.set($event)" />
-}

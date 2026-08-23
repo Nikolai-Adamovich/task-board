@@ -22,36 +22,21 @@
               type="text"
               [formField]="workspaceForm.name"
               placeholder="My Workspace"
-              (input)="onNameChange()"
             />
             @if (workspaceForm.name().touched() && workspaceForm.name().errors().length) {
               <p hlm-field-error>{{ workspaceForm.name().errors()[0].message | transloco }}</p>
             }
           </hlm-field>
-
           <hlm-field>
-            <label hlmFieldLabel for="workspace-slug">{{ 'createWorkspace.slug' | transloco }}</label>
-            <input
-              hlmInput
-              id="workspace-slug"
-              type="text"
-              [formField]="workspaceForm.slug"
-              placeholder="my-workspace"
-            />
-            @if (workspaceForm.slug().touched() && workspaceForm.slug().errors().length) {
-              <p hlm-field-error>{{ workspaceForm.slug().errors()[0].message | transloco }}</p>
-            }
-            <p class="mt-1 text-xs text-muted-foreground">
-              {{ 'createWorkspace.slugHint' | transloco }}
-            </p>
+            <label hlmFieldLabel for="workspace-desc">{{ 'createWorkspace.descriptionLabel' | transloco }}</label>
+            <textarea
+              hlmTextarea
+              id="workspace-desc"
+              [formField]="workspaceForm.description"
+              rows="3"
+              [placeholder]="'createWorkspace.descriptionPlaceholder' | transloco"
+            ></textarea>
           </hlm-field>
-
-          <div class="space-y-1">
-            <span class="text-sm font-medium text-foreground">{{ 'createWorkspace.plan' | transloco }}</span>
-            <div class="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-foreground">
-              {{ 'createWorkspace.planFree' | transloco }}
-            </div>
-          </div>
         </hlm-field-group>
       </form>
     </div>

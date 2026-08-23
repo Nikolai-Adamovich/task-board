@@ -15,12 +15,12 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { InvitationView } from './invitation-view';
 import { TenantClient } from '@services/tenant-client';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { MyInvitation } from '@task-board/shared';
+import type { MyInvitation } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockInvitations: MyInvitation[] = [
-  { id: 'inv1', tenantId: 't1', tenantName: 'Acme', role: 'member', invitedEmail: 'a@b.com', invitedAt: NOW },
-  { id: 'inv2', tenantId: 't2', tenantName: 'Globex', role: 'admin', invitedEmail: 'c@d.com', invitedAt: NOW },
+  { id: 'inv1', tenantId: 't1', tenantName: 'Acme', role: 'MEMBER', invitedEmail: 'a@b.com', invitedAt: NOW },
+  { id: 'inv2', tenantId: 't2', tenantName: 'Globex', role: 'ADMIN', invitedEmail: 'c@d.com', invitedAt: NOW },
 ];
 
 describe('InvitationView', () => {

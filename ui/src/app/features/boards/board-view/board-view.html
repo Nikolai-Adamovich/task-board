@@ -8,26 +8,47 @@
     <div class="mb-4 flex items-center justify-between">
       <div>
         <h2 class="text-xl font-bold text-foreground">{{ b.name }}</h2>
-        @if (b.description) {
-          <p class="text-sm text-muted-foreground">{{ b.description }}</p>
-        }
+        <p class="text-xs text-muted-foreground">{{ b.type }}</p>
       </div>
-      <button hlmBtn size="sm" (click)="showCreateTask.set(true)">
-        <ng-icon name="lucidePlus" class="mr-1" />
-        {{ 'boardView.newTask' | transloco }}
-      </button>
+      @if (canCreateTask()) {
+        <button hlmBtn size="sm" (click)="showCreateTask.set(true)">
+          <ng-icon name="lucidePlus" class="mr-1" />
+          {{ 'boardView.newTask' | transloco }}
+        </button>
+      }
     </div>
 
-    <!-- Kanban columns -->
+    <!-- Columns -->
     <div class="flex flex-1 gap-4 overflow-x-auto pb-4">
-      @for (col of columns(); track col.id) {
-        <ui-column-view
-          [column]="col"
-          [tasks]="getTasksForColumn(col.id)"
-          [showAddButton]="false"
-          (taskDrop)="onTaskDrop($event)"
-          (taskClick)="goToTask($event)"
-        />
+      @for (column of b.columns; track column.id) {
+        <div class="flex min-w-70 flex-1 flex-col rounded-lg border border-border bg-muted/30">
+          <div class="border-b border-border px-3 py-2">
+            <h3 class="text-sm font-semibold text-foreground">
+              {{ getColumnName(column) }}
+              <span class="ml-1 text-xs font-normal text-muted-foreground">
+                ({{ getTasksForColumn(column).length }})
+              </span>
+            </h3>
+          </div>
+          <div
+            cdkDropList
+            [cdkDropListData]="getTasksForColumn(column)"
+            [id]="getColumnDropId(column)"
+            [cdkDropListConnectedTo]="b.columns.map((c) => getColumnDropId(c))"
+            (cdkDropListDropped)="onTaskDrop($event, column)"
+            class="flex flex-1 flex-col gap-2 overflow-y-auto p-2"
+          >
+            @for (task of getTasksForColumn(column); track task.id) {
+              <div cdkDrag [cdkDragData]="task">
+                <ui-task-card [task]="task" [projectKey]="projectKey()" (click)="goToTask(task)" />
+              </div>
+            } @empty {
+              <div class="flex items-center justify-center py-8 text-xs text-muted-foreground">
+                {{ 'boardView.noTasks' | transloco }}
+              </div>
+            }
+          </div>
+        </div>
       }
     </div>
   </div>
@@ -68,23 +89,52 @@
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="task-priority">{{ 'boardView.priority' | transloco }}</label>
-          <select hlmNativeSelect id="task-priority" [formField]="newTaskForm.priority">
-            <option value="low">{{ 'priority.low' | transloco }}</option>
-            <option value="medium">{{ 'priority.medium' | transloco }}</option>
-            <option value="high">{{ 'priority.high' | transloco }}</option>
-            <option value="critical">{{ 'priority.critical' | transloco }}</option>
-          </select>
+          <hlm-select
+            [value]="model().priority"
+            (valueChange)="model.update((m) => ({ ...m, priority: $any($event) }))"
+          >
+            <hlm-select-trigger class="w-full" size="sm">
+              <hlm-select-value />
+            </hlm-select-trigger>
+            <hlm-select-content *hlmSelectPortal>
+              <hlm-select-group>
+                <hlm-select-item value="LOW">{{ 'priority.low' | transloco }}</hlm-select-item>
+                <hlm-select-item value="MEDIUM">{{ 'priority.medium' | transloco }}</hlm-select-item>
+                <hlm-select-item value="HIGH">{{ 'priority.high' | transloco }}</hlm-select-item>
+                <hlm-select-item value="CRITICAL">{{ 'priority.critical' | transloco }}</hlm-select-item>
+              </hlm-select-group>
+            </hlm-select-content>
+          </hlm-select>
         </hlm-field>
-        @if (columns().length > 0) {
-          <hlm-field>
-            <label hlmFieldLabel for="task-column">{{ 'boardView.column' | transloco }}</label>
-            <select hlmNativeSelect id="task-column" [formField]="newTaskForm.columnId">
-              @for (col of columns(); track col.id) {
-                <option [value]="col.id">{{ col.name }}</option>
-              }
-            </select>
-          </hlm-field>
-        }
+        <hlm-field>
+          <label hlmFieldLabel for="task-status">{{ 'boardView.status' | transloco }}</label>
+          <hlm-select
+            [value]="model().statusId"
+            (valueChange)="model.update((m) => ({ ...m, statusId: $any($event) }))"
+            [itemToString]="statusItemToString"
+          >
+            <hlm-select-trigger class="w-full" size="sm">
+              <hlm-select-value [placeholder]="'boardView.selectStatus' | transloco" />
+            </hlm-select-trigger>
+            <hlm-select-content *hlmSelectPortal>
+              <hlm-select-group>
+                @for (statusId of allStatusIds; track statusId) {
+                  <hlm-select-item [value]="statusId">{{ statusId }}</hlm-select-item>
+                }
+              </hlm-select-group>
+            </hlm-select-content>
+          </hlm-select>
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="task-type">{{ 'boardView.type' | transloco }}</label>
+          <input
+            hlmInput
+            id="task-type"
+            type="text"
+            [formField]="newTaskForm.typeId"
+            [placeholder]="'boardView.typePlaceholder' | transloco"
+          />
+        </hlm-field>
       </form>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>{{ 'boardView.cancel' | transloco }}</button>
@@ -100,6 +150,30 @@
             {{ 'boardView.create' | transloco }}
           }
         </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- Status Selection Dialog (for multi-status columns) -->
+  <hlm-dialog [state]="showStatusSelect() ? 'open' : 'closed'" (stateChanged)="onStatusSelectDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'boardView.selectStatus' | transloco }}</h3>
+      </hlm-dialog-header>
+      <p class="text-sm text-muted-foreground mb-4">
+        {{ 'boardView.multiStatusHint' | transloco }}
+      </p>
+      @if (pendingDrop(); as pd) {
+        <div class="space-y-2">
+          @for (statusId of pd.targetColumn.statusIds; track statusId) {
+            <button hlmBtn variant="outline" class="w-full justify-start" (click)="applyStatusSelection(statusId)">
+              {{ statusMap()[statusId] || statusId }}
+            </button>
+          }
+        </div>
+      }
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'boardView.cancel' | transloco }}</button>
       </hlm-dialog-footer>
     </hlm-dialog-content>
   </hlm-dialog>

@@ -24,8 +24,8 @@ import type { InvitationDetails, AuthResponse, User } from '@task-board/shared';
 const mockInvitationDetails: InvitationDetails = {
   email: 'invited@example.com',
   tenantName: 'Acme',
-  role: 'member',
-  status: 'pending',
+  role: 'MEMBER',
+  status: 'PENDING',
   isRegistered: false,
 };
 const mockAuthResponse: AuthResponse = {

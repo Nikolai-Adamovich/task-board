@@ -14,6 +14,7 @@ interface RegisterModel {
   displayName: string;
   email: string;
   password: string;
+  confirmPassword: string;
 }
 
 @Component({
@@ -35,7 +36,12 @@ export class Register {
   private readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
   protected readonly error = signal('');
-  private readonly model = signal<RegisterModel>({ displayName: '', email: '', password: '' });
+  private readonly model = signal<RegisterModel>({
+    displayName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
   protected readonly registerForm = form(
     this.model,
     schema<RegisterModel>((field) => {
@@ -46,14 +52,26 @@ export class Register {
       required(field.password, { message: 'validation.passwordRequired' });
       minLength(field.password, 8, { message: 'validation.passwordMin' });
       maxLength(field.password, 128, { message: 'validation.passwordMax' });
+      required(field.confirmPassword, { message: 'validation.confirmPasswordRequired' });
     }),
     {
       submission: {
         action: async () => {
           this.error.set('');
 
+          const modelValue = this.model();
+
+          if (modelValue.password !== modelValue.confirmPassword) {
+            this.error.set('validation.passwordsMustMatch');
+            return;
+          }
+
           try {
-            await this.authStore.register(this.model());
+            await this.authStore.register({
+              displayName: modelValue.displayName,
+              email: modelValue.email,
+              password: modelValue.password,
+            });
             await this.router.navigateByUrl('/');
           } catch (err) {
             this.error.set(this.getErrorMessage(err));
@@ -65,7 +83,14 @@ export class Register {
 
   private getErrorMessage(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
+      const body = err.error;
+
+      if (body?.error?.code) {
+        return 'errors.serverError';
+      }
+      if (body?.error?.message) {
+        return body.error.message;
+      }
     }
 
     return 'auth.register.failed';

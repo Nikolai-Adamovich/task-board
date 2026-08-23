@@ -1,29 +1,31 @@
+import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
-import { DEFAULT_THEME_ID } from '@task-board/shared';
-import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
+import type { UserProjectBoardPreference, UpdateUserProjectBoardPreference } from '@task-board/shared';
 
 // Required MongoDB indexes:
-// - { userId: 1 } (unique)
+// - { userId: 1, projectId: 1 } (unique)
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
 export interface UserPreferencesDocument {
   _id?: import('mongodb').ObjectId;
+  id: string;
   userId: string;
-  zoom: number;
-  theme: string;
-  language: string;
+  projectId: string;
+  defaultBoardId: string | null;
+  createdAt: Date;
   updatedAt: Date;
 }
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
-function toDomain(doc: UserPreferencesDocument): UserPreferences {
+function toDomain(doc: UserPreferencesDocument): UserProjectBoardPreference {
   return {
+    id: doc.id,
     userId: doc.userId,
-    zoom: doc.zoom,
-    theme: doc.theme,
-    language: doc.language,
+    projectId: doc.projectId,
+    defaultBoardId: doc.defaultBoardId,
+    createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };
 }
@@ -33,34 +35,28 @@ function toDomain(doc: UserPreferencesDocument): UserPreferences {
 export class UserPreferencesRepository {
   constructor(private readonly collection: Collection<UserPreferencesDocument>) {}
 
-  async findByUserId(userId: string): Promise<UserPreferences | null> {
-    const doc = await this.collection.findOne({ userId });
+  async findByUserAndProject(userId: string, projectId: string): Promise<UserProjectBoardPreference | null> {
+    const doc = await this.collection.findOne({ userId, projectId });
 
     return doc ? toDomain(doc) : null;
   }
 
-  async upsert(userId: string, data: UpdateUserPreferences): Promise<UserPreferences> {
+  async upsert(
+    userId: string,
+    projectId: string,
+    data: UpdateUserProjectBoardPreference,
+  ): Promise<UserProjectBoardPreference> {
     const now = new Date();
-    const $set: Record<string, unknown> = { updatedAt: now };
-
-    if (data.zoom !== undefined) $set.zoom = data.zoom;
-    if (data.theme !== undefined) $set.theme = data.theme;
-    if (data.language !== undefined) $set.language = data.language;
-
-    const $setOnInsert: Record<string, unknown> = { userId };
-
-    if (data.zoom === undefined) $setOnInsert.zoom = 100;
-    if (data.theme === undefined) $setOnInsert.theme = DEFAULT_THEME_ID;
-    if (data.language === undefined) $setOnInsert.language = 'en';
-
+    const $set: Record<string, unknown> = { updatedAt: now, defaultBoardId: data.defaultBoardId };
+    const $setOnInsert: Record<string, unknown> = { id: randomUUID(), userId, projectId };
     const result = await this.collection.findOneAndUpdate(
-      { userId },
+      { userId, projectId },
       { $set, $setOnInsert },
       { upsert: true, returnDocument: 'after' },
     );
 
     if (!result) {
-      throw new Error('Upsert returned null — this should never happen');
+      throw new Error('Upsert returned null');
     }
 
     return toDomain(result);

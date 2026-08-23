@@ -61,6 +61,11 @@
           {{ 'auth.login.submit' | transloco }}
         }
       </button>
+      <div class="flex w-full items-center justify-between">
+        <a routerLink="/auth/forgot-password" class="text-sm font-medium text-primary hover:underline">{{
+          'auth.login.forgotPassword' | transloco
+        }}</a>
+      </div>
       <p class="text-center text-sm text-muted-foreground">
         {{ 'auth.login.noAccount' | transloco }}
         <a routerLink="/auth/register" class="font-medium text-primary hover:underline">{{

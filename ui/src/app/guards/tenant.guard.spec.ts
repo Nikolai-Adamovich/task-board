@@ -6,7 +6,31 @@ import { tenantGuard } from './tenant.guard';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { TenantWithRole } from '@task-board/shared';
+import type { TenantWithRole } from '@app/types/frontend';
+
+const NOW = '2025-01-01T00:00:00Z';
+const mockTenants: TenantWithRole[] = [
+  {
+    id: 'tenant-1',
+    name: 'Acme',
+    description: null,
+    status: 'ACTIVE',
+    deletionScheduledAt: null,
+    role: 'OWNER',
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
+  {
+    id: 'tenant-2',
+    name: 'Beta',
+    description: null,
+    status: 'ACTIVE',
+    deletionScheduledAt: null,
+    role: 'ADMIN',
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
+];
 
 describe('tenantGuard', () => {
   const mockState = {} as RouterStateSnapshot;
@@ -60,17 +84,14 @@ describe('tenantGuard', () => {
 
     const tenantStore = TestBed.inject(TenantStore);
     const authStore = TestBed.inject(AuthStore);
-    const tenants: TenantWithRole[] = [
-      { id: 'tenant-1', name: 'Test', slug: 'test', subscription: 'free', createdAt: '', updatedAt: '', role: 'owner' },
-    ];
 
-    tenantStore.tenants.set(tenants);
-    tenantStore.setActiveTenant(tenants[0]);
+    tenantStore.tenants.set(mockTenants);
+    tenantStore.setActiveTenant(mockTenants[0]);
 
     const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('tenant-1'), mockState));
 
     expect(result).toBe(true);
-    expect(authStore.tenantRole()).toBe('owner');
+    expect(authStore.tenantRole()).toBe('OWNER');
   });
 
   it('should sync tenantRole when finding a matching tenant by route param', async () => {
@@ -78,17 +99,14 @@ describe('tenantGuard', () => {
 
     const tenantStore = TestBed.inject(TenantStore);
     const authStore = TestBed.inject(AuthStore);
-    const tenants: TenantWithRole[] = [
-      { id: 'tenant-1', name: 'Test', slug: 'test', subscription: 'free', createdAt: '', updatedAt: '', role: 'admin' },
-    ];
 
-    tenantStore.tenants.set(tenants);
+    tenantStore.tenants.set(mockTenants);
     // No active tenant set — guard should find the match and sync the role
 
-    const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('tenant-1'), mockState));
+    const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('tenant-2'), mockState));
 
     expect(result).toBe(true);
-    expect(authStore.tenantRole()).toBe('admin');
-    expect(tenantStore.activeTenant()?.id).toBe('tenant-1');
+    expect(authStore.tenantRole()).toBe('ADMIN');
+    expect(tenantStore.activeTenant()?.id).toBe('tenant-2');
   });
 });

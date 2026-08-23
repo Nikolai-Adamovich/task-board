@@ -1,0 +1,25 @@
+@if (loading()) {
+  <div class="flex items-center justify-center py-4">
+    <hlm-spinner />
+    <span class="ml-2 text-sm text-muted-foreground">{{ 'milkdownEditor.loading' | transloco }}</span>
+  </div>
+}
+
+@if (fallbackMode()) {
+  <!-- Fallback: plain textarea with markdown support -->
+  <!-- TODO: Replace with full Milkdown WYSIWYG editor once build pipeline is verified -->
+  <div class="milkdown-fallback">
+    <textarea
+      hlmTextarea
+      class="min-h-50 w-full font-mono text-sm"
+      [value]="fallbackContent()"
+      (input)="onFallbackInput($event)"
+      placeholder="Write markdown here..."
+    ></textarea>
+  </div>
+} @else if (editorReady()) {
+  <!-- Milkdown WYSIWYG editor mounts here -->
+  <div
+    class="milkdown-host rounded-md border border-border bg-card p-4 prose prose-sm dark:prose-invert max-w-none"
+  ></div>
+}

@@ -1,37 +1,35 @@
-import { DEFAULT_THEME_ID } from '@task-board/shared';
-import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
-import type { UserPreferencesRepository } from '../repositories/user-preferences.repository.js';
+import type { UserProjectBoardPreference, UpdateUserProjectBoardPreference } from '@task-board/shared';
+import { NotFoundError } from '../errors/app-error.js';
+import { UserPreferencesRepository } from '../repositories/user-preferences.repository.js';
 
-// ─── Default Preferences ─────────────────────────────────────────────────────
-
-function defaultPreferences(userId: string): UserPreferences {
-  return {
-    userId,
-    zoom: 100,
-    theme: DEFAULT_THEME_ID,
-    language: 'en',
-    updatedAt: new Date().toISOString(),
-  };
+export interface UserPreferencesServiceBoardRepo {
+  findById(id: string): Promise<{ id: string; projectId: string } | null>;
 }
 
-// ─── User Preferences Service ────────────────────────────────────────────────
-
 export class UserPreferencesService {
-  constructor(private readonly repo: UserPreferencesRepository) {}
+  constructor(
+    private readonly prefsRepo: UserPreferencesRepository,
+    private readonly boardRepo: UserPreferencesServiceBoardRepo,
+  ) {}
 
-  /**
-   * Get preferences for a user. Returns defaults if none are stored yet.
-   */
-  async getPreferences(userId: string): Promise<UserPreferences> {
-    const existing = await this.repo.findByUserId(userId);
-
-    return existing ?? defaultPreferences(userId);
+  async getPreferences(userId: string, projectId: string): Promise<UserProjectBoardPreference | null> {
+    return this.prefsRepo.findByUserAndProject(userId, projectId);
   }
 
-  /**
-   * Create or update preferences for a user.
-   */
-  async updatePreferences(userId: string, data: UpdateUserPreferences): Promise<UserPreferences> {
-    return this.repo.upsert(userId, data);
+  async updatePreferences(
+    userId: string,
+    projectId: string,
+    input: UpdateUserProjectBoardPreference,
+  ): Promise<UserProjectBoardPreference> {
+    // Validate defaultBoardId belongs to the same project
+    if (input.defaultBoardId) {
+      const board = await this.boardRepo.findById(input.defaultBoardId);
+
+      if (!board || board.projectId !== projectId) {
+        throw new NotFoundError(`Board ${input.defaultBoardId} not found in project ${projectId}`);
+      }
+    }
+
+    return this.prefsRepo.upsert(userId, projectId, input);
   }
 }

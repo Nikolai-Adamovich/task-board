@@ -1,112 +1,159 @@
-import { TenantRole, DefaultColumnNames } from '@task-board/shared';
-import type { Board, Column, CreateBoard, UpdateBoard } from '@task-board/shared';
-import { ForbiddenError, NotFoundError } from '../middleware/error-handler.js';
+import { randomUUID } from 'node:crypto';
+import type { Board, CreateBoard, UpdateBoard } from '@task-board/shared';
+import { NotFoundError } from '../errors/app-error.js';
 import { BoardRepository } from '../repositories/board.repository.js';
-import { ColumnRepository } from '../repositories/column.repository.js';
+import { StatusRepository } from '../repositories/status.repository.js';
+import type { AuditService } from './audit.service.js';
+
+export interface BoardServiceProjectRepo {
+  findById(id: string): Promise<{ tenantId: string } | null>;
+}
 
 // ─── Board Service ───────────────────────────────────────────────────────────
 
 export class BoardService {
   constructor(
     private readonly boardRepo: BoardRepository,
-    private readonly columnRepo: ColumnRepository,
+    private readonly statusRepo: StatusRepository,
+    private readonly projectRepo?: BoardServiceProjectRepo,
+    private readonly auditService?: AuditService,
   ) {}
 
-  /**
-   * List all boards for a project within a tenant.
-   */
-  async listBoards(tenantId: string, projectId: string): Promise<Board[]> {
-    return this.boardRepo.findByProject(tenantId, projectId);
+  async getBoardsByProject(projectId: string): Promise<Board[]> {
+    return this.boardRepo.findByProject(projectId);
   }
 
-  /**
-   * Create a new board with default columns. Admin+ only.
-   */
-  async createBoard(
-    tenantId: string,
-    input: CreateBoard & { projectId: string },
-    userRole: string,
-  ): Promise<{ board: Board; columns: Column[] }> {
-    this.requireAdmin(userRole);
+  async getBoard(id: string): Promise<Board> {
+    const board = await this.boardRepo.findById(id);
 
-    const board = await this.boardRepo.create(tenantId, {
-      projectId: input.projectId,
+    if (!board) {
+      throw new NotFoundError('Board not found');
+    }
+    return board;
+  }
+
+  async createBoard(projectId: string, input: CreateBoard, userId?: string): Promise<Board> {
+    // Validate all statusIds belong to the same project
+    await this.validateStatusIds(
+      projectId,
+      input.columns.flatMap((c) => c.statusIds),
+    );
+
+    // Generate UUID for each column
+    const columns = input.columns.map((col) => ({
+      id: randomUUID(),
+      statusIds: col.statusIds,
+      position: col.position,
+    }));
+    const board = await this.boardRepo.create(projectId, {
       name: input.name,
-      description: input.description,
+      type: input.type,
+      columns,
     });
-    // Create columns — use custom names if provided, otherwise use defaults
-    const columnNames = input.columnNames ?? [...DefaultColumnNames];
-    const columns: Column[] = [];
 
-    for (let i = 0; i < columnNames.length; i++) {
-      const column = await this.columnRepo.create(tenantId, {
-        boardId: board.id,
-        name: columnNames[i],
-        position: i,
-        isDefault: i < DefaultColumnNames.length && !input.columnNames,
+    // Audit side effect
+    if (this.auditService && userId && this.projectRepo) {
+      const project = await this.projectRepo.findById(projectId);
+
+      await this.auditService.log({
+        tenantId: project?.tenantId ?? '',
+        projectId,
+        entityType: 'BOARD',
+        entityId: board.id,
+        action: 'CREATED',
+        actorId: userId,
       });
-
-      columns.push(column);
-    }
-
-    return { board, columns };
-  }
-
-  /**
-   * Get a board by ID with its columns.
-   */
-  async getBoard(tenantId: string, id: string): Promise<{ board: Board; columns: Column[] }> {
-    const board = await this.boardRepo.findById(tenantId, id);
-
-    if (!board) {
-      throw new NotFoundError('Board not found');
-    }
-
-    const columns = await this.columnRepo.findByBoard(tenantId, id);
-
-    return { board, columns };
-  }
-
-  /**
-   * Update a board. Admin+ only.
-   */
-  async updateBoard(tenantId: string, id: string, input: UpdateBoard, userRole: string): Promise<Board> {
-    this.requireAdmin(userRole);
-
-    const board = await this.boardRepo.update(tenantId, id, input);
-
-    if (!board) {
-      throw new NotFoundError('Board not found');
     }
 
     return board;
   }
 
-  /**
-   * Delete a board and its columns. Admin+ only.
-   */
-  async deleteBoard(tenantId: string, id: string, userRole: string): Promise<void> {
-    this.requireAdmin(userRole);
+  async updateBoard(id: string, input: UpdateBoard, userId?: string): Promise<Board> {
+    const board = await this.getBoard(id);
+    const updateFields: { name?: string; columns?: { id: string; statusIds: string[]; position: number }[] } = {};
 
-    // Delete all columns first
-    const columns = await this.columnRepo.findByBoard(tenantId, id);
-
-    for (const column of columns) {
-      await this.columnRepo.delete(tenantId, column.id);
+    if (input.name !== undefined) {
+      updateFields.name = input.name;
     }
 
-    const deleted = await this.boardRepo.delete(tenantId, id);
+    if (input.columns !== undefined) {
+      // Validate all statusIds belong to the same project
+      await this.validateStatusIds(
+        board.projectId,
+        input.columns.flatMap((c) => c.statusIds),
+      );
 
-    if (!deleted) {
+      updateFields.columns = input.columns.map((col) => ({
+        id: col.id ?? randomUUID(),
+        statusIds: col.statusIds,
+        position: col.position,
+      }));
+    }
+
+    const updated = await this.boardRepo.update(id, updateFields);
+
+    if (!updated) {
       throw new NotFoundError('Board not found');
     }
+
+    // Audit side effect
+    if (this.auditService && userId && this.projectRepo) {
+      const project = await this.projectRepo.findById(updated.projectId);
+      const changes: { field: string; oldValue: unknown; newValue: unknown }[] = [];
+
+      if (input.name !== undefined) changes.push({ field: 'name', oldValue: board.name, newValue: input.name });
+      if (input.columns !== undefined)
+        changes.push({ field: 'columns', oldValue: board.columns, newValue: input.columns });
+      await this.auditService.log({
+        tenantId: project?.tenantId ?? '',
+        projectId: updated.projectId,
+        entityType: 'BOARD',
+        entityId: updated.id,
+        action: 'UPDATED',
+        actorId: userId,
+        changes,
+      });
+    }
+
+    return updated;
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
+  async deleteBoard(id: string, userId?: string): Promise<void> {
+    const board = await this.boardRepo.findById(id);
 
-  private requireAdmin(role: string): void {
-    if (role !== TenantRole.Owner && role !== TenantRole.Admin) {
-      throw new ForbiddenError('Only owner or admin can perform this action');
+    if (!board) {
+      throw new NotFoundError('Board not found');
+    }
+
+    // Audit side effect (before delete)
+    if (this.auditService && userId && this.projectRepo) {
+      const project = await this.projectRepo.findById(board.projectId);
+
+      await this.auditService.log({
+        tenantId: project?.tenantId ?? '',
+        projectId: board.projectId,
+        entityType: 'BOARD',
+        entityId: id,
+        action: 'DELETED',
+        actorId: userId,
+      });
+    }
+
+    await this.boardRepo.delete(id);
+  }
+
+  /**
+   * Validate that all status IDs exist and belong to the given project.
+   */
+  private async validateStatusIds(projectId: string, statusIds: string[]): Promise<void> {
+    const uniqueStatusIds = [...new Set(statusIds)];
+
+    for (const statusId of uniqueStatusIds) {
+      const status = await this.statusRepo.findById(statusId);
+
+      if (!status || status.projectId !== projectId) {
+        throw new NotFoundError(`Status ${statusId} not found in project ${projectId}`);
+      }
     }
   }
 }

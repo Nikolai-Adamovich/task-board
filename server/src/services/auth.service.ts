@@ -1,4 +1,4 @@
-import { MemberStatus } from '@task-board/shared';
+import { MemberStatus, InvitationStatus } from '@task-board/shared';
 import type {
   User,
   AuthResponse,
@@ -7,7 +7,7 @@ import type {
   InvitationDetails,
   TenantRole,
 } from '@task-board/shared';
-import { ConflictError, NotFoundError, UnauthorizedError } from '../middleware/error-handler.js';
+import { ConflictError, NotFoundError, UnauthorizedError } from '../errors/app-error.js';
 import { UserRepository } from '../repositories/user.repository.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
 import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
@@ -28,10 +28,6 @@ function base64UrlEncode(data: string): string {
   return btoa(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/**
- * Sign a JWT using Web Crypto API (HMAC-SHA256).
- * Compatible with Cloudflare Workers.
- */
 async function signJwt(payload: JwtPayload, secret: string): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
   const headerB64 = base64UrlEncode(JSON.stringify(header));
@@ -42,7 +38,6 @@ async function signJwt(payload: JwtPayload, secret: string): Promise<string> {
   ]);
   const data = encoder.encode(`${headerB64}.${payloadB64}`);
   const signatureBuffer = await crypto.subtle.sign('HMAC', key, data);
-  // Convert ArrayBuffer to base64url
   const signatureArray = new Uint8Array(signatureBuffer);
   const signatureB64 = btoa(String.fromCharCode(...signatureArray))
     .replace(/\+/g, '-')
@@ -57,6 +52,13 @@ async function signJwt(payload: JwtPayload, secret: string): Promise<string> {
 const BCRYPT_SALT_ROUNDS = 10;
 const TOKEN_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
 
+/** Create a deterministic SHA-256 hash of a token for storage/lookup */
+async function hashToken(token: string): Promise<string> {
+  const crypto = await import('node:crypto');
+
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 // ─── Auth Service ────────────────────────────────────────────────────────────
 
 export class AuthService {
@@ -70,40 +72,38 @@ export class AuthService {
   /**
    * Register a new user.
    * Creates the user and activates any pending invitations for the email.
-   * If no pending invitations exist, issues a JWT with tenantId: null.
    */
   async register(input: RegisterRequest): Promise<AuthResponse> {
-    // Check if email is already taken
-    const existingUser = await this.userRepo.findByEmail(input.email);
+    const normalizedEmail = input.email.toLowerCase().trim();
+    const existingUser = await this.userRepo.findByEmail(normalizedEmail);
 
     if (existingUser) {
       throw new ConflictError('A user with this email already exists');
     }
 
-    // bcryptjs is a pure-JS implementation — no native bindings, Workers-compatible
     const bcrypt = await import('bcryptjs');
     const passwordHash = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
-    // Create the user
     const user = await this.userRepo.create({
-      email: input.email,
+      email: normalizedEmail,
       displayName: input.displayName,
       passwordHash,
     });
-    // Check for pending invitations and activate them
-    const pendingInvitations = await this.tenantMemberRepo.findPendingByEmail(input.email);
+    // Activate pending invitations for this email
+    const pendingInvitations = await this.tenantMemberRepo.findPendingByEmail(normalizedEmail);
     let firstTenantId: string | null = null;
     let firstTenantRole: TenantRole | null = null;
 
-    for (const invitation of pendingInvitations) {
-      if (!invitation.invitationToken) continue;
-      await this.tenantMemberRepo.activateInvitation(invitation.invitationToken, user.id);
+    for (const member of pendingInvitations) {
+      await this.tenantMemberRepo.update(member.id, {
+        status: MemberStatus.ACTIVE,
+        invitation: null,
+      });
       if (!firstTenantId) {
-        firstTenantId = invitation.tenantId;
-        firstTenantRole = invitation.role as TenantRole;
+        firstTenantId = member.tenantId;
+        firstTenantRole = member.role as TenantRole;
       }
     }
 
-    // Generate JWT
     const token = await this.generateToken(user, firstTenantId, firstTenantRole);
 
     return { token, user };
@@ -113,7 +113,8 @@ export class AuthService {
    * Log in with email and password.
    */
   async login(input: LoginRequest): Promise<AuthResponse> {
-    const userDoc = await this.userRepo.findByEmail(input.email);
+    const normalizedEmail = input.email.toLowerCase().trim();
+    const userDoc = await this.userRepo.findByEmail(normalizedEmail);
 
     if (!userDoc) {
       throw new UnauthorizedError('Invalid email or password');
@@ -126,15 +127,16 @@ export class AuthService {
       throw new UnauthorizedError('Invalid email or password');
     }
 
-    // Find the user's first active tenant membership for the token
     const memberships = await this.tenantMemberRepo.findByUser(userDoc.id);
-    const activeMembership = memberships.find((m) => m.status === MemberStatus.Active);
+    const activeMembership = memberships.find((m) => m.status === MemberStatus.ACTIVE);
     const user: User = {
       id: userDoc.id,
       email: userDoc.email,
       displayName: userDoc.displayName,
+      avatarUrl: userDoc.avatarUrl,
       createdAt: userDoc.createdAt.toISOString(),
       updatedAt: userDoc.updatedAt.toISOString(),
+      deletedAt: userDoc.deletedAt ? userDoc.deletedAt.toISOString() : null,
     };
     const token = await this.generateToken(user, activeMembership?.tenantId ?? null, activeMembership?.role ?? null);
 
@@ -155,54 +157,31 @@ export class AuthService {
 
   /**
    * Accept an invitation to join a tenant.
-   * If the user doesn't exist yet, creates a new account using the provided password and displayName.
+   * Token is matched via SHA-256 hash.
    */
   async acceptInvitation(input: { token: string; password?: string; displayName?: string }): Promise<AuthResponse> {
-    // Find the pending invitation by token
-    const invitation = await this.tenantMemberRepo.findByInvitationToken(input.token);
+    const hash = await hashToken(input.token);
+    const invitation = await this.tenantMemberRepo.findByInvitationToken(hash);
 
-    if (!invitation || invitation.status !== MemberStatus.Pending) {
+    if (!invitation || !invitation.invitation || invitation.invitation.status !== InvitationStatus.PENDING) {
       throw new NotFoundError('Invalid or expired invitation');
     }
 
-    if (!invitation.invitedEmail) {
-      throw new NotFoundError('Invitation has no associated email');
+    const user = await this.userRepo.findById(invitation.userId);
+
+    if (!user) {
+      throw new NotFoundError('Invitation user not found');
     }
 
-    const invitedEmail = invitation.invitedEmail;
-    let user: User;
-    // Check if a user with the invited email already exists
-    const existingUser = await this.userRepo.findByEmail(invitedEmail);
+    // Note: In v5, the invite flow creates a real user record.
+    // Password handling for placeholder accounts is done at the invite creation time.
 
-    if (existingUser) {
-      // Existing user — activate the membership
-      user = {
-        id: existingUser.id,
-        email: existingUser.email,
-        displayName: existingUser.displayName,
-        createdAt: existingUser.createdAt.toISOString(),
-        updatedAt: existingUser.updatedAt.toISOString(),
-      };
-      await this.tenantMemberRepo.activateInvitation(input.token, existingUser.id);
-    } else {
-      // New user — password and displayName are required
-      if (!input.password || !input.displayName) {
-        throw new ConflictError('Password and display name are required for new accounts');
-      }
+    // Activate the membership
+    await this.tenantMemberRepo.update(invitation.id, {
+      status: MemberStatus.ACTIVE,
+      invitation: null,
+    });
 
-      const bcrypt = await import('bcryptjs');
-      const passwordHash = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
-
-      user = await this.userRepo.create({
-        email: invitedEmail,
-        displayName: input.displayName,
-        passwordHash,
-      });
-
-      await this.tenantMemberRepo.activateInvitation(input.token, user.id);
-    }
-
-    // Generate JWT with the tenant from the invitation
     const token = await this.generateToken(user, invitation.tenantId, invitation.role as TenantRole);
 
     return { token, user };
@@ -212,14 +191,11 @@ export class AuthService {
    * Get invitation details by token.
    */
   async getInvitationDetails(token: string): Promise<InvitationDetails> {
-    const invitation = await this.tenantMemberRepo.findByInvitationToken(token);
+    const hash = await hashToken(token);
+    const invitation = await this.tenantMemberRepo.findByInvitationToken(hash);
 
-    if (!invitation) {
+    if (!invitation || !invitation.invitation) {
       throw new NotFoundError('Invitation not found');
-    }
-
-    if (!invitation.invitedEmail) {
-      throw new NotFoundError('Invitation has no associated email');
     }
 
     const tenant = await this.tenantRepo.findById(invitation.tenantId);
@@ -228,15 +204,15 @@ export class AuthService {
       throw new NotFoundError('Tenant not found');
     }
 
-    // Check if the invited email corresponds to a registered user
-    const existingUser = await this.userRepo.findByEmail(invitation.invitedEmail);
+    const user = await this.userRepo.findById(invitation.userId);
+    const isRegistered = user !== null;
 
     return {
-      email: invitation.invitedEmail,
+      email: user?.email ?? '',
       tenantName: tenant.name,
       role: invitation.role as InvitationDetails['role'],
-      status: invitation.status as InvitationDetails['status'],
-      isRegistered: existingUser !== null,
+      status: invitation.invitation.status as InvitationDetails['status'],
+      isRegistered,
     };
   }
 

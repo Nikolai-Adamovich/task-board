@@ -1,0 +1,48 @@
+import type { Collection } from 'mongodb';
+
+// ─── MongoDB Document Shape ───────────────────────────────────────────────────
+
+export interface CounterDocument {
+  _id: string; // e.g., "taskNumber:<projectId>"
+  value: number;
+}
+
+// ─── Counter Repository ──────────────────────────────────────────────────────
+
+/**
+ * Atomic counter using MongoDB `$inc` with `upsert: true`.
+ * Used for generating sequential task numbers within a project.
+ */
+export class CounterRepository {
+  constructor(private readonly collection: Collection<CounterDocument>) {}
+
+  /**
+   * Atomically increments the counter and returns the new value.
+   * First call for a key creates the document with value: 1.
+   */
+  async getNextValue(key: string): Promise<number> {
+    const result = await this.collection.findOneAndUpdate(
+      { _id: key },
+      { $inc: { value: 1 } },
+      { upsert: true, returnDocument: 'after' },
+    );
+
+    return result?.value ?? 1;
+  }
+
+  /**
+   * Get the current value without incrementing.
+   */
+  async getCurrentValue(key: string): Promise<number> {
+    const doc = await this.collection.findOne({ _id: key });
+
+    return doc?.value ?? 0;
+  }
+
+  /**
+   * Delete all entities belonging to a project. Used for cascade delete.
+   */
+  async deleteByProject(projectId: string): Promise<void> {
+    await this.collection.deleteMany({ projectId });
+  }
+}

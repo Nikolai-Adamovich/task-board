@@ -21,14 +21,16 @@
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       @for (project of projects(); track project.id) {
         <a
-          [routerLink]="['/tenants', project.tenantId, 'projects', project.id]"
+          [routerLink]="['/tenants', project.tenantId, 'projects', project.key]"
           class="block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-md"
         >
-          <h3 class="text-lg font-semibold text-foreground">{{ project.name }}</h3>
+          <div class="flex items-center gap-2">
+            <h3 class="text-lg font-semibold text-foreground">{{ project.name }}</h3>
+            <span class="text-xs font-mono text-muted-foreground">[{{ project.key }}]</span>
+          </div>
           @if (project.description) {
             <p class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
           }
-          <p class="mt-2 text-xs text-muted-foreground">{{ 'projects.slug' | transloco: { slug: project.slug } }}</p>
         </a>
       }
     </div>
@@ -56,10 +58,10 @@
           }
         </hlm-field>
         <hlm-field>
-          <label hlmFieldLabel for="project-slug">{{ 'projects.slugLabel' | transloco }}</label>
-          <input hlmInput id="project-slug" type="text" [formField]="newProjectForm.slug" placeholder="project-slug" />
-          @if (newProjectForm.slug().touched() && newProjectForm.slug().errors().length) {
-            <p hlm-field-error>{{ newProjectForm.slug().errors()[0].message | transloco }}</p>
+          <label hlmFieldLabel for="project-key">{{ 'projects.key' | transloco }}</label>
+          <input hlmInput id="project-key" type="text" [formField]="newProjectForm.key" placeholder="PROJ" />
+          @if (newProjectForm.key().touched() && newProjectForm.key().errors().length) {
+            <p hlm-field-error>{{ newProjectForm.key().errors()[0].message | transloco }}</p>
           }
         </hlm-field>
         <hlm-field>

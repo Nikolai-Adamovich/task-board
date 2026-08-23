@@ -31,7 +31,7 @@ function createTestApp() {
   app.get('/tenant-protected/resource', (c) => {
     return c.json({
       tenantId: c.get('tenantId'),
-      userRole: c.get('userRole'),
+      tenantRole: c.get('tenantRole'),
     });
   });
 
@@ -67,12 +67,12 @@ describe('tenantContextMiddleware', () => {
     const app = createTestApp();
     const res = await app.request('/tenant-protected/resource', {}, TEST_ENV);
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as { error: { code: string; message: string } };
 
-    expect(body.code).toBe('VALIDATION_ERROR');
-    expect(body.message).toBe('Missing X-Tenant-Id header');
+    expect(json.error.code).toBe('VALIDATION_ERROR');
+    expect(json.error.message).toBe('Missing X-Tenant-Id header');
   });
 
   it('returns 403 when userId is not set (no auth)', async () => {
@@ -81,10 +81,10 @@ describe('tenantContextMiddleware', () => {
 
     expect(res.status).toBe(403);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as { error: { code: string; message: string } };
 
-    expect(body.code).toBe('FORBIDDEN');
-    expect(body.message).toBe('Authentication required for tenant context');
+    expect(json.error.code).toBe('FORBIDDEN');
+    expect(json.error.message).toBe('Authentication required for tenant context');
   });
 
   it('returns 403 when user is not a member of the tenant', async () => {
@@ -95,18 +95,18 @@ describe('tenantContextMiddleware', () => {
 
     expect(res.status).toBe(403);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as { error: { code: string; message: string } };
 
-    expect(body.code).toBe('FORBIDDEN');
-    expect(body.message).toBe('You are not a member of this tenant');
+    expect(json.error.code).toBe('FORBIDDEN');
+    expect(json.error.message).toBe('You are not a member of this tenant');
   });
 
-  it('returns 403 when membership status is pending', async () => {
+  it('returns 403 when membership status is ACCESS_REVOKED', async () => {
     mockFindOne.mockResolvedValue({
       userId: 'user-1',
       tenantId: 'tenant-1',
-      role: 'member',
-      status: 'pending',
+      role: 'MEMBER',
+      status: 'ACCESS_REVOKED',
     });
 
     const app = createTestApp();
@@ -114,36 +114,17 @@ describe('tenantContextMiddleware', () => {
 
     expect(res.status).toBe(403);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as { error: { code: string; message: string } };
 
-    expect(body.code).toBe('FORBIDDEN');
-    expect(body.message).toBe('Your membership is pending. Please accept the invitation first.');
+    expect(json.error.code).toBe('FORBIDDEN');
+    expect(json.error.message).toBe('Your access to this tenant has been revoked');
   });
 
-  it('returns 403 when membership status is declined', async () => {
+  it('returns 403 when membership status is unknown/non-active', async () => {
     mockFindOne.mockResolvedValue({
       userId: 'user-1',
       tenantId: 'tenant-1',
-      role: 'member',
-      status: 'declined',
-    });
-
-    const app = createTestApp();
-    const res = await app.request('/tenant-protected/resource', { headers: { 'X-Tenant-Id': 'tenant-1' } }, TEST_ENV);
-
-    expect(res.status).toBe(403);
-
-    const body = (await res.json()) as Record<string, unknown>;
-
-    expect(body.code).toBe('FORBIDDEN');
-    expect(body.message).toBe('Your membership has been declined.');
-  });
-
-  it('returns 403 when membership status is inactive', async () => {
-    mockFindOne.mockResolvedValue({
-      userId: 'user-1',
-      tenantId: 'tenant-1',
-      role: 'member',
+      role: 'MEMBER',
       status: 'disabled',
     });
 
@@ -152,18 +133,18 @@ describe('tenantContextMiddleware', () => {
 
     expect(res.status).toBe(403);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as { error: { code: string; message: string } };
 
-    expect(body.code).toBe('FORBIDDEN');
-    expect(body.message).toBe('Your membership is not active');
+    expect(json.error.code).toBe('FORBIDDEN');
+    expect(json.error.message).toBe('Your membership is not active');
   });
 
-  it('sets tenantId and userRole for active membership', async () => {
+  it('sets tenantId and tenantRole for ACTIVE membership', async () => {
     mockFindOne.mockResolvedValue({
       userId: 'user-1',
       tenantId: 'tenant-1',
-      role: 'admin',
-      status: 'active',
+      role: 'ADMIN',
+      status: 'ACTIVE',
     });
 
     const app = createTestApp();
@@ -171,18 +152,18 @@ describe('tenantContextMiddleware', () => {
 
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { tenantId: string; userRole: string };
+    const body = (await res.json()) as { tenantId: string; tenantRole: string };
 
     expect(body.tenantId).toBe('tenant-1');
-    expect(body.userRole).toBe('admin');
+    expect(body.tenantRole).toBe('ADMIN');
   });
 
   it('queries tenant_members collection with correct filter', async () => {
     mockFindOne.mockResolvedValue({
       userId: 'user-1',
       tenantId: 'tenant-42',
-      role: 'owner',
-      status: 'active',
+      role: 'OWNER',
+      status: 'ACTIVE',
     });
 
     const app = createTestApp();
@@ -193,5 +174,41 @@ describe('tenantContextMiddleware', () => {
       userId: 'user-1',
       tenantId: 'tenant-42',
     });
+  });
+
+  it('sets correct tenantRole for OWNER', async () => {
+    mockFindOne.mockResolvedValue({
+      userId: 'user-1',
+      tenantId: 'tenant-1',
+      role: 'OWNER',
+      status: 'ACTIVE',
+    });
+
+    const app = createTestApp();
+    const res = await app.request('/tenant-protected/resource', { headers: { 'X-Tenant-Id': 'tenant-1' } }, TEST_ENV);
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { tenantRole: string };
+
+    expect(body.tenantRole).toBe('OWNER');
+  });
+
+  it('sets correct tenantRole for MEMBER', async () => {
+    mockFindOne.mockResolvedValue({
+      userId: 'user-1',
+      tenantId: 'tenant-1',
+      role: 'MEMBER',
+      status: 'ACTIVE',
+    });
+
+    const app = createTestApp();
+    const res = await app.request('/tenant-protected/resource', { headers: { 'X-Tenant-Id': 'tenant-1' } }, TEST_ENV);
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { tenantRole: string };
+
+    expect(body.tenantRole).toBe('MEMBER');
   });
 });

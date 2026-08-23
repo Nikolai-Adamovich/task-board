@@ -2,13 +2,11 @@
  * Tests for the ProjectDetail component.
  *
  * Covers:
- * - Loading project, boards, and members on init
- * - createBoard validation & submission
- * - addMember validation & submission
- * - onRoleChange
- * - confirmRemoveMember / removeMember
+ * - Loading project and boards on init
+ * - createBoard validation & submission (v5 shape with type)
  * - Dialog state changes
  * - isAdmin computed signal
+ * - Lifecycle actions (archive/restore/delete/cancelDeletion)
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -22,41 +20,42 @@ import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Project, Board, ProjectMember } from '@task-board/shared';
+import type { Project, Board } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockProject: Project = {
   id: 'p0000000-0000-0000-0000-000000000001',
   tenantId: 't0000000-0000-0000-0000-000000000001',
+  key: 'TP',
   name: 'Test Project',
-  slug: 'test-project',
   description: 'A project for testing',
+  status: 'ACTIVE',
+  defaultStatusId: 's1',
+  defaultBoardId: 'b1',
+  archiveReason: null,
+  deletionScheduledAt: null,
   createdAt: NOW,
   updatedAt: NOW,
 };
 const mockBoards: Board[] = [
   {
     id: 'b1',
-    tenantId: mockProject.tenantId,
     projectId: mockProject.id,
     name: 'Board 1',
-    description: null,
+    type: 'KANBAN',
+    columns: [],
     createdAt: NOW,
     updatedAt: NOW,
   },
   {
     id: 'b2',
-    tenantId: mockProject.tenantId,
     projectId: mockProject.id,
     name: 'Board 2',
-    description: 'Second board',
+    type: 'SPRINT',
+    columns: [],
     createdAt: NOW,
     updatedAt: NOW,
   },
-];
-const mockMembers: ProjectMember[] = [
-  { userId: 'u1', projectId: mockProject.id, tenantId: mockProject.tenantId, role: 'admin' },
-  { userId: 'u2', projectId: mockProject.id, tenantId: mockProject.tenantId, role: 'developer' },
 ];
 
 describe('ProjectDetail', () => {
@@ -64,10 +63,10 @@ describe('ProjectDetail', () => {
   let component: any;
   let projectClientMock: {
     getById: ReturnType<typeof vi.fn>;
-    listMembers: ReturnType<typeof vi.fn>;
-    addMember: ReturnType<typeof vi.fn>;
-    updateMemberRole: ReturnType<typeof vi.fn>;
-    removeMember: ReturnType<typeof vi.fn>;
+    archive: ReturnType<typeof vi.fn>;
+    restore: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+    cancelDeletion: ReturnType<typeof vi.fn>;
   };
   let boardClientMock: {
     list: ReturnType<typeof vi.fn>;
@@ -78,19 +77,18 @@ describe('ProjectDetail', () => {
   function setup() {
     projectClientMock = {
       getById: vi.fn().mockReturnValue(of(mockProject)),
-      listMembers: vi.fn().mockReturnValue(of({ data: mockMembers })),
-      addMember: vi.fn().mockReturnValue(of(mockMembers[0])),
-      updateMemberRole: vi.fn().mockReturnValue(of(mockMembers[0])),
-      removeMember: vi.fn().mockReturnValue(of(undefined)),
+      archive: vi.fn().mockReturnValue(of({ success: true })),
+      restore: vi.fn().mockReturnValue(of({ success: true })),
+      delete: vi.fn().mockReturnValue(of({ success: true })),
+      cancelDeletion: vi.fn().mockReturnValue(of({ success: true })),
     };
     boardClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: mockBoards })),
+      list: vi.fn().mockReturnValue(of(mockBoards)),
       create: vi.fn().mockReturnValue(of({ ...mockBoards[0], id: 'b3', name: 'New Board' })),
     };
     authStoreMock = {
-      tenantRole: vi.fn().mockReturnValue('owner'),
+      tenantRole: vi.fn().mockReturnValue('OWNER'),
     };
-
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
@@ -130,11 +128,6 @@ describe('ProjectDetail', () => {
       expect(component.boards()).toEqual(mockBoards);
     });
 
-    it('should load members for the project', () => {
-      expect(projectClientMock.listMembers).toHaveBeenCalledWith(mockProject.id);
-      expect(component.members()).toEqual(mockMembers);
-    });
-
     it('should set loading to false', () => {
       expect(component.loading()).toBe(false);
     });
@@ -146,22 +139,30 @@ describe('ProjectDetail', () => {
     beforeEach(() => setup());
 
     it('should not create board when name is empty', () => {
-      component.boardModel.update((m: { name: string; description: string }) => ({ ...m, name: '' }));
+      component.boardModel.update((m: { name: string; type: string }) => ({ ...m, name: '' }));
       submit(component.createBoardForm);
       expect(boardClientMock.create).not.toHaveBeenCalled();
     });
 
-    it('should create board and add to list', () => {
-      component.boardModel.update((m: { name: string; description: string }) => ({ ...m, name: 'New Board' }));
+    it('should create board with v5 shape and add to list', () => {
+      component.boardModel.update((m: { name: string; type: string }) => ({ ...m, name: 'New Board' }));
       submit(component.createBoardForm);
 
-      expect(boardClientMock.create).toHaveBeenCalledWith(mockProject.id, { name: 'New Board', description: '' });
+      expect(boardClientMock.create).toHaveBeenCalledWith(mockProject.id, {
+        name: 'New Board',
+        type: 'KANBAN',
+        columns: [
+          { statusIds: [], position: 0 },
+          { statusIds: [], position: 1 },
+          { statusIds: [], position: 2 },
+        ],
+      });
       expect(component.boards()).toHaveLength(3);
       expect(component.showCreateBoard()).toBe(false);
     });
 
     it('should reset newBoard after creation', () => {
-      component.boardModel.update((m: { name: string; description: string }) => ({ ...m, name: 'New Board' }));
+      component.boardModel.update((m: { name: string; type: string }) => ({ ...m, name: 'New Board' }));
       submit(component.createBoardForm);
 
       expect(component.boardModel().name).toBe('');
@@ -169,90 +170,8 @@ describe('ProjectDetail', () => {
 
     it('should set creatingBoard to false on error', () => {
       boardClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.boardModel.update((m: { name: string; description: string }) => ({ ...m, name: 'Fail Board' }));
+      component.boardModel.update((m: { name: string; type: string }) => ({ ...m, name: 'Fail Board' }));
       submit(component.createBoardForm);
-
-      expect(component.loading()).toBe(false);
-    });
-  });
-
-  // ── addMember ──────────────────────────────────────────────────────────
-
-  describe('addMember', () => {
-    beforeEach(() => setup());
-
-    it('should not add member when userId is empty', () => {
-      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: '' }));
-      submit(component.addMemberForm);
-      expect(projectClientMock.addMember).not.toHaveBeenCalled();
-    });
-
-    it('should call projectClient.addMember with correct params', () => {
-      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: 'user-new' }));
-      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, role: 'developer' }));
-      submit(component.addMemberForm);
-
-      expect(projectClientMock.addMember).toHaveBeenCalledWith(mockProject.id, 'user-new', 'developer');
-    });
-
-    it('should reset member form after success', () => {
-      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: 'user-new' }));
-      submit(component.addMemberForm);
-
-      expect(component.memberModel().userId).toBe('');
-      expect(component.memberModel().role).toBe('developer');
-      expect(component.showAddMember()).toBe(false);
-    });
-
-    it('should set addingMember to false on error', () => {
-      projectClientMock.addMember.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: 'user-new' }));
-      submit(component.addMemberForm);
-
-      expect(component.loading()).toBe(false);
-    });
-  });
-
-  // ── onRoleChange ───────────────────────────────────────────────────────
-
-  describe('onRoleChange', () => {
-    beforeEach(() => setup());
-
-    it('should not call API when role is unchanged', () => {
-      component.onRoleChange(mockMembers[0], 'admin');
-      expect(projectClientMock.updateMemberRole).not.toHaveBeenCalled();
-    });
-
-    it('should call projectClient.updateMemberRole when role changes', () => {
-      component.onRoleChange(mockMembers[1], 'viewer');
-      expect(projectClientMock.updateMemberRole).toHaveBeenCalledWith(mockProject.id, 'u2', 'viewer');
-    });
-  });
-
-  // ── confirmRemoveMember / removeMember ──────────────────────────────────
-
-  describe('removeMember', () => {
-    beforeEach(() => setup());
-
-    it('should set memberToRemove on confirmRemoveMember', () => {
-      component.confirmRemoveMember(mockMembers[0]);
-      expect(component.memberToRemove()).toEqual(mockMembers[0]);
-      expect(component.showRemoveConfirm()).toBe(true);
-    });
-
-    it('should remove member and reload members', () => {
-      component.confirmRemoveMember(mockMembers[0]);
-      component.removeMember();
-
-      expect(projectClientMock.removeMember).toHaveBeenCalledWith(mockProject.id, 'u1');
-      expect(component.showRemoveConfirm()).toBe(false);
-      expect(component.memberToRemove()).toBeNull();
-    });
-
-    it('should set removingMember to false on error', () => {
-      projectClientMock.removeMember.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.confirmRemoveMember(mockMembers[0]);
-      component.removeMember();
 
       expect(component.loading()).toBe(false);
     });
@@ -268,21 +187,6 @@ describe('ProjectDetail', () => {
       component.onDialogStateChange('closed');
       expect(component.showCreateBoard()).toBe(false);
     });
-
-    it('should close add member dialog on closed state', () => {
-      component.showAddMember.set(true);
-      component.onAddMemberDialogStateChange('closed');
-      expect(component.showAddMember()).toBe(false);
-    });
-
-    it('should close remove confirm dialog and clear memberToRemove', () => {
-      component.memberToRemove.set(mockMembers[0]);
-      component.showRemoveConfirm.set(true);
-      component.onRemoveDialogStateChange('closed');
-
-      expect(component.showRemoveConfirm()).toBe(false);
-      expect(component.memberToRemove()).toBeNull();
-    });
   });
 
   // ── isAdmin computed ───────────────────────────────────────────────────
@@ -293,19 +197,20 @@ describe('ProjectDetail', () => {
       expect(component.isAdmin()).toBe(true);
     });
 
-    it('should be true when tenantRole is admin', () => {
-      authStoreMock = { tenantRole: vi.fn().mockReturnValue('admin') };
+    it('should be true when tenantRole is ADMIN', () => {
+      authStoreMock = { tenantRole: vi.fn().mockReturnValue('ADMIN') };
       projectClientMock = {
         getById: vi.fn().mockReturnValue(of(mockProject)),
-        listMembers: vi.fn().mockReturnValue(of({ data: mockMembers })),
-        addMember: vi.fn(),
-        updateMemberRole: vi.fn(),
-        removeMember: vi.fn(),
+        archive: vi.fn(),
+        restore: vi.fn(),
+        delete: vi.fn(),
+        cancelDeletion: vi.fn(),
       };
       boardClientMock = {
-        list: vi.fn().mockReturnValue(of({ data: mockBoards })),
+        list: vi.fn().mockReturnValue(of(mockBoards)),
         create: vi.fn(),
       };
+      TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
@@ -322,25 +227,28 @@ describe('ProjectDetail', () => {
       const fixture = TestBed.createComponent(ProjectDetail);
 
       fixture.componentRef.setInput('projectId', mockProject.id);
+
       component = fixture.componentInstance;
       fixture.detectChanges();
 
       expect(component.isAdmin()).toBe(true);
     });
 
-    it('should be false when tenantRole is member', () => {
-      authStoreMock = { tenantRole: vi.fn().mockReturnValue('member') };
+    it('should be false when tenantRole is MEMBER', () => {
+      authStoreMock = { tenantRole: vi.fn().mockReturnValue('MEMBER') };
       projectClientMock = {
         getById: vi.fn().mockReturnValue(of(mockProject)),
-        listMembers: vi.fn().mockReturnValue(of({ data: mockMembers })),
-        addMember: vi.fn(),
-        updateMemberRole: vi.fn(),
-        removeMember: vi.fn(),
+        archive: vi.fn(),
+        restore: vi.fn(),
+        delete: vi.fn(),
+        cancelDeletion: vi.fn(),
       };
       boardClientMock = {
-        list: vi.fn().mockReturnValue(of({ data: mockBoards })),
+        list: vi.fn().mockReturnValue(of(mockBoards)),
         create: vi.fn(),
       };
+
+      TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
@@ -357,10 +265,41 @@ describe('ProjectDetail', () => {
       const fixture = TestBed.createComponent(ProjectDetail);
 
       fixture.componentRef.setInput('projectId', mockProject.id);
+
       component = fixture.componentInstance;
       fixture.detectChanges();
 
       expect(component.isAdmin()).toBe(false);
+    });
+  });
+
+  // ── Project Lifecycle ──────────────────────────────────────────────────
+
+  describe('project lifecycle', () => {
+    beforeEach(() => setup());
+
+    it('should archive project', () => {
+      component.archiveProject();
+      expect(projectClientMock.archive).toHaveBeenCalledWith(mockProject.id);
+      expect(component.project()?.status).toBe('ARCHIVED');
+    });
+
+    it('should restore project', () => {
+      component.restoreProject();
+      expect(projectClientMock.restore).toHaveBeenCalledWith(mockProject.id);
+      expect(component.project()?.status).toBe('ACTIVE');
+    });
+
+    it('should delete project', () => {
+      component.deleteProject();
+      expect(projectClientMock.delete).toHaveBeenCalledWith(mockProject.id);
+      expect(component.project()?.status).toBe('DELETION_PENDING');
+    });
+
+    it('should cancel deletion', () => {
+      component.cancelDeletion();
+      expect(projectClientMock.cancelDeletion).toHaveBeenCalledWith(mockProject.id);
+      expect(component.project()?.status).toBe('ACTIVE');
     });
   });
 });

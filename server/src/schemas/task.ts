@@ -1,125 +1,50 @@
 import { z } from 'zod';
 import { TaskPriorityValues } from '@task-board/shared';
-import {
-  uuid,
-  nonEmptyString,
-  optionalString,
-  nullableOptionalString,
-  isoDateTime,
-  nonNegativeInt,
-  uuidArray,
-} from '../validators/common.js';
-
-/**
- * Task entity schema.
- * The core work item in the task board. Tasks belong to a column within a board.
- */
-export const TaskSchema = z.object({
-  /** Unique task identifier (UUID v4) */
-  id: uuid(),
-  /** Owning tenant ID */
-  tenantId: uuid(),
-  /** Parent project ID */
-  projectId: uuid(),
-  /** Parent board ID */
-  boardId: uuid(),
-  /** Column the task is currently in */
-  columnId: uuid(),
-  /** Optional sprint assignment (null if in backlog) */
-  sprintId: uuid().nullable(),
-  /** Task title */
-  title: nonEmptyString(200, 'Task title'),
-  /** Optional detailed description (markdown) */
-  description: nullableOptionalString(5000),
-  /** User IDs assigned to this task */
-  assigneeIds: uuidArray(),
-  /** Task priority level */
-  priority: z.enum(TaskPriorityValues),
-  /** Position/order within the column (for drag-and-drop) */
-  position: nonNegativeInt(),
-  /** User ID of the task creator */
-  createdBy: uuid(),
-  /** Creation timestamp (ISO 8601) */
-  createdAt: isoDateTime(),
-  /** Last update timestamp (ISO 8601) */
-  updatedAt: isoDateTime(),
-});
+import { uuid, nonEmptyString, optionalString } from '../validators/common.js';
 
 /**
  * Schema for creating a new task.
  */
 export const CreateTaskSchema = z.object({
-  title: nonEmptyString(200, 'Task title'),
-  description: optionalString(5000),
-  projectId: uuid(),
-  boardId: uuid(),
-  columnId: uuid(),
+  typeId: uuid(),
+  title: nonEmptyString(255, 'Task title'),
+  description: optionalString(10000),
+  statusId: uuid(),
+  priority: z.enum(TaskPriorityValues),
+  assigneeId: uuid().optional(),
   sprintId: uuid().optional(),
-  priority: z.enum(TaskPriorityValues).default('medium'),
-  assigneeIds: uuidArray().default([]),
+  labelIds: z.array(uuid()).optional(),
 });
 
 /**
  * Schema for updating an existing task.
- * All fields are optional (partial update).
+ * Version is required for optimistic concurrency.
  */
 export const UpdateTaskSchema = z.object({
-  title: nonEmptyString(200, 'Task title').optional(),
-  description: optionalString(5000),
+  title: nonEmptyString(255, 'Task title').optional(),
+  description: optionalString(10000),
+  statusId: uuid().optional(),
   priority: z.enum(TaskPriorityValues).optional(),
-  assigneeIds: uuidArray().optional(),
+  assigneeId: uuid().nullable().optional(),
+  typeId: uuid().optional(),
+  sprintId: uuid().nullable().optional(),
+  labelIds: z.array(uuid()).optional(),
+  version: z.number().int().positive(),
 });
 
 /**
- * Schema for moving a task to a different column (and optionally a sprint).
- * Used for drag-and-drop operations on the board.
+ * Schema for task query parameters.
  */
-export const MoveTaskSchema = z.object({
-  taskId: uuid(),
-  targetColumnId: uuid(),
-  targetSprintId: uuid().optional(),
-});
-
-/**
- * Schema for assigning/unassigning users to a task.
- */
-export const AssignTaskSchema = z.object({
-  taskId: uuid(),
-  assigneeIds: uuidArray(),
-});
-
-/**
- * Denormalized task schema for the cross-tenant "my tasks" view.
- * Contains contextual fields (tenant name, project name, column title)
- * so the dashboard can render without extra lookups.
- */
-export const MyTaskSchema = z.object({
-  /** Unique task identifier (UUID v4) */
-  id: uuid(),
-  /** Owning tenant ID */
-  tenantId: uuid(),
-  /** Tenant display name */
-  tenantName: nonEmptyString(100, 'Tenant name'),
-  /** Parent project ID */
-  projectId: uuid(),
-  /** Project display name */
-  projectName: nonEmptyString(100, 'Project name'),
-  /** Parent board ID */
-  boardId: uuid(),
-  /** Column the task is currently in */
-  columnId: uuid(),
-  /** Column display title */
-  columnTitle: nonEmptyString(50, 'Column title'),
-  /** Task title */
-  title: nonEmptyString(200, 'Task title'),
-  /** Optional detailed description */
-  description: z.string().nullable(),
-  /** Task priority level */
-  priority: z.enum(TaskPriorityValues),
-  /** Optional sprint assignment (null if in backlog) */
-  sprintId: uuid().nullable(),
-  /** Creation timestamp (ISO 8601) */
-  createdAt: isoDateTime(),
-  /** Last update timestamp (ISO 8601) */
-  updatedAt: isoDateTime(),
+export const TaskQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  sort: z.string().optional(),
+  search: z.string().optional(),
+  statusId: uuid().optional(),
+  priority: z.enum(TaskPriorityValues).optional(),
+  typeId: uuid().optional(),
+  assigneeId: uuid().optional(),
+  reporterId: uuid().optional(),
+  sprintId: uuid().optional(),
+  labelId: uuid().optional(),
 });

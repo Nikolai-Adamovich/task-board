@@ -7,7 +7,7 @@ import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NgIcon } from '@ng-icons/core';
-import type { TenantWithRole } from '@task-board/shared';
+import type { TenantWithRole } from '@app/types/frontend';
 
 @Component({
   selector: 'ui-tenant-switcher',
@@ -29,6 +29,8 @@ export class TenantSwitcher {
     this.tenantStore.setActiveTenant(tenant);
     this.authStore.setTenantRole(tenant.role);
     this.isOpen.set(false);
+    // Navigate to tenant home and clear project context
+    this.router.navigate(['/tenants', tenant.id]);
   }
 
   protected isActive(tenant: TenantWithRole): boolean {

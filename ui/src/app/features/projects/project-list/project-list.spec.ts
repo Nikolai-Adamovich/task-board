@@ -3,7 +3,7 @@
  *
  * Covers:
  * - Loading projects on init
- * - createProject validation & submission
+ * - createProject validation & submission (with key field)
  * - canCreate check
  * - onDialogStateChange
  */
@@ -19,17 +19,36 @@ import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Project, TenantWithRole, User } from '@task-board/shared';
+import type { Project, User } from '@task-board/shared';
+import type { TenantWithRole } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockProjects: Project[] = [
-  { id: 'p1', tenantId: 't1', name: 'Project A', slug: 'project-a', description: null, createdAt: NOW, updatedAt: NOW },
+  {
+    id: 'p1',
+    tenantId: 't1',
+    key: 'PA',
+    name: 'Project A',
+    description: null,
+    status: 'ACTIVE',
+    defaultStatusId: 's1',
+    defaultBoardId: 'b1',
+    archiveReason: null,
+    deletionScheduledAt: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
   {
     id: 'p2',
     tenantId: 't1',
+    key: 'PB',
     name: 'Project B',
-    slug: 'project-b',
     description: 'Desc B',
+    status: 'ACTIVE',
+    defaultStatusId: 's1',
+    defaultBoardId: 'b1',
+    archiveReason: null,
+    deletionScheduledAt: null,
     createdAt: NOW,
     updatedAt: NOW,
   },
@@ -37,10 +56,10 @@ const mockProjects: Project[] = [
 const mockTenant: TenantWithRole = {
   id: 't1',
   name: 'Acme',
-  slug: 'acme',
   description: null,
-  subscription: 'free',
-  role: 'owner',
+  status: 'ACTIVE',
+  deletionScheduledAt: null,
+  role: 'OWNER',
   createdAt: NOW,
   updatedAt: NOW,
 };
@@ -57,8 +76,8 @@ describe('ProjectList', () => {
 
   function setup(hasTenant = true, hasUser = true) {
     projectClientMock = {
-      list: vi.fn().mockReturnValue(of({ data: mockProjects, total: 2, page: 1, limit: 20 })),
-      create: vi.fn().mockReturnValue(of({ ...mockProjects[0], id: 'p3', name: 'New Project' })),
+      list: vi.fn().mockReturnValue(of({ data: mockProjects })),
+      create: vi.fn().mockReturnValue(of({ data: { ...mockProjects[0], id: 'p3', name: 'New Project', key: 'NP' } })),
     };
     tenantStoreMock = {
       activeTenant: vi.fn().mockReturnValue(hasTenant ? mockTenant : null),
@@ -103,7 +122,7 @@ describe('ProjectList', () => {
     it('should not load projects when no active tenant', () => {
       // Re-setup without tenant
       projectClientMock = {
-        list: vi.fn().mockReturnValue(of({ data: [], total: 0, page: 1, limit: 20 })),
+        list: vi.fn().mockReturnValue(of({ data: [] })),
         create: vi.fn(),
       };
       tenantStoreMock = { activeTenant: vi.fn().mockReturnValue(null) };
@@ -138,22 +157,19 @@ describe('ProjectList', () => {
     beforeEach(() => setup());
 
     it('should not create when name is empty', () => {
-      component.model.update((m: CreateProjectForm) => ({ ...m, name: '' }));
-      component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'slug' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: '', key: 'NP' }));
       submit(component.newProjectForm);
       expect(projectClientMock.create).not.toHaveBeenCalled();
     });
 
-    it('should not create when slug is empty', () => {
-      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'Name' }));
-      component.model.update((m: CreateProjectForm) => ({ ...m, slug: '' }));
+    it('should not create when key is empty', () => {
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'Name', key: '' }));
       submit(component.newProjectForm);
       expect(projectClientMock.create).not.toHaveBeenCalled();
     });
 
     it('should create project and add to list', () => {
-      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'New Project' }));
-      component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'new-project' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'New Project', key: 'NP' }));
       submit(component.newProjectForm);
 
       expect(projectClientMock.create).toHaveBeenCalled();
@@ -162,18 +178,16 @@ describe('ProjectList', () => {
     });
 
     it('should reset form after creation', () => {
-      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'New Project' }));
-      component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'new-project' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'New Project', key: 'NP' }));
       submit(component.newProjectForm);
 
       expect(component.model().name).toBe('');
-      expect(component.model().slug).toBe('');
+      expect(component.model().key).toBe('');
     });
 
     it('should set creating to false on error', () => {
       projectClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'Fail' }));
-      component.model.update((m: CreateProjectForm) => ({ ...m, slug: 'fail' }));
+      component.model.update((m: CreateProjectForm) => ({ ...m, name: 'Fail', key: 'FL' }));
       submit(component.newProjectForm);
 
       expect(component.loading()).toBe(false);

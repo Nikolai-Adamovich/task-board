@@ -2,13 +2,13 @@ import { TenantRole } from '@task-board/shared';
 
 export function getRoleColor(role: TenantRole | null): string {
   switch (role) {
-    case TenantRole.Owner:
+    case TenantRole.OWNER:
       return 'var(--role-owner)';
 
-    case TenantRole.Admin:
+    case TenantRole.ADMIN:
       return 'var(--role-admin)';
 
-    case TenantRole.Member:
+    case TenantRole.MEMBER:
       return 'var(--role-member)';
 
     default:

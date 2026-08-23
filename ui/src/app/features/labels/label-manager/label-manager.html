@@ -1,0 +1,154 @@
+<div class="mx-auto max-w-3xl">
+  <div class="mb-6 flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-foreground">{{ 'labelManager.title' | transloco }}</h2>
+    @if (canManage()) {
+      <button hlmBtn (click)="showCreateDialog.set(true)">
+        <ng-icon name="lucidePlus" class="mr-1" />
+        {{ 'labelManager.newLabel' | transloco }}
+      </button>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+      {{ error() | transloco }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="flex items-center justify-center py-12">
+      <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'labelManager.loading' | transloco }}</span>
+    </div>
+  } @else if (labels().length === 0) {
+    <div class="rounded-lg border border-dashed border-border py-12 text-center">
+      <ng-icon name="lucideTag" class="mx-auto h-12 w-12 text-muted-foreground" />
+      <p class="mt-4 text-sm text-muted-foreground">{{ 'labelManager.noLabels' | transloco }}</p>
+      @if (canManage()) {
+        <button hlmBtn class="mt-4" (click)="showCreateDialog.set(true)">
+          {{ 'labelManager.createFirst' | transloco }}
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="flex flex-wrap gap-2">
+      @for (label of labels(); track label.id) {
+        <div class="group flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5">
+          @if (editingId() === label.id) {
+            <div class="flex items-center gap-2">
+              <input
+                hlmInput
+                type="text"
+                class="h-7 w-32 text-sm"
+                [value]="editingName()"
+                (input)="editingName.set($any($event.target).value)"
+                (keydown.enter)="saveEdit(label)"
+                (keydown.escape)="cancelEdit()"
+              />
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7 text-green-600"
+                (click)="saveEdit(label)"
+                [disabled]="saving()"
+                [attr.aria-label]="'labelManager.save' | transloco"
+              >
+                <ng-icon name="lucideCheck" />
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7"
+                (click)="cancelEdit()"
+                [attr.aria-label]="'labelManager.cancel' | transloco"
+              >
+                <ng-icon name="lucideX" />
+              </button>
+            </div>
+          } @else {
+            <span class="text-sm text-foreground">{{ label.name }}</span>
+            @if (canManage()) {
+              <div class="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  class="h-6 w-6"
+                  (click)="startEdit(label)"
+                  [attr.aria-label]="'labelManager.edit' | transloco"
+                >
+                  <ng-icon name="lucidePencil" class="h-3 w-3" />
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  class="h-6 w-6 text-destructive hover:text-destructive"
+                  (click)="confirmDelete(label)"
+                  [attr.aria-label]="'labelManager.delete' | transloco"
+                >
+                  <ng-icon name="lucideTrash2" class="h-3 w-3" />
+                </button>
+              </div>
+            }
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Create Label Dialog -->
+  <hlm-dialog [state]="showCreateDialog() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'labelManager.createTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+
+      <form id="create-label-form" [formRoot]="createForm" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="label-name">{{ 'labelManager.name' | transloco }}</label>
+          <input hlmInput id="label-name" type="text" [formField]="createForm.name" placeholder="feature" />
+        </hlm-field>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'labelManager.cancel' | transloco }}</button>
+        <button
+          hlmBtn
+          type="submit"
+          form="create-label-form"
+          [disabled]="createForm().invalid() || createForm().submitting()"
+        >
+          @if (createForm().submitting()) {
+            <hlm-spinner /> {{ 'labelManager.creating' | transloco }}
+          } @else {
+            {{ 'labelManager.create' | transloco }}
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- Delete Label Confirmation Dialog -->
+  <hlm-dialog [state]="showDeleteDialog() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'labelManager.deleteTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+      <p class="text-sm text-muted-foreground">
+        {{ 'labelManager.deleteConfirm' | transloco: { name: deletingLabel()?.name } }}
+      </p>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'labelManager.cancel' | transloco }}</button>
+        <button hlmBtn variant="destructive" (click)="deleteLabel()" [disabled]="saving()">
+          @if (saving()) {
+            <hlm-spinner /> {{ 'labelManager.deleting' | transloco }}
+          } @else {
+            <ng-icon name="lucideTrash2" class="mr-1" />
+            {{ 'labelManager.deleteButton' | transloco }}
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</div>

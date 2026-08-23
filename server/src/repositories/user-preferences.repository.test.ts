@@ -3,8 +3,6 @@ import { UserPreferencesRepository } from './user-preferences.repository.js';
 import type { UserPreferencesDocument } from './user-preferences.repository.js';
 import type { Collection } from 'mongodb';
 
-// ─── Mock Collection Helper ──────────────────────────────────────────────────
-
 function createMockCollection() {
   return {
     findOne: vi.fn(),
@@ -17,10 +15,11 @@ function createMockCollection() {
 
 function makeDoc(overrides: Partial<UserPreferencesDocument> = {}): UserPreferencesDocument {
   return {
-    userId: 'user-123',
-    zoom: 100,
-    theme: 'light',
-    language: 'en',
+    id: 'pref-123',
+    userId: 'user-1',
+    projectId: 'project-1',
+    defaultBoardId: 'board-1',
+    createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
   };
@@ -35,76 +34,39 @@ describe('UserPreferencesRepository', () => {
     repo = new UserPreferencesRepository(collection);
   });
 
-  // ── findByUserId ───────────────────────────────────────────────────────
-
-  describe('findByUserId', () => {
-    it('returns mapped preferences when found', async () => {
+  describe('findByUserAndProject', () => {
+    it('returns preferences when found', async () => {
       collection.findOne.mockResolvedValue(makeDoc());
 
-      const result = await repo.findByUserId('user-123');
+      const result = await repo.findByUserAndProject('user-1', 'project-1');
 
-      expect(collection.findOne).toHaveBeenCalledWith({ userId: 'user-123' });
-      expect(result).toEqual({
-        userId: 'user-123',
-        zoom: 100,
-        theme: 'light',
-        language: 'en',
-        updatedAt: '2025-01-01T00:00:00.000Z',
-      });
+      expect(collection.findOne).toHaveBeenCalledWith({ userId: 'user-1', projectId: 'project-1' });
+      expect(result?.defaultBoardId).toBe('board-1');
     });
 
     it('returns null when not found', async () => {
       collection.findOne.mockResolvedValue(null);
 
-      const result = await repo.findByUserId('missing');
+      const result = await repo.findByUserAndProject('missing', 'missing');
 
       expect(result).toBeNull();
     });
   });
 
-  // ── upsert ─────────────────────────────────────────────────────────────
-
   describe('upsert', () => {
-    it('creates a new document when none exists', async () => {
-      const created = makeDoc({ zoom: 150, theme: 'dark', language: 'pl' });
+    it('upserts preferences', async () => {
+      collection.findOneAndUpdate.mockResolvedValue(makeDoc({ defaultBoardId: 'board-2' }));
 
-      collection.findOneAndUpdate.mockResolvedValue(created);
+      const result = await repo.upsert('user-1', 'project-1', { defaultBoardId: 'board-2' });
 
-      const result = await repo.upsert('user-123', { zoom: 150, theme: 'dark', language: 'pl' });
-
+      expect(result.defaultBoardId).toBe('board-2');
       expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
-        { userId: 'user-123' },
-        {
-          $set: { updatedAt: expect.any(Date), zoom: 150, theme: 'dark', language: 'pl' },
-          $setOnInsert: { userId: 'user-123' },
-        },
+        { userId: 'user-1', projectId: 'project-1' },
+        expect.objectContaining({
+          $set: expect.objectContaining({ defaultBoardId: 'board-2' }),
+        }),
         { upsert: true, returnDocument: 'after' },
       );
-      expect(result).toEqual({
-        userId: 'user-123',
-        zoom: 150,
-        theme: 'dark',
-        language: 'pl',
-        updatedAt: '2025-01-01T00:00:00.000Z',
-      });
-    });
-
-    it('updates an existing document', async () => {
-      const updated = makeDoc({ zoom: 200 });
-
-      collection.findOneAndUpdate.mockResolvedValue(updated);
-
-      const result = await repo.upsert('user-123', { zoom: 200 });
-
-      expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
-        { userId: 'user-123' },
-        {
-          $set: { updatedAt: expect.any(Date), zoom: 200 },
-          $setOnInsert: { userId: 'user-123', theme: 'light', language: 'en' },
-        },
-        { upsert: true, returnDocument: 'after' },
-      );
-      expect(result.zoom).toBe(200);
     });
   });
 });

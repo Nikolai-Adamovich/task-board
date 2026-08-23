@@ -3,111 +3,80 @@ import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
 import { BoardService } from '../services/board.service.js';
 import { BoardRepository } from '../repositories/board.repository.js';
-import { ColumnRepository } from '../repositories/column.repository.js';
+import { StatusRepository } from '../repositories/status.repository.js';
 import { getCollection } from '../db/mongo.js';
 import type { BoardDocument } from '../repositories/board.repository.js';
-import type { ColumnDocument } from '../repositories/column.repository.js';
+import type { StatusDocument } from '../repositories/status.repository.js';
 import { CreateBoardSchema, UpdateBoardSchema } from '../schemas/board.js';
 
 // ─── Board Routes ────────────────────────────────────────────────────────────
 
-/**
- * Creates and returns the board Hono app with all board-related routes.
- *
- * Tenant context is already resolved. Board routes expect `projectId` as a
- * query parameter for listing and as part of the body for creation.
- */
 export function createBoardRoutes(): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
   /**
-   * GET / — List boards for a project.
-   * Requires `projectId` query parameter.
+   * GET /projects/:projectId/boards — List boards for a project.
    */
-  router.get('/', async (c) => {
-    const tenantId = c.get('tenantId');
-    const projectId = c.req.query('projectId');
-
-    if (!projectId) {
-      return c.json({ code: 'VALIDATION_ERROR', message: 'projectId query parameter is required' }, 422);
-    }
-
+  router.get('/projects/:projectId/boards', async (c) => {
+    const projectId = c.req.param('projectId');
     const service = createBoardService();
-    const boards = await service.listBoards(tenantId, projectId);
+    const boards = await service.getBoardsByProject(projectId);
 
-    return c.json({
-      data: boards,
-      total: boards.length,
-      page: 1,
-      limit: boards.length,
-    });
+    return c.json({ data: boards });
   });
 
   /**
-   * POST / — Create a new board with default columns. Admin+ only.
-   * Body includes `projectId` to associate the board with a project.
+   * POST /projects/:projectId/boards — Create a board.
    */
-  router.post('/', validateBody(CreateBoardSchema), async (c) => {
-    const tenantId = c.get('tenantId');
-    const userRole = c.get('userRole');
+  router.post('/projects/:projectId/boards', validateBody(CreateBoardSchema), async (c) => {
+    const projectId = c.req.param('projectId');
     const body = c.get('validatedBody' as never) as {
       name: string;
-      description?: string;
-      columnNames?: string[];
+      type: 'KANBAN' | 'SPRINT';
+      columns: { statusIds: string[]; position: number }[];
     };
-    const projectId = c.req.query('projectId');
-
-    if (!projectId) {
-      return c.json({ code: 'VALIDATION_ERROR', message: 'projectId query parameter is required' }, 422);
-    }
-
     const service = createBoardService();
-    const result = await service.createBoard(tenantId, { ...body, projectId }, userRole);
+    const board = await service.createBoard(projectId, body);
 
-    return c.json({ ...result.board, columns: result.columns }, 201);
+    return c.json({ data: board }, 201);
   });
 
   /**
-   * GET /:boardId — Get board with columns.
+   * GET /boards/:boardId — Get board details.
    */
-  router.get('/:boardId', async (c) => {
-    const tenantId = c.get('tenantId');
+  router.get('/boards/:boardId', async (c) => {
     const boardId = c.req.param('boardId');
     const service = createBoardService();
-    const result = await service.getBoard(tenantId, boardId);
+    const board = await service.getBoard(boardId);
 
-    return c.json({ ...result.board, columns: result.columns });
+    return c.json({ data: board });
   });
 
   /**
-   * PATCH /:boardId — Update board. Admin+ only.
+   * PATCH /boards/:boardId — Update board.
    */
-  router.patch('/:boardId', validateBody(UpdateBoardSchema), async (c) => {
-    const tenantId = c.get('tenantId');
-    const userRole = c.get('userRole');
+  router.patch('/boards/:boardId', validateBody(UpdateBoardSchema), async (c) => {
     const boardId = c.req.param('boardId');
     const body = c.get('validatedBody' as never) as {
       name?: string;
-      description?: string;
+      columns?: { id?: string; statusIds: string[]; position: number }[];
     };
     const service = createBoardService();
-    const board = await service.updateBoard(tenantId, boardId, body, userRole);
+    const board = await service.updateBoard(boardId, body);
 
-    return c.json(board);
+    return c.json({ data: board });
   });
 
   /**
-   * DELETE /:boardId — Delete board. Admin+ only.
+   * DELETE /boards/:boardId — Delete board.
    */
-  router.delete('/:boardId', async (c) => {
-    const tenantId = c.get('tenantId');
-    const userRole = c.get('userRole');
+  router.delete('/boards/:boardId', async (c) => {
     const boardId = c.req.param('boardId');
     const service = createBoardService();
 
-    await service.deleteBoard(tenantId, boardId, userRole);
+    await service.deleteBoard(boardId);
 
-    return c.json({ success: true as const });
+    return c.json({ data: { success: true } });
   });
 
   return router;
@@ -117,7 +86,7 @@ export function createBoardRoutes(): Hono<AppEnv> {
 
 function createBoardService(): BoardService {
   const boardRepo = new BoardRepository(getCollection<BoardDocument>('boards'));
-  const columnRepo = new ColumnRepository(getCollection<ColumnDocument>('columns'));
+  const statusRepo = new StatusRepository(getCollection<StatusDocument>('statuses'));
 
-  return new BoardService(boardRepo, columnRepo);
+  return new BoardService(boardRepo, statusRepo);
 }

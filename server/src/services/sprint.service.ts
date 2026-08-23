@@ -1,185 +1,188 @@
-import { TenantRole } from '@task-board/shared';
-import type { Sprint, Task, CreateSprint, UpdateSprint } from '@task-board/shared';
-import { ForbiddenError, NotFoundError, ConflictError } from '../middleware/error-handler.js';
+import type { Sprint, CreateSprint, UpdateSprint } from '@task-board/shared';
+import { AppError, NotFoundError } from '../errors/app-error.js';
 import { SprintRepository } from '../repositories/sprint.repository.js';
-import { TaskRepository } from '../repositories/task.repository.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
+import type { AuditService } from './audit.service.js';
+
+// ─── Interfaces ──────────────────────────────────────────────────────────────
+
+export interface SprintServiceTaskRepo {
+  clearSprintFromTasks(projectId: string, sprintId: string): Promise<void>;
+}
 
 // ─── Sprint Service ──────────────────────────────────────────────────────────
 
 export class SprintService {
   constructor(
     private readonly sprintRepo: SprintRepository,
-    private readonly taskRepo: TaskRepository,
     private readonly projectRepo: ProjectRepository,
+    private readonly taskRepo: SprintServiceTaskRepo,
+    private readonly auditService?: AuditService,
   ) {}
 
-  /**
-   * List all sprints for a project.
-   */
-  async listSprints(tenantId: string, projectId: string): Promise<Sprint[]> {
-    await this.requireProject(tenantId, projectId);
-    return this.sprintRepo.findByProject(tenantId, projectId);
+  async getSprintsByProject(projectId: string): Promise<Sprint[]> {
+    return this.sprintRepo.findByProject(projectId);
   }
 
-  /**
-   * List all sprints for a tenant (across all projects).
-   */
-  async listAllSprints(tenantId: string): Promise<Sprint[]> {
-    return this.sprintRepo.findByTenant(tenantId);
-  }
-
-  /**
-   * Create a new sprint. Admin+ only.
-   */
-  async createSprint(tenantId: string, projectId: string, input: CreateSprint, userRole: string): Promise<Sprint> {
-    this.requireAdmin(userRole);
-    await this.requireProject(tenantId, projectId);
-
-    return this.sprintRepo.create(tenantId, {
-      projectId,
-      name: input.name,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      goal: input.goal,
-    });
-  }
-
-  /**
-   * Get a sprint by ID with its tasks.
-   */
-  async getSprint(tenantId: string, id: string): Promise<{ sprint: Sprint; tasks: Task[] }> {
-    const sprint = await this.sprintRepo.findById(tenantId, id);
+  async getSprint(id: string): Promise<Sprint> {
+    const sprint = await this.sprintRepo.findById(id);
 
     if (!sprint) {
       throw new NotFoundError('Sprint not found');
     }
-
-    const tasks = await this.taskRepo.findBySprint(tenantId, id);
-
-    return { sprint, tasks };
-  }
-
-  /**
-   * Update a sprint. Admin+ only.
-   */
-  async updateSprint(tenantId: string, id: string, input: UpdateSprint, userRole: string): Promise<Sprint> {
-    this.requireAdmin(userRole);
-
-    const sprint = await this.sprintRepo.update(tenantId, id, {
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.startDate !== undefined && { startDate: input.startDate }),
-      ...(input.endDate !== undefined && { endDate: input.endDate }),
-      ...(input.goal !== undefined && { goal: input.goal }),
-      ...(input.status !== undefined && { status: input.status }),
-    });
-
-    if (!sprint) {
-      throw new NotFoundError('Sprint not found');
-    }
-
     return sprint;
   }
 
-  /**
-   * Delete a sprint. Admin+ only.
-   * Moves all tasks in the sprint back to backlog (clears sprintId).
-   */
-  async deleteSprint(tenantId: string, id: string, userRole: string): Promise<void> {
-    this.requireAdmin(userRole);
-
-    // Clear sprintId on all tasks in this sprint
-    const tasks = await this.taskRepo.findBySprint(tenantId, id);
-
-    for (const task of tasks) {
-      await this.taskRepo.update(tenantId, task.id, { sprintId: null });
-    }
-
-    const deleted = await this.sprintRepo.delete(tenantId, id);
-
-    if (!deleted) {
-      throw new NotFoundError('Sprint not found');
-    }
-  }
-
-  /**
-   * Add a task from the backlog into a sprint.
-   * Business rule: task must belong to the same project.
-   */
-  async addTaskToSprint(tenantId: string, sprintId: string, taskId: string): Promise<Sprint> {
-    const sprint = await this.requireSprint(tenantId, sprintId);
-    const task = await this.requireTask(tenantId, taskId);
-
-    // Validate task belongs to the same project
-    if (task.projectId !== sprint.projectId) {
-      throw new ConflictError('Task must belong to the same project as the sprint');
-    }
-
-    // Update task's sprintId
-    await this.taskRepo.update(tenantId, taskId, { sprintId });
-
-    // Add task to sprint's taskIds
-    const updatedSprint = await this.sprintRepo.addTask(tenantId, sprintId, taskId);
-
-    if (!updatedSprint) {
-      throw new NotFoundError('Sprint not found');
-    }
-
-    return updatedSprint;
-  }
-
-  /**
-   * Remove a task from a sprint (moves it back to backlog).
-   */
-  async removeTaskFromSprint(tenantId: string, sprintId: string, taskId: string): Promise<Sprint> {
-    await this.requireSprint(tenantId, sprintId);
-    await this.requireTask(tenantId, taskId);
-
-    // Clear task's sprintId
-    await this.taskRepo.update(tenantId, taskId, { sprintId: null });
-
-    // Remove task from sprint's taskIds
-    const updatedSprint = await this.sprintRepo.removeTask(tenantId, sprintId, taskId);
-
-    if (!updatedSprint) {
-      throw new NotFoundError('Sprint not found');
-    }
-
-    return updatedSprint;
-  }
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  private async requireProject(tenantId: string, projectId: string) {
-    const project = await this.projectRepo.findById(tenantId, projectId);
+  async createSprint(projectId: string, input: CreateSprint, userId?: string): Promise<Sprint> {
+    // Validate project exists and is ACTIVE
+    const project = await this.projectRepo.findById(projectId);
 
     if (!project) {
       throw new NotFoundError('Project not found');
     }
-    return project;
+
+    if (project.status !== 'ACTIVE') {
+      throw new AppError(400, 'PROJECT_ARCHIVED', 'Cannot create sprints in an archived project');
+    }
+
+    // Validate date constraints
+    if (input.startDate && input.endDate && input.endDate < input.startDate) {
+      throw new AppError(422, 'INVALID_SPRINT_DATES', 'endDate must be >= startDate');
+    }
+
+    const sprint = await this.sprintRepo.create(projectId, {
+      name: input.name,
+      startDate: input.startDate,
+      endDate: input.endDate,
+    });
+
+    // Audit side effect
+    if (this.auditService && userId) {
+      const project = await this.projectRepo.findById(projectId);
+
+      await this.auditService.log({
+        tenantId: project?.tenantId ?? '',
+        projectId,
+        entityType: 'SPRINT',
+        entityId: sprint.id,
+        action: 'CREATED',
+        actorId: userId,
+      });
+    }
+
+    return sprint;
   }
 
-  private async requireSprint(tenantId: string, sprintId: string): Promise<Sprint> {
-    const sprint = await this.sprintRepo.findById(tenantId, sprintId);
+  async updateSprint(id: string, input: UpdateSprint, userId?: string): Promise<Sprint> {
+    const sprint = await this.sprintRepo.findById(id);
 
     if (!sprint) {
       throw new NotFoundError('Sprint not found');
     }
-    return sprint;
+
+    // Handle status transitions with date side effects
+    const updates: {
+      name?: string;
+      status?: string;
+      startDate?: string | Date | null;
+      endDate?: string | Date | null;
+    } = {};
+
+    if (input.name !== undefined) updates.name = input.name;
+
+    if (input.status !== undefined && input.status !== sprint.status) {
+      updates.status = input.status;
+
+      // Starting sprint: set startDate to now if null, endDate to now if null (spec §7.4)
+      if (input.status === 'ACTIVE') {
+        if (!sprint.startDate && !input.startDate) {
+          updates.startDate = new Date();
+        }
+        if (!sprint.endDate && !input.endDate) {
+          updates.endDate = new Date();
+        }
+      }
+
+      // Completing sprint: set endDate to now if null
+      if (input.status === 'COMPLETED') {
+        if (!sprint.endDate && !input.endDate) {
+          updates.endDate = new Date();
+        }
+      }
+    }
+
+    if (input.startDate !== undefined) updates.startDate = input.startDate;
+    if (input.endDate !== undefined) updates.endDate = input.endDate;
+
+    // Validate date constraints
+    const toDate = (value: string | Date | null | undefined): Date | null => {
+      if (value === null || value === undefined) return null;
+      return new Date(value);
+    };
+    const effectiveStartDate = updates.startDate !== undefined ? toDate(updates.startDate) : toDate(sprint.startDate);
+    const effectiveEndDate = updates.endDate !== undefined ? toDate(updates.endDate) : toDate(sprint.endDate);
+
+    if (effectiveStartDate && effectiveEndDate && effectiveEndDate < effectiveStartDate) {
+      throw new AppError(422, 'INVALID_SPRINT_DATES', 'endDate must be >= startDate');
+    }
+
+    const updated = await this.sprintRepo.update(id, updates);
+
+    if (!updated) {
+      throw new NotFoundError('Sprint not found');
+    }
+
+    // Audit side effect
+    if (this.auditService && userId) {
+      const project = await this.projectRepo.findById(updated.projectId);
+      const changes: { field: string; oldValue: unknown; newValue: unknown }[] = [];
+
+      if (input.name !== undefined) changes.push({ field: 'name', oldValue: sprint.name, newValue: input.name });
+      if (input.status !== undefined)
+        changes.push({ field: 'status', oldValue: sprint.status, newValue: input.status });
+      if (input.startDate !== undefined)
+        changes.push({ field: 'startDate', oldValue: sprint.startDate, newValue: input.startDate });
+      if (input.endDate !== undefined)
+        changes.push({ field: 'endDate', oldValue: sprint.endDate, newValue: input.endDate });
+      await this.auditService.log({
+        tenantId: project?.tenantId ?? '',
+        projectId: updated.projectId,
+        entityType: 'SPRINT',
+        entityId: updated.id,
+        action: 'UPDATED',
+        actorId: userId,
+        changes,
+      });
+    }
+
+    return updated;
   }
 
-  private async requireTask(tenantId: string, taskId: string): Promise<Task> {
-    const task = await this.taskRepo.findById(tenantId, taskId);
+  async deleteSprint(id: string, userId?: string): Promise<void> {
+    const sprint = await this.sprintRepo.findById(id);
 
-    if (!task) {
-      throw new NotFoundError('Task not found');
+    if (!sprint) {
+      throw new NotFoundError('Sprint not found');
     }
-    return task;
-  }
 
-  private requireAdmin(role: string): void {
-    if (role !== TenantRole.Owner && role !== TenantRole.Admin) {
-      throw new ForbiddenError('Only owner or admin can perform this action');
+    // Set sprintId = null on all affected tasks
+    await this.taskRepo.clearSprintFromTasks(sprint.projectId, id);
+
+    // Audit side effect (before hard delete)
+    if (this.auditService && userId) {
+      const project = await this.projectRepo.findById(sprint.projectId);
+
+      await this.auditService.log({
+        tenantId: project?.tenantId ?? '',
+        projectId: sprint.projectId,
+        entityType: 'SPRINT',
+        entityId: sprint.id,
+        action: 'DELETED',
+        actorId: userId,
+      });
     }
+
+    // Hard delete the sprint
+    await this.sprintRepo.delete(id);
   }
 }

@@ -46,6 +46,7 @@
                   <ng-icon name="lucideBuilding2" />{{ tenant.name }}</a
                 >
                 <span hlmBadge class="mt-0.5 bg-purple-100 text-purple-700">{{ tenant.role }}</span>
+                <span hlmBadge [class]="getStatusBadgeClass(tenant.status)" class="mt-0.5">{{ tenant.status }}</span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -60,10 +61,6 @@
               <a hlmBtn variant="outline" size="sm" [routerLink]="['/tenants', tenant.id, 'settings', 'members']">
                 <ng-icon name="lucideUsers" class="mr-1 h-3 w-3" />
                 {{ 'ownerDashboard.members' | transloco }}
-              </a>
-              <a hlmBtn variant="outline" size="sm" [routerLink]="['/tenants', tenant.id, 'upgrade']">
-                <ng-icon name="lucideCreditCard" class="mr-1 h-3 w-3" />
-                {{ 'ownerDashboard.upgrade' | transloco }}
               </a>
             </div>
           </div>

@@ -25,9 +25,9 @@ function makeDoc(overrides: Partial<TenantDocument> = {}): TenantDocument {
   return {
     id: 'tenant-123',
     name: 'Test Tenant',
-    slug: 'test-tenant',
     description: null,
-    subscription: 'free',
+    status: 'ACTIVE',
+    deletionScheduledAt: null,
     createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
@@ -53,8 +53,9 @@ describe('TenantRepository', () => {
       expect(result).toEqual({
         id: 'tenant-123',
         name: 'Test Tenant',
-        slug: 'test-tenant',
-        subscription: 'free',
+        description: null,
+        status: 'ACTIVE',
+        deletionScheduledAt: null,
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
       });
@@ -69,23 +70,9 @@ describe('TenantRepository', () => {
     });
   });
 
-  describe('findBySlug', () => {
-    it('queries by slug and maps the result', async () => {
-      collection.findOne.mockResolvedValue(makeDoc());
-
-      const result = await repo.findBySlug('test-tenant');
-
-      expect(collection.findOne).toHaveBeenCalledWith({ slug: 'test-tenant' });
-      expect(result).not.toBeNull();
-      expect(result?.slug).toBe('test-tenant');
-    });
-  });
-
   describe('findAll', () => {
     it('returns all tenants mapped to domain objects', async () => {
-      const toArray = vi
-        .fn()
-        .mockResolvedValue([makeDoc(), makeDoc({ id: 'tenant-456', name: 'Other', slug: 'other' })]);
+      const toArray = vi.fn().mockResolvedValue([makeDoc(), makeDoc({ id: 'tenant-456', name: 'Tenant 2' })]);
 
       collection.find.mockReturnValue({ toArray });
 
@@ -98,23 +85,25 @@ describe('TenantRepository', () => {
   });
 
   describe('create', () => {
-    it('inserts a document and returns the domain tenant', async () => {
+    it('inserts a document with ACTIVE status and returns the domain tenant', async () => {
       collection.insertOne.mockResolvedValue({ acknowledged: true } as InsertOneResult);
 
-      const result = await repo.create({ name: 'New Tenant', slug: 'new-tenant' });
+      const result = await repo.create({ name: 'New Tenant' });
 
       expect(collection.insertOne).toHaveBeenCalledTimes(1);
 
       const insertedDoc = collection.insertOne.mock.calls[0]?.[0] as TenantDocument;
 
       expect(insertedDoc.name).toBe('New Tenant');
-      expect(insertedDoc.slug).toBe('new-tenant');
+      expect(insertedDoc.status).toBe('ACTIVE');
+      expect(insertedDoc.deletionScheduledAt).toBeNull();
       expect(insertedDoc.id).toBeDefined();
       expect(insertedDoc.createdAt).toBeInstanceOf(Date);
       expect(insertedDoc.updatedAt).toBeInstanceOf(Date);
 
       expect(result.name).toBe('New Tenant');
-      expect(result.slug).toBe('new-tenant');
+      expect(result.status).toBe('ACTIVE');
+      expect(result.deletionScheduledAt).toBeNull();
       // Domain object should have ISO string dates
       expect(typeof result.createdAt).toBe('string');
     });
@@ -134,6 +123,21 @@ describe('TenantRepository', () => {
         { returnDocument: 'after' },
       );
       expect(result?.name).toBe('Updated');
+    });
+
+    it('can update status and deletionScheduledAt', async () => {
+      const deletionDate = new Date('2025-02-01T00:00:00Z');
+      const updated = makeDoc({ status: 'DELETION_PENDING', deletionScheduledAt: deletionDate });
+
+      collection.findOneAndUpdate.mockResolvedValue(updated);
+
+      const result = await repo.update('tenant-123', {
+        status: 'DELETION_PENDING',
+        deletionScheduledAt: deletionDate,
+      });
+
+      expect(result?.status).toBe('DELETION_PENDING');
+      expect(result?.deletionScheduledAt).toBe('2025-02-01T00:00:00.000Z');
     });
 
     it('returns null when tenant not found', async () => {

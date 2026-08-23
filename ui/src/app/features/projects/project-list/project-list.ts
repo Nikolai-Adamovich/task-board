@@ -21,7 +21,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 export interface CreateProjectForm {
   name: string;
-  slug: string;
+  key: string;
   description: string;
 }
 
@@ -54,14 +54,14 @@ export class ProjectList implements OnInit {
   protected readonly tenantId = signal('');
   private readonly model = signal<CreateProjectForm>({
     name: '',
-    slug: '',
+    key: '',
     description: '',
   });
   protected readonly newProjectForm = form(
     this.model,
     schema<CreateProjectForm>((field) => {
       required(field.name, { message: 'validation.nameRequired' });
-      required(field.slug, { message: 'validation.slugRequired' });
+      required(field.key, { message: 'validation.keyRequired' });
     }),
     {
       submission: {
@@ -70,14 +70,14 @@ export class ProjectList implements OnInit {
           this.projectClient
             .create({
               name: this.model().name,
-              slug: this.model().slug,
-              description: this.model().description,
+              key: this.model().key.toUpperCase(),
+              description: this.model().description || undefined,
             })
             .subscribe({
               next: (project) => {
                 this.projects.update((list) => [...list, project]);
                 this.showCreateModal.set(false);
-                f().reset({ name: '', slug: '', description: '' });
+                f().reset({ name: '', key: '', description: '' });
               },
               error: (err) => {
                 this.error.set(this.getErrorMessage(err));
@@ -113,8 +113,8 @@ export class ProjectList implements OnInit {
       .list()
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (res) => {
-          this.projects.set(res.data);
+        next: (projects) => {
+          this.projects.set(projects);
         },
       });
   }

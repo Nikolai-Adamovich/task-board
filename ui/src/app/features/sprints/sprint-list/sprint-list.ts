@@ -7,16 +7,19 @@ import { lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown } 
 import { finalize } from 'rxjs';
 import { SprintClient } from '@services/sprint-client';
 import { AuthStore } from '@stores/auth-store';
+import { ProjectStore } from '@stores/project-store';
 import { HttpErrorResponse } from '@angular/common/http';
 import { StatusColorMap, NeutralColor } from '@app/constants/priority';
+import { SprintStatus } from '@task-board/shared';
+import { canManageProject } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { HlmCollapsibleImports } from '@spartan-ng/helm/collapsible';
+import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { NgIcon } from '@ng-icons/core';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Sprint } from '@task-board/shared';
@@ -26,13 +29,11 @@ export interface CreateSprintForm {
   name: string;
   startDate: string;
   endDate: string;
-  goal: string;
 }
 
-interface ProjectSprintGroup {
-  projectId: string;
-  projectName: string;
-  tenantId: string;
+interface SprintGroup {
+  label: string;
+  labelKey: string;
   sprints: Sprint[];
 }
 
@@ -50,9 +51,9 @@ interface ProjectSprintGroup {
     HlmSpinnerImports,
     HlmFieldImports,
     HlmInputImports,
-    HlmTextareaImports,
     HlmNativeSelectImports,
     HlmCollapsibleImports,
+    HlmBadgeImports,
   ],
   providers: [provideIcons({ lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown })],
   templateUrl: './sprint-list.html',
@@ -60,8 +61,11 @@ interface ProjectSprintGroup {
 export class SprintList implements OnInit {
   private readonly sprintClient = inject(SprintClient);
   private readonly authStore = inject(AuthStore);
-  /** Bound via withComponentInputBinding() */
-  readonly projectId = input<string>('');
+  private readonly projectStore = inject(ProjectStore);
+  /** Bound via withComponentInputBinding() — now receives project key from route */
+  readonly projectKey = input<string>('');
+  /** Resolved project UUID from the store */
+  protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
   protected readonly sprints = signal<Sprint[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
@@ -71,32 +75,30 @@ export class SprintList implements OnInit {
     name: '',
     startDate: '',
     endDate: '',
-    goal: '',
   });
   protected readonly newSprintForm = form(
     this.model,
     schema<CreateSprintForm>((field) => {
       required(field.name, { message: 'validation.nameRequired' });
-      required(field.startDate, { message: 'validation.startDateRequired' });
-      required(field.endDate, { message: 'validation.endDateRequired' });
     }),
     {
       submission: {
         action: async (f) => {
           this.error.set('');
 
+          const m = this.model();
+
           this.sprintClient
             .create(this.projectId() ?? '', {
-              name: this.model().name,
-              startDate: new Date(this.model().startDate).toISOString(),
-              endDate: new Date(this.model().endDate).toISOString(),
-              goal: this.model().goal,
+              name: m.name,
+              startDate: m.startDate ? new Date(m.startDate).toISOString() : undefined,
+              endDate: m.endDate ? new Date(m.endDate).toISOString() : undefined,
             })
             .subscribe({
               next: (sprint) => {
                 this.sprints.update((list) => [...list, sprint]);
                 this.showCreateModal.set(false);
-                f().reset({ name: '', startDate: '', endDate: '', goal: '' });
+                f().reset({ name: '', startDate: '', endDate: '' });
               },
               error: (err) => {
                 this.error.set(this.getErrorMessage(err));
@@ -106,39 +108,38 @@ export class SprintList implements OnInit {
       },
     },
   );
-  protected readonly projectGroups = computed<ProjectSprintGroup[]>(() => {
-    const groups = new Map<string, { sprints: Sprint[]; projectName: string; tenantId: string }>();
+  /** Group sprints by status: Active, Future, Completed */
+  protected readonly sprintGroups = computed<SprintGroup[]>(() => {
+    const allSprints = this.sprints();
+    const active = allSprints.filter((s) => s.status === SprintStatus.ACTIVE);
+    const future = allSprints.filter((s) => s.status === SprintStatus.FUTURE);
+    const completed = allSprints.filter((s) => s.status === SprintStatus.COMPLETED);
+    const groups: SprintGroup[] = [];
 
-    for (const sprint of this.sprints()) {
-      const pid = sprint.projectId;
-      const group = groups.get(pid);
-
-      if (group) {
-        group.sprints.push(sprint);
-      } else {
-        groups.set(pid, { sprints: [sprint], projectName: sprint.projectId, tenantId: sprint.tenantId });
-      }
+    if (active.length > 0) {
+      groups.push({ label: 'Active', labelKey: 'sprints.active', sprints: active });
+    }
+    if (future.length > 0) {
+      groups.push({ label: 'Future', labelKey: 'sprints.future', sprints: future });
+    }
+    if (completed.length > 0) {
+      groups.push({ label: 'Completed', labelKey: 'sprints.completed', sprints: completed });
     }
 
-    return Array.from(groups.entries()).map(([pid, group]) => ({
-      projectId: pid,
-      projectName: group.projectName,
-      tenantId: group.tenantId,
-      sprints: group.sprints,
-    }));
+    return groups;
   });
   protected readonly canCreate = computed(() => {
-    return !!this.authStore.currentUser();
+    return canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole());
   });
 
-  protected isGroupExpanded(projectId: string): boolean {
-    return this.expandedGroups()[projectId] ?? false;
+  protected isGroupExpanded(groupKey: string): boolean {
+    return this.expandedGroups()[groupKey] ?? true;
   }
 
-  protected toggleGroup(projectId: string): void {
+  protected toggleGroup(groupKey: string): void {
     this.expandedGroups.update((groups) => ({
       ...groups,
-      [projectId]: !groups[projectId],
+      [groupKey]: !groups[groupKey],
     }));
   }
 
@@ -158,8 +159,8 @@ export class SprintList implements OnInit {
       .list(this.projectId() ?? '')
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (res) => {
-          this.sprints.set(res.data);
+        next: (sprints) => {
+          this.sprints.set(sprints);
         },
         error: (err) => {
           this.error.set(this.getErrorMessage(err));

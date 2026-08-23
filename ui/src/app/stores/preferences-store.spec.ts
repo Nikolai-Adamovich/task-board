@@ -97,7 +97,7 @@ describe('PreferencesStore', () => {
 
     const store = TestBed.inject(PreferencesStore);
     const promise = store.loadPreferences();
-    const req = httpMock.expectOne('http://localhost/api/users/user-1/preferences');
+    const req = httpMock.expectOne('http://localhost/api/preferences');
 
     expect(req.request.method).toBe('GET');
 
@@ -135,12 +135,12 @@ describe('PreferencesStore', () => {
     expect(document.documentElement.style.getPropertyValue('font-size')).toBe('150%');
 
     // No HTTP request yet — setZoomLocal only applies zoom locally
-    httpMock.expectNone('http://localhost/api/users/user-1/preferences');
+    httpMock.expectNone('http://localhost/api/preferences');
 
     // Committing flushes the pending zoom to the backend
     store.commitZoom();
 
-    const req = httpMock.expectOne('http://localhost/api/users/user-1/preferences');
+    const req = httpMock.expectOne('http://localhost/api/preferences');
 
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual({ zoom: 150 });
@@ -163,12 +163,12 @@ describe('PreferencesStore', () => {
     expect(localStorage.getItem('taskboard_theme')).toBe('dark');
 
     // No HTTP request yet — setThemeLocal only applies the theme locally
-    httpMock.expectNone('http://localhost/api/users/user-1/preferences');
+    httpMock.expectNone('http://localhost/api/preferences');
 
     // Committing flushes the pending theme to the backend
     store.commitTheme();
 
-    const req = httpMock.expectOne('http://localhost/api/users/user-1/preferences');
+    const req = httpMock.expectOne('http://localhost/api/preferences');
 
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual({ theme: 'dark' });
@@ -182,7 +182,7 @@ describe('PreferencesStore', () => {
 
     store.commitTheme();
 
-    const req2 = httpMock.expectOne('http://localhost/api/users/user-1/preferences');
+    const req2 = httpMock.expectOne('http://localhost/api/preferences');
 
     expect(req2.request.method).toBe('PUT');
     expect(req2.request.body).toEqual({ theme: 'light' });
@@ -202,7 +202,7 @@ describe('PreferencesStore', () => {
 
     expect(store.language()).toBe('de');
 
-    const req = httpMock.expectOne('http://localhost/api/users/user-1/preferences');
+    const req = httpMock.expectOne('http://localhost/api/preferences');
 
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual({ language: 'de' });

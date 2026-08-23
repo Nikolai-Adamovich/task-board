@@ -2,163 +2,154 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
 import { TaskService } from '../services/task.service.js';
-import { TaskRepository, type TaskFilters } from '../repositories/task.repository.js';
-import { ColumnRepository } from '../repositories/column.repository.js';
-import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
-import { TenantRepository } from '../repositories/tenant.repository.js';
+import { TaskRepository, type TaskQueryOptions } from '../repositories/task.repository.js';
+import { CounterRepository } from '../repositories/counter.repository.js';
+import { CounterService } from '../services/counter.service.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
+import { ProjectMemberRepository } from '../repositories/project-member.repository.js';
+import { StatusRepository } from '../repositories/status.repository.js';
+import { TaskTypeRepository } from '../repositories/task-type.repository.js';
+import { UserRepository } from '../repositories/user.repository.js';
+import { SprintRepository } from '../repositories/sprint.repository.js';
+import { CommentRepository } from '../repositories/comment.repository.js';
+import { TaskRelationshipRepository } from '../repositories/task-relationship.repository.js';
+import { AuditEventRepository } from '../repositories/audit-event.repository.js';
+import { AuditService } from '../services/audit.service.js';
 import { getCollection } from '../db/mongo.js';
 import type { TaskDocument } from '../repositories/task.repository.js';
-import type { ColumnDocument } from '../repositories/column.repository.js';
-import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
-import type { TenantDocument } from '../repositories/tenant.repository.js';
+import type { CounterDocument } from '../repositories/counter.repository.js';
 import type { ProjectDocument } from '../repositories/project.repository.js';
-import { CreateTaskSchema, UpdateTaskSchema, MoveTaskSchema, AssignTaskSchema } from '../schemas/task.js';
+import type { ProjectMemberDocument } from '../repositories/project-member.repository.js';
+import type { StatusDocument } from '../repositories/status.repository.js';
+import type { TaskTypeDocument } from '../repositories/task-type.repository.js';
+import type { UserDocument } from '../repositories/user.repository.js';
+import type { SprintDocument } from '../repositories/sprint.repository.js';
+import type { CommentDocument } from '../repositories/comment.repository.js';
+import type { TaskRelationshipDocument } from '../repositories/task-relationship.repository.js';
+import type { AuditEventDocument } from '../repositories/audit-event.repository.js';
+import { CreateTaskSchema, UpdateTaskSchema } from '../schemas/task.js';
 
 // ─── Task Routes ─────────────────────────────────────────────────────────────
 
-/**
- * Creates and returns the task Hono app with all task-related routes.
- *
- * Tenant context is already resolved. Task routes expect filter
- * query parameters for listing and task IDs for individual operations.
- */
 export function createTaskRoutes(): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
   /**
-   * GET / — List tasks with optional filters.
-   * Query params: projectId, boardId, columnId, sprintId, assigneeId, page, limit
+   * GET /projects/:projectId/tasks — List tasks with filters, pagination, sort.
    */
-  router.get('/', async (c) => {
-    const tenantId = c.get('tenantId');
-    const filters: TaskFilters & { page?: number; limit?: number } = {
-      projectId: c.req.query('projectId'),
-      boardId: c.req.query('boardId'),
-      columnId: c.req.query('columnId'),
-      sprintId: c.req.query('sprintId'),
+  router.get('/projects/:projectId/tasks', async (c) => {
+    const projectId = c.req.param('projectId');
+    const pageStr = c.req.query('page');
+    const limitStr = c.req.query('limit');
+    const sortParam = c.req.query('sort');
+    let sort: { field: string; direction: 'asc' | 'desc' } | undefined;
+
+    if (sortParam) {
+      const [field, direction] = sortParam.split(':');
+
+      sort = { field, direction: direction === 'asc' ? 'asc' : 'desc' };
+    }
+
+    const options: TaskQueryOptions = {
+      page: pageStr ? parseInt(pageStr, 10) : 1,
+      limit: limitStr ? parseInt(limitStr, 10) : 20,
+      search: c.req.query('search'),
+      statusId: c.req.query('statusId'),
+      priority: c.req.query('priority'),
+      typeId: c.req.query('typeId'),
       assigneeId: c.req.query('assigneeId'),
+      reporterId: c.req.query('reporterId'),
+      sprintId: c.req.query('sprintId'),
+      labelId: c.req.query('labelId'),
+      sort,
     };
-    const page = c.req.query('page');
-    const limit = c.req.query('limit');
-
-    if (page) filters.page = parseInt(page, 10);
-    if (limit) filters.limit = parseInt(limit, 10);
-
     const service = createTaskService();
-    const result = await service.listTasks(tenantId, filters);
+    const result = await service.getTasksByProject(projectId, options);
 
-    return c.json(result);
+    return c.json({ data: result.data, pagination: result.pagination });
   });
 
   /**
-   * POST / — Create a new task. Member+ only.
+   * POST /projects/:projectId/tasks — Create a task.
    */
-  router.post('/', validateBody(CreateTaskSchema), async (c) => {
-    const tenantId = c.get('tenantId');
+  router.post('/projects/:projectId/tasks', validateBody(CreateTaskSchema), async (c) => {
+    const projectId = c.req.param('projectId');
     const userId = c.get('userId');
+    const tenantRole = c.get('tenantRole');
+    const projectRole = c.get('projectRole');
     const body = c.get('validatedBody' as never) as {
+      typeId: string;
       title: string;
       description?: string;
-      projectId: string;
-      boardId: string;
-      columnId: string;
+      statusId: string;
+      priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      assigneeId?: string;
       sprintId?: string;
-      priority?: string;
-      assigneeIds?: string[];
+      labelIds?: string[];
     };
     const service = createTaskService();
-    const task = await service.createTask(tenantId, userId, body as never);
+    const task = await service.createTask(projectId, userId, tenantRole, projectRole, body);
 
-    return c.json(task, 201);
+    return c.json({ data: task }, 201);
   });
 
   /**
-   * GET /:taskId — Get task details.
+   * GET /tasks/:taskId — Get task details.
+   * Accepts both UUID and KEY-NUMBER format (e.g. "PRO-1").
    */
-  router.get('/:taskId', async (c) => {
-    const tenantId = c.get('tenantId');
-    const taskId = c.req.param('taskId');
+  router.get('/tasks/:taskId', async (c) => {
+    const taskIdParam = c.req.param('taskId');
     const service = createTaskService();
-    const task = await service.getTask(tenantId, taskId);
+    // Check if param matches KEY-NUMBER format (e.g. "PRO-1")
+    const keyNumberMatch = taskIdParam.match(/^(.+)-(\d+)$/);
 
-    return c.json(task);
+    if (keyNumberMatch) {
+      const projectKey = keyNumberMatch[1];
+      const number = parseInt(keyNumberMatch[2], 10);
+      const task = await service.getTaskByKey(projectKey, number);
+
+      return c.json({ data: task });
+    }
+
+    const task = await service.getTask(taskIdParam);
+
+    return c.json({ data: task });
   });
 
   /**
-   * PATCH /:taskId — Update task.
-   * Members can edit own tasks, admin+ can edit any task.
+   * PATCH /tasks/:taskId — Update task (with optimistic concurrency).
    */
-  router.patch('/:taskId', validateBody(UpdateTaskSchema), async (c) => {
-    const tenantId = c.get('tenantId');
-    const userId = c.get('userId');
-    const userRole = c.get('userRole');
+  router.patch('/tasks/:taskId', validateBody(UpdateTaskSchema), async (c) => {
     const taskId = c.req.param('taskId');
+    const userId = c.get('userId');
     const body = c.get('validatedBody' as never) as {
       title?: string;
       description?: string;
-      priority?: string;
-      assigneeIds?: string[];
+      statusId?: string;
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      assigneeId?: string | null;
+      typeId?: string;
+      sprintId?: string | null;
+      labelIds?: string[];
+      version: number;
     };
     const service = createTaskService();
-    const task = await service.updateTask(tenantId, userId, taskId, body as never, userRole);
+    const task = await service.updateTask(taskId, body, userId);
 
-    return c.json(task);
+    return c.json({ data: task });
   });
 
   /**
-   * DELETE /:taskId — Delete task. Admin+ only.
+   * DELETE /tasks/:taskId — Delete task (cascade).
    */
-  router.delete('/:taskId', async (c) => {
-    const tenantId = c.get('tenantId');
-    const userRole = c.get('userRole');
+  router.delete('/tasks/:taskId', async (c) => {
     const taskId = c.req.param('taskId');
+    const userId = c.get('userId');
     const service = createTaskService();
 
-    await service.deleteTask(tenantId, taskId, userRole);
+    await service.deleteTask(taskId, userId);
 
-    return c.json({ success: true as const });
-  });
-
-  /**
-   * PATCH /:taskId/move — Move task to a different column.
-   */
-  router.patch('/:taskId/move', validateBody(MoveTaskSchema), async (c) => {
-    const tenantId = c.get('tenantId');
-    const taskId = c.req.param('taskId');
-    const body = c.get('validatedBody' as never) as {
-      taskId: string;
-      targetColumnId: string;
-      targetSprintId?: string;
-    };
-
-    // Override taskId from URL param
-    body.taskId = taskId;
-
-    const service = createTaskService();
-    const task = await service.moveTask(tenantId, body as never);
-
-    return c.json(task);
-  });
-
-  /**
-   * PATCH /:taskId/assign — Assign/unassign users to a task.
-   */
-  router.patch('/:taskId/assign', validateBody(AssignTaskSchema), async (c) => {
-    const tenantId = c.get('tenantId');
-    const taskId = c.req.param('taskId');
-    const body = c.get('validatedBody' as never) as {
-      taskId: string;
-      assigneeIds: string[];
-    };
-
-    // Override taskId from URL param
-    body.taskId = taskId;
-
-    const service = createTaskService();
-    const task = await service.assignTask(tenantId, body as never);
-
-    return c.json(task);
+    return c.json({ data: { success: true } });
   });
 
   return router;
@@ -168,10 +159,32 @@ export function createTaskRoutes(): Hono<AppEnv> {
 
 function createTaskService(): TaskService {
   const taskRepo = new TaskRepository(getCollection<TaskDocument>('tasks'));
-  const columnRepo = new ColumnRepository(getCollection<ColumnDocument>('columns'));
-  const tenantMemberRepo = new TenantMemberRepository(getCollection<TenantMemberDocument>('tenant_members'));
-  const tenantRepo = new TenantRepository(getCollection<TenantDocument>('tenants'));
+  const counterRepo = new CounterRepository(getCollection<CounterDocument>('counters'));
+  const counterService = new CounterService(counterRepo);
   const projectRepo = new ProjectRepository(getCollection<ProjectDocument>('projects'));
+  const projectMemberRepo = new ProjectMemberRepository(getCollection<ProjectMemberDocument>('project_members'));
+  const statusRepo = new StatusRepository(getCollection<StatusDocument>('statuses'));
+  const taskTypeRepo = new TaskTypeRepository(getCollection<TaskTypeDocument>('task_types'));
+  const userRepo = new UserRepository(getCollection<UserDocument>('users')) as never;
+  const sprintRepo = new SprintRepository(getCollection<SprintDocument>('sprints')) as never;
+  const commentRepo = new CommentRepository(getCollection<CommentDocument>('comments')) as never;
+  const relationshipRepo = new TaskRelationshipRepository(
+    getCollection<TaskRelationshipDocument>('task_relationships'),
+  ) as never;
+  const auditRepo = new AuditEventRepository(getCollection<AuditEventDocument>('audit_events'));
+  const auditService = new AuditService(auditRepo, userRepo);
 
-  return new TaskService(taskRepo, columnRepo, tenantMemberRepo, tenantRepo, projectRepo);
+  return new TaskService(
+    taskRepo,
+    counterService,
+    projectRepo,
+    projectMemberRepo,
+    statusRepo,
+    taskTypeRepo,
+    userRepo,
+    sprintRepo,
+    commentRepo,
+    relationshipRepo,
+    auditService,
+  );
 }

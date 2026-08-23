@@ -21,50 +21,14 @@
         <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">{{ 'sprints.createFirst' | transloco }}</button>
       }
     </div>
-  } @else if (projectId()) {
-    <!-- Flat list for project-level view -->
-    <div class="space-y-3">
-      @for (sprint of sprints(); track sprint.id) {
-        <a
-          [routerLink]="['/tenants', sprint.tenantId, 'projects', sprint.projectId, 'sprints', sprint.id]"
-          class="group flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
-        >
-          <div>
-            <div class="flex items-center gap-3">
-              <h3 class="text-base font-semibold text-foreground group-hover:text-primary">
-                {{ sprint.name }}
-              </h3>
-              <span hlmBadge [class]="getStatusColor(sprint.status)">
-                {{ sprint.status }}
-              </span>
-            </div>
-            @if (sprint.goal) {
-              <p class="mt-1 text-sm text-muted-foreground">{{ sprint.goal }}</p>
-            }
-            <p class="mt-1 text-xs text-muted-foreground">
-              {{ sprint.startDate | date: 'mediumDate' }} — {{ sprint.endDate | date: 'mediumDate' }} &middot;
-              {{ 'sprints.tasks' | transloco: { count: sprint.taskIds.length } }}
-            </p>
-          </div>
-          <ng-icon
-            name="lucideChevronRight"
-            class="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1"
-          />
-        </a>
-      }
-    </div>
   } @else {
-    <!-- Grouped by project with collapsible sections for tenant-level view -->
+    <!-- Grouped by status: Active, Future, Completed -->
     <div class="space-y-6">
-      @for (group of projectGroups(); track group.projectId) {
-        <hlm-collapsible [expanded]="isGroupExpanded(group.projectId)" (expandedChange)="toggleGroup(group.projectId)">
+      @for (group of sprintGroups(); track group.label) {
+        <hlm-collapsible [expanded]="isGroupExpanded(group.label)" (expandedChange)="toggleGroup(group.label)">
           <div class="flex items-center justify-between rounded-t-lg border border-border bg-surface-50 px-4 py-3">
             <div class="flex items-center gap-3">
-              <a
-                [routerLink]="['/tenants', group.tenantId, 'projects', group.projectId]"
-                class="text-lg font-semibold text-primary hover:underline"
-                >{{ group.projectName }}</a
-              >
+              <h3 class="text-lg font-semibold text-foreground">{{ group.labelKey | transloco }}</h3>
               <span hlmBadge variant="secondary">{{
                 'sprints.sprintsCount' | transloco: { count: group.sprints.length }
               }}</span>
@@ -78,7 +42,7 @@
             <div class="space-y-2 rounded-b-lg border border-t-0 border-border bg-card p-3">
               @for (sprint of group.sprints; track sprint.id) {
                 <a
-                  [routerLink]="['/tenants', sprint.tenantId, 'projects', sprint.projectId, 'sprints', sprint.id]"
+                  [routerLink]="['/tenants', 'current', 'projects', sprint.projectId, 'sprints', sprint.id]"
                   class="group flex items-center justify-between rounded-md border border-border bg-background p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
                 >
                   <div>
@@ -90,12 +54,8 @@
                         {{ sprint.status }}
                       </span>
                     </div>
-                    @if (sprint.goal) {
-                      <p class="mt-1 text-sm text-muted-foreground">{{ sprint.goal }}</p>
-                    }
                     <p class="mt-1 text-xs text-muted-foreground">
-                      {{ sprint.startDate | date: 'mediumDate' }} — {{ sprint.endDate | date: 'mediumDate' }} &middot;
-                      {{ 'sprints.tasks' | transloco: { count: sprint.taskIds.length } }}
+                      {{ sprint.startDate | date: 'mediumDate' }} — {{ sprint.endDate | date: 'mediumDate' }}
                     </p>
                   </div>
                   <ng-icon
@@ -139,16 +99,6 @@
             <input hlmInput id="sprint-end" type="date" [formField]="newSprintForm.endDate" />
           </hlm-field>
         </div>
-        <hlm-field>
-          <label hlmFieldLabel for="sprint-goal">{{ 'sprints.goal' | transloco }}</label>
-          <textarea
-            hlmTextarea
-            id="sprint-goal"
-            [formField]="newSprintForm.goal"
-            rows="2"
-            [placeholder]="'sprints.goalPlaceholder' | transloco"
-          ></textarea>
-        </hlm-field>
       </form>
       <hlm-dialog-footer>
         <button hlmBtn variant="outline" hlmDialogClose>{{ 'sprints.cancel' | transloco }}</button>

@@ -6,7 +6,7 @@ import { TenantStore } from '@stores/tenant-store';
 import { TenantClient } from '@services/tenant-client';
 import { TaskClient } from '@services/task-client';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import type { TenantWithRole, MyInvitation, MyTask } from '@task-board/shared';
+import type { TenantWithRole, MyInvitation, MyTask } from '@app/types/frontend';
 
 // Sub-views
 import { LandingPage } from './landing-page/landing-page';
@@ -16,7 +16,7 @@ import { MemberDashboard } from './member-dashboard/member-dashboard';
 import { OwnerDashboard } from './owner-dashboard/owner-dashboard';
 
 type DashboardState =
-  'visitor' | 'new-user' | 'pending-invitations' | typeof TenantRole.Member | typeof TenantRole.Owner;
+  'visitor' | 'new-user' | 'pending-invitations' | typeof TenantRole.MEMBER | typeof TenantRole.OWNER;
 
 @Component({
   selector: 'ui-dashboard',
@@ -37,8 +37,8 @@ export class Dashboard implements OnInit {
     if (!this.authStore.isAuthenticated()) return 'visitor';
     if (this.invitations().length > 0 && this.tenants().length === 0) return 'pending-invitations';
     if (this.tenants().length === 0) return 'new-user';
-    if (this.tenants().some((t) => t.role === TenantRole.Owner)) return TenantRole.Owner;
-    return TenantRole.Member;
+    if (this.tenants().some((t) => t.role === TenantRole.OWNER)) return TenantRole.OWNER;
+    return TenantRole.MEMBER;
   });
 
   async ngOnInit(): Promise<void> {
@@ -78,11 +78,11 @@ export class Dashboard implements OnInit {
       ]);
 
       if (invitationsRes) {
-        this.invitations.set(invitationsRes.data);
+        this.invitations.set(invitationsRes);
       }
 
       if (tasksRes) {
-        this.tasks.set(tasksRes.data);
+        this.tasks.set(tasksRes);
       }
     } catch {
       // Silently handle errors

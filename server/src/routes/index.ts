@@ -1,22 +1,20 @@
-/**
- * Route aggregation index.
- *
- * Re-exports all feature route modules as a single registry.
- * Auth, tenant, project, board, column, task, and sprint routes are fully implemented.
- */
-
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { TenantRole } from '@task-board/shared';
-import { requireRole } from '../middleware/rbac.js';
+import { requireRole, requirePermission } from '../middleware/rbac.js';
 import { createAuthRoutes } from './auth.js';
 import { createTenantRoutes } from './tenants.js';
 import { createProjectRoutes } from './projects.js';
 import { createBoardRoutes } from './boards.js';
-import { createColumnRoutes } from './columns.js';
 import { createTaskRoutes } from './tasks.js';
 import { createSprintRoutes } from './sprints.js';
-import { createSupportRoutes } from './support.js';
+import { createStatusRoutes } from './statuses.js';
+import { createTaskTypeRoutes } from './task-types.js';
+import { createLabelRoutes } from './labels.js';
+import { createCommentRoutes } from './comments.js';
+import { createTaskRelationshipRoutes } from './task-relationships.js';
+import { createFilterRoutes } from './filters.js';
+import { createAuditRoutes } from './audit.js';
 
 // ─── Route Registry ───────────────────────────────────────────────────────────
 
@@ -26,8 +24,6 @@ import { createSupportRoutes } from './support.js';
  * Auth routes have no tenant context or RBAC middleware.
  * Tenant routes require auth but handle RBAC internally per-route.
  * All other routes use RBAC middleware per their specific requirements.
- *
- * Column routes are nested under boards: `/boards/:boardId/columns`.
  */
 export const routeRegistry = {
   /** Auth routes — no tenant context, no RBAC */
@@ -35,8 +31,6 @@ export const routeRegistry = {
 
   /**
    * Tenant routes — requires auth, handles RBAC internally.
-   * List/create tenants don't need tenant context; specific tenant
-   * operations check membership via the tenant service.
    */
   tenants: createTenantRoutes(),
 
@@ -44,7 +38,8 @@ export const routeRegistry = {
   projects: (() => {
     const router = new Hono<AppEnv>();
 
-    router.use('/*', requireRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Member));
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
+    router.use('/*', requirePermission('create_project'));
     router.route('/', createProjectRoutes());
     return router;
   })(),
@@ -53,14 +48,8 @@ export const routeRegistry = {
   boards: (() => {
     const router = new Hono<AppEnv>();
 
-    router.use('/*', requireRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Member));
-
-    // Mount board CRUD routes
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
     router.route('/', createBoardRoutes());
-
-    // Mount column routes nested under boards: /boards/:boardId/columns
-    router.route('/:boardId/columns', createColumnRoutes());
-
     return router;
   })(),
 
@@ -68,7 +57,7 @@ export const routeRegistry = {
   tasks: (() => {
     const router = new Hono<AppEnv>();
 
-    router.use('/*', requireRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Member));
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
     router.route('/', createTaskRoutes());
     return router;
   })(),
@@ -77,11 +66,71 @@ export const routeRegistry = {
   sprints: (() => {
     const router = new Hono<AppEnv>();
 
-    router.use('/*', requireRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Member));
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
     router.route('/', createSprintRoutes());
     return router;
   })(),
 
-  /** Support routes — no tenant context, no RBAC, no auth required */
-  support: createSupportRoutes(),
+  /** Status routes — requires any tenant member role */
+  statuses: (() => {
+    const router = new Hono<AppEnv>();
+
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
+    router.route('/', createStatusRoutes());
+    return router;
+  })(),
+
+  /** TaskType routes — requires any tenant member role */
+  taskTypes: (() => {
+    const router = new Hono<AppEnv>();
+
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
+    router.route('/', createTaskTypeRoutes());
+    return router;
+  })(),
+
+  /** Label routes — requires any tenant member role */
+  labels: (() => {
+    const router = new Hono<AppEnv>();
+
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
+    router.route('/', createLabelRoutes());
+    return router;
+  })(),
+
+  /** Comment routes — requires any tenant member role */
+  comments: (() => {
+    const router = new Hono<AppEnv>();
+
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
+    router.route('/', createCommentRoutes());
+    return router;
+  })(),
+
+  /** Task relationship routes — requires any tenant member role */
+  taskRelationships: (() => {
+    const router = new Hono<AppEnv>();
+
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
+    router.route('/', createTaskRelationshipRoutes());
+    return router;
+  })(),
+
+  /** Filter routes — requires any tenant member role */
+  filters: (() => {
+    const router = new Hono<AppEnv>();
+
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
+    router.route('/', createFilterRoutes());
+    return router;
+  })(),
+
+  /** Audit routes — requires any tenant member role */
+  audit: (() => {
+    const router = new Hono<AppEnv>();
+
+    router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
+    router.route('/', createAuditRoutes());
+    return router;
+  })(),
 } as const;

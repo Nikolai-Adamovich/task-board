@@ -1,0 +1,129 @@
+<hlm-card>
+  <div hlmCardContent>
+    <h3 class="text-sm font-medium text-foreground mb-4">{{ 'comments.title' | transloco }}</h3>
+
+    @if (loading()) {
+      <div class="flex items-center justify-center py-6">
+        <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'comments.loading' | transloco }}</span>
+      </div>
+    } @else if (error()) {
+      <div class="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+        {{ error() | transloco }}
+      </div>
+    } @else {
+      <!-- Comment list -->
+      <div class="space-y-4">
+        @for (comment of comments(); track comment.id) {
+          <div class="flex gap-3">
+            <hlm-avatar class="h-8 w-8 shrink-0">
+              <div hlmAvatarFallback class="text-xs font-medium">
+                {{ comment.authorSnapshot.displayName.substring(0, 2).toUpperCase() }}
+              </div>
+            </hlm-avatar>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-foreground">{{ comment.authorSnapshot.displayName }}</span>
+                <span class="text-xs text-muted-foreground">{{ comment.createdAt | date: 'medium' }}</span>
+                @if (comment.createdAt !== comment.updatedAt) {
+                  <span class="text-xs text-muted-foreground italic">({{ 'comments.edited' | transloco }})</span>
+                }
+              </div>
+
+              @if (editingId() === comment.id) {
+                <!-- Inline edit mode -->
+                <div class="mt-2 space-y-2">
+                  <textarea
+                    hlmTextarea
+                    rows="3"
+                    class="w-full"
+                    [value]="editBody()"
+                    (input)="onEditBodyInput($event)"
+                  ></textarea>
+                  <div class="flex gap-2">
+                    <button hlmBtn size="sm" (click)="saveEdit(comment.id)" [disabled]="savingEdit()">
+                      @if (savingEdit()) {
+                        <hlm-spinner class="mr-1" /> {{ 'comments.saving' | transloco }}
+                      } @else {
+                        {{ 'comments.save' | transloco }}
+                      }
+                    </button>
+                    <button hlmBtn variant="outline" size="sm" (click)="cancelEdit()">
+                      {{ 'comments.cancel' | transloco }}
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <!-- Display mode -->
+                <p class="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{{ comment.body }}</p>
+                @if (canModifyComment(comment)) {
+                  <div class="mt-1 flex gap-2">
+                    <button hlmBtn variant="ghost" size="sm" class="h-6 px-2 text-xs" (click)="startEdit(comment)">
+                      {{ 'comments.edit' | transloco }}
+                    </button>
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="sm"
+                      class="h-6 px-2 text-xs text-red-600"
+                      (click)="confirmDelete(comment)"
+                    >
+                      {{ 'comments.delete' | transloco }}
+                    </button>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        } @empty {
+          <p class="text-sm text-muted-foreground italic">{{ 'comments.noComments' | transloco }}</p>
+        }
+      </div>
+
+      <!-- New comment form (hidden for viewers) -->
+      @if (canEdit()) {
+        <div class="mt-6 flex gap-3">
+          <hlm-avatar class="h-8 w-8 shrink-0">
+            <div hlmAvatarFallback class="text-xs font-medium">ME</div>
+          </hlm-avatar>
+          <div class="flex-1 space-y-2">
+            <textarea
+              hlmTextarea
+              rows="3"
+              class="w-full"
+              [placeholder]="'comments.placeholder' | transloco"
+              [value]="newBody()"
+              (input)="onNewBodyInput($event)"
+            ></textarea>
+            <button hlmBtn size="sm" (click)="submitComment()" [disabled]="!newBody().trim() || submitting()">
+              @if (submitting()) {
+                <hlm-spinner class="mr-1" /> {{ 'comments.submitting' | transloco }}
+              } @else {
+                {{ 'comments.submit' | transloco }}
+              }
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</hlm-card>
+
+<!-- Delete Confirmation Dialog -->
+<hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
+  <hlm-dialog-content *hlmDialogPortal>
+    <div class="space-y-4">
+      <h3 hlmDialogTitle>{{ 'comments.deleteTitle' | transloco }}</h3>
+      <p class="text-sm text-muted-foreground">
+        {{ 'comments.deleteConfirm' | transloco }}
+      </p>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">
+          {{ 'comments.cancelDelete' | transloco }}
+        </button>
+        <button hlmBtn variant="destructive" (click)="deleteComment()">
+          {{ 'comments.confirmDelete' | transloco }}
+        </button>
+      </hlm-dialog-footer>
+    </div>
+  </hlm-dialog-content>
+</hlm-dialog>

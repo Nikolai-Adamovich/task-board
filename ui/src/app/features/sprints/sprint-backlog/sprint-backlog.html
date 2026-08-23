@@ -29,7 +29,7 @@
           </div>
           <div class="flex items-center gap-2">
             @if (targetSprint()) {
-              <button hlmBtn size="sm" variant="outline" (click)="addTaskToSprint(task.id)">
+              <button hlmBtn size="sm" variant="outline" (click)="addTaskToSprint(task)">
                 {{ 'sprintBacklog.addToSprint' | transloco }}
               </button>
             }

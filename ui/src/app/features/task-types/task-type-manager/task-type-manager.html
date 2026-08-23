@@ -1,0 +1,217 @@
+<div class="mx-auto max-w-3xl">
+  <div class="mb-6 flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-foreground">{{ 'taskTypeManager.title' | transloco }}</h2>
+    @if (canManage()) {
+      <button hlmBtn (click)="showCreateDialog.set(true)">
+        <ng-icon name="lucidePlus" class="mr-1" />
+        {{ 'taskTypeManager.newTaskType' | transloco }}
+      </button>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+      {{ error() | transloco }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="flex items-center justify-center py-12">
+      <hlm-spinner />
+      <span class="ml-2 text-sm text-muted-foreground">{{ 'taskTypeManager.loading' | transloco }}</span>
+    </div>
+  } @else if (taskTypes().length === 0) {
+    <div class="rounded-lg border border-dashed border-border py-12 text-center">
+      <ng-icon name="lucideGripVertical" class="mx-auto h-12 w-12 text-muted-foreground" />
+      <p class="mt-4 text-sm text-muted-foreground">{{ 'taskTypeManager.noTaskTypes' | transloco }}</p>
+      @if (canManage()) {
+        <button hlmBtn class="mt-4" (click)="showCreateDialog.set(true)">
+          {{ 'taskTypeManager.createFirst' | transloco }}
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="rounded-lg border border-border">
+      @for (taskType of taskTypes(); track taskType.id; let idx = $index) {
+        <div class="flex items-center justify-between border-b border-border px-4 py-3 last:border-b-0">
+          <div class="flex items-center gap-3">
+            @if (canManage()) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                class="h-5 w-5 text-muted-foreground"
+                [disabled]="idx === 0"
+                (click)="moveUp(taskType)"
+                [attr.aria-label]="'taskTypeManager.moveUp' | transloco"
+              >
+                <ng-icon name="lucideGripVertical" />
+              </button>
+            }
+            <span hlmBadge variant="secondary" class="min-w-[2rem] justify-center">{{ taskType.position }}</span>
+            <span class="text-base">{{ taskType.icon }}</span>
+            <span hlmBadge variant="outline" class="font-mono text-xs">{{ taskType.key }}</span>
+            @if (editingId() === taskType.id) {
+              <div class="flex items-center gap-2">
+                <input
+                  hlmInput
+                  type="text"
+                  class="h-8 w-24"
+                  [value]="editingName()"
+                  (input)="editingName.set($any($event.target).value)"
+                  (keydown.enter)="saveEdit(taskType)"
+                  (keydown.escape)="cancelEdit()"
+                  [attr.aria-label]="'taskTypeManager.name' | transloco"
+                />
+                <input
+                  hlmInput
+                  type="text"
+                  class="h-8 w-16"
+                  [value]="editingIcon()"
+                  (input)="editingIcon.set($any($event.target).value)"
+                  (keydown.enter)="saveEdit(taskType)"
+                  (keydown.escape)="cancelEdit()"
+                  [attr.aria-label]="'taskTypeManager.icon' | transloco"
+                  placeholder="🔧"
+                />
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8 text-green-600"
+                  (click)="saveEdit(taskType)"
+                  [disabled]="saving()"
+                  [attr.aria-label]="'taskTypeManager.save' | transloco"
+                >
+                  <ng-icon name="lucideCheck" />
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8"
+                  (click)="cancelEdit()"
+                  [attr.aria-label]="'taskTypeManager.cancel' | transloco"
+                >
+                  <ng-icon name="lucideX" />
+                </button>
+              </div>
+            } @else {
+              <span class="text-sm font-medium text-foreground">{{ taskType.name }}</span>
+            }
+          </div>
+          @if (canManage() && editingId() !== taskType.id) {
+            <div class="flex items-center gap-1">
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+                (click)="startEdit(taskType)"
+                [attr.aria-label]="'taskTypeManager.edit' | transloco"
+              >
+                <ng-icon name="lucidePencil" />
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 text-destructive hover:text-destructive"
+                (click)="confirmDelete(taskType)"
+                [attr.aria-label]="'taskTypeManager.delete' | transloco"
+              >
+                <ng-icon name="lucideTrash2" />
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Create Task Type Dialog -->
+  <hlm-dialog [state]="showCreateDialog() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'taskTypeManager.createTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+
+      <form id="create-task-type-form" [formRoot]="createForm" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="task-type-key">{{ 'taskTypeManager.key' | transloco }}</label>
+          <input
+            hlmInput
+            id="task-type-key"
+            type="text"
+            [formField]="createForm.key"
+            placeholder="BUG"
+            class="uppercase"
+          />
+          <p class="text-xs text-muted-foreground">{{ 'taskTypeManager.keyHint' | transloco }}</p>
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="task-type-name">{{ 'taskTypeManager.name' | transloco }}</label>
+          <input hlmInput id="task-type-name" type="text" [formField]="createForm.name" placeholder="Bug" />
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="task-type-icon">{{ 'taskTypeManager.icon' | transloco }}</label>
+          <input hlmInput id="task-type-icon" type="text" [formField]="createForm.icon" placeholder="🐛" />
+          <p class="text-xs text-muted-foreground">{{ 'taskTypeManager.iconHint' | transloco }}</p>
+        </hlm-field>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'taskTypeManager.cancel' | transloco }}</button>
+        <button
+          hlmBtn
+          type="submit"
+          form="create-task-type-form"
+          [disabled]="createForm().invalid() || createForm().submitting()"
+        >
+          @if (createForm().submitting()) {
+            <hlm-spinner /> {{ 'taskTypeManager.creating' | transloco }}
+          } @else {
+            {{ 'taskTypeManager.create' | transloco }}
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- Delete Task Type Dialog -->
+  <hlm-dialog [state]="showDeleteDialog() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'taskTypeManager.deleteTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+      <p class="text-sm text-muted-foreground">
+        {{ 'taskTypeManager.deleteConfirm' | transloco }}
+      </p>
+      @if (otherTaskTypes().length > 0) {
+        <hlm-field>
+          <label hlmFieldLabel for="replacement-type">{{ 'taskTypeManager.replacementType' | transloco }}</label>
+          <hlm-native-select
+            id="replacement-type"
+            [value]="replacementTypeId()"
+            (valueChange)="replacementTypeId.set($event ?? '')"
+          >
+            <option value="">— {{ 'taskTypeManager.noReplacement' | transloco }} —</option>
+            @for (t of otherTaskTypes(); track t.id) {
+              <option [value]="t.id">{{ t.icon }} {{ t.name }} ({{ t.key }})</option>
+            }
+          </hlm-native-select>
+        </hlm-field>
+      }
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'taskTypeManager.cancel' | transloco }}</button>
+        <button hlmBtn variant="destructive" (click)="deleteTaskType()" [disabled]="saving()">
+          @if (saving()) {
+            <hlm-spinner /> {{ 'taskTypeManager.deleting' | transloco }}
+          } @else {
+            <ng-icon name="lucideTrash2" class="mr-1" />
+            {{ 'taskTypeManager.deleteButton' | transloco }}
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</div>

@@ -37,7 +37,15 @@ describe('errorInterceptor', () => {
     // Set a token so logout has something to clear
     store.setSession({
       token: 'test',
-      user: { id: '1', email: 'a@b.com', displayName: 'A', createdAt: '', updatedAt: '' },
+      user: {
+        id: '1',
+        email: 'a@b.com',
+        displayName: 'A',
+        avatarUrl: null,
+        createdAt: '',
+        updatedAt: '',
+        deletedAt: null,
+      },
     });
 
     http.get('/api/boards').subscribe({
@@ -62,5 +70,105 @@ describe('errorInterceptor', () => {
     const req = httpMock.expectOne('/api/boards');
 
     req.flush({ id: 'board-1' });
+  });
+
+  it('should handle structured VALIDATION_ERROR response', () => {
+    const errorBody = {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        details: { email: 'Invalid email format' },
+      },
+    };
+
+    http.get('/api/boards').subscribe({
+      error: (err) => {
+        expect(err.status).toBe(422);
+        expect(err.userMessage).toBe('errors.validation');
+      },
+    });
+
+    const req = httpMock.expectOne('/api/boards');
+
+    req.flush(errorBody, { status: 422, statusText: 'Unprocessable Entity' });
+  });
+
+  it('should handle structured NOT_FOUND response', () => {
+    const errorBody = {
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Resource not found',
+      },
+    };
+
+    http.get('/api/tasks/999').subscribe({
+      error: (err) => {
+        expect(err.status).toBe(404);
+        expect(err.userMessage).toBe('errors.notFound');
+      },
+    });
+
+    const req = httpMock.expectOne('/api/tasks/999');
+
+    req.flush(errorBody, { status: 404, statusText: 'Not Found' });
+  });
+
+  it('should handle structured TASK_VERSION_CONFLICT response', () => {
+    const errorBody = {
+      error: {
+        code: 'TASK_VERSION_CONFLICT',
+        message: 'Task has been modified by another user',
+      },
+    };
+
+    http.patch('/api/tasks/1', {}).subscribe({
+      error: (err) => {
+        expect(err.status).toBe(409);
+        expect(err.userMessage).toBe('errors.taskVersionConflict');
+      },
+    });
+
+    const req = httpMock.expectOne('/api/tasks/1');
+
+    req.flush(errorBody, { status: 409, statusText: 'Conflict' });
+  });
+
+  it('should handle 403 permission denied', () => {
+    const errorBody = {
+      error: {
+        code: 'FORBIDDEN',
+        message: 'You do not have permission',
+      },
+    };
+
+    http.delete('/api/tenants/1').subscribe({
+      error: (err) => {
+        expect(err.status).toBe(403);
+        expect(err.userMessage).toBe('errors.forbidden');
+      },
+    });
+
+    const req = httpMock.expectOne('/api/tenants/1');
+
+    req.flush(errorBody, { status: 403, statusText: 'Forbidden' });
+  });
+
+  it('should handle unknown error codes gracefully', () => {
+    const errorBody = {
+      error: {
+        code: 'UNKNOWN_CODE',
+        message: 'Something went wrong',
+      },
+    };
+
+    http.get('/api/boards').subscribe({
+      error: (err) => {
+        expect(err.userMessage).toBe('Something went wrong');
+      },
+    });
+
+    const req = httpMock.expectOne('/api/boards');
+
+    req.flush(errorBody, { status: 500, statusText: 'Internal Server Error' });
   });
 });

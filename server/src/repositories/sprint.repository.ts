@@ -1,21 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
-import { SprintStatus } from '@task-board/shared';
-import type { Sprint } from '@task-board/shared';
+import type { Sprint, SprintStatus } from '@task-board/shared';
+
+// Required MongoDB indexes:
+// - { id: 1 } (unique)
+// - { projectId: 1, status: 1 }
+// - { projectId: 1, startDate: 1 }
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
 export interface SprintDocument {
   _id?: import('mongodb').ObjectId;
   id: string;
-  tenantId: string;
   projectId: string;
   name: string;
-  startDate: Date;
-  endDate: Date;
-  goal: string | null;
   status: string;
-  taskIds: string[];
+  startDate: Date | null;
+  endDate: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,14 +26,11 @@ export interface SprintDocument {
 function toDomain(doc: SprintDocument): Sprint {
   return {
     id: doc.id,
-    tenantId: doc.tenantId,
     projectId: doc.projectId,
     name: doc.name,
-    startDate: doc.startDate.toISOString(),
-    endDate: doc.endDate.toISOString(),
-    goal: doc.goal ?? undefined,
-    status: doc.status as Sprint['status'],
-    taskIds: doc.taskIds,
+    status: doc.status as SprintStatus,
+    startDate: doc.startDate ? doc.startDate.toISOString() : null,
+    endDate: doc.endDate ? doc.endDate.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };
@@ -43,45 +41,27 @@ function toDomain(doc: SprintDocument): Sprint {
 export class SprintRepository {
   constructor(private readonly collection: Collection<SprintDocument>) {}
 
-  async findById(tenantId: string, id: string): Promise<Sprint | null> {
-    const doc = await this.collection.findOne({ id, tenantId });
+  async findById(id: string): Promise<Sprint | null> {
+    const doc = await this.collection.findOne({ id });
 
     return doc ? toDomain(doc) : null;
   }
 
-  async findByProject(tenantId: string, projectId: string): Promise<Sprint[]> {
-    const docs = await this.collection.find({ tenantId, projectId }).sort({ startDate: -1 }).toArray();
+  async findByProject(projectId: string): Promise<Sprint[]> {
+    const docs = await this.collection.find({ projectId }).sort({ createdAt: -1 }).toArray();
 
     return docs.map(toDomain);
   }
 
-  async findByTenant(tenantId: string): Promise<Sprint[]> {
-    const docs = await this.collection.find({ tenantId }).sort({ startDate: -1 }).toArray();
-
-    return docs.map(toDomain);
-  }
-
-  async create(
-    tenantId: string,
-    input: {
-      projectId: string;
-      name: string;
-      startDate: string;
-      endDate: string;
-      goal?: string;
-    },
-  ): Promise<Sprint> {
+  async create(projectId: string, input: { name: string; startDate?: string; endDate?: string }): Promise<Sprint> {
     const now = new Date();
     const doc: SprintDocument = {
       id: randomUUID(),
-      tenantId,
-      projectId: input.projectId,
+      projectId,
       name: input.name,
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-      goal: input.goal ?? null,
-      status: SprintStatus.Planned,
-      taskIds: [],
+      status: 'FUTURE',
+      startDate: input.startDate ? new Date(input.startDate) : null,
+      endDate: input.endDate ? new Date(input.endDate) : null,
       createdAt: now,
       updatedAt: now,
     };
@@ -91,62 +71,36 @@ export class SprintRepository {
   }
 
   async update(
-    tenantId: string,
     id: string,
     input: {
       name?: string;
-      startDate?: string | Date;
-      endDate?: string | Date;
-      goal?: string | null;
       status?: string;
+      startDate?: string | Date | null;
+      endDate?: string | Date | null;
     },
   ): Promise<Sprint | null> {
     const updateFields: Record<string, unknown> = { updatedAt: new Date() };
 
     if (input.name !== undefined) updateFields.name = input.name;
-    if (input.startDate !== undefined) updateFields.startDate = new Date(input.startDate);
-    if (input.endDate !== undefined) updateFields.endDate = new Date(input.endDate);
-    if (input.goal !== undefined) updateFields.goal = input.goal;
     if (input.status !== undefined) updateFields.status = input.status;
+    if (input.startDate !== undefined) updateFields.startDate = input.startDate ? new Date(input.startDate) : null;
+    if (input.endDate !== undefined) updateFields.endDate = input.endDate ? new Date(input.endDate) : null;
 
-    const result = await this.collection.findOneAndUpdate(
-      { id, tenantId },
-      { $set: updateFields },
-      { returnDocument: 'after' },
-    );
+    const result = await this.collection.findOneAndUpdate({ id }, { $set: updateFields }, { returnDocument: 'after' });
 
     return result ? toDomain(result) : null;
   }
 
-  async delete(tenantId: string, id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id, tenantId });
+  async delete(id: string): Promise<boolean> {
+    const result = await this.collection.deleteOne({ id });
 
     return result.deletedCount > 0;
   }
 
-  async addTask(tenantId: string, sprintId: string, taskId: string): Promise<Sprint | null> {
-    const result = await this.collection.findOneAndUpdate(
-      { id: sprintId, tenantId },
-      {
-        $addToSet: { taskIds: taskId },
-        $set: { updatedAt: new Date() },
-      },
-      { returnDocument: 'after' },
-    );
-
-    return result ? toDomain(result) : null;
-  }
-
-  async removeTask(tenantId: string, sprintId: string, taskId: string): Promise<Sprint | null> {
-    const result = await this.collection.findOneAndUpdate(
-      { id: sprintId, tenantId },
-      {
-        $pull: { taskIds: taskId },
-        $set: { updatedAt: new Date() },
-      },
-      { returnDocument: 'after' },
-    );
-
-    return result ? toDomain(result) : null;
+  /**
+   * Delete all entities belonging to a project. Used for cascade delete.
+   */
+  async deleteByProject(projectId: string): Promise<void> {
+    await this.collection.deleteMany({ projectId });
   }
 }

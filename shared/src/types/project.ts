@@ -1,4 +1,4 @@
-import type { ProjectRole } from '../constants/roles.js';
+import type { ProjectRole, ProjectStatus, ArchiveReason } from '../constants/roles.js';
 
 /** Project entity type */
 export interface Project {
@@ -6,12 +6,22 @@ export interface Project {
   id: string;
   /** Owning tenant ID */
   tenantId: string;
+  /** Short unique project key (e.g., "PROJ") */
+  key: string;
   /** Project name */
   name: string;
-  /** URL-friendly slug for the project */
-  slug: string;
   /** Optional project description */
-  description?: string | null;
+  description: string | null;
+  /** Project lifecycle status */
+  status: ProjectStatus;
+  /** Default status ID assigned to new tasks */
+  defaultStatusId: string;
+  /** Default board ID for the project */
+  defaultBoardId: string;
+  /** Reason for archival (null if not archived) */
+  archiveReason: ArchiveReason | null;
+  /** Scheduled deletion timestamp (ISO 8601, null if not scheduled) */
+  deletionScheduledAt: string | null;
   /** Creation timestamp (ISO 8601) */
   createdAt: string;
   /** Last update timestamp (ISO 8601) */
@@ -20,26 +30,35 @@ export interface Project {
 
 /** Create project request body type */
 export interface CreateProject {
+  key: string;
   name: string;
-  slug: string;
   description?: string;
 }
 
 /** Update project request body type */
 export interface UpdateProject {
   name?: string;
-  slug?: string;
   description?: string;
 }
 
 /** Project membership type */
 export interface ProjectMember {
-  /** User ID of the member */
-  userId: string;
+  /** Unique member identifier (UUID v4) */
+  id: string;
   /** Project ID */
   projectId: string;
-  /** Tenant ID (denormalized for multi-tenant queries) */
-  tenantId: string;
+  /** User ID of the member */
+  userId: string;
   /** Role of the user within the project */
   role: ProjectRole;
+  /** Display name of the user (resolved from users collection) */
+  displayName?: string;
+  /** Email of the user (resolved from users collection) */
+  email?: string;
+  /** Avatar URL of the user (resolved from users collection) */
+  avatarUrl?: string | null;
+  /** Creation timestamp (ISO 8601) */
+  createdAt: string;
+  /** Last update timestamp (ISO 8601) */
+  updatedAt: string;
 }

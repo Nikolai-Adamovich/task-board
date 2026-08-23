@@ -1,18 +1,32 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
 import { TenantStore } from '@stores/tenant-store';
+import { AuthStore } from '@stores/auth-store';
+import { ProjectStore } from '@stores/project-store';
+import { TenantRole } from '@task-board/shared';
+import type { TenantRole as TenantRoleType, ProjectRole } from '@task-board/shared';
+
+/** Tenant-level roles that can bypass project membership checks */
+const BYPASS_TENANT_ROLES: TenantRoleType[] = [TenantRole.OWNER, TenantRole.ADMIN];
 
 /**
- * Functional route guard that ensures a valid project context.
- * Verifies tenantId is present and active tenant matches.
+ * Functional route guard that ensures the user has access to a project.
+ *
+ * Access is granted when:
+ * 1. The user's tenant role is OWNER or ADMIN (bypass — stores PROJECT_ADMIN), OR
+ * 2. The user has a project membership with PROJECT_ADMIN, EDITOR, or VIEWER role.
+ *
+ * The guard also loads the project context and resolves the project role.
  */
-export const projectGuard: CanActivateFn = (route) => {
+export const projectGuard: CanActivateFn = async (route) => {
   const tenantStore = inject(TenantStore);
+  const authStore = inject(AuthStore);
+  const projectStore = inject(ProjectStore);
   const router = inject(Router);
   const tenantId = route.paramMap.get('tenantId');
-  const projectId = route.paramMap.get('projectId');
+  const projectKey = route.paramMap.get('projectKey');
 
-  if (!tenantId || !projectId) {
+  if (!tenantId || !projectKey) {
     return router.parseUrl('/');
   }
 
@@ -22,5 +36,32 @@ export const projectGuard: CanActivateFn = (route) => {
     return router.parseUrl('/');
   }
 
-  return true;
+  // Load project context by key
+  try {
+    await projectStore.loadProjectByKey(tenantId, projectKey);
+  } catch {
+    // Project not found or inaccessible — clear and redirect
+    projectStore.clearProject();
+    return router.parseUrl('/');
+  }
+
+  // Tenant OWNER/ADMIN can access any project within their tenant
+  const tenantRole = authStore.tenantRole();
+
+  if (tenantRole && BYPASS_TENANT_ROLES.includes(tenantRole)) {
+    projectStore.setProjectRole('PROJECT_ADMIN' as ProjectRole);
+    return true;
+  }
+
+  // For tenant MEMBERS, the project role is resolved from membership
+  // The API will return 403 if the user has no access
+  if (tenantRole === TenantRole.MEMBER) {
+    // Project role is loaded from members list inside loadProject()
+    // If user has no membership, API calls will return 403
+    return true;
+  }
+
+  // No valid tenant role — redirect
+  projectStore.clearProject();
+  return router.parseUrl('/');
 };

@@ -25,7 +25,7 @@ export function createAuthRoutes(): Hono<AppEnv> {
 
   /**
    * POST /register — Register a new user account.
-   * Returns 201 with { token, user }.
+   * Returns 201 with { data: { id, email, displayName, avatarUrl } }.
    */
   router.post('/register', validateBody(RegisterRequestSchema), async (c) => {
     const body = c.get('validatedBody' as never) as {
@@ -36,12 +36,12 @@ export function createAuthRoutes(): Hono<AppEnv> {
     const service = createAuthService(c);
     const result = await service.register(body);
 
-    return c.json(result, 201);
+    return c.json({ data: result }, 201);
   });
 
   /**
    * POST /login — Authenticate with email and password.
-   * Returns 200 with { token, user }.
+   * Returns 200 with { data: { token, user: { id, email, displayName, avatarUrl } } }.
    */
   router.post('/login', validateBody(LoginRequestSchema), async (c) => {
     const body = c.get('validatedBody' as never) as {
@@ -51,38 +51,38 @@ export function createAuthRoutes(): Hono<AppEnv> {
     const service = createAuthService(c);
     const result = await service.login(body);
 
-    return c.json(result, 200);
+    return c.json({ data: result }, 200);
   });
 
   /**
    * POST /accept-invitation — Accept an invitation to join a tenant.
    * Public endpoint — no auth required.
-   * Returns 200 with { token, user }.
+   * Returns 200 with { data: { token, user } }.
    */
   router.post('/accept-invitation', validateBody(AcceptInvitationSchema), async (c) => {
     const body = c.get('validatedBody' as never) as { token: string; password?: string; displayName?: string };
     const service = createAuthService(c);
     const result = await service.acceptInvitation(body);
 
-    return c.json(result, 200);
+    return c.json({ data: result }, 200);
   });
 
   /**
    * GET /invitations/:token — Get invitation details by token.
    * Public endpoint — no auth required.
-   * Returns 200 with invitation details.
+   * Returns 200 with { data: invitationDetails }.
    */
   router.get('/invitations/:token', async (c) => {
     const token = c.req.param('token');
     const service = createAuthService(c);
     const result = await service.getInvitationDetails(token);
 
-    return c.json(result, 200);
+    return c.json({ data: result }, 200);
   });
 
   /**
    * GET /me — Get the currently authenticated user's profile.
-   * Returns 200 with the user object.
+   * Returns 200 with { data: user }.
    * Requires Authorization header (authMiddleware).
    */
   router.get('/me', authMiddleware, async (c) => {
@@ -90,7 +90,7 @@ export function createAuthRoutes(): Hono<AppEnv> {
     const service = createAuthService(c);
     const user = await service.me(userId);
 
-    return c.json(user, 200);
+    return c.json({ data: user }, 200);
   });
 
   return router;

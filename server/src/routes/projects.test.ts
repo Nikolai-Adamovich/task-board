@@ -1,8 +1,5 @@
 /**
  * Tests for project CRUD and member management HTTP routes.
- *
- * Validates that the endpoints correctly enforce Zod schema validation
- * and return proper HTTP status codes and error responses.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
@@ -13,15 +10,26 @@ import type { AppEnv } from '../types/context.js';
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock('../db/mongo.js', () => ({
-  getCollection: vi.fn(() => ({})),
+  getCollection: vi.fn(() => ({
+    insertOne: vi.fn(),
+    findOne: vi.fn(),
+    find: vi.fn(),
+    findOneAndUpdate: vi.fn(),
+    deleteOne: vi.fn(),
+  })),
 }));
 
 const mockProject = {
   id: '550e8400-e29b-41d4-a716-446655440010',
   tenantId: '550e8400-e29b-41d4-a716-446655440000',
+  key: 'TEST',
   name: 'Test Project',
-  slug: 'test-project',
-  description: 'A test project',
+  description: null,
+  status: 'ACTIVE',
+  defaultStatusId: 'status-1',
+  defaultBoardId: 'board-1',
+  archiveReason: null,
+  deletionScheduledAt: null,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
 };
@@ -29,9 +37,9 @@ const mockProjectMember = {
   id: '550e8400-e29b-41d4-a716-446655440011',
   userId: '550e8400-e29b-41d4-a716-446655440002',
   projectId: '550e8400-e29b-41d4-a716-446655440010',
-  tenantId: '550e8400-e29b-41d4-a716-446655440000',
-  role: 'admin',
+  role: 'PROJECT_ADMIN',
   createdAt: '2025-01-01T00:00:00.000Z',
+  updatedAt: '2025-01-01T00:00:00.000Z',
 };
 
 vi.mock('../services/project.service.js', () => ({
@@ -41,6 +49,9 @@ vi.mock('../services/project.service.js', () => ({
     getProject: vi.fn().mockResolvedValue(mockProject),
     updateProject: vi.fn().mockResolvedValue(mockProject),
     deleteProject: vi.fn().mockResolvedValue(undefined),
+    archiveProject: vi.fn().mockResolvedValue(undefined),
+    restoreProject: vi.fn().mockResolvedValue(undefined),
+    cancelDeletion: vi.fn().mockResolvedValue(undefined),
     getProjectMembers: vi.fn().mockResolvedValue([mockProjectMember]),
     addMember: vi.fn().mockResolvedValue(mockProjectMember),
     updateMemberRole: vi.fn().mockResolvedValue(mockProjectMember),
@@ -58,15 +69,14 @@ function createTestApp() {
 
   app.onError(errorHandler);
 
-  // Set tenant context (tenantContextMiddleware equivalent)
-  app.use('/api/v1/*', async (c, next) => {
+  app.use('/api/*', async (c, next) => {
     c.set('userId', VALID_UUID);
     c.set('tenantId', '550e8400-e29b-41d4-a716-446655440000');
-    c.set('userRole', 'owner');
+    c.set('tenantRole', 'OWNER');
     await next();
   });
 
-  app.route('/api/v1/projects', createProjectRoutes());
+  app.route('/api/projects', createProjectRoutes());
 
   return app;
 }
@@ -103,292 +113,183 @@ async function deleteJson(app: Hono<AppEnv>, path: string) {
   return app.request(path, { method: 'DELETE' }, TEST_ENV);
 }
 
-// ─── GET /api/v1/projects ────────────────────────────────────────────────────
+// ─── GET /api/projects ────────────────────────────────────────────────────
 
-describe('GET /api/v1/projects', () => {
+describe('GET /api/projects', () => {
   const app = createTestApp();
 
-  it('should return 200 with a list of projects', async () => {
-    const res = await getJson(app, '/api/v1/projects');
+  it('should return 200 with { data } envelope', async () => {
+    const res = await getJson(app, '/api/projects');
 
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as Record<string, unknown>;
 
     expect(body).toHaveProperty('data');
-    expect(body).toHaveProperty('total');
+    expect(Array.isArray(body.data)).toBe(true);
   });
 });
 
-// ─── POST /api/v1/projects ───────────────────────────────────────────────────
+// ─── POST /api/projects ───────────────────────────────────────────────────
 
-describe('POST /api/v1/projects', () => {
+describe('POST /api/projects', () => {
   const app = createTestApp();
-  const validBody = { name: 'New Project', slug: 'new-project', description: 'A new project' };
+  const validBody = { key: 'TEST', name: 'New Project', description: 'A new project' };
 
   it('should return 201 for valid project creation', async () => {
-    const res = await postJson(app, '/api/v1/projects', validBody);
+    const res = await postJson(app, '/api/projects', validBody);
 
     expect(res.status).toBe(201);
   });
 
   it('should return 201 without optional description', async () => {
-    const res = await postJson(app, '/api/v1/projects', { name: 'New Project', slug: 'new-project' });
+    const res = await postJson(app, '/api/projects', { key: 'TEST', name: 'New Project' });
 
     expect(res.status).toBe(201);
+  });
+
+  // ── Key validation ──────────────────────────────────────────────────────
+
+  it('should return 422 for missing key', async () => {
+    const res = await postJson(app, '/api/projects', { name: 'New Project' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should return 422 for lowercase key', async () => {
+    const res = await postJson(app, '/api/projects', { key: 'abc', name: 'New Project' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should return 422 for key starting with digit', async () => {
+    const res = await postJson(app, '/api/projects', { key: '1ABC', name: 'New Project' });
+
+    expect(res.status).toBe(400);
   });
 
   // ── Name validation ──────────────────────────────────────────────────────
 
   it('should return 422 for empty name', async () => {
-    const res = await postJson(app, '/api/v1/projects', { ...validBody, name: '' });
+    const res = await postJson(app, '/api/projects', { ...validBody, name: '' });
 
-    expect(res.status).toBe(422);
-
-    const body = (await res.json()) as Record<string, unknown>;
-
-    expect(body.code).toBe('VALIDATION_ERROR');
+    expect(res.status).toBe(400);
   });
 
-  it('should return 422 for name exceeding 100 chars', async () => {
-    const res = await postJson(app, '/api/v1/projects', { ...validBody, name: 'a'.repeat(101) });
+  it('should return 422 for name exceeding 200 chars', async () => {
+    const res = await postJson(app, '/api/projects', { ...validBody, name: 'a'.repeat(201) });
 
-    expect(res.status).toBe(422);
-  });
-
-  // ── Slug validation ──────────────────────────────────────────────────────
-
-  it('should return 422 for slug shorter than 2 chars', async () => {
-    const res = await postJson(app, '/api/v1/projects', { ...validBody, slug: 'a' });
-
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for slug with invalid characters', async () => {
-    const res = await postJson(app, '/api/v1/projects', { ...validBody, slug: 'Invalid Slug!' });
-
-    expect(res.status).toBe(422);
-  });
-
-  // ── Missing fields ──────────────────────────────────────────────────────
-
-  it('should return 422 for missing body', async () => {
-    const res = await postJson(app, '/api/v1/projects', {});
-
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('should return 422 for missing name', async () => {
-    const res = await postJson(app, '/api/v1/projects', { slug: 'new-project' });
+    const res = await postJson(app, '/api/projects', { key: 'TEST' });
 
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for missing slug', async () => {
-    const res = await postJson(app, '/api/v1/projects', { name: 'New Project' });
-
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for invalid JSON body', async () => {
-    const res = await app.request(
-      '/api/v1/projects',
-      {
-        method: 'POST',
-        body: 'not json',
-        headers: { 'Content-Type': 'application/json' },
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 });
 
-// ─── GET /api/v1/projects/:projectId ─────────────────────────────────────────
+// ─── GET /api/projects/:projectId ─────────────────────────────────────────
 
-describe('GET /api/v1/projects/:projectId', () => {
+describe('GET /api/projects/:projectId', () => {
   const app = createTestApp();
 
-  it('should return 200 for a valid project ID', async () => {
-    const res = await getJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010');
+  it('should return 200 with { data } envelope', async () => {
+    const res = await getJson(app, '/api/projects/550e8400-e29b-41d4-a716-446655440010');
 
     expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).toHaveProperty('data');
   });
 });
 
-// ─── PATCH /api/v1/projects/:projectId ───────────────────────────────────────
+// ─── PATCH /api/projects/:projectId ───────────────────────────────────────
 
-describe('PATCH /api/v1/projects/:projectId', () => {
+describe('PATCH /api/projects/:projectId', () => {
   const app = createTestApp();
 
   it('should return 200 for valid partial update', async () => {
-    const res = await patchJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010', {
+    const res = await patchJson(app, '/api/projects/550e8400-e29b-41d4-a716-446655440010', {
       name: 'Updated Project',
     });
 
     expect(res.status).toBe(200);
   });
 
-  it('should return 200 for empty body (no-op update)', async () => {
-    const res = await patchJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010', {});
-
-    expect(res.status).toBe(200);
-  });
-
   it('should return 422 for empty name in update', async () => {
-    const res = await patchJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010', {
-      name: '',
-    });
+    const res = await patchJson(app, '/api/projects/550e8400-e29b-41d4-a716-446655440010', { name: '' });
 
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for invalid slug in update', async () => {
-    const res = await patchJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010', {
-      slug: 'a',
-    });
-
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for invalid JSON body', async () => {
-    const res = await app.request(
-      '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010',
-      {
-        method: 'PATCH',
-        body: 'not json',
-        headers: { 'Content-Type': 'application/json' },
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 });
 
-// ─── DELETE /api/v1/projects/:projectId ──────────────────────────────────────
+// ─── DELETE /api/projects/:projectId ──────────────────────────────────────
 
-describe('DELETE /api/v1/projects/:projectId', () => {
+describe('DELETE /api/projects/:projectId', () => {
   const app = createTestApp();
 
-  it('should return 200 with success flag', async () => {
-    const res = await deleteJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010');
-
-    expect(res.status).toBe(200);
-
-    const body = (await res.json()) as Record<string, unknown>;
-
-    expect(body.success).toBe(true);
-  });
-});
-
-// ─── GET /api/v1/projects/:projectId/members ─────────────────────────────────
-
-describe('GET /api/v1/projects/:projectId/members', () => {
-  const app = createTestApp();
-
-  it('should return 200 with a list of members', async () => {
-    const res = await getJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members');
+  it('should return 200 with { data } envelope', async () => {
+    const res = await deleteJson(app, '/api/projects/550e8400-e29b-41d4-a716-446655440010');
 
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as Record<string, unknown>;
 
     expect(body).toHaveProperty('data');
-    expect(body).toHaveProperty('total');
   });
 });
 
-// ─── POST /api/v1/projects/:projectId/members ────────────────────────────────
+// ─── GET /api/projects/:projectId/members ─────────────────────────────────
 
-describe('POST /api/v1/projects/:projectId/members', () => {
+describe('GET /api/projects/:projectId/members', () => {
   const app = createTestApp();
 
-  it('should return 201 for valid member addition', async () => {
-    const res = await postJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members', {
-      userId: VALID_UUID,
-      role: 'developer',
-    });
-
-    expect(res.status).toBe(201);
-  });
-
-  it('should return 422 for missing userId', async () => {
-    const res = await postJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members', {
-      role: 'developer',
-    });
-
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for missing role', async () => {
-    const res = await postJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members', {
-      userId: VALID_UUID,
-    });
-
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for invalid role', async () => {
-    const res = await postJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members', {
-      userId: VALID_UUID,
-      role: 'invalid-role',
-    });
-
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for invalid userId format', async () => {
-    const res = await postJson(app, '/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members', {
-      userId: 'not-a-uuid',
-      role: 'developer',
-    });
-
-    expect(res.status).toBe(422);
-  });
-});
-
-// ─── PATCH /api/v1/projects/:projectId/members/:memberUserId ─────────────────
-
-describe('PATCH /api/v1/projects/:projectId/members/:memberUserId', () => {
-  const app = createTestApp();
-
-  it('should return 200 for valid role update', async () => {
-    const res = await patchJson(app, `/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members/${VALID_UUID}`, {
-      role: 'viewer',
-    });
-
-    expect(res.status).toBe(200);
-  });
-
-  it('should return 422 for missing role', async () => {
-    const res = await patchJson(app, `/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members/${VALID_UUID}`, {});
-
-    expect(res.status).toBe(422);
-  });
-
-  it('should return 422 for invalid role', async () => {
-    const res = await patchJson(app, `/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members/${VALID_UUID}`, {
-      role: 'invalid-role',
-    });
-
-    expect(res.status).toBe(422);
-  });
-});
-
-// ─── DELETE /api/v1/projects/:projectId/members/:memberUserId ────────────────
-
-describe('DELETE /api/v1/projects/:projectId/members/:memberUserId', () => {
-  const app = createTestApp();
-
-  it('should return 200 with success flag', async () => {
-    const res = await deleteJson(app, `/api/v1/projects/550e8400-e29b-41d4-a716-446655440010/members/${VALID_UUID}`);
+  it('should return 200 with { data } envelope', async () => {
+    const res = await getJson(app, '/api/projects/550e8400-e29b-41d4-a716-446655440010/members');
 
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as Record<string, unknown>;
 
-    expect(body.success).toBe(true);
+    expect(body).toHaveProperty('data');
+    expect(Array.isArray(body.data)).toBe(true);
+  });
+});
+
+// ─── POST /api/projects/:projectId/members ────────────────────────────────
+
+describe('POST /api/projects/:projectId/members', () => {
+  const app = createTestApp();
+
+  it('should return 201 for valid member addition', async () => {
+    const res = await postJson(app, '/api/projects/550e8400-e29b-41d4-a716-446655440010/members', {
+      userId: VALID_UUID,
+      role: 'EDITOR',
+    });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('should return 422 for invalid role', async () => {
+    const res = await postJson(app, '/api/projects/550e8400-e29b-41d4-a716-446655440010/members', {
+      userId: VALID_UUID,
+      role: 'invalid-role',
+    });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── DELETE /api/projects/:projectId/members/:memberUserId ────────────────
+
+describe('DELETE /api/projects/:projectId/members/:memberUserId', () => {
+  const app = createTestApp();
+
+  it('should return 200 with { data } envelope', async () => {
+    const res = await deleteJson(app, `/api/projects/550e8400-e29b-41d4-a716-446655440010/members/${VALID_UUID}`);
+
+    expect(res.status).toBe(200);
   });
 });

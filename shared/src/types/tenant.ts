@@ -1,6 +1,9 @@
-import type { SubscriptionTier } from '../constants/roles.js';
-import type { TenantRole } from '../constants/roles.js';
-import type { MemberStatus } from '../constants/roles.js';
+import type { TenantRole, TenantStatus, MemberStatus, InvitationStatus } from '../constants/roles.js';
+
+/** Identity snapshot — denormalized display name at time of action */
+export interface IdentitySnapshot {
+  displayName: string;
+}
 
 /** Tenant (organization) entity type */
 export interface Tenant {
@@ -8,12 +11,12 @@ export interface Tenant {
   id: string;
   /** Tenant display name */
   name: string;
-  /** URL-friendly slug for the tenant */
-  slug: string;
   /** Optional description of the tenant */
-  description?: string | null;
-  /** Subscription tier */
-  subscription: SubscriptionTier;
+  description: string | null;
+  /** Tenant lifecycle status */
+  status: TenantStatus;
+  /** Scheduled deletion timestamp (ISO 8601, null if not scheduled) */
+  deletionScheduledAt: string | null;
   /** Creation timestamp (ISO 8601) */
   createdAt: string;
   /** Last update timestamp (ISO 8601) */
@@ -23,43 +26,47 @@ export interface Tenant {
 /** Create tenant request body type */
 export interface CreateTenant {
   name: string;
-  slug: string;
   description?: string;
-  subscription: SubscriptionTier;
 }
 
 /** Update tenant request body type */
 export interface UpdateTenant {
   name?: string;
-  slug?: string;
   description?: string;
+}
+
+/** Invitation embedded in a TenantMember */
+export interface Invitation {
+  /** Current invitation status */
+  status: InvitationStatus;
+  /** Hashed invitation token */
+  tokenHash: string;
+  /** User ID of the person who sent the invitation */
+  invitedBy: string;
+  /** Timestamp when the invitation was sent (ISO 8601) */
+  invitedOn: string;
 }
 
 /** Tenant member type */
 export interface TenantMember {
-  /** User ID of the member (null for pending invitations) */
-  userId: string | null;
+  /** Unique member identifier (UUID v4) */
+  id: string;
   /** Tenant ID */
   tenantId: string;
+  /** User ID of the member */
+  userId: string;
   /** Role of the user within the tenant */
   role: TenantRole;
   /** Member status */
   status: MemberStatus;
-  /** Email address for pending invitations */
-  invitedEmail: string | null;
-  /** Invitation token for pending invitations */
-  invitationToken: string | null;
-  /** Timestamp when the invitation was sent (ISO 8601) */
-  invitedAt: string | null;
-}
-
-/** Invite member to tenant request body type */
-export interface InviteMember {
-  email: string;
-  role: TenantRole;
-}
-
-/** Tenant with the current user's role */
-export interface TenantWithRole extends Tenant {
-  role: TenantRole;
+  /** Embedded invitation data (null for direct members) */
+  invitation: Invitation | null;
+  /** Resolved user display name (null if user deleted/not found) */
+  displayName: string | null;
+  /** Resolved user email (null if user deleted/not found) */
+  email: string | null;
+  /** Creation timestamp (ISO 8601) */
+  createdAt: string;
+  /** Last update timestamp (ISO 8601) */
+  updatedAt: string;
 }

@@ -10,79 +10,58 @@ import { getCollection } from '../db/mongo.js';
 import type { TenantDocument } from '../repositories/tenant.repository.js';
 import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
 import type { UserDocument } from '../repositories/user.repository.js';
-import { CreateTenantSchema, UpdateTenantSchema, InviteMemberSchema } from '../schemas/tenant.js';
+import {
+  CreateTenantSchema,
+  UpdateTenantSchema,
+  InviteMemberSchema,
+  UpdateMemberRoleSchema,
+} from '../schemas/tenant.js';
 import type { CreateTenant } from '@task-board/shared';
 
 // ─── Tenant Routes ───────────────────────────────────────────────────────────
 
-/**
- * Creates and returns the tenant Hono app with all tenant-related routes.
- *
- * These routes are protected by authMiddleware and tenantContextMiddleware
- * (applied at the app level in index.ts). Specific routes that don't need
- * tenant context are registered before tenant-context middleware is applied.
- */
 export function createTenantRoutes(): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
-  /**
-   * GET / — List all tenants for the authenticated user.
-   * Does not require tenant context (cross-tenant query).
-   */
+  // ─── Tenant CRUD ────────────────────────────────────────────────────────
+
   router.get('/', async (c) => {
     const userId = c.get('userId');
     const service = createTenantService(c);
     const tenants = await service.listTenantsWithRole(userId);
 
-    return c.json({
-      data: tenants,
-      total: tenants.length,
-      page: 1,
-      limit: tenants.length,
-    });
+    return c.json({ data: tenants });
   });
 
-  /**
-   * POST / — Create a new tenant.
-   * The authenticated user becomes the owner.
-   * Does not require tenant context.
-   */
   router.post('/', validateBody(CreateTenantSchema), async (c) => {
     const userId = c.get('userId');
     const body = c.get('validatedBody' as never) as CreateTenant;
     const service = createTenantService();
     const tenant = await service.createTenant(userId, body);
 
-    return c.json(tenant, 201);
+    return c.json({ data: tenant }, 201);
   });
 
-  /**
-   * GET /:tenantId — Get tenant details.
-   */
   router.get('/:tenantId', async (c) => {
     const tenantId = c.req.param('tenantId');
     const service = createTenantService();
     const tenant = await service.getTenant(tenantId);
 
-    return c.json(tenant);
+    return c.json({ data: tenant });
   });
 
-  /**
-   * PATCH /:tenantId — Update tenant. Owner/admin only.
-   */
   router.patch('/:tenantId', validateBody(UpdateTenantSchema), async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
-    const body = c.get('validatedBody' as never) as { name?: string; slug?: string };
+    const body = c.get('validatedBody' as never) as { name?: string; description?: string };
     const service = createTenantService();
     const tenant = await service.updateTenant(userId, tenantId, body);
 
-    return c.json(tenant);
+    return c.json({ data: tenant });
   });
 
-  /**
-   * DELETE /:tenantId — Delete tenant. Owner only.
-   */
+  // ─── Tenant Lifecycle ───────────────────────────────────────────────────
+
   router.delete('/:tenantId', async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
@@ -90,56 +69,70 @@ export function createTenantRoutes(): Hono<AppEnv> {
 
     await service.deleteTenant(userId, tenantId);
 
-    return c.json({ success: true as const });
+    return c.json({ data: { success: true } });
   });
 
-  // ─── Member Management ─────────────────────────────────────────────────────
+  router.post('/:tenantId/archive', async (c) => {
+    const userId = c.get('userId');
+    const tenantId = c.req.param('tenantId');
+    const service = createTenantService();
 
-  /**
-   * GET /:tenantId/members — List all members of a tenant.
-   * Accessible to any authenticated tenant member.
-   */
+    await service.archiveTenant(userId, tenantId);
+
+    return c.json({ data: { success: true } });
+  });
+
+  router.post('/:tenantId/restore', async (c) => {
+    const userId = c.get('userId');
+    const tenantId = c.req.param('tenantId');
+    const service = createTenantService();
+
+    await service.restoreTenant(userId, tenantId);
+
+    return c.json({ data: { success: true } });
+  });
+
+  router.post('/:tenantId/cancel-deletion', async (c) => {
+    const userId = c.get('userId');
+    const tenantId = c.req.param('tenantId');
+    const service = createTenantService();
+
+    await service.cancelDeletion(userId, tenantId);
+
+    return c.json({ data: { success: true } });
+  });
+
+  // ─── Member Management ─────────────────────────────────────────────────
+
   router.get('/:tenantId/members', async (c) => {
     const tenantId = c.req.param('tenantId');
     const service = createTenantService();
     const members = await service.getTenantMembers(tenantId);
 
-    return c.json({ data: members, total: members.length });
+    return c.json({ data: members });
   });
 
-  /**
-   * POST /:tenantId/members — Invite a member to the tenant.
-   * Owner/admin only. Body: { email, role }.
-   */
-  router.post('/:tenantId/members', validateBody(InviteMemberSchema), async (c) => {
+  router.post('/:tenantId/members/invite', validateBody(InviteMemberSchema), async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     const body = c.get('validatedBody' as never) as { email: string; role: string };
     const service = createTenantService(c);
-    const member = await service.inviteMember(userId, tenantId, body.email, body.role);
+    const member = await service.inviteUser(userId, tenantId, body.email, body.role);
 
-    return c.json(member, 201);
+    return c.json({ data: member }, 201);
   });
 
-  /**
-   * PATCH /:tenantId/members/:userId — Update a member's role.
-   * Owner/admin only.
-   */
-  router.patch('/:tenantId/members/:memberUserId', async (c) => {
+  router.patch('/:tenantId/members/:memberUserId', validateBody(UpdateMemberRoleSchema), async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     const memberUserId = c.req.param('memberUserId');
-    const body = await c.req.json<{ role: string }>();
+    const body = c.get('validatedBody' as never) as { role: string };
     const service = createTenantService();
     const member = await service.updateMemberRole(userId, tenantId, memberUserId, body.role);
 
-    return c.json(member);
+    return c.json({ data: member });
   });
 
-  /**
-   * DELETE /:tenantId/members/:userId — Remove a member from the tenant.
-   * Owner/admin only. Cannot remove the owner.
-   */
   router.delete('/:tenantId/members/:memberUserId', async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
@@ -148,66 +141,41 @@ export function createTenantRoutes(): Hono<AppEnv> {
 
     await service.removeMember(userId, tenantId, memberUserId);
 
-    return c.json({ success: true as const });
+    return c.json({ data: { success: true } });
   });
 
-  // ─── Pending Invitations & Member Actions ───────────────────────────────────
-
-  /**
-   * GET /:tenantId/invitations/pending — owner/admin view of sent invitations.
-   */
-  router.get('/:tenantId/invitations/pending', async (c) => {
+  router.post('/:tenantId/members/:memberUserId/restore', async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
-    const service = createTenantService(c);
-    const invitations = await service.getPendingInvitationsByTenant(userId, tenantId);
+    const memberUserId = c.req.param('memberUserId');
+    const service = createTenantService();
 
-    return c.json({ data: invitations, total: invitations.length });
+    await service.restoreMembership(userId, tenantId, memberUserId);
+
+    return c.json({ data: { success: true } });
   });
 
-  /**
-   * PATCH /:tenantId/members/:memberId/revoke — revoke a member's access.
-   * Owner/admin only. Sets status to 'access_revoked'.
-   */
-  router.patch('/:tenantId/members/:memberId/revoke', async (c) => {
+  router.post('/:tenantId/members/:memberUserId/reinvite', async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
-    const memberId = c.req.param('memberId');
+    const memberUserId = c.req.param('memberUserId');
     const service = createTenantService(c);
 
-    await service.revokeAccess(userId, tenantId, memberId);
+    await service.reinviteUser(userId, tenantId, memberUserId);
 
-    return c.json({ success: true as const });
+    return c.json({ data: { success: true } });
   });
 
-  /**
-   * PATCH /:tenantId/members/:memberId/resend — resend an invitation.
-   * Owner/admin only. Resets status to 'pending' and sends a new email.
-   */
-  router.patch('/:tenantId/members/:memberId/resend', async (c) => {
-    const userId = c.get('userId');
-    const tenantId = c.req.param('tenantId');
-    const memberId = c.req.param('memberId');
-    const service = createTenantService(c);
+  // ─── User Deletion (admin only) ──────────────────────────────────────────
 
-    await service.resendInvitation(userId, tenantId, memberId);
+  router.delete('/users/:userId', async (c) => {
+    const requesterId = c.get('userId');
+    const userId = c.req.param('userId');
+    const service = createTenantService();
 
-    return c.json({ success: true as const });
-  });
+    await service.deleteUser(requesterId, userId);
 
-  /**
-   * DELETE /:tenantId/members/:memberId/hard — permanently remove a member.
-   * Owner/admin only. Hard-deletes the membership record.
-   */
-  router.delete('/:tenantId/members/:memberId/hard', async (c) => {
-    const userId = c.get('userId');
-    const tenantId = c.req.param('tenantId');
-    const memberId = c.req.param('memberId');
-    const service = createTenantService(c);
-
-    await service.hardDeleteMember(userId, tenantId, memberId);
-
-    return c.json({ success: true as const });
+    return c.json({ data: { success: true } });
   });
 
   return router;

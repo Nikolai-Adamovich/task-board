@@ -8,11 +8,12 @@
  * - startEdit / cancelEdit toggle
  * - saveTask submission
  * - canDelete check
+ * - optimistic concurrency conflict handling
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
 import { TranslocoTestingModule } from '@jsverse/transloco';
@@ -21,22 +22,28 @@ import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { NeutralColor } from '@app/constants/priority';
+import { HttpErrorResponse } from '@angular/common/http';
 import type { Task, User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockTask: Task = {
   id: 'tk000000-0000-0000-0000-000000000001',
-  tenantId: 't0000000-0000-0000-0000-000000000001',
   projectId: 'p0000000-0000-0000-0000-000000000001',
-  boardId: 'b0000000-0000-0000-0000-000000000001',
-  columnId: 'c0000000-0000-0000-0000-000000000001',
-  sprintId: null,
+  number: 1,
+  typeId: 'type1',
   title: 'Test Task',
   description: 'Task description',
-  assigneeIds: [],
-  priority: 'high',
-  position: 0,
-  createdBy: 'u0000000-0000-0000-0000-000000000001',
+  statusId: 's1',
+  priority: 'HIGH',
+  reporterId: 'u1',
+  reporterSnapshot: { displayName: 'Reporter User' },
+  assigneeId: 'u2',
+  assigneeSnapshot: { displayName: 'Assignee User' },
+  sprintId: null,
+  labelIds: ['label1'],
+  createdById: 'u1',
+  createdBySnapshot: { displayName: 'Creator User' },
+  version: 1,
   createdAt: NOW,
   updatedAt: NOW,
 };
@@ -49,18 +56,19 @@ describe('TaskDetail', () => {
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
-  let authStoreMock: { currentUser: ReturnType<typeof vi.fn> };
+  let authStoreMock: { currentUser: ReturnType<typeof vi.fn>; tenantRole: ReturnType<typeof vi.fn> };
 
   function setup(taskOverrides: Partial<Task> = {}) {
     const task = { ...mockTask, ...taskOverrides };
 
     taskClientMock = {
-      getById: vi.fn().mockReturnValue(of(task)),
-      update: vi.fn().mockReturnValue(of({ ...task, title: 'Updated Title' })),
+      getById: vi.fn().mockReturnValue(of({ data: task })),
+      update: vi.fn().mockReturnValue(of({ data: { ...task, title: 'Updated Title', version: 2 } })),
       delete: vi.fn().mockReturnValue(of(undefined)),
     };
     authStoreMock = {
       currentUser: vi.fn().mockReturnValue({ id: 'u1', email: 'a@b.com', displayName: 'Test' } as User),
+      tenantRole: vi.fn().mockReturnValue('OWNER'),
     };
 
     TestBed.configureTestingModule({
@@ -72,6 +80,13 @@ describe('TaskDetail', () => {
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: TaskClient, useValue: taskClientMock },
         { provide: AuthStore, useValue: authStoreMock },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { paramMap: { get: () => 't1' } },
+            parent: { snapshot: { paramMap: { get: () => 't1' } }, parent: null },
+          },
+        },
       ],
     });
 
@@ -110,6 +125,7 @@ describe('TaskDetail', () => {
       };
       authStoreMock = {
         currentUser: vi.fn().mockReturnValue(null),
+        tenantRole: vi.fn().mockReturnValue(null),
       };
       TestBed.configureTestingModule({
         imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
@@ -120,6 +136,13 @@ describe('TaskDetail', () => {
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
           { provide: TaskClient, useValue: taskClientMock },
           { provide: AuthStore, useValue: authStoreMock },
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              snapshot: { paramMap: { get: () => 't1' } },
+              parent: { snapshot: { paramMap: { get: () => 't1' } }, parent: null },
+            },
+          },
         ],
       });
 
@@ -139,24 +162,34 @@ describe('TaskDetail', () => {
   describe('getPriorityColor', () => {
     beforeEach(() => setup());
 
-    it('should return correct color for low', () => {
-      expect(component.getPriorityColor('low')).toBe('bg-blue-100 text-blue-700');
+    it('should return correct color for LOW', () => {
+      expect(component.getPriorityColor('LOW')).toBe('bg-blue-100 text-blue-700');
     });
 
-    it('should return correct color for medium', () => {
-      expect(component.getPriorityColor('medium')).toBe('bg-yellow-100 text-yellow-700');
+    it('should return correct color for MEDIUM', () => {
+      expect(component.getPriorityColor('MEDIUM')).toBe('bg-yellow-100 text-yellow-700');
     });
 
-    it('should return correct color for high', () => {
-      expect(component.getPriorityColor('high')).toBe('bg-orange-100 text-orange-700');
+    it('should return correct color for HIGH', () => {
+      expect(component.getPriorityColor('HIGH')).toBe('bg-orange-100 text-orange-700');
     });
 
-    it('should return correct color for critical', () => {
-      expect(component.getPriorityColor('critical')).toBe('bg-red-100 text-red-700');
+    it('should return correct color for CRITICAL', () => {
+      expect(component.getPriorityColor('CRITICAL')).toBe('bg-red-100 text-red-700');
     });
 
     it('should return fallback color for unknown priority', () => {
       expect(component.getPriorityColor('unknown')).toBe(NeutralColor);
+    });
+  });
+
+  // ── taskLabel ──────────────────────────────────────────
+
+  describe('taskLabel', () => {
+    beforeEach(() => setup());
+
+    it('should return #number', () => {
+      expect(component.taskLabel()).toBe('#1');
     });
   });
 
@@ -171,7 +204,7 @@ describe('TaskDetail', () => {
       expect(component.isEditing()).toBe(true);
       expect(component.model().title).toBe('Test Task');
       expect(component.model().description).toBe('Task description');
-      expect(component.model().priority).toBe('high');
+      expect(component.model().priority).toBe('HIGH');
     });
 
     it('should reset form when cancelEdit is called', () => {
@@ -181,17 +214,17 @@ describe('TaskDetail', () => {
       expect(component.isEditing()).toBe(false);
       expect(component.model().title).toBe('');
       expect(component.model().description).toBe('');
-      expect(component.model().priority).toBe('medium');
+      expect(component.model().priority).toBe('MEDIUM');
     });
 
-    it('should call taskClient.update on saveTask', () => {
+    it('should call taskClient.update with version on saveTask', () => {
       component.startEdit();
       component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
       submit(component.editForm);
 
       expect(taskClientMock.update).toHaveBeenCalledWith(
         mockTask.id,
-        expect.objectContaining({ title: 'Updated Title' }),
+        expect.objectContaining({ title: 'Updated Title', version: 1 }),
       );
     });
 
@@ -225,9 +258,10 @@ describe('TaskDetail', () => {
     it('should return false when user is not authenticated', () => {
       authStoreMock = {
         currentUser: vi.fn().mockReturnValue(null),
+        tenantRole: vi.fn().mockReturnValue(null),
       };
       taskClientMock = {
-        getById: vi.fn().mockReturnValue(of(mockTask)),
+        getById: vi.fn().mockReturnValue(of({ data: mockTask })),
         update: vi.fn(),
         delete: vi.fn(),
       };
@@ -240,6 +274,13 @@ describe('TaskDetail', () => {
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
           { provide: TaskClient, useValue: taskClientMock },
           { provide: AuthStore, useValue: authStoreMock },
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              snapshot: { paramMap: { get: () => 't1' } },
+              parent: { snapshot: { paramMap: { get: () => 't1' } }, parent: null },
+            },
+          },
         ],
       });
 
@@ -250,6 +291,35 @@ describe('TaskDetail', () => {
       fixture.detectChanges();
 
       expect(component.canDelete()).toBe(false);
+    });
+  });
+
+  // ── Optimistic concurrency ────────────────────────────────────
+
+  describe('optimistic concurrency', () => {
+    beforeEach(() => setup());
+
+    it('should show conflict dialog on 409 response', () => {
+      const conflictError = new HttpErrorResponse({
+        status: 409,
+        error: { error: { code: 'TASK_VERSION_CONFLICT', message: 'Version conflict' } },
+      });
+
+      taskClientMock.update.mockReturnValueOnce(throwError(() => conflictError));
+      component.startEdit();
+      component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
+      submit(component.editForm);
+
+      expect(component.showConflictDialog()).toBe(true);
+      expect(component.conflictMessage()).toBe('Version conflict');
+    });
+
+    it('should reload task and close conflict dialog on reloadAfterConflict', () => {
+      component.showConflictDialog.set(true);
+      component.reloadAfterConflict();
+
+      expect(component.showConflictDialog()).toBe(false);
+      expect(component.isEditing()).toBe(false);
     });
   });
 });

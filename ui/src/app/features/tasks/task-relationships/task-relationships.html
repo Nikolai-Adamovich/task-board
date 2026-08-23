@@ -1,0 +1,117 @@
+<hlm-card>
+  <div hlmCardContent>
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-medium text-foreground">{{ 'relationships.title' | transloco }}</h3>
+      <button hlmBtn variant="outline" size="sm" (click)="showCreateForm.set(!showCreateForm())">
+        {{ 'relationships.add' | transloco }}
+      </button>
+    </div>
+
+    @if (loading()) {
+      <div class="flex items-center justify-center py-6">
+        <hlm-spinner />
+        <span class="ml-2 text-sm text-muted-foreground">{{ 'relationships.loading' | transloco }}</span>
+      </div>
+    } @else if (error()) {
+      <div class="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+        {{ error() | transloco }}
+      </div>
+    } @else {
+      <!-- Create form -->
+      @if (showCreateForm()) {
+        <div class="mb-4 space-y-3 rounded-md border p-3">
+          <hlm-field>
+            <label hlmFieldLabel for="target-task-id">{{ 'relationships.targetTask' | transloco }}</label>
+            <input
+              hlmInput
+              id="target-task-id"
+              type="text"
+              [placeholder]="'relationships.targetTaskPlaceholder' | transloco"
+              [value]="targetTaskId()"
+              (input)="onTargetTaskIdInput($event)"
+            />
+          </hlm-field>
+          <hlm-field>
+            <label hlmFieldLabel for="rel-type">{{ 'relationships.type' | transloco }}</label>
+            <hlm-select [value]="relationshipType()" (valueChange)="relationshipType.set($any($event))">
+              <hlm-select-trigger class="w-full" size="sm">
+                <hlm-select-value />
+              </hlm-select-trigger>
+              <hlm-select-content *hlmSelectPortal>
+                <hlm-select-group>
+                  @for (type of relationshipTypes; track type) {
+                    <hlm-select-item [value]="type">{{ type }}</hlm-select-item>
+                  }
+                </hlm-select-group>
+              </hlm-select-content>
+            </hlm-select>
+          </hlm-field>
+          <div class="flex gap-2">
+            <button hlmBtn size="sm" (click)="createRelationship()" [disabled]="!targetTaskId().trim() || creating()">
+              @if (creating()) {
+                <hlm-spinner class="mr-1" /> {{ 'relationships.creating' | transloco }}
+              } @else {
+                {{ 'relationships.create' | transloco }}
+              }
+            </button>
+            <button hlmBtn variant="outline" size="sm" (click)="showCreateForm.set(false)">
+              {{ 'relationships.cancel' | transloco }}
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Relationship list -->
+      <div class="space-y-2">
+        @for (rel of relationships(); track rel.id) {
+          <div class="flex items-center justify-between rounded-md border p-2">
+            <div class="flex items-center gap-2">
+              <span
+                hlmBadge
+                [class]="
+                  isBlocks(rel) ? 'bg-red-100 text-red-800 border-red-300' : 'bg-blue-100 text-blue-800 border-blue-300'
+                "
+                variant="outline"
+                class="text-xs"
+              >
+                {{ rel.type }}
+              </span>
+              <span class="text-sm text-muted-foreground">
+                @if (isSource(rel)) {
+                  → {{ otherTaskId(rel) }}
+                } @else {
+                  ← {{ otherTaskId(rel) }}
+                }
+              </span>
+            </div>
+            <button hlmBtn variant="ghost" size="sm" class="h-6 px-2 text-xs text-red-600" (click)="confirmDelete(rel)">
+              {{ 'relationships.delete' | transloco }}
+            </button>
+          </div>
+        } @empty {
+          <p class="text-sm text-muted-foreground italic">{{ 'relationships.noRelationships' | transloco }}</p>
+        }
+      </div>
+    }
+  </div>
+</hlm-card>
+
+<!-- Delete Confirmation Dialog -->
+<hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
+  <hlm-dialog-content *hlmDialogPortal>
+    <div class="space-y-4">
+      <h3 hlmDialogTitle>{{ 'relationships.deleteTitle' | transloco }}</h3>
+      <p class="text-sm text-muted-foreground">
+        {{ 'relationships.deleteConfirm' | transloco }}
+      </p>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">
+          {{ 'relationships.cancelDelete' | transloco }}
+        </button>
+        <button hlmBtn variant="destructive" (click)="deleteRelationship()">
+          {{ 'relationships.confirmDelete' | transloco }}
+        </button>
+      </hlm-dialog-footer>
+    </div>
+  </hlm-dialog-content>
+</hlm-dialog>

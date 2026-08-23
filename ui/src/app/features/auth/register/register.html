@@ -58,6 +58,21 @@
               <p hlm-field-error>{{ registerForm.password().errors()[0].message | transloco }}</p>
             }
           </hlm-field>
+
+          <hlm-field>
+            <label hlmFieldLabel for="confirmPassword">{{ 'auth.register.confirmPassword' | transloco }}</label>
+            <input
+              hlmInput
+              id="confirmPassword"
+              type="password"
+              [formField]="registerForm.confirmPassword"
+              autocomplete="new-password"
+              placeholder="••••••••"
+            />
+            @if (registerForm.confirmPassword().touched() && registerForm.confirmPassword().errors().length) {
+              <p hlm-field-error>{{ registerForm.confirmPassword().errors()[0].message | transloco }}</p>
+            }
+          </hlm-field>
         </hlm-field-group>
       </form>
     </div>

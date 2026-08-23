@@ -19,17 +19,18 @@ import { TenantStore } from '@stores/tenant-store';
 import { TenantClient } from '@services/tenant-client';
 import { TaskClient } from '@services/task-client';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { TenantWithRole, User } from '@task-board/shared';
+import type { User } from '@task-board/shared';
+import type { TenantWithRole } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockTenants: TenantWithRole[] = [
   {
     id: 't1',
     name: 'Acme',
-    slug: 'acme',
     description: null,
-    subscription: 'free',
-    role: 'owner',
+    status: 'ACTIVE',
+    deletionScheduledAt: null,
+    role: 'OWNER',
     createdAt: NOW,
     updatedAt: NOW,
   },
@@ -124,8 +125,8 @@ describe('Dashboard', () => {
       expect(component.loading()).toBe(false);
     });
 
-    it('dashboardState should be owner for owner role', () => {
-      expect(component.dashboardState()).toBe('owner');
+    it('dashboardState should be OWNER for owner role', () => {
+      expect(component.dashboardState()).toBe('OWNER');
     });
   });
 

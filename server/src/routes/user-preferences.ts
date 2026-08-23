@@ -1,89 +1,126 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
-import { UserPreferencesRepository } from '../repositories/user-preferences.repository.js';
-import type { UserPreferencesDocument } from '../repositories/user-preferences.repository.js';
+import { validateBody } from '../middleware/validation.js';
 import { UserPreferencesService } from '../services/user-preferences.service.js';
+import { UserPreferencesRepository } from '../repositories/user-preferences.repository.js';
+import { BoardRepository } from '../repositories/board.repository.js';
 import { getCollection } from '../db/mongo.js';
-import { UpdateUserPreferencesSchema } from '../schemas/user-preferences.js';
+import type { UserPreferencesDocument } from '../repositories/user-preferences.repository.js';
+import type { BoardDocument } from '../repositories/board.repository.js';
+import { UpdateUserProjectBoardPreferenceSchema } from '../schemas/user-preferences.js';
 
-// ─── User Preferences Routes ─────────────────────────────────────────────────
+// ─── User-Level Settings Document ────────────────────────────────────────────
 
-/**
- * Creates and returns the user-preferences Hono router.
- *
- * Mount under `/api/v1/users` so that the full paths become:
- *   GET  /api/v1/users/:id/preferences
- *   PUT  /api/v1/users/:id/preferences
- *
- * Both routes require authentication and enforce own-user access only.
- */
+interface UserSettingsDocument {
+  _id?: import('mongodb').ObjectId;
+  userId: string;
+  zoom: number;
+  theme: string;
+  language: string;
+  pageSize: number;
+  updatedAt: Date;
+}
+
 export function createUserPreferencesRoutes(): Hono<AppEnv> {
   const router = new Hono<AppEnv>();
 
+  // ── User-level preferences (no tenant context needed) ─────────────────────
+
   /**
-   * GET /:id/preferences — Retrieve the authenticated user's preferences.
-   * Returns 403 if the requested id does not match the authenticated user.
+   * GET /preferences — Get current user's global preferences (zoom, theme, language).
    */
-  router.get('/:id/preferences', async (c) => {
+  router.get('/preferences', async (c) => {
     const userId = c.get('userId');
-    const targetId = c.req.param('id');
+    const collection = getCollection<UserSettingsDocument>('user_settings');
+    const doc = await collection.findOne({ userId });
+    const prefs = doc
+      ? {
+          userId: doc.userId,
+          zoom: doc.zoom,
+          theme: doc.theme,
+          language: doc.language,
+          pageSize: doc.pageSize ?? 10,
+          updatedAt: doc.updatedAt.toISOString(),
+        }
+      : { userId, zoom: 100, theme: 'light', language: 'en', pageSize: 20, updatedAt: new Date().toISOString() };
 
-    if (userId !== targetId) {
-      return c.json({ error: 'Forbidden', message: 'You can only access your own preferences' }, 403);
-    }
-
-    const service = createPreferencesService();
-    const preferences = await service.getPreferences(userId);
-
-    return c.json(preferences);
+    return c.json({ data: prefs });
   });
 
   /**
-   * PUT /:id/preferences — Upsert the authenticated user's preferences.
-   * Validates the request body against `UpdateUserPreferencesSchema`.
-   * Returns 400 if validation fails, 403 if the id doesn't match.
+   * PUT /preferences — Update current user's global preferences.
    */
-  router.put('/:id/preferences', async (c) => {
+  router.put('/preferences', async (c) => {
     const userId = c.get('userId');
-    const targetId = c.req.param('id');
+    const body = await c.req.json<{ zoom?: number; theme?: string; language?: string; pageSize?: number }>();
+    const collection = getCollection<UserSettingsDocument>('user_settings');
+    const now = new Date();
+    const $set: Record<string, unknown> = { updatedAt: now };
 
-    if (userId !== targetId) {
-      return c.json({ error: 'Forbidden', message: 'You can only update your own preferences' }, 403);
-    }
+    if (body.zoom !== undefined) $set.zoom = body.zoom;
+    if (body.theme !== undefined) $set.theme = body.theme;
+    if (body.language !== undefined) $set.language = body.language;
+    if (body.pageSize !== undefined) $set.pageSize = body.pageSize;
 
-    let body: unknown;
+    // $setOnInsert must not contain keys that also appear in $set —
+    // MongoDB rejects that with "Updating the path … would create a conflict".
+    const $setOnInsert: Record<string, unknown> = { userId };
 
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: 'Bad Request', message: 'Invalid JSON in request body' }, 400);
-    }
+    if (body.zoom === undefined) $setOnInsert.zoom = 100;
+    if (body.theme === undefined) $setOnInsert.theme = 'light';
+    if (body.language === undefined) $setOnInsert.language = 'en';
+    if (body.pageSize === undefined) $setOnInsert.pageSize = 10;
 
-    const parsed = UpdateUserPreferencesSchema.safeParse(body);
+    await collection.updateOne({ userId }, { $set, $setOnInsert }, { upsert: true });
 
-    if (!parsed.success) {
-      const details = parsed.error.issues.map((issue) => ({
-        path: issue.path.join('.'),
-        message: issue.message,
-        code: issue.code,
-      }));
+    const doc = await collection.findOne({ userId });
+    const prefs = doc
+      ? {
+          userId: doc.userId,
+          zoom: doc.zoom,
+          theme: doc.theme,
+          language: doc.language,
+          pageSize: doc.pageSize ?? 10,
+          updatedAt: doc.updatedAt.toISOString(),
+        }
+      : { userId, zoom: 100, theme: 'light', language: 'en', pageSize: 10, updatedAt: now.toISOString() };
 
-      return c.json({ error: 'Bad Request', message: 'Validation failed', details }, 400);
-    }
+    return c.json({ data: prefs });
+  });
 
+  // ── Project-scoped preferences (requires tenant context) ──────────────────
+
+  /**
+   * GET /projects/:projectId/preferences — Get user's project preferences.
+   */
+  router.get('/projects/:projectId/preferences', async (c) => {
+    const projectId = c.req.param('projectId');
+    const userId = c.get('userId');
     const service = createPreferencesService();
-    const preferences = await service.updatePreferences(userId, parsed.data);
+    const prefs = await service.getPreferences(userId, projectId);
 
-    return c.json(preferences);
+    return c.json({ data: prefs });
+  });
+
+  /**
+   * PATCH /projects/:projectId/preferences — Update user's project preferences.
+   */
+  router.patch('/projects/:projectId/preferences', validateBody(UpdateUserProjectBoardPreferenceSchema), async (c) => {
+    const projectId = c.req.param('projectId');
+    const userId = c.get('userId');
+    const body = c.get('validatedBody' as never) as { defaultBoardId: string | null };
+    const service = createPreferencesService();
+    const prefs = await service.updatePreferences(userId, projectId, body);
+
+    return c.json({ data: prefs });
   });
 
   return router;
 }
 
-// ─── Factory Helper ──────────────────────────────────────────────────────────
-
 function createPreferencesService(): UserPreferencesService {
-  const repo = new UserPreferencesRepository(getCollection<UserPreferencesDocument>('user_preferences'));
+  const prefsRepo = new UserPreferencesRepository(getCollection<UserPreferencesDocument>('user_preferences'));
+  const boardRepo = new BoardRepository(getCollection<BoardDocument>('boards')) as never;
 
-  return new UserPreferencesService(repo);
+  return new UserPreferencesService(prefsRepo, boardRepo);
 }

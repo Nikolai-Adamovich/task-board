@@ -1,0 +1,280 @@
+<div class="mx-auto max-w-3xl">
+  <!-- Page header -->
+  <div class="mb-6 flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-foreground">{{ 'projectMembers.title' | transloco }}</h2>
+    @if (isAdmin()) {
+      <button hlmBtn (click)="showAddMember.set(true)">
+        <ng-icon name="lucideUserPlus" class="mr-1" />
+        {{ 'projectMembers.addMember' | transloco }}
+      </button>
+    }
+  </div>
+
+  <div hlmTableContainer>
+    <table hlmTable>
+      <thead hlmTableHeader>
+        <tr hlmTableRow>
+          <!-- Name — sort + text filter -->
+          <th hlmTableHead>
+            <div class="flex items-center gap-1">
+              <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort('displayName')">
+                <span>{{ 'projectMembers.name' | transloco }}</span>
+                <span class="inline-flex h-3 w-3 shrink-0">
+                  @if (sortField() === 'displayName') {
+                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="h-3 w-3" />
+                  }
+                </span>
+              </button>
+              <hlm-popover sideOffset="4">
+                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                  <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="filterName()" />
+                </button>
+                <hlm-popover-content *hlmPopoverPortal class="w-56">
+                  <div class="space-y-2">
+                    <span class="text-xs font-medium">{{ 'projectMembers.name' | transloco }}</span>
+                    <input
+                      hlmInput
+                      type="text"
+                      class="h-8 w-full"
+                      [value]="filterName()"
+                      (input)="onColumnFilterChange('name', $any($event.target).value)"
+                      placeholder="Filter by name..."
+                    />
+                  </div>
+                </hlm-popover-content>
+              </hlm-popover>
+            </div>
+          </th>
+          <!-- Email — sort + text filter -->
+          <th hlmTableHead>
+            <div class="flex items-center gap-1">
+              <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort('email')">
+                <span>{{ 'projectMembers.email' | transloco }}</span>
+                <span class="inline-flex h-3 w-3 shrink-0">
+                  @if (sortField() === 'email') {
+                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="h-3 w-3" />
+                  }
+                </span>
+              </button>
+              <hlm-popover sideOffset="4">
+                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                  <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="filterEmail()" />
+                </button>
+                <hlm-popover-content *hlmPopoverPortal class="w-56">
+                  <div class="space-y-2">
+                    <span class="text-xs font-medium">{{ 'projectMembers.email' | transloco }}</span>
+                    <input
+                      hlmInput
+                      type="text"
+                      class="h-8 w-full"
+                      [value]="filterEmail()"
+                      (input)="onColumnFilterChange('email', $any($event.target).value)"
+                      placeholder="Filter by email..."
+                    />
+                  </div>
+                </hlm-popover-content>
+              </hlm-popover>
+            </div>
+          </th>
+          <!-- Role — sort + select filter -->
+          <th hlmTableHead>
+            <div class="flex items-center gap-1">
+              <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort('role')">
+                <span>{{ 'projectMembers.role' | transloco }}</span>
+                <span class="inline-flex h-3 w-3 shrink-0">
+                  @if (sortField() === 'role') {
+                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="h-3 w-3" />
+                  }
+                </span>
+              </button>
+              <hlm-popover sideOffset="4">
+                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                  <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="filterRole()" />
+                </button>
+                <hlm-popover-content *hlmPopoverPortal class="w-48">
+                  <div class="space-y-2">
+                    <span class="text-xs font-medium">{{ 'projectMembers.role' | transloco }}</span>
+                    <hlm-select [value]="filterRole()" (valueChange)="onColumnFilterChange('role', $any($event))">
+                      <hlm-select-trigger class="w-full" size="sm">
+                        <hlm-select-value placeholder="All Roles" />
+                      </hlm-select-trigger>
+                      <hlm-select-content *hlmSelectPortal>
+                        <hlm-select-group>
+                          <hlm-select-item value="">All Roles</hlm-select-item>
+                          @for (role of projectRoles; track role) {
+                            <hlm-select-item [value]="role">{{ role }}</hlm-select-item>
+                          }
+                        </hlm-select-group>
+                      </hlm-select-content>
+                    </hlm-select>
+                  </div>
+                </hlm-popover-content>
+              </hlm-popover>
+            </div>
+          </th>
+          @if (isAdmin()) {
+            <th hlmTableHead class="text-right">{{ 'projectMembers.actions' | transloco }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody hlmTableBody>
+        @for (member of paginatedMembers(); track member.userId) {
+          <tr hlmTableRow>
+            <td hlmTableCell>
+              <div class="flex items-center gap-3">
+                <hlm-avatar class="h-8 w-8">
+                  <div hlmAvatarFallback class="text-xs font-medium">
+                    {{ (member.displayName ?? '??').substring(0, 2).toUpperCase() }}
+                  </div>
+                </hlm-avatar>
+                <span class="text-sm font-medium text-foreground">
+                  {{ member.displayName ?? 'Unknown' }}
+                </span>
+              </div>
+            </td>
+            <td hlmTableCell>
+              <span class="text-sm text-muted-foreground">
+                {{ member.email ?? '—' }}
+              </span>
+            </td>
+            <td hlmTableCell>
+              @if (isAdmin()) {
+                <div class="flex items-center gap-2">
+                  <hlm-native-select
+                    [value]="getEffectiveRole(member)"
+                    (valueChange)="onRoleSelect(member, $event)"
+                    class="h-8 w-32 text-xs"
+                  >
+                    @for (role of projectRoles; track role) {
+                      <option [value]="role">{{ role }}</option>
+                    }
+                  </hlm-native-select>
+
+                  @if (hasPendingChange(member)) {
+                    <button
+                      hlmBtn
+                      variant="default"
+                      size="sm"
+                      class="h-8"
+                      (click)="saveRole(member)"
+                      [disabled]="savingUserId() === member.userId"
+                    >
+                      @if (savingUserId() === member.userId) {
+                        <hlm-spinner class="mr-1 h-3 w-3" />
+                      } @else {
+                        <ng-icon name="lucideSave" class="mr-1 h-3 w-3" />
+                      }
+                      {{ 'projectMembers.save' | transloco }}
+                    </button>
+                  }
+                </div>
+              } @else {
+                <span hlmBadge variant="secondary">{{ member.role }}</span>
+              }
+            </td>
+            @if (isAdmin()) {
+              <td hlmTableCell class="text-right">
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8 text-destructive hover:text-destructive"
+                  (click)="confirmRemoveMember(member)"
+                  [attr.aria-label]="'projectMembers.removeMember' | transloco"
+                >
+                  <ng-icon name="lucideTrash2" />
+                </button>
+              </td>
+            }
+          </tr>
+        } @empty {
+          <tr hlmTableRow>
+            <td hlmTableCell [attr.colspan]="3 + (isAdmin() ? 1 : 0)" class="py-12 text-center">
+              <p class="text-sm text-muted-foreground">{{ 'projectMembers.noMembers' | transloco }}</p>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <ui-pagination
+    [page]="page()"
+    [totalPages]="totalPages()"
+    [pageSize]="pageSize()"
+    [total]="total()"
+    (pageChange)="onPageChange($event)"
+    (pageSizeChange)="onPageSizeChange($event)"
+  />
+
+  <!-- Add Member Modal -->
+  <hlm-dialog [state]="showAddMember() ? 'open' : 'closed'" (stateChanged)="onAddMemberDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'projectMembers.addMemberTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+
+      @if (error()) {
+        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ error() | transloco }}
+        </div>
+      }
+
+      <form id="add-member-form" [formRoot]="addMemberForm" class="space-y-4">
+        <hlm-field>
+          <label hlmFieldLabel for="member-userid">{{ 'projectMembers.userId' | transloco }}</label>
+          <input
+            hlmInput
+            id="member-userid"
+            type="text"
+            [formField]="addMemberForm.userId"
+            [placeholder]="'projectMembers.userIdPlaceholder' | transloco"
+          />
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="member-role">{{ 'projectMembers.role' | transloco }}</label>
+          <hlm-native-select id="member-role" [formField]="addMemberForm.role">
+            @for (role of projectRoles; track role) {
+              <option hlmNativeSelectOption [value]="role">{{ role }}</option>
+            }
+          </hlm-native-select>
+        </hlm-field>
+      </form>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'projectMembers.cancel' | transloco }}</button>
+        <button
+          hlmBtn
+          type="submit"
+          form="add-member-form"
+          [disabled]="addMemberForm().invalid() || addMemberForm().submitting()"
+        >
+          @if (addMemberForm().submitting()) {
+            <hlm-spinner /> {{ 'projectMembers.adding' | transloco }}
+          } @else {
+            <ng-icon name="lucideUserPlus" class="mr-1" />
+            {{ 'projectMembers.addMemberButton' | transloco }}
+          }
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- Remove Member Confirmation Modal -->
+  <hlm-dialog [state]="showRemoveConfirm() ? 'open' : 'closed'" (stateChanged)="onRemoveDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal>
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'projectMembers.removeMemberTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+      <p class="text-sm text-muted-foreground">
+        {{ 'projectMembers.removeConfirm' | transloco }}
+      </p>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'projectMembers.cancel' | transloco }}</button>
+        <button hlmBtn variant="destructive" (click)="removeMember()">
+          <ng-icon name="lucideTrash2" class="mr-1" />
+          {{ 'projectMembers.removeButton' | transloco }}
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</div>

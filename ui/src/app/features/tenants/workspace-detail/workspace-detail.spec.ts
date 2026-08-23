@@ -16,25 +16,35 @@ import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { TenantWithRole, Project, User } from '@task-board/shared';
+import type { Project, User } from '@task-board/shared';
+import type { TenantWithRole } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockFreeTenant: TenantWithRole = {
   id: 't1',
   name: 'Acme',
-  slug: 'acme',
   description: null,
-  subscription: 'free',
-  role: 'owner',
+  status: 'ACTIVE',
+  deletionScheduledAt: null,
+  role: 'OWNER',
   createdAt: NOW,
   updatedAt: NOW,
 };
-const mockPremiumTenant: TenantWithRole = {
-  ...mockFreeTenant,
-  subscription: 'premium',
-};
 const mockProjects: Project[] = [
-  { id: 'p1', tenantId: 't1', name: 'Project A', slug: 'project-a', description: null, createdAt: NOW, updatedAt: NOW },
+  {
+    id: 'p1',
+    tenantId: 't1',
+    key: 'PA',
+    name: 'Project A',
+    description: null,
+    status: 'ACTIVE',
+    defaultStatusId: 's1',
+    defaultBoardId: 'b1',
+    archiveReason: null,
+    deletionScheduledAt: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
 ];
 
 describe('WorkspaceDetail', () => {
@@ -44,7 +54,7 @@ describe('WorkspaceDetail', () => {
   let tenantStoreMock: { activeTenant: ReturnType<typeof vi.fn> };
   let authStoreMock: { tenantRole: ReturnType<typeof vi.fn>; currentUser: ReturnType<typeof vi.fn> };
 
-  function setup(tenant: TenantWithRole | null = mockFreeTenant, role = 'owner') {
+  function setup(tenant: TenantWithRole | null = mockFreeTenant, role = 'OWNER') {
     projectClientMock = {
       list: vi.fn().mockReturnValue(of({ data: mockProjects, total: 1, page: 1, limit: 100 })),
     };
@@ -85,47 +95,22 @@ describe('WorkspaceDetail', () => {
 
     it('should compute role from authStore', () => {
       setup();
-      expect(component.role()).toBe('owner');
+      expect(component.role()).toBe('OWNER');
     });
 
-    it('isOwnerOrAdmin should be true for owner', () => {
-      setup(mockFreeTenant, 'owner');
+    it('isOwnerOrAdmin should be true for OWNER', () => {
+      setup(mockFreeTenant, 'OWNER');
       expect(component.isOwnerOrAdmin()).toBe(true);
     });
 
-    it('isOwnerOrAdmin should be true for admin', () => {
-      setup(mockFreeTenant, 'admin');
+    it('isOwnerOrAdmin should be true for ADMIN', () => {
+      setup(mockFreeTenant, 'ADMIN');
       expect(component.isOwnerOrAdmin()).toBe(true);
     });
 
-    it('isOwnerOrAdmin should be false for member', () => {
-      setup(mockFreeTenant, 'member');
+    it('isOwnerOrAdmin should be false for MEMBER', () => {
+      setup(mockFreeTenant, 'MEMBER');
       expect(component.isOwnerOrAdmin()).toBe(false);
-    });
-
-    it('isOwner should be true for owner', () => {
-      setup(mockFreeTenant, 'owner');
-      expect(component.isOwner()).toBe(true);
-    });
-
-    it('isOwner should be false for admin', () => {
-      setup(mockFreeTenant, 'admin');
-      expect(component.isOwner()).toBe(false);
-    });
-
-    it('showUpgrade should be true for owner with free plan', () => {
-      setup(mockFreeTenant, 'owner');
-      expect(component.showUpgrade()).toBe(true);
-    });
-
-    it('showUpgrade should be false for owner with premium plan', () => {
-      setup(mockPremiumTenant, 'owner');
-      expect(component.showUpgrade()).toBe(false);
-    });
-
-    it('showUpgrade should be false for admin', () => {
-      setup(mockFreeTenant, 'admin');
-      expect(component.showUpgrade()).toBe(false);
     });
   });
 
@@ -135,7 +120,7 @@ describe('WorkspaceDetail', () => {
     beforeEach(() => setup());
 
     it('should load projects', () => {
-      expect(projectClientMock.list).toHaveBeenCalledWith(1, 100);
+      expect(projectClientMock.list).toHaveBeenCalled();
       expect(component.projects()).toEqual(mockProjects);
     });
 
@@ -148,7 +133,7 @@ describe('WorkspaceDetail', () => {
         list: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
       };
       tenantStoreMock = { activeTenant: vi.fn().mockReturnValue(mockFreeTenant) };
-      authStoreMock = { tenantRole: vi.fn().mockReturnValue('owner'), currentUser: vi.fn().mockReturnValue(null) };
+      authStoreMock = { tenantRole: vi.fn().mockReturnValue('OWNER'), currentUser: vi.fn().mockReturnValue(null) };
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({

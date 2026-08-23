@@ -1,32 +1,32 @@
 import { z } from 'zod';
-import { ProjectRoleValues } from '@task-board/shared';
-import {
-  uuid,
-  slug,
-  nonEmptyString,
-  optionalString,
-  nullableOptionalString,
-  isoDateTime,
-} from '../validators/common.js';
+import { ProjectRoleValues, ProjectStatusValues } from '@task-board/shared';
+import { uuid, nonEmptyString, optionalString, nullableOptionalString, isoDateTime } from '../validators/common.js';
+
+/**
+ * Project key validation: 2-10 chars, starts with letter, uppercase + digits only.
+ */
+const projectKey = () =>
+  z
+    .string()
+    .min(2, 'Key must be at least 2 characters')
+    .max(10, 'Key must be at most 10 characters')
+    .regex(/^[A-Z][A-Z0-9]*$/, 'Key must start with a letter and contain only uppercase letters and digits');
 
 /**
  * Project entity schema.
- * A project belongs to a tenant and contains boards and tasks.
  */
 export const ProjectSchema = z.object({
-  /** Unique project identifier (UUID v4) */
   id: uuid(),
-  /** Owning tenant ID */
   tenantId: uuid(),
-  /** Project name */
-  name: nonEmptyString(100, 'Project name'),
-  /** URL-friendly slug for the project */
-  slug: slug(),
-  /** Optional project description */
-  description: nullableOptionalString(500),
-  /** Creation timestamp (ISO 8601) */
+  key: projectKey(),
+  name: nonEmptyString(200, 'Project name'),
+  description: nullableOptionalString(2000),
+  status: z.enum(ProjectStatusValues),
+  defaultStatusId: z.string(),
+  defaultBoardId: z.string(),
+  archiveReason: z.string().nullable(),
+  deletionScheduledAt: z.iso.datetime().nullable(),
   createdAt: isoDateTime(),
-  /** Last update timestamp (ISO 8601) */
   updatedAt: isoDateTime(),
 });
 
@@ -34,32 +34,43 @@ export const ProjectSchema = z.object({
  * Schema for creating a new project.
  */
 export const CreateProjectSchema = z.object({
-  name: nonEmptyString(100, 'Project name'),
-  slug: slug(),
-  description: optionalString(500),
+  key: projectKey(),
+  name: nonEmptyString(200, 'Project name'),
+  description: optionalString(2000),
 });
 
 /**
  * Schema for updating an existing project.
- * All fields are optional (partial update).
+ * Key cannot be changed after creation.
  */
 export const UpdateProjectSchema = z.object({
-  name: nonEmptyString(100, 'Project name').optional(),
-  slug: slug().optional(),
-  description: optionalString(500),
+  name: nonEmptyString(200, 'Project name').optional(),
+  description: optionalString(2000),
+});
+
+/**
+ * Schema for adding a project member.
+ */
+export const AddProjectMemberSchema = z.object({
+  userId: uuid(),
+  role: z.enum(ProjectRoleValues),
+});
+
+/**
+ * Schema for updating a project member's role.
+ */
+export const UpdateProjectMemberSchema = z.object({
+  role: z.enum(ProjectRoleValues),
 });
 
 /**
  * Project membership schema.
- * Represents a user's membership in a project with a specific role.
  */
 export const ProjectMemberSchema = z.object({
-  /** User ID of the member */
-  userId: uuid(),
-  /** Project ID */
+  id: uuid(),
   projectId: uuid(),
-  /** Tenant ID (denormalized for multi-tenant queries) */
-  tenantId: uuid(),
-  /** Role of the user within the project */
+  userId: uuid(),
   role: z.enum(ProjectRoleValues),
+  createdAt: isoDateTime(),
+  updatedAt: isoDateTime(),
 });

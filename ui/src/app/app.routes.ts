@@ -50,19 +50,11 @@ export const routes: Routes = [
           import('./features/tenants/tenant-member-list/tenant-member-list').then((m) => m.TenantMemberList),
       },
       {
-        path: 'upgrade',
-        loadComponent: () => import('./features/tenants/upgrade/upgrade').then((m) => m.Upgrade),
-      },
-      {
         path: 'projects',
         loadComponent: () => import('./features/projects/project-list/project-list').then((m) => m.ProjectList),
       },
       {
-        path: 'sprints',
-        loadComponent: () => import('./features/sprints/sprint-list/sprint-list').then((m) => m.SprintList),
-      },
-      {
-        path: 'projects/:projectId',
+        path: 'projects/:projectKey',
         canActivate: [projectGuard],
         children: [
           {
@@ -75,6 +67,10 @@ export const routes: Routes = [
             loadComponent: () => import('./features/boards/board-view/board-view').then((m) => m.BoardView),
           },
           {
+            path: 'tasks',
+            loadComponent: () => import('./features/tasks/task-table/task-table').then((m) => m.TaskTable),
+          },
+          {
             path: 'tasks/:taskId',
             loadComponent: () => import('./features/tasks/task-detail/task-detail').then((m) => m.TaskDetail),
           },
@@ -85,6 +81,30 @@ export const routes: Routes = [
           {
             path: 'sprints/:sprintId',
             loadComponent: () => import('./features/sprints/sprint-detail/sprint-detail').then((m) => m.SprintDetail),
+          },
+          {
+            path: 'members',
+            loadComponent: () =>
+              import('./features/projects/project-member-list/project-member-list').then((m) => m.ProjectMemberList),
+          },
+          {
+            path: 'settings/statuses',
+            loadComponent: () =>
+              import('./features/statuses/status-manager/status-manager').then((m) => m.StatusManager),
+          },
+          {
+            path: 'settings/task-types',
+            loadComponent: () =>
+              import('./features/task-types/task-type-manager/task-type-manager').then((m) => m.TaskTypeManager),
+          },
+          {
+            path: 'settings/labels',
+            loadComponent: () => import('./features/labels/label-manager/label-manager').then((m) => m.LabelManager),
+          },
+          {
+            path: 'audit',
+            loadComponent: () =>
+              import('./features/audit/audit-log-viewer/audit-log-viewer').then((m) => m.AuditLogViewer),
           },
         ],
       },
@@ -105,14 +125,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/help/support/support').then((m) => m.Support),
   },
 
-  // Settings (authenticated)
+  // Settings (authenticated, no tenant context)
   {
     path: 'settings',
     canActivate: [authGuard],
     loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
   },
 
-  // Wildcard redirect
+  // Fallback
   {
     path: '**',
     redirectTo: '',

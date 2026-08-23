@@ -6,10 +6,14 @@ export interface User {
   email: string;
   /** User's display name */
   displayName: string;
+  /** URL to the user's avatar image (null if not set) */
+  avatarUrl: string | null;
   /** Account creation timestamp (ISO 8601) */
   createdAt: string;
   /** Last update timestamp (ISO 8601) */
   updatedAt: string;
+  /** Soft-deletion timestamp (ISO 8601, null if active) */
+  deletedAt: string | null;
 }
 
 /** Create user request body type */

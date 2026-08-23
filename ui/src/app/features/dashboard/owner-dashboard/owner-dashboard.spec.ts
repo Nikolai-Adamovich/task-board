@@ -14,7 +14,7 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { OwnerDashboard } from './owner-dashboard';
 import { API_BASE_URL } from '@app/api-url.token';
 import { NeutralColor } from '@app/constants/priority';
-import type { MyTask } from '@task-board/shared';
+import type { MyTask } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockTasks: MyTask[] = [
@@ -29,7 +29,7 @@ const mockTasks: MyTask[] = [
     columnTitle: 'In Progress',
     title: 'Task 1',
     description: null,
-    priority: 'high',
+    priority: 'HIGH',
     sprintId: null,
     createdAt: NOW,
     updatedAt: NOW,
@@ -45,7 +45,7 @@ const mockTasks: MyTask[] = [
     columnTitle: 'To Do',
     title: 'Task 2',
     description: null,
-    priority: 'low',
+    priority: 'LOW',
     sprintId: null,
     createdAt: NOW,
     updatedAt: NOW,
@@ -61,7 +61,7 @@ const mockTasks: MyTask[] = [
     columnTitle: 'In Progress',
     title: 'Task 3',
     description: null,
-    priority: 'critical',
+    priority: 'CRITICAL',
     sprintId: null,
     createdAt: NOW,
     updatedAt: NOW,
@@ -97,20 +97,20 @@ describe('OwnerDashboard', () => {
   describe('getPriorityColor', () => {
     beforeEach(() => setup());
 
-    it('should return correct color for critical', () => {
-      expect(component.getPriorityColor('critical')).toBe('bg-red-100 text-red-700');
+    it('should return correct color for CRITICAL', () => {
+      expect(component.getPriorityColor('CRITICAL')).toBe('bg-red-100 text-red-700');
     });
 
-    it('should return correct color for high', () => {
-      expect(component.getPriorityColor('high')).toBe('bg-orange-100 text-orange-700');
+    it('should return correct color for HIGH', () => {
+      expect(component.getPriorityColor('HIGH')).toBe('bg-orange-100 text-orange-700');
     });
 
-    it('should return correct color for medium', () => {
-      expect(component.getPriorityColor('medium')).toBe('bg-yellow-100 text-yellow-700');
+    it('should return correct color for MEDIUM', () => {
+      expect(component.getPriorityColor('MEDIUM')).toBe('bg-yellow-100 text-yellow-700');
     });
 
-    it('should return correct color for low', () => {
-      expect(component.getPriorityColor('low')).toBe('bg-blue-100 text-blue-700');
+    it('should return correct color for LOW', () => {
+      expect(component.getPriorityColor('LOW')).toBe('bg-blue-100 text-blue-700');
     });
 
     it('should return fallback for unknown priority', () => {

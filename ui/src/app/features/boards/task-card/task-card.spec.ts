@@ -3,6 +3,7 @@
  *
  * Covers:
  * - priorityColor helper
+ * - taskLabel helper
  * - onDragStart emitting
  * - taskClick output
  */
@@ -20,17 +21,22 @@ const NOW = '2025-01-01T00:00:00Z';
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: 'tk1',
-    tenantId: 't1',
     projectId: 'p1',
-    boardId: 'b1',
-    columnId: 'c1',
-    sprintId: null,
+    number: 1,
+    typeId: 'type1',
     title: 'Test Task',
     description: null,
-    assigneeIds: [],
-    priority: 'medium',
-    position: 0,
-    createdBy: 'u1',
+    statusId: 's1',
+    priority: 'MEDIUM',
+    reporterId: null,
+    reporterSnapshot: null,
+    assigneeId: null,
+    assigneeSnapshot: null,
+    sprintId: null,
+    labelIds: [],
+    createdById: 'u1',
+    createdBySnapshot: { displayName: 'Test User' },
+    version: 1,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,
@@ -54,6 +60,7 @@ describe('TaskCard', () => {
     const fixture = TestBed.createComponent(TaskCard);
 
     fixture.componentRef.setInput('task', makeTask(taskOverrides));
+    fixture.componentRef.setInput('projectKey', 'PROJ');
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -62,29 +69,59 @@ describe('TaskCard', () => {
   // ── priorityColor ──────────────────────────────────────────────────────
 
   describe('priorityColor', () => {
-    it('should return correct color for low', () => {
-      setup({ priority: 'low' });
+    it('should return correct color for LOW', () => {
+      setup({ priority: 'LOW' });
       expect(component.priorityColor()).toBe('bg-blue-100 text-blue-700');
     });
 
-    it('should return correct color for medium', () => {
-      setup({ priority: 'medium' });
+    it('should return correct color for MEDIUM', () => {
+      setup({ priority: 'MEDIUM' });
       expect(component.priorityColor()).toBe('bg-yellow-100 text-yellow-700');
     });
 
-    it('should return correct color for high', () => {
-      setup({ priority: 'high' });
+    it('should return correct color for HIGH', () => {
+      setup({ priority: 'HIGH' });
       expect(component.priorityColor()).toBe('bg-orange-100 text-orange-700');
     });
 
-    it('should return correct color for critical', () => {
-      setup({ priority: 'critical' });
+    it('should return correct color for CRITICAL', () => {
+      setup({ priority: 'CRITICAL' });
       expect(component.priorityColor()).toBe('bg-red-100 text-red-700');
     });
 
     it('should return fallback for unknown priority', () => {
       setup({ priority: 'unknown' as Task['priority'] });
       expect(component.priorityColor()).toBe(NeutralColor);
+    });
+  });
+
+  // ── taskLabel ──────────────────────────────────────────────────────────
+
+  describe('taskLabel', () => {
+    it('should return project key + number when projectKey is set', () => {
+      setup({ number: 42 });
+      expect(component.taskLabel()).toBe('PROJ-42');
+    });
+
+    it('should return #number when projectKey is empty', () => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideRouter([]),
+          { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        ],
+      });
+
+      const fixture = TestBed.createComponent(TaskCard);
+
+      fixture.componentRef.setInput('task', makeTask({ number: 7 }));
+      fixture.componentRef.setInput('projectKey', '');
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      expect(component.taskLabel()).toBe('#7');
     });
   });
 

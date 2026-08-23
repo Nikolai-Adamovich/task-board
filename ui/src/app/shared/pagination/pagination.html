@@ -1,0 +1,10 @@
+<div class="flex justify-end">
+  <hlm-numbered-pagination
+    [currentPage]="page()"
+    [totalItems]="total()"
+    [itemsPerPage]="pageSize()"
+    [pageSizes]="[10, 20, 30, 50, 70, 100]"
+    (currentPageChange)="onCurrentPageChange($event)"
+    (itemsPerPageChange)="onItemsPerPageChange($event)"
+  />
+</div>

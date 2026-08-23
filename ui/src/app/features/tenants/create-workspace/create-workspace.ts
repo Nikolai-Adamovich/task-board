@@ -2,29 +2,20 @@ import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { SubscriptionTier, TenantRole } from '@task-board/shared';
-import { form, FormField, FormRoot, schema, required, minLength, maxLength } from '@angular/forms/signals';
+import { TenantRole } from '@task-board/shared';
+import { form, FormField, FormRoot, schema, required, maxLength } from '@angular/forms/signals';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
+import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 
 interface WorkspaceModel {
   name: string;
-  slug: string;
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  description: string;
 }
 
 @Component({
@@ -35,6 +26,7 @@ function slugify(value: string): string {
     HlmCardImports,
     HlmFieldImports,
     HlmInputImports,
+    HlmTextareaImports,
     HlmButtonImports,
     HlmSpinnerImports,
   ],
@@ -46,15 +38,12 @@ export class CreateWorkspace {
   private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   protected readonly error = signal('');
-  private readonly model = signal<WorkspaceModel>({ name: '', slug: '' });
+  private readonly model = signal<WorkspaceModel>({ name: '', description: '' });
   protected readonly workspaceForm = form(
     this.model,
     schema<WorkspaceModel>((field) => {
       required(field.name, { message: 'validation.workspaceNameRequired' });
       maxLength(field.name, 100, { message: 'validation.nameMax' });
-      required(field.slug, { message: 'validation.slugRequired' });
-      minLength(field.slug, 2, { message: 'validation.slugMin' });
-      maxLength(field.slug, 80, { message: 'validation.slugMax' });
     }),
     {
       submission: {
@@ -64,11 +53,10 @@ export class CreateWorkspace {
           try {
             const tenant = await this.tenantStore.createTenant({
               name: this.model().name,
-              slug: this.model().slug,
-              subscription: SubscriptionTier.Free,
+              description: this.model().description || undefined,
             });
 
-            this.authStore.setTenantContext(tenant.id, TenantRole.Owner);
+            this.authStore.setTenantContext(tenant.id, TenantRole.OWNER);
 
             await this.router.navigateByUrl('/');
           } catch (err) {
@@ -82,10 +70,4 @@ export class CreateWorkspace {
       },
     },
   );
-
-  protected onNameChange(): void {
-    const name = this.model().name;
-
-    this.model.update((m) => ({ ...m, slug: slugify(name) }));
-  }
 }

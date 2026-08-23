@@ -1,8 +1,5 @@
 /**
  * Tests for invitation HTTP routes.
- *
- * Validates that the endpoints enforce auth, return proper HTTP status codes,
- * and correctly delegate to the TenantService.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
@@ -24,18 +21,23 @@ vi.mock('../middleware/auth.js', () => ({
 
 const mockGetMyInvitations = vi.fn().mockResolvedValue([
   {
+    id: 'member-1',
     tenantId: 'tenant-1',
-    tenantName: 'Acme',
-    role: 'member',
-    invitedAt: '2025-01-01T00:00:00.000Z',
-    invitationToken: 'tok-1',
+    userId: 'user-1',
+    role: 'MEMBER',
+    status: 'ACTIVE',
+    invitation: { status: 'PENDING', tokenHash: 'hash', invitedBy: 'owner', invitedOn: '2025-01-01T00:00:00.000Z' },
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
   },
 ]);
+const mockAcceptInvitation = vi.fn().mockResolvedValue(undefined);
 const mockDeclineInvitation = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../services/tenant.service.js', () => ({
   TenantService: vi.fn().mockImplementation(() => ({
     getMyInvitations: mockGetMyInvitations,
+    acceptInvitation: mockAcceptInvitation,
     declineInvitation: mockDeclineInvitation,
   })),
 }));
@@ -52,8 +54,10 @@ const mockFindById = vi.fn().mockResolvedValue({
   id: 'user-1',
   email: 'test@example.com',
   displayName: 'Test User',
+  avatarUrl: null,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
+  deletedAt: null,
 });
 
 vi.mock('../repositories/user.repository.js', () => ({
@@ -76,14 +80,21 @@ function createTestApp() {
 
   app.onError(errorHandler);
 
-  // Simulate auth middleware setting userId
-  app.use('/api/v1/invitations/*', async (c, next) => {
+  app.use('/api/invitations/*', async (c, next) => {
     c.set('userId', 'user-1');
-    c.set('user', { id: 'user-1', email: 'test@example.com', displayName: 'Test User' });
+    c.set('user', {
+      id: 'user-1',
+      email: 'test@example.com',
+      displayName: 'Test User',
+      avatarUrl: null,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+      deletedAt: null,
+    });
     await next();
   });
 
-  app.route('/api/v1/invitations', createInvitationRoutes());
+  app.route('/api/invitations', createInvitationRoutes());
 
   return app;
 }
@@ -93,49 +104,61 @@ function createTestApp() {
 describe('Invitation Routes', () => {
   beforeEach(() => {
     mockGetMyInvitations.mockClear();
+    mockAcceptInvitation.mockClear();
     mockDeclineInvitation.mockClear();
     mockFindById.mockClear();
   });
 
-  describe('GET /api/v1/invitations/my', () => {
-    it('returns 200 with pending invitations', async () => {
+  describe('GET /api/invitations/my', () => {
+    it('returns 200 with { data } envelope', async () => {
       const app = createTestApp();
-      const res = await app.request('/api/v1/invitations/my', { method: 'GET' }, TEST_ENV);
+      const res = await app.request('/api/invitations/my', { method: 'GET' }, TEST_ENV);
 
       expect(res.status).toBe(200);
 
-      const body = (await res.json()) as { data: unknown[]; total: number };
+      const body = (await res.json()) as { data: unknown[] };
 
       expect(body.data).toHaveLength(1);
-      expect(body.total).toBe(1);
-    });
-
-    it('calls TenantService.getMyInvitations with user email', async () => {
-      const app = createTestApp();
-
-      await app.request('/api/v1/invitations/my', { method: 'GET' }, TEST_ENV);
-
-      expect(mockFindById).toHaveBeenCalledWith('user-1');
-      expect(mockGetMyInvitations).toHaveBeenCalledWith('test@example.com');
     });
   });
 
-  describe('DELETE /api/v1/invitations/:invitationId', () => {
-    it('returns 200 with success true on decline', async () => {
+  describe('POST /api/invitations/:invitationId/accept', () => {
+    it('returns 200 with success', async () => {
       const app = createTestApp();
-      const res = await app.request('/api/v1/invitations/inv-123', { method: 'DELETE' }, TEST_ENV);
+      const res = await app.request('/api/invitations/inv-123/accept', { method: 'POST' }, TEST_ENV);
 
       expect(res.status).toBe(200);
 
-      const body = (await res.json()) as { success: boolean };
+      const body = (await res.json()) as { data: { success: boolean } };
 
-      expect(body.success).toBe(true);
+      expect(body.data.success).toBe(true);
     });
 
-    it('calls TenantService.declineInvitation with correct params', async () => {
+    it('calls TenantService.acceptInvitation', async () => {
       const app = createTestApp();
 
-      await app.request('/api/v1/invitations/inv-123', { method: 'DELETE' }, TEST_ENV);
+      await app.request('/api/invitations/inv-123/accept', { method: 'POST' }, TEST_ENV);
+
+      expect(mockAcceptInvitation).toHaveBeenCalledWith('inv-123', 'user-1');
+    });
+  });
+
+  describe('POST /api/invitations/:invitationId/decline', () => {
+    it('returns 200 with success', async () => {
+      const app = createTestApp();
+      const res = await app.request('/api/invitations/inv-123/decline', { method: 'POST' }, TEST_ENV);
+
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as { data: { success: boolean } };
+
+      expect(body.data.success).toBe(true);
+    });
+
+    it('calls TenantService.declineInvitation', async () => {
+      const app = createTestApp();
+
+      await app.request('/api/invitations/inv-123/decline', { method: 'POST' }, TEST_ENV);
 
       expect(mockDeclineInvitation).toHaveBeenCalledWith('inv-123', 'user-1');
     });

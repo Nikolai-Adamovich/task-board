@@ -1,31 +1,42 @@
 import type { TaskPriority } from '../constants/roles.js';
+import type { IdentitySnapshot } from './tenant.js';
 
 /** Task entity type */
 export interface Task {
   /** Unique task identifier (UUID v4) */
   id: string;
-  /** Owning tenant ID */
-  tenantId: string;
   /** Parent project ID */
   projectId: string;
-  /** Parent board ID */
-  boardId: string;
-  /** Column the task is currently in */
-  columnId: string;
-  /** Optional sprint assignment (null if in backlog) */
-  sprintId: string | null;
+  /** Sequential task number within the project */
+  number: number;
+  /** Task type ID (references TaskType) */
+  typeId: string;
   /** Task title */
   title: string;
   /** Optional detailed description (markdown) */
-  description?: string | null;
-  /** User IDs assigned to this task */
-  assigneeIds: string[];
+  description: string | null;
+  /** Status ID (references Status) */
+  statusId: string;
   /** Task priority level */
   priority: TaskPriority;
-  /** Position/order within the column (for drag-and-drop) */
-  position: number;
+  /** User ID of the reporter */
+  reporterId: string | null;
+  /** Denormalized reporter identity at time of assignment */
+  reporterSnapshot: IdentitySnapshot | null;
+  /** User ID of the assignee */
+  assigneeId: string | null;
+  /** Denormalized assignee identity at time of assignment */
+  assigneeSnapshot: IdentitySnapshot | null;
+  /** Optional sprint assignment (null if in backlog) */
+  sprintId: string | null;
+  /** Label IDs attached to this task */
+  labelIds: string[];
   /** User ID of the task creator */
-  createdBy: string;
+  createdById: string;
+  /** Denormalized creator identity at time of creation */
+  createdBySnapshot: IdentitySnapshot;
+  /** Optimistic concurrency version */
+  version: number;
   /** Creation timestamp (ISO 8601) */
   createdAt: string;
   /** Last update timestamp (ISO 8601) */
@@ -34,65 +45,25 @@ export interface Task {
 
 /** Create task request body type */
 export interface CreateTask {
+  typeId: string;
   title: string;
   description?: string;
-  projectId: string;
-  boardId: string;
-  columnId: string;
-  sprintId?: string;
+  statusId: string;
   priority: TaskPriority;
-  assigneeIds: string[];
+  assigneeId?: string;
+  sprintId?: string;
+  labelIds?: string[];
 }
 
-/** Update task request body type */
+/** Update task request body type (version is required for optimistic concurrency) */
 export interface UpdateTask {
   title?: string;
   description?: string;
+  statusId?: string;
   priority?: TaskPriority;
-  assigneeIds?: string[];
-}
-
-/** Move task request body type */
-export interface MoveTask {
-  taskId: string;
-  targetColumnId: string;
-  targetSprintId?: string;
-}
-
-/** Assign task request body type */
-export interface AssignTask {
-  taskId: string;
-  assigneeIds: string[];
-}
-
-/** Denormalized task for cross-tenant "my tasks" view */
-export interface MyTask {
-  /** Unique task identifier (UUID v4) */
-  id: string;
-  /** Owning tenant ID */
-  tenantId: string;
-  /** Tenant display name */
-  tenantName: string;
-  /** Parent project ID */
-  projectId: string;
-  /** Project display name */
-  projectName: string;
-  /** Parent board ID */
-  boardId: string;
-  /** Column the task is currently in */
-  columnId: string;
-  /** Column display title */
-  columnTitle: string;
-  /** Task title */
-  title: string;
-  /** Optional detailed description */
-  description: string | null;
-  /** Task priority level */
-  priority: TaskPriority;
-  /** Optional sprint assignment (null if in backlog) */
-  sprintId: string | null;
-  /** Creation timestamp (ISO 8601) */
-  createdAt: string;
-  /** Last update timestamp (ISO 8601) */
-  updatedAt: string;
+  assigneeId?: string | null;
+  typeId?: string;
+  sprintId?: string | null;
+  labelIds?: string[];
+  version: number;
 }

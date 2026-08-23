@@ -28,13 +28,21 @@ function makeDoc(overrides: Partial<TenantMemberDocument> = {}): TenantMemberDoc
     id: 'member-123',
     userId: 'user-1',
     tenantId: 'tenant-1',
-    role: 'owner',
-    status: 'active',
-    invitedEmail: null,
-    invitationToken: null,
-    invitedAt: null,
+    role: 'OWNER',
+    status: 'ACTIVE',
+    invitation: null,
     createdAt: new Date('2025-01-01T00:00:00Z'),
+    updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
+  };
+}
+
+function makeInvitation() {
+  return {
+    status: 'PENDING',
+    tokenHash: 'abc123hash',
+    invitedBy: 'user-owner',
+    invitedOn: new Date('2025-01-01T00:00:00Z'),
   };
 }
 
@@ -55,13 +63,16 @@ describe('TenantMemberRepository', () => {
 
       expect(collection.findOne).toHaveBeenCalledWith({ userId: 'user-1', tenantId: 'tenant-1' });
       expect(result).toEqual({
+        id: 'member-123',
         userId: 'user-1',
         tenantId: 'tenant-1',
-        role: 'owner',
-        status: 'active',
-        invitedEmail: null,
-        invitationToken: null,
-        invitedAt: null,
+        role: 'OWNER',
+        status: 'ACTIVE',
+        invitation: null,
+        displayName: null,
+        email: null,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
       });
     });
 
@@ -78,7 +89,7 @@ describe('TenantMemberRepository', () => {
     it('returns all members for a tenant', async () => {
       const toArray = vi
         .fn()
-        .mockResolvedValue([makeDoc({ userId: 'user-1' }), makeDoc({ userId: 'user-2', role: 'member' })]);
+        .mockResolvedValue([makeDoc({ userId: 'user-1' }), makeDoc({ userId: 'user-2', role: 'MEMBER' })]);
 
       collection.find.mockReturnValue({ toArray });
 
@@ -94,8 +105,8 @@ describe('TenantMemberRepository', () => {
       const toArray = vi
         .fn()
         .mockResolvedValue([
-          makeDoc({ tenantId: 't1', status: 'active' }),
-          makeDoc({ tenantId: 't2', role: 'member', status: 'pending' }),
+          makeDoc({ tenantId: 't1', status: 'ACTIVE' }),
+          makeDoc({ tenantId: 't2', role: 'MEMBER', status: 'ACTIVE' }),
         ]);
 
       collection.find.mockReturnValue({ toArray });
@@ -108,58 +119,37 @@ describe('TenantMemberRepository', () => {
   });
 
   describe('findByInvitationToken', () => {
-    it('returns the raw document when found', async () => {
+    it('finds by tokenHash and pending status', async () => {
       const doc = makeDoc({
-        invitationToken: 'token-abc',
-        status: 'pending',
-        invitedEmail: 'invited@example.com',
+        invitation: makeInvitation(),
+        status: 'ACTIVE',
       });
 
       collection.findOne.mockResolvedValue(doc);
 
-      const result = await repo.findByInvitationToken('token-abc');
+      const result = await repo.findByInvitationToken('abc123hash');
 
-      expect(collection.findOne).toHaveBeenCalledWith({ invitationToken: 'token-abc' });
+      expect(collection.findOne).toHaveBeenCalledWith({
+        'invitation.tokenHash': 'abc123hash',
+        'invitation.status': 'PENDING',
+      });
       expect(result).toBe(doc);
     });
   });
 
   describe('findPendingByEmail', () => {
-    it('queries for pending members by invited email', async () => {
-      const toArray = vi.fn().mockResolvedValue([makeDoc({ status: 'pending', invitedEmail: 'a@b.com' })]);
+    it('queries for pending invitations by invited email', async () => {
+      const toArray = vi.fn().mockResolvedValue([makeDoc({ invitation: makeInvitation() })]);
 
       collection.find.mockReturnValue({ toArray });
 
-      const result = await repo.findPendingByEmail('a@b.com');
+      const result = await repo.findPendingByEmail('invited@example.com');
 
-      expect(collection.find).toHaveBeenCalledWith({ invitedEmail: 'a@b.com', status: 'pending' });
+      expect(collection.find).toHaveBeenCalledWith({
+        'invitation.invitedEmail': 'invited@example.com',
+        'invitation.status': 'PENDING',
+      });
       expect(result).toHaveLength(1);
-    });
-  });
-
-  describe('activateInvitation', () => {
-    it('activates the pending invitation with the userId', async () => {
-      const activated = makeDoc({ userId: 'user-2', status: 'active', invitationToken: null, invitedAt: null });
-
-      collection.findOneAndUpdate.mockResolvedValue(activated);
-
-      const result = await repo.activateInvitation('token-abc', 'user-2');
-
-      expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
-        { invitationToken: 'token-abc', status: 'pending' },
-        { $set: { userId: 'user-2', status: 'active', invitedAt: null } },
-        { returnDocument: 'after' },
-      );
-      expect(result?.userId).toBe('user-2');
-      expect(result?.status).toBe('active');
-    });
-
-    it('returns null when invitation not found', async () => {
-      collection.findOneAndUpdate.mockResolvedValue(null);
-
-      const result = await repo.activateInvitation('invalid', 'user-2');
-
-      expect(result).toBeNull();
     });
   });
 
@@ -169,7 +159,7 @@ describe('TenantMemberRepository', () => {
 
       const result = await repo.countActiveByTenant('tenant-1');
 
-      expect(collection.countDocuments).toHaveBeenCalledWith({ tenantId: 'tenant-1', status: 'active' });
+      expect(collection.countDocuments).toHaveBeenCalledWith({ tenantId: 'tenant-1', status: 'ACTIVE' });
       expect(result).toBe(3);
     });
   });
@@ -180,21 +170,8 @@ describe('TenantMemberRepository', () => {
 
       const result = await repo.countOwnedTenants('user-1');
 
-      expect(collection.countDocuments).toHaveBeenCalledWith({ userId: 'user-1', role: 'owner' });
+      expect(collection.countDocuments).toHaveBeenCalledWith({ userId: 'user-1', role: 'OWNER' });
       expect(result).toBe(1);
-    });
-  });
-
-  describe('findPendingByTenant', () => {
-    it('returns pending members for a tenant', async () => {
-      const toArray = vi.fn().mockResolvedValue([makeDoc({ status: 'pending' })]);
-
-      collection.find.mockReturnValue({ toArray });
-
-      const result = await repo.findPendingByTenant('tenant-1');
-
-      expect(collection.find).toHaveBeenCalledWith({ tenantId: 'tenant-1', status: 'pending' });
-      expect(result).toHaveLength(1);
     });
   });
 
@@ -211,50 +188,15 @@ describe('TenantMemberRepository', () => {
     });
   });
 
-  describe('updateStatusById', () => {
-    it('updates the status and returns the domain member', async () => {
-      const updated = makeDoc({ status: 'declined' });
-
-      collection.findOneAndUpdate.mockResolvedValue(updated);
-
-      const result = await repo.updateStatusById('member-123', 'declined');
-
-      expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
-        { id: 'member-123' },
-        { $set: { status: 'declined' } },
-        { returnDocument: 'after' },
-      );
-      expect(result?.status).toBe('declined');
-    });
-  });
-
-  describe('deleteById', () => {
-    it('returns true when a document was deleted', async () => {
-      collection.deleteOne.mockResolvedValue({ deletedCount: 1 } as DeleteResult);
-
-      const result = await repo.deleteById('member-123');
-
-      expect(result).toBe(true);
-    });
-
-    it('returns false when no document was deleted', async () => {
-      collection.deleteOne.mockResolvedValue({ deletedCount: 0 } as DeleteResult);
-
-      const result = await repo.deleteById('missing');
-
-      expect(result).toBe(false);
-    });
-  });
-
   describe('create', () => {
-    it('creates an active member', async () => {
+    it('creates an active member without invitation', async () => {
       collection.insertOne.mockResolvedValue({ acknowledged: true } as InsertOneResult);
 
       const result = await repo.create({
         userId: 'user-1',
         tenantId: 'tenant-1',
-        role: 'owner',
-        status: 'active',
+        role: 'OWNER',
+        status: 'ACTIVE',
       });
 
       expect(collection.insertOne).toHaveBeenCalledTimes(1);
@@ -263,57 +205,77 @@ describe('TenantMemberRepository', () => {
 
       expect(insertedDoc.userId).toBe('user-1');
       expect(insertedDoc.tenantId).toBe('tenant-1');
-      expect(insertedDoc.role).toBe('owner');
-      expect(insertedDoc.status).toBe('active');
-      expect(insertedDoc.invitedAt).toBeNull();
+      expect(insertedDoc.role).toBe('OWNER');
+      expect(insertedDoc.status).toBe('ACTIVE');
+      expect(insertedDoc.invitation).toBeNull();
       expect(insertedDoc.id).toBeDefined();
 
-      expect(result.role).toBe('owner');
+      expect(result.role).toBe('OWNER');
+      expect(result.invitation).toBeNull();
     });
 
-    it('creates a pending invitation with invitedAt', async () => {
+    it('creates a member with embedded invitation', async () => {
       collection.insertOne.mockResolvedValue({ acknowledged: true } as InsertOneResult);
 
       const result = await repo.create({
-        userId: null,
+        userId: 'user-2',
         tenantId: 'tenant-1',
-        role: 'member',
-        status: 'pending',
-        invitedEmail: 'invited@example.com',
-        invitationToken: 'token-abc',
+        role: 'MEMBER',
+        status: 'ACTIVE',
+        invitation: makeInvitation(),
       });
       const insertedDoc = collection.insertOne.mock.calls[0]?.[0] as TenantMemberDocument;
 
-      expect(insertedDoc.userId).toBeNull();
-      expect(insertedDoc.invitedEmail).toBe('invited@example.com');
-      expect(insertedDoc.invitationToken).toBe('token-abc');
-      expect(insertedDoc.invitedAt).toBeInstanceOf(Date);
-      expect(result.status).toBe('pending');
+      expect(insertedDoc.invitation).not.toBeNull();
+      expect(insertedDoc.invitation?.status).toBe('PENDING');
+      expect(insertedDoc.invitation?.tokenHash).toBe('abc123hash');
+      expect(result.invitation).not.toBeNull();
+    });
+  });
+
+  describe('update', () => {
+    it('updates status and clears invitation', async () => {
+      const updated = makeDoc({ status: 'ACTIVE', invitation: null });
+
+      collection.findOneAndUpdate.mockResolvedValue(updated);
+
+      const result = await repo.update('member-123', {
+        status: 'ACTIVE',
+        invitation: null,
+      });
+
+      expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
+        { id: 'member-123' },
+        { $set: { status: 'ACTIVE', invitation: null, updatedAt: expect.any(Date) } },
+        { returnDocument: 'after' },
+      );
+      expect(result?.status).toBe('ACTIVE');
+      expect(result?.invitation).toBeNull();
+    });
+
+    it('returns null when member not found', async () => {
+      collection.findOneAndUpdate.mockResolvedValue(null);
+
+      const result = await repo.update('missing', { status: 'ACTIVE' });
+
+      expect(result).toBeNull();
     });
   });
 
   describe('updateRole', () => {
     it('returns the updated member', async () => {
-      const updated = makeDoc({ role: 'admin' });
+      const updated = makeDoc({ role: 'ADMIN' });
 
       collection.findOneAndUpdate.mockResolvedValue(updated);
 
-      const result = await repo.updateRole('tenant-1', 'user-1', 'admin');
+      const result = await repo.updateRole('tenant-1', 'user-1', 'ADMIN');
 
       expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: 'user-1', tenantId: 'tenant-1' },
-        { $set: { role: 'admin' } },
+        { $set: { role: 'ADMIN', updatedAt: expect.any(Date) } },
         { returnDocument: 'after' },
       );
-      expect(result?.role).toBe('admin');
-    });
-
-    it('returns null when not found', async () => {
-      collection.findOneAndUpdate.mockResolvedValue(null);
-
-      const result = await repo.updateRole('tenant-1', 'missing', 'admin');
-
-      expect(result).toBeNull();
+      expect(result?.role).toBe('ADMIN');
     });
   });
 
@@ -330,6 +292,24 @@ describe('TenantMemberRepository', () => {
       collection.deleteOne.mockResolvedValue({ deletedCount: 0 } as DeleteResult);
 
       const result = await repo.delete('tenant-1', 'missing');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('deleteById', () => {
+    it('returns true when a document was deleted', async () => {
+      collection.deleteOne.mockResolvedValue({ deletedCount: 1 } as DeleteResult);
+
+      const result = await repo.deleteById('member-123');
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when no document was deleted', async () => {
+      collection.deleteOne.mockResolvedValue({ deletedCount: 0 } as DeleteResult);
+
+      const result = await repo.deleteById('missing');
 
       expect(result).toBe(false);
     });

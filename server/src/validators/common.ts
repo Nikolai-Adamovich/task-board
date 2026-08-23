@@ -1,9 +1,19 @@
 import { z } from 'zod';
 
 /**
- * Validates that a string is a valid UUID v4.
+ * Validates that a string is a valid identifier.
+ * Accepts either UUID v4 format or MongoDB ObjectId format (24-char hex).
+ *
+ * This covers both auto-generated UUIDs and MongoDB's native _id format.
  */
-export const uuid = () => z.uuid('Invalid UUID format');
+export const uuid = () =>
+  z
+    .string()
+    .refine(
+      (val) =>
+        /^[0-9a-fA-F]{24}$/.test(val) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(val),
+      'Invalid ID format — must be a UUID or 24-character hex string',
+    );
 
 /**
  * Validates that a string is a URL-friendly slug.
@@ -41,9 +51,14 @@ export const optionalString = (maxLength: number) => z.string().max(maxLength).o
 export const nullableOptionalString = (maxLength: number) => z.string().max(maxLength).nullable().optional();
 
 /**
- * Validates an email address.
+ * Validates an email address with normalization (toLowerCase + trim).
+ * The transform ensures the stored value is always normalized.
  */
-export const email = () => z.email({ message: 'Invalid email address', pattern: z.regexes.html5Email });
+export const email = () =>
+  z
+    .string()
+    .email({ message: 'Invalid email address', pattern: z.regexes.html5Email })
+    .transform((val) => val.toLowerCase().trim());
 
 /**
  * Validates an ISO 8601 datetime string.
@@ -61,6 +76,6 @@ export const nullableIsoDateTime = () => z.iso.datetime().nullable();
 export const nonNegativeInt = () => z.number().int().nonnegative();
 
 /**
- * Validates a string array of UUIDs.
+ * Validates a string array of IDs (UUID or ObjectId format).
  */
 export const uuidArray = () => z.array(uuid());

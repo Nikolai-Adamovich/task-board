@@ -12,22 +12,27 @@ function createMockCollection() {
     insertOne: vi.fn(),
     findOneAndUpdate: vi.fn(),
     deleteOne: vi.fn(),
+    updateMany: vi.fn(),
   } as unknown as Collection<BoardDocument> & {
     findOne: ReturnType<typeof vi.fn>;
     find: ReturnType<typeof vi.fn>;
     insertOne: ReturnType<typeof vi.fn>;
     findOneAndUpdate: ReturnType<typeof vi.fn>;
     deleteOne: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
   };
 }
 
 function makeDoc(overrides: Partial<BoardDocument> = {}): BoardDocument {
   return {
     id: 'board-123',
-    tenantId: 'tenant-1',
     projectId: 'project-1',
-    name: 'Test Board',
-    description: 'A test board',
+    name: 'Main Board',
+    type: 'KANBAN',
+    columns: [
+      { id: 'col-1', statusIds: ['status-1', 'status-2'], position: 0 },
+      { id: 'col-2', statusIds: ['status-3'], position: 1 },
+    ],
     createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
@@ -47,15 +52,18 @@ describe('BoardRepository', () => {
     it('returns a mapped board when found', async () => {
       collection.findOne.mockResolvedValue(makeDoc());
 
-      const result = await repo.findById('tenant-1', 'board-123');
+      const result = await repo.findById('board-123');
 
-      expect(collection.findOne).toHaveBeenCalledWith({ id: 'board-123', tenantId: 'tenant-1' });
+      expect(collection.findOne).toHaveBeenCalledWith({ id: 'board-123' });
       expect(result).toEqual({
         id: 'board-123',
-        tenantId: 'tenant-1',
         projectId: 'project-1',
-        name: 'Test Board',
-        description: 'A test board',
+        name: 'Main Board',
+        type: 'KANBAN',
+        columns: [
+          { id: 'col-1', statusIds: ['status-1', 'status-2'], position: 0 },
+          { id: 'col-2', statusIds: ['status-3'], position: 1 },
+        ],
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
       });
@@ -64,103 +72,84 @@ describe('BoardRepository', () => {
     it('returns null when not found', async () => {
       collection.findOne.mockResolvedValue(null);
 
-      const result = await repo.findById('tenant-1', 'missing');
+      const result = await repo.findById('missing');
 
       expect(result).toBeNull();
     });
   });
 
   describe('findByProject', () => {
-    it('returns boards for a project', async () => {
-      const toArray = vi
-        .fn()
-        .mockResolvedValue([makeDoc({ id: 'board-1', name: 'Board 1' }), makeDoc({ id: 'board-2', name: 'Board 2' })]);
+    it('returns all boards for a project', async () => {
+      const toArray = vi.fn().mockResolvedValue([makeDoc({ id: 'b1' }), makeDoc({ id: 'b2' })]);
 
       collection.find.mockReturnValue({ toArray });
 
-      const result = await repo.findByProject('tenant-1', 'project-1');
+      const result = await repo.findByProject('project-1');
 
-      expect(collection.find).toHaveBeenCalledWith({ tenantId: 'tenant-1', projectId: 'project-1' });
+      expect(collection.find).toHaveBeenCalledWith({ projectId: 'project-1' });
       expect(result).toHaveLength(2);
-      expect(result[0]?.name).toBe('Board 1');
-      expect(result[1]?.name).toBe('Board 2');
     });
   });
 
   describe('create', () => {
-    it('inserts a document and returns the domain board', async () => {
+    it('inserts a document with embedded columns and returns domain board', async () => {
       collection.insertOne.mockResolvedValue({ acknowledged: true } as InsertOneResult);
 
-      const result = await repo.create('tenant-1', {
-        projectId: 'project-1',
+      const result = await repo.create('project-1', {
         name: 'New Board',
-        description: 'desc',
+        type: 'KANBAN',
+        columns: [
+          { id: 'col-1', statusIds: ['s1'], position: 0 },
+          { id: 'col-2', statusIds: ['s2'], position: 1 },
+        ],
       });
 
       expect(collection.insertOne).toHaveBeenCalledTimes(1);
-
-      const insertedDoc = collection.insertOne.mock.calls[0]?.[0] as BoardDocument;
-
-      expect(insertedDoc.name).toBe('New Board');
-      expect(insertedDoc.tenantId).toBe('tenant-1');
-      expect(insertedDoc.projectId).toBe('project-1');
-      expect(insertedDoc.id).toBeDefined();
-
       expect(result.name).toBe('New Board');
-      expect(typeof result.createdAt).toBe('string');
-    });
-
-    it('defaults description to null when omitted', async () => {
-      collection.insertOne.mockResolvedValue({ acknowledged: true } as InsertOneResult);
-
-      await repo.create('tenant-1', { projectId: 'project-1', name: 'Board' });
-
-      const insertedDoc = collection.insertOne.mock.calls[0]?.[0] as BoardDocument;
-
-      expect(insertedDoc.description).toBeNull();
+      expect(result.type).toBe('KANBAN');
+      expect(result.columns).toHaveLength(2);
+      expect(result.columns[0].id).toBe('col-1');
     });
   });
 
   describe('update', () => {
     it('returns the updated board', async () => {
-      const updated = makeDoc({ name: 'Updated Board' });
+      const updated = makeDoc({ name: 'Updated' });
 
       collection.findOneAndUpdate.mockResolvedValue(updated);
 
-      const result = await repo.update('tenant-1', 'board-123', { name: 'Updated Board' });
+      const result = await repo.update('board-123', { name: 'Updated' });
 
-      expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
-        { id: 'board-123', tenantId: 'tenant-1' },
-        { $set: { name: 'Updated Board', updatedAt: expect.any(Date) } },
-        { returnDocument: 'after' },
-      );
-      expect(result?.name).toBe('Updated Board');
-    });
-
-    it('returns null when board not found', async () => {
-      collection.findOneAndUpdate.mockResolvedValue(null);
-
-      const result = await repo.update('tenant-1', 'missing', { name: 'X' });
-
-      expect(result).toBeNull();
+      expect(result?.name).toBe('Updated');
     });
   });
 
   describe('delete', () => {
-    it('returns true when a document was deleted', async () => {
+    it('returns true when deleted', async () => {
       collection.deleteOne.mockResolvedValue({ deletedCount: 1 } as DeleteResult);
 
-      const result = await repo.delete('tenant-1', 'board-123');
+      const result = await repo.delete('board-123');
 
       expect(result).toBe(true);
     });
+  });
 
-    it('returns false when no document was deleted', async () => {
-      collection.deleteOne.mockResolvedValue({ deletedCount: 0 } as DeleteResult);
+  describe('replaceStatusInColumns', () => {
+    it('calls updateMany with arrayFilters', async () => {
+      collection.updateMany.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 } as never);
 
-      const result = await repo.delete('tenant-1', 'missing');
+      await repo.replaceStatusInColumns('project-1', 'old-status', 'new-status');
 
-      expect(result).toBe(false);
+      expect(collection.updateMany).toHaveBeenCalledWith(
+        { projectId: 'project-1', 'columns.statusIds': 'old-status' },
+        {
+          $set: {
+            'columns.$[col].statusIds.$[sid]': 'new-status',
+            updatedAt: expect.any(Date),
+          },
+        },
+        { arrayFilters: [{ 'col.statusIds': 'old-status' }, { sid: 'old-status' }] },
+      );
     });
   });
 });

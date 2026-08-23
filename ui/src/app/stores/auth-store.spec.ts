@@ -68,7 +68,7 @@ describe('AuthStore', () => {
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
-    const payload = btoa(JSON.stringify({ sub: '1', email: 'test@example.com', tenantRole: 'admin', exp: 9999999999 }))
+    const payload = btoa(JSON.stringify({ sub: '1', email: 'test@example.com', tenantRole: 'ADMIN', exp: 9999999999 }))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
@@ -79,7 +79,7 @@ describe('AuthStore', () => {
       user: { id: '1', email: 'test@example.com', displayName: 'Test' } as User,
     });
 
-    expect(store.tenantRole()).toBe('admin');
+    expect(store.tenantRole()).toBe('ADMIN');
   });
 
   it('should expose null tenantRole when JWT has no tenantRole claim', () => {
@@ -109,13 +109,13 @@ describe('AuthStore', () => {
 
     const store = TestBed.inject(AuthStore);
 
-    store.setTenantRole('owner');
+    store.setTenantRole('OWNER');
 
-    expect(store.tenantRole()).toBe('owner');
+    expect(store.tenantRole()).toBe('OWNER');
 
-    store.setTenantRole('member');
+    store.setTenantRole('MEMBER');
 
-    expect(store.tenantRole()).toBe('member');
+    expect(store.tenantRole()).toBe('MEMBER');
   });
 
   it('should clear tenantRole on logout', () => {
@@ -123,7 +123,7 @@ describe('AuthStore', () => {
 
     const store = TestBed.inject(AuthStore);
 
-    store.setTenantRole('admin');
+    store.setTenantRole('ADMIN');
     store.logout();
 
     expect(store.tenantRole()).toBeNull();
@@ -169,7 +169,8 @@ describe('AuthStore', () => {
     const promise = store.fetchCurrentUser();
     const req = httpMock.expectOne('http://localhost/api/auth/me');
 
-    req.flush({ id: '1', email: 'user@test.com', displayName: 'User' } as User);
+    // API returns { data: User } envelope
+    req.flush({ data: { id: '1', email: 'user@test.com', displayName: 'User' } as User });
 
     await promise;
 

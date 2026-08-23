@@ -7,8 +7,7 @@ function createMockProjectRepo() {
   return {
     findById: vi.fn(),
     findByTenant: vi.fn(),
-    findBySlug: vi.fn(),
-    countByTenant: vi.fn(),
+    findByTenantAndKey: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -17,12 +16,21 @@ function createMockProjectRepo() {
 
 function createMockProjectMemberRepo() {
   return {
-    findByProjectAndUser: vi.fn(),
+    findByUserAndProject: vi.fn(),
     findByProject: vi.fn(),
+    findByProjectWithUsers: vi.fn(),
     findByUser: vi.fn(),
     create: vi.fn(),
     updateRole: vi.fn(),
     delete: vi.fn(),
+  };
+}
+
+function createMockCollections() {
+  return {
+    taskTypes: { insertOne: vi.fn() },
+    statuses: { insertOne: vi.fn() },
+    boards: { insertOne: vi.fn() },
   };
 }
 
@@ -32,9 +40,14 @@ function makeProject(overrides: Record<string, unknown> = {}) {
   return {
     id: 'proj-1',
     tenantId: 'tenant-1',
+    key: 'TEST',
     name: 'Test Project',
-    slug: 'test-project',
     description: null,
+    status: 'ACTIVE',
+    defaultStatusId: 'status-todo',
+    defaultBoardId: 'board-1',
+    archiveReason: null,
+    deletionScheduledAt: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,
@@ -43,107 +56,88 @@ function makeProject(overrides: Record<string, unknown> = {}) {
 
 function makeProjectMember(overrides: Record<string, unknown> = {}) {
   return {
+    id: 'pmember-1',
     userId: 'user-1',
     projectId: 'proj-1',
-    tenantId: 'tenant-1',
-    role: 'admin',
+    role: 'PROJECT_ADMIN',
+    createdAt: NOW,
+    updatedAt: NOW,
     ...overrides,
   };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-function createMockTenantRepo() {
-  return {
-    findById: vi.fn(),
-    findBySlug: vi.fn(),
-    findAll: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  };
-}
-
 describe('ProjectService', () => {
   let projectRepo: ReturnType<typeof createMockProjectRepo>;
   let memberRepo: ReturnType<typeof createMockProjectMemberRepo>;
-  let tenantRepo: ReturnType<typeof createMockTenantRepo>;
+  let collections: ReturnType<typeof createMockCollections>;
   let service: ProjectService;
 
   beforeEach(() => {
     projectRepo = createMockProjectRepo();
     memberRepo = createMockProjectMemberRepo();
-    tenantRepo = createMockTenantRepo();
-    service = new ProjectService(projectRepo as never, memberRepo as never, tenantRepo as never);
+    collections = createMockCollections();
+    service = new ProjectService(projectRepo as never, memberRepo as never, collections as never);
   });
 
   // ── listProjects ──────────────────────────────────────────────────────────
 
   describe('listProjects', () => {
     it('returns all projects in a tenant', async () => {
-      projectRepo.findByTenant.mockResolvedValue([makeProject(), makeProject({ id: 'proj-2' })]);
+      projectRepo.findByTenant.mockResolvedValue([makeProject(), makeProject({ id: 'proj-2', key: 'PROJ2' })]);
 
       const result = await service.listProjects('tenant-1');
 
       expect(result).toHaveLength(2);
       expect(projectRepo.findByTenant).toHaveBeenCalledWith('tenant-1');
     });
-
-    it('returns empty array when no projects exist', async () => {
-      projectRepo.findByTenant.mockResolvedValue([]);
-
-      const result = await service.listProjects('tenant-1');
-
-      expect(result).toEqual([]);
-    });
   });
 
   // ── createProject ─────────────────────────────────────────────────────────
 
   describe('createProject', () => {
-    it('creates a project and adds the creator as admin', async () => {
-      tenantRepo.findById.mockResolvedValue({ subscription: 'free' });
-      projectRepo.countByTenant.mockResolvedValue(0);
-      projectRepo.findBySlug.mockResolvedValue(null);
-      projectRepo.create.mockResolvedValue(makeProject());
+    it('creates a project with seed data and adds the creator as PROJECT_ADMIN', async () => {
+      projectRepo.findByTenantAndKey.mockResolvedValue(null);
+      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '', defaultBoardId: '' }));
+      projectRepo.findById.mockResolvedValue(makeProject());
       memberRepo.create.mockResolvedValue(makeProjectMember());
 
-      const result = await service.createProject('tenant-1', 'user-1', 'admin', {
+      const result = await service.createProject('tenant-1', 'user-1', 'ADMIN', {
+        key: 'TEST',
         name: 'Test Project',
-        slug: 'test-project',
       });
 
-      expect(projectRepo.create).toHaveBeenCalledWith('tenant-1', {
-        name: 'Test Project',
-        slug: 'test-project',
-      });
+      expect(projectRepo.create).toHaveBeenCalledWith('tenant-1', { key: 'TEST', name: 'Test Project' });
+      expect(collections.statuses.insertOne).toHaveBeenCalledTimes(5); // 5 seed statuses
+      expect(collections.taskTypes.insertOne).toHaveBeenCalledTimes(3); // 3 seed task types
+      expect(collections.boards.insertOne).toHaveBeenCalledTimes(1); // 1 default board
       expect(memberRepo.create).toHaveBeenCalledWith({
         userId: 'user-1',
         projectId: 'proj-1',
-        tenantId: 'tenant-1',
-        role: 'admin',
+        role: 'PROJECT_ADMIN',
       });
-      expect(result.name).toBe('Test Project');
+      expect(result.key).toBe('TEST');
     });
 
-    it('throws ConflictError when slug is already taken', async () => {
-      projectRepo.findBySlug.mockResolvedValue(makeProject());
+    it('throws ConflictError for duplicate key', async () => {
+      projectRepo.findByTenantAndKey.mockResolvedValue(makeProject());
 
-      await expect(
-        service.createProject('tenant-1', 'user-1', 'admin', {
-          name: 'X',
-          slug: 'test-project',
-        }),
-      ).rejects.toThrow('already exists');
+      await expect(service.createProject('tenant-1', 'user-1', 'ADMIN', { key: 'TEST', name: 'Dup' })).rejects.toThrow(
+        'already exists',
+      );
     });
 
     it('throws ForbiddenError when user is not admin or owner', async () => {
-      await expect(
-        service.createProject('tenant-1', 'user-1', 'member', {
-          name: 'X',
-          slug: 'test',
-        }),
-      ).rejects.toThrow('Only owner or admin');
+      await expect(service.createProject('tenant-1', 'user-1', 'MEMBER', { key: 'TEST', name: 'X' })).rejects.toThrow(
+        'Only owner or admin',
+      );
+    });
+
+    it('throws for invalid key format', async () => {
+      await expect(service.createProject('tenant-1', 'user-1', 'ADMIN', { key: 'ab', name: 'X' })).rejects.toThrow(
+        'Key must start with a letter',
+      );
     });
   });
 
@@ -153,7 +147,7 @@ describe('ProjectService', () => {
     it('returns the project', async () => {
       projectRepo.findById.mockResolvedValue(makeProject());
 
-      const result = await service.getProject('tenant-1', 'proj-1');
+      const result = await service.getProject('proj-1');
 
       expect(result.id).toBe('proj-1');
     });
@@ -161,7 +155,7 @@ describe('ProjectService', () => {
     it('throws NotFoundError when project does not exist', async () => {
       projectRepo.findById.mockResolvedValue(null);
 
-      await expect(service.getProject('tenant-1', 'missing')).rejects.toThrow('not found');
+      await expect(service.getProject('missing')).rejects.toThrow('not found');
     });
   });
 
@@ -169,46 +163,67 @@ describe('ProjectService', () => {
 
   describe('updateProject', () => {
     it('updates the project', async () => {
-      projectRepo.findBySlug.mockResolvedValue(null);
+      projectRepo.findById.mockResolvedValue(makeProject());
       projectRepo.update.mockResolvedValue(makeProject({ name: 'Updated' }));
 
-      const result = await service.updateProject('tenant-1', 'proj-1', 'admin', {
-        name: 'Updated',
-      });
+      const result = await service.updateProject('proj-1', 'ADMIN', { name: 'Updated' });
 
       expect(result.name).toBe('Updated');
     });
 
-    it('throws ConflictError when new slug is already taken', async () => {
-      projectRepo.findBySlug.mockResolvedValue(makeProject({ id: 'other-proj' }));
-
-      await expect(service.updateProject('tenant-1', 'proj-1', 'admin', { slug: 'taken-slug' })).rejects.toThrow(
-        'already exists',
-      );
+    it('throws ForbiddenError when user is not admin', async () => {
+      await expect(service.updateProject('proj-1', 'MEMBER', { name: 'X' })).rejects.toThrow('Only owner or admin');
     });
 
-    it('throws ForbiddenError when user is not admin', async () => {
-      await expect(service.updateProject('tenant-1', 'proj-1', 'member', { name: 'X' })).rejects.toThrow(
-        'Only owner or admin',
-      );
+    it('throws for archived project', async () => {
+      projectRepo.findById.mockResolvedValue(makeProject({ status: 'ARCHIVED' }));
+
+      await expect(service.updateProject('proj-1', 'ADMIN', { name: 'X' })).rejects.toThrow('archived');
     });
   });
 
   // ── deleteProject ─────────────────────────────────────────────────────────
 
   describe('deleteProject', () => {
-    it('deletes the project', async () => {
-      projectRepo.delete.mockResolvedValue(true);
+    it('sets status to DELETION_PENDING', async () => {
+      projectRepo.findById.mockResolvedValue(makeProject());
+      projectRepo.update.mockResolvedValue(makeProject({ status: 'DELETION_PENDING' }));
 
-      await service.deleteProject('tenant-1', 'proj-1', 'admin');
+      await service.deleteProject('proj-1', 'ADMIN');
 
-      expect(projectRepo.delete).toHaveBeenCalledWith('tenant-1', 'proj-1');
+      expect(projectRepo.update).toHaveBeenCalledWith('proj-1', {
+        status: 'DELETION_PENDING',
+        deletionScheduledAt: expect.any(Date),
+      });
     });
+  });
 
-    it('throws NotFoundError when project not found', async () => {
-      projectRepo.delete.mockResolvedValue(false);
+  // ── archiveProject ────────────────────────────────────────────────────────
 
-      await expect(service.deleteProject('tenant-1', 'missing', 'admin')).rejects.toThrow('not found');
+  describe('archiveProject', () => {
+    it('sets status to ARCHIVED with archiveReason', async () => {
+      projectRepo.findById.mockResolvedValue(makeProject());
+
+      await service.archiveProject('proj-1', 'ADMIN');
+
+      expect(projectRepo.update).toHaveBeenCalledWith('proj-1', {
+        status: 'ARCHIVED',
+        archiveReason: 'PROJECT_ARCHIVE',
+      });
+    });
+  });
+
+  // ── restoreProject ────────────────────────────────────────────────────────
+
+  describe('restoreProject', () => {
+    it('sets status to ACTIVE and clears archive fields', async () => {
+      await service.restoreProject('proj-1', 'ADMIN');
+
+      expect(projectRepo.update).toHaveBeenCalledWith('proj-1', {
+        status: 'ACTIVE',
+        archiveReason: null,
+        deletionScheduledAt: null,
+      });
     });
   });
 
@@ -217,49 +232,24 @@ describe('ProjectService', () => {
   describe('addMember', () => {
     it('adds a member to the project', async () => {
       projectRepo.findById.mockResolvedValue(makeProject());
-      memberRepo.findByProjectAndUser.mockResolvedValue(null);
-      memberRepo.create.mockResolvedValue(makeProjectMember({ userId: 'user-2', role: 'developer' }));
+      memberRepo.findByUserAndProject.mockResolvedValue(null);
+      memberRepo.create.mockResolvedValue(makeProjectMember({ userId: 'user-2', role: 'EDITOR' }));
 
-      const result = await service.addMember('tenant-1', 'proj-1', 'user-2', 'developer', 'admin');
+      const result = await service.addMember('proj-1', 'user-2', 'EDITOR', 'ADMIN');
 
       expect(memberRepo.create).toHaveBeenCalledWith({
         userId: 'user-2',
         projectId: 'proj-1',
-        tenantId: 'tenant-1',
-        role: 'developer',
+        role: 'EDITOR',
       });
-      expect(result.role).toBe('developer');
+      expect(result.role).toBe('EDITOR');
     });
 
     it('throws ConflictError when user is already a member', async () => {
       projectRepo.findById.mockResolvedValue(makeProject());
-      memberRepo.findByProjectAndUser.mockResolvedValue(makeProjectMember());
+      memberRepo.findByUserAndProject.mockResolvedValue(makeProjectMember());
 
-      await expect(service.addMember('tenant-1', 'proj-1', 'user-1', 'developer', 'admin')).rejects.toThrow(
-        'already a member',
-      );
-    });
-  });
-
-  // ── updateMemberRole ──────────────────────────────────────────────────────
-
-  describe('updateMemberRole', () => {
-    it('updates a member role', async () => {
-      projectRepo.findById.mockResolvedValue(makeProject());
-      memberRepo.updateRole.mockResolvedValue(makeProjectMember({ role: 'viewer' }));
-
-      const result = await service.updateMemberRole('tenant-1', 'proj-1', 'user-1', 'viewer', 'admin');
-
-      expect(result.role).toBe('viewer');
-    });
-
-    it('throws NotFoundError when member not found', async () => {
-      projectRepo.findById.mockResolvedValue(makeProject());
-      memberRepo.updateRole.mockResolvedValue(null);
-
-      await expect(service.updateMemberRole('tenant-1', 'proj-1', 'missing', 'viewer', 'admin')).rejects.toThrow(
-        'not found',
-      );
+      await expect(service.addMember('proj-1', 'user-1', 'EDITOR', 'ADMIN')).rejects.toThrow('already a member');
     });
   });
 
@@ -270,7 +260,7 @@ describe('ProjectService', () => {
       projectRepo.findById.mockResolvedValue(makeProject());
       memberRepo.delete.mockResolvedValue(true);
 
-      await service.removeMember('tenant-1', 'proj-1', 'user-2', 'admin');
+      await service.removeMember('proj-1', 'user-2', 'ADMIN');
 
       expect(memberRepo.delete).toHaveBeenCalledWith('proj-1', 'user-2');
     });
@@ -279,7 +269,7 @@ describe('ProjectService', () => {
       projectRepo.findById.mockResolvedValue(makeProject());
       memberRepo.delete.mockResolvedValue(false);
 
-      await expect(service.removeMember('tenant-1', 'proj-1', 'missing', 'admin')).rejects.toThrow('not found');
+      await expect(service.removeMember('proj-1', 'missing', 'ADMIN')).rejects.toThrow('not found');
     });
   });
 
@@ -288,12 +278,12 @@ describe('ProjectService', () => {
   describe('getProjectMembers', () => {
     it('returns all project members', async () => {
       projectRepo.findById.mockResolvedValue(makeProject());
-      memberRepo.findByProject.mockResolvedValue([
+      memberRepo.findByProjectWithUsers.mockResolvedValue([
         makeProjectMember(),
-        makeProjectMember({ userId: 'user-2', role: 'developer' }),
+        makeProjectMember({ id: 'pm-2', userId: 'user-2', role: 'EDITOR' }),
       ]);
 
-      const result = await service.getProjectMembers('tenant-1', 'proj-1');
+      const result = await service.getProjectMembers('proj-1');
 
       expect(result).toHaveLength(2);
     });

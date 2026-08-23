@@ -2,15 +2,25 @@ import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
 import type { Board } from '@task-board/shared';
 
+// Required MongoDB indexes:
+// - { id: 1 } (unique)
+// - { projectId: 1 }
+
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
+
+export interface BoardColumnDocument {
+  id: string;
+  statusIds: string[];
+  position: number;
+}
 
 export interface BoardDocument {
   _id?: import('mongodb').ObjectId;
   id: string;
-  tenantId: string;
   projectId: string;
   name: string;
-  description: string | null;
+  type: string;
+  columns: BoardColumnDocument[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,10 +30,14 @@ export interface BoardDocument {
 function toDomain(doc: BoardDocument): Board {
   return {
     id: doc.id,
-    tenantId: doc.tenantId,
     projectId: doc.projectId,
     name: doc.name,
-    description: doc.description ?? undefined,
+    type: doc.type as Board['type'],
+    columns: doc.columns.map((col) => ({
+      id: col.id,
+      statusIds: col.statusIds,
+      position: col.position,
+    })),
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
   };
@@ -34,26 +48,33 @@ function toDomain(doc: BoardDocument): Board {
 export class BoardRepository {
   constructor(private readonly collection: Collection<BoardDocument>) {}
 
-  async findById(tenantId: string, id: string): Promise<Board | null> {
-    const doc = await this.collection.findOne({ id, tenantId });
+  async findById(id: string): Promise<Board | null> {
+    const doc = await this.collection.findOne({ id });
 
     return doc ? toDomain(doc) : null;
   }
 
-  async findByProject(tenantId: string, projectId: string): Promise<Board[]> {
-    const docs = await this.collection.find({ tenantId, projectId }).toArray();
+  async findByProject(projectId: string): Promise<Board[]> {
+    const docs = await this.collection.find({ projectId }).toArray();
 
     return docs.map(toDomain);
   }
 
-  async create(tenantId: string, input: { projectId: string; name: string; description?: string }): Promise<Board> {
+  async create(
+    projectId: string,
+    input: {
+      name: string;
+      type: string;
+      columns: { id: string; statusIds: string[]; position: number }[];
+    },
+  ): Promise<Board> {
     const now = new Date();
     const doc: BoardDocument = {
       id: randomUUID(),
-      tenantId,
-      projectId: input.projectId,
+      projectId,
       name: input.name,
-      description: input.description ?? null,
+      type: input.type,
+      columns: input.columns,
       createdAt: now,
       updatedAt: now,
     };
@@ -62,13 +83,9 @@ export class BoardRepository {
     return toDomain(doc);
   }
 
-  async update(
-    tenantId: string,
-    id: string,
-    input: Partial<Pick<BoardDocument, 'name' | 'description'>>,
-  ): Promise<Board | null> {
+  async update(id: string, input: Partial<Pick<BoardDocument, 'name' | 'columns'>>): Promise<Board | null> {
     const result = await this.collection.findOneAndUpdate(
-      { id, tenantId },
+      { id },
       { $set: { ...input, updatedAt: new Date() } },
       { returnDocument: 'after' },
     );
@@ -76,9 +93,28 @@ export class BoardRepository {
     return result ? toDomain(result) : null;
   }
 
-  async delete(tenantId: string, id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id, tenantId });
+  async delete(id: string): Promise<boolean> {
+    const result = await this.collection.deleteOne({ id });
 
     return result.deletedCount > 0;
+  }
+
+  /**
+   * Replace a status ID in all columns across all boards in a project.
+   * Used when deleting a status with a replacement.
+   */
+  async replaceStatusInColumns(projectId: string, oldStatusId: string, newStatusId: string): Promise<void> {
+    await this.collection.updateMany(
+      { projectId, 'columns.statusIds': oldStatusId },
+      { $set: { 'columns.$[col].statusIds.$[sid]': newStatusId, updatedAt: new Date() } },
+      { arrayFilters: [{ 'col.statusIds': oldStatusId }, { sid: oldStatusId }] },
+    );
+  }
+
+  /**
+   * Delete all entities belonging to a project. Used for cascade delete.
+   */
+  async deleteByProject(projectId: string): Promise<void> {
+    await this.collection.deleteMany({ projectId });
   }
 }

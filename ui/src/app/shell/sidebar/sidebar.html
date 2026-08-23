@@ -1,17 +1,6 @@
-<div hlmSidebarWrapper>
+<div hlmSidebarWrapper class="min-h-[calc(100dvh-var(--header-height))]!">
   <hlm-sidebar collapsible="icon" class="bg-card">
-    <div hlmSidebarHeader>
-      <div class="flex items-center gap-2 px-2">
-        <h1 class="text-lg font-bold text-sidebar-primary group-data-[collapsible=icon]:hidden">
-          {{ 'sidebar.brand' | transloco }}
-        </h1>
-        <h1 class="text-lg font-bold text-sidebar-primary hidden group-data-[collapsible=icon]:block">
-          {{ 'sidebar.brandShort' | transloco }}
-        </h1>
-      </div>
-    </div>
-
-    <div hlmSidebarContent>
+    <div hlmSidebarContent class="min-h-[calc(100dvh-var(--header-height))] mt-(--header-height)">
       @if (tenantStore.activeTenant(); as tenant) {
         <div hlmSidebarGroup>
           <div hlmSidebarGroupContent>
@@ -31,20 +20,6 @@
                 >
                   <ng-icon name="lucideFolder" />
                   <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.projects' | transloco }}</span>
-                </a>
-              </li>
-              <li hlmSidebarMenuItem>
-                <a
-                  hlmSidebarMenuButton
-                  [routerLink]="['/tenants', tenant.id, 'sprints']"
-                  routerLinkActive
-                  #rlaSprints="routerLinkActive"
-                  [isActive]="rlaSprints.isActive"
-                  [tooltip]="'sidebar.sprints' | transloco"
-                  size="lg"
-                >
-                  <ng-icon name="lucideCalendar" />
-                  <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.sprints' | transloco }}</span>
                 </a>
               </li>
               <li hlmSidebarMenuItem>
@@ -78,6 +53,149 @@
             </ul>
           </div>
         </div>
+
+        <!-- Project sub-navigation (shown when inside a project) -->
+        @if (currentProjectKey(); as projectId) {
+          <div hlmSidebarSeparator class="mx-2 my-1"></div>
+          <div hlmSidebarGroup>
+            <div hlmSidebarGroupLabel>{{ 'sidebar.project' | transloco }}</div>
+            <div hlmSidebarGroupContent>
+              <ul hlmSidebarMenu>
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/tenants', tenant.id, 'projects', projectId]"
+                    routerLinkActive
+                    #rlaOverview="routerLinkActive"
+                    [routerLinkActiveOptions]="{ exact: true }"
+                    [isActive]="rlaOverview.isActive"
+                    [tooltip]="'sidebar.overview' | transloco"
+                    size="default"
+                  >
+                    <ng-icon name="lucideHome" />
+                    <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.overview' | transloco }}</span>
+                  </a>
+                </li>
+                @if (defaultBoardId(); as boardId) {
+                  <li hlmSidebarMenuItem>
+                    <a
+                      hlmSidebarMenuButton
+                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'boards', boardId]"
+                      routerLinkActive
+                      #rlaBoard="routerLinkActive"
+                      [isActive]="rlaBoard.isActive"
+                      [tooltip]="'sidebar.board' | transloco"
+                      size="default"
+                    >
+                      <ng-icon name="lucideLayoutDashboard" />
+                      <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.board' | transloco }}</span>
+                    </a>
+                  </li>
+                }
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'tasks']"
+                    routerLinkActive
+                    #rlaTasks="routerLinkActive"
+                    [isActive]="rlaTasks.isActive"
+                    [tooltip]="'sidebar.tasks' | transloco"
+                    size="default"
+                  >
+                    <ng-icon name="lucideListTodo" />
+                    <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.tasks' | transloco }}</span>
+                  </a>
+                </li>
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'sprints']"
+                    routerLinkActive
+                    #rlaPSprints="routerLinkActive"
+                    [isActive]="rlaPSprints.isActive"
+                    [tooltip]="'sidebar.sprints' | transloco"
+                    size="default"
+                  >
+                    <ng-icon name="lucideCalendar" />
+                    <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.sprints' | transloco }}</span>
+                  </a>
+                </li>
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'members']"
+                    routerLinkActive
+                    #rlaPMembers="routerLinkActive"
+                    [isActive]="rlaPMembers.isActive"
+                    [tooltip]="'sidebar.members' | transloco"
+                    size="default"
+                  >
+                    <ng-icon name="lucideUserCog" />
+                    <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.members' | transloco }}</span>
+                  </a>
+                </li>
+                @if (canManageProject()) {
+                  <li hlmSidebarMenuItem>
+                    <a
+                      hlmSidebarMenuButton
+                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'settings', 'statuses']"
+                      routerLinkActive
+                      #rlaStatuses="routerLinkActive"
+                      [isActive]="rlaStatuses.isActive"
+                      [tooltip]="'sidebar.statuses' | transloco"
+                      size="default"
+                    >
+                      <ng-icon name="lucideCircleDot" />
+                      <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.statuses' | transloco }}</span>
+                    </a>
+                  </li>
+                  <li hlmSidebarMenuItem>
+                    <a
+                      hlmSidebarMenuButton
+                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'settings', 'task-types']"
+                      routerLinkActive
+                      #rlaTaskTypes="routerLinkActive"
+                      [isActive]="rlaTaskTypes.isActive"
+                      [tooltip]="'sidebar.taskTypes' | transloco"
+                      size="default"
+                    >
+                      <ng-icon name="lucideLayers" />
+                      <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.taskTypes' | transloco }}</span>
+                    </a>
+                  </li>
+                  <li hlmSidebarMenuItem>
+                    <a
+                      hlmSidebarMenuButton
+                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'settings', 'labels']"
+                      routerLinkActive
+                      #rlaLabels="routerLinkActive"
+                      [isActive]="rlaLabels.isActive"
+                      [tooltip]="'sidebar.labels' | transloco"
+                      size="default"
+                    >
+                      <ng-icon name="lucideTag" />
+                      <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.labels' | transloco }}</span>
+                    </a>
+                  </li>
+                  <li hlmSidebarMenuItem>
+                    <a
+                      hlmSidebarMenuButton
+                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'audit']"
+                      routerLinkActive
+                      #rlaAudit="routerLinkActive"
+                      [isActive]="rlaAudit.isActive"
+                      [tooltip]="'sidebar.audit' | transloco"
+                      size="default"
+                    >
+                      <ng-icon name="lucideHistory" />
+                      <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.audit' | transloco }}</span>
+                    </a>
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+        }
       }
     </div>
 

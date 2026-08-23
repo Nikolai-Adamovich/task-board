@@ -1,0 +1,188 @@
+<hlm-dialog [state]="open() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+    <div class="space-y-4">
+      <h3 hlmDialogTitle>{{ 'taskTable.createTaskTitle' | transloco }}</h3>
+
+      @if (createError()) {
+        <div class="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ createError() | transloco }}
+        </div>
+      }
+
+      <form id="create-task-form" [formRoot]="createForm" class="space-y-4">
+        <!-- Title -->
+        <hlm-field>
+          <label hlmFieldLabel for="create-title">{{ 'taskTable.taskTitle' | transloco }}</label>
+          <input
+            hlmInput
+            id="create-title"
+            type="text"
+            [placeholder]="'taskTable.taskTitlePlaceholder' | transloco"
+            [formField]="createForm.title"
+          />
+        </hlm-field>
+
+        <!-- Description -->
+        <hlm-field>
+          <label hlmFieldLabel for="create-description">{{ 'taskTable.description' | transloco }}</label>
+          <textarea
+            hlmTextarea
+            id="create-description"
+            rows="3"
+            [placeholder]="'taskTable.descriptionPlaceholder' | transloco"
+            [value]="createModel().description"
+            (input)="onFieldChange('description', $any($event.target).value)"
+          ></textarea>
+        </hlm-field>
+
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Type -->
+          <hlm-field>
+            <label hlmFieldLabel for="create-type">{{ 'taskTable.type' | transloco }}</label>
+            <hlm-select
+              [value]="createModel().typeId"
+              (valueChange)="onFieldChange('typeId', $any($event))"
+              [itemToString]="typeItemToString"
+            >
+              <hlm-select-trigger class="w-full" size="sm">
+                <hlm-select-value [placeholder]="'taskTable.selectType' | transloco" />
+              </hlm-select-trigger>
+              <hlm-select-content *hlmSelectPortal>
+                <hlm-select-group>
+                  @for (opt of typeOptions(); track opt.id) {
+                    <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                  }
+                </hlm-select-group>
+              </hlm-select-content>
+            </hlm-select>
+          </hlm-field>
+
+          <!-- Status -->
+          <hlm-field>
+            <label hlmFieldLabel for="create-status">{{ 'taskTable.status' | transloco }}</label>
+            <hlm-select
+              [value]="createModel().statusId"
+              (valueChange)="onFieldChange('statusId', $any($event))"
+              [itemToString]="statusItemToString"
+            >
+              <hlm-select-trigger class="w-full" size="sm">
+                <hlm-select-value [placeholder]="'taskTable.selectStatus' | transloco" />
+              </hlm-select-trigger>
+              <hlm-select-content *hlmSelectPortal>
+                <hlm-select-group>
+                  @for (opt of statusOptions(); track opt.id) {
+                    <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                  }
+                </hlm-select-group>
+              </hlm-select-content>
+            </hlm-select>
+          </hlm-field>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Priority -->
+          <hlm-field>
+            <label hlmFieldLabel for="create-priority">{{ 'taskTable.priority' | transloco }}</label>
+            <hlm-select [value]="createModel().priority" (valueChange)="onFieldChange('priority', $any($event))">
+              <hlm-select-trigger class="w-full" size="sm">
+                <hlm-select-value />
+              </hlm-select-trigger>
+              <hlm-select-content *hlmSelectPortal>
+                <hlm-select-group>
+                  <hlm-select-item value="LOW">{{ 'priority.low' | transloco }}</hlm-select-item>
+                  <hlm-select-item value="MEDIUM">{{ 'priority.medium' | transloco }}</hlm-select-item>
+                  <hlm-select-item value="HIGH">{{ 'priority.high' | transloco }}</hlm-select-item>
+                  <hlm-select-item value="CRITICAL">{{ 'priority.critical' | transloco }}</hlm-select-item>
+                </hlm-select-group>
+              </hlm-select-content>
+            </hlm-select>
+          </hlm-field>
+
+          <!-- Assignee -->
+          <hlm-field>
+            <label hlmFieldLabel for="create-assignee">{{ 'taskTable.assignee' | transloco }}</label>
+            <hlm-select
+              [value]="createModel().assigneeId"
+              (valueChange)="onFieldChange('assigneeId', $any($event))"
+              [itemToString]="assigneeItemToString"
+            >
+              <hlm-select-trigger class="w-full" size="sm">
+                <hlm-select-value [placeholder]="'taskTable.noAssignee' | transloco" />
+              </hlm-select-trigger>
+              <hlm-select-content *hlmSelectPortal>
+                <hlm-select-group>
+                  @for (opt of memberOptions(); track opt.id) {
+                    <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                  }
+                </hlm-select-group>
+              </hlm-select-content>
+            </hlm-select>
+          </hlm-field>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Sprint -->
+          <hlm-field>
+            <label hlmFieldLabel for="create-sprint">{{ 'taskTable.sprint' | transloco }}</label>
+            <hlm-select
+              [value]="createModel().sprintId"
+              (valueChange)="onFieldChange('sprintId', $any($event))"
+              [itemToString]="sprintItemToString"
+            >
+              <hlm-select-trigger class="w-full" size="sm">
+                <hlm-select-value [placeholder]="'taskTable.backlog' | transloco" />
+              </hlm-select-trigger>
+              <hlm-select-content *hlmSelectPortal>
+                <hlm-select-group>
+                  @for (opt of sprintOptions(); track opt.id) {
+                    <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+                  }
+                </hlm-select-group>
+              </hlm-select-content>
+            </hlm-select>
+          </hlm-field>
+
+          <!-- Labels (multi-select via checkboxes) -->
+          <hlm-field>
+            <span class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{{
+              'taskTable.labels' | transloco
+            }}</span>
+            <div class="max-h-32 overflow-y-auto rounded-md border p-2 space-y-1">
+              @for (opt of labelOptions(); track opt.id) {
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    [checked]="isLabelSelected(opt.id)"
+                    (change)="toggleLabel(opt.id)"
+                    class="h-3.5 w-3.5 rounded border-border"
+                  />
+                  {{ opt.name }}
+                </label>
+              } @empty {
+                <span class="text-xs text-muted-foreground">—</span>
+              }
+            </div>
+          </hlm-field>
+        </div>
+      </form>
+
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" (click)="dialogClosed.emit()">
+          {{ 'taskTable.cancel' | transloco }}
+        </button>
+        <button
+          hlmBtn
+          type="submit"
+          form="create-task-form"
+          [disabled]="createForm().invalid() || createForm().submitting()"
+        >
+          @if (createForm().submitting()) {
+            <hlm-spinner class="mr-1" /> {{ 'taskTable.creating' | transloco }}
+          } @else {
+            {{ 'taskTable.create' | transloco }}
+          }
+        </button>
+      </hlm-dialog-footer>
+    </div>
+  </hlm-dialog-content>
+</hlm-dialog>

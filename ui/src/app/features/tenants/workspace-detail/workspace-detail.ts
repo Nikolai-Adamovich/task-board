@@ -2,14 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
-import {
-  lucideSettings,
-  lucideUsers,
-  lucideCreditCard,
-  lucideChevronDown,
-  lucideFolder,
-  lucideChevronRight,
-} from '@ng-icons/lucide';
+import { lucideSettings, lucideUsers, lucideChevronDown, lucideFolder, lucideChevronRight } from '@ng-icons/lucide';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -19,7 +12,8 @@ import { firstValueFrom } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
-import { SubscriptionTier, TenantRole } from '@task-board/shared';
+import { TenantRole, TenantStatus } from '@task-board/shared';
+import { TenantStatusColorMap, NeutralColor } from '@app/constants/priority';
 import type { Project } from '@task-board/shared';
 
 @Component({
@@ -38,7 +32,6 @@ import type { Project } from '@task-board/shared';
     provideIcons({
       lucideSettings,
       lucideUsers,
-      lucideCreditCard,
       lucideChevronDown,
       lucideFolder,
       lucideChevronRight,
@@ -55,21 +48,22 @@ export class WorkspaceDetail implements OnInit {
   protected readonly projects = signal<Project[]>([]);
   protected readonly loadingProjects = signal(true);
   protected readonly projectsExpanded = signal(true);
+  protected readonly TenantStatus = TenantStatus;
   protected readonly isOwnerOrAdmin = computed(() => {
     const r = this.role();
 
-    return r === TenantRole.Owner || r === TenantRole.Admin;
+    return r === TenantRole.OWNER || r === TenantRole.ADMIN;
   });
-  protected readonly isOwner = computed(() => this.role() === TenantRole.Owner);
-  protected readonly showUpgrade = computed(
-    () => this.isOwner() && this.tenant()?.subscription === SubscriptionTier.Free,
-  );
+
+  protected getStatusColor(status: string): string {
+    return (TenantStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
+  }
 
   async ngOnInit(): Promise<void> {
     try {
-      const res = await firstValueFrom(this.projectClient.list(1, 100));
+      const projects = await firstValueFrom(this.projectClient.list());
 
-      this.projects.set(res.data);
+      this.projects.set(projects);
     } catch {
       this.projects.set([]);
     } finally {
