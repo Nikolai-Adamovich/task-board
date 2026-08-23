@@ -139,7 +139,7 @@ describe('Invitation Routes', () => {
 
       await app.request('/api/invitations/inv-123/accept', { method: 'POST' }, TEST_ENV);
 
-      expect(mockAcceptInvitation).toHaveBeenCalledWith('inv-123', 'user-1');
+      expect(mockAcceptInvitation).toHaveBeenCalledWith('inv-123');
     });
   });
 
