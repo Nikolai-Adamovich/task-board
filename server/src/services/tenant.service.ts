@@ -579,28 +579,36 @@ export class TenantService {
 
   async getMyInvitations(email: string): Promise<TenantMember[]> {
     const memberships = await this.tenantMemberRepo.findPendingByEmail(email);
+    const enriched: TenantMember[] = [];
 
-    return memberships.map((doc) => ({
-      id: doc.id,
-      tenantId: doc.tenantId,
-      userId: doc.userId,
-      role: doc.role as TenantMember['role'],
-      status: doc.status as TenantMember['status'],
-      invitation: doc.invitation
-        ? {
-            status: doc.invitation.status as TenantMember['invitation'] extends infer I
-              ? I extends { status: infer S }
-                ? S
-                : never
-              : never,
-            tokenHash: doc.invitation.tokenHash,
-            invitedBy: doc.invitation.invitedBy,
-            invitedOn: doc.invitation.invitedOn.toISOString(),
-          }
-        : null,
-      createdAt: doc.createdAt.toISOString(),
-      updatedAt: doc.updatedAt.toISOString(),
-    }));
+    for (const doc of memberships) {
+      const user = doc.userId ? await this.userRepo.findById(doc.userId) : null;
+
+      enriched.push({
+        id: doc.id,
+        tenantId: doc.tenantId,
+        userId: doc.userId,
+        role: doc.role as TenantMember['role'],
+        status: doc.status as TenantMember['status'],
+        invitation: doc.invitation
+          ? {
+              status: doc.invitation.status as TenantMember['invitation'] extends infer I
+                ? I extends { status: infer S }
+                  ? S
+                  : never
+                : never,
+              tokenHash: doc.invitation.tokenHash,
+              invitedBy: doc.invitation.invitedBy,
+              invitedOn: doc.invitation.invitedOn.toISOString(),
+            }
+          : null,
+        displayName: user?.displayName ?? null,
+        email: user?.email ?? null,
+        createdAt: doc.createdAt.toISOString(),
+        updatedAt: doc.updatedAt.toISOString(),
+      });
+    }
+    return enriched;
   }
 
   // ─── User Deletion ─────────────────────────────────────────────────────────
