@@ -20,7 +20,7 @@ import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import { NeutralColor, NeutralDotColor } from '@app/constants/priority';
+import { NeutralDotColor } from '@app/constants/priority';
 import type { Sprint, Task, User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -226,19 +226,19 @@ describe('SprintDetail', () => {
     beforeEach(() => setup());
 
     it('should return color for FUTURE', () => {
-      expect(component.statusBadgeClass('FUTURE')).toBe('bg-blue-100 text-blue-700');
+      expect(component.statusBadgeVariant('FUTURE')).toBe('secondary');
     });
 
     it('should return color for ACTIVE', () => {
-      expect(component.statusBadgeClass('ACTIVE')).toBe('bg-green-100 text-green-700');
+      expect(component.statusBadgeVariant('ACTIVE')).toBe('default');
     });
 
     it('should return color for COMPLETED', () => {
-      expect(component.statusBadgeClass('COMPLETED')).toBe('bg-gray-100 text-gray-600');
+      expect(component.statusBadgeVariant('COMPLETED')).toBe('outline');
     });
 
     it('should return fallback for unknown', () => {
-      expect(component.statusBadgeClass('unknown')).toBe(NeutralColor);
+      expect(component.statusBadgeVariant('unknown')).toBe('outline');
     });
   });
 
@@ -246,10 +246,10 @@ describe('SprintDetail', () => {
     beforeEach(() => setup());
 
     it('should return correct dot color for each priority', () => {
-      expect(component.getPriorityDot('LOW')).toBe('bg-blue-500');
-      expect(component.getPriorityDot('MEDIUM')).toBe('bg-yellow-500');
-      expect(component.getPriorityDot('HIGH')).toBe('bg-orange-500');
-      expect(component.getPriorityDot('CRITICAL')).toBe('bg-red-500');
+      expect(component.getPriorityDot('LOW')).toBe('bg-primary/40');
+      expect(component.getPriorityDot('MEDIUM')).toBe('bg-primary/70');
+      expect(component.getPriorityDot('HIGH')).toBe('bg-destructive/70');
+      expect(component.getPriorityDot('CRITICAL')).toBe('bg-destructive');
       expect(component.getPriorityDot('unknown')).toBe(NeutralDotColor);
     });
   });
@@ -258,11 +258,11 @@ describe('SprintDetail', () => {
     beforeEach(() => setup());
 
     it('should return correct badge color for each priority', () => {
-      expect(component.getPriorityBadge('LOW')).toBe('bg-blue-100 text-blue-700');
-      expect(component.getPriorityBadge('MEDIUM')).toBe('bg-yellow-100 text-yellow-700');
-      expect(component.getPriorityBadge('HIGH')).toBe('bg-orange-100 text-orange-700');
-      expect(component.getPriorityBadge('CRITICAL')).toBe('bg-red-100 text-red-700');
-      expect(component.getPriorityBadge('unknown')).toBe(NeutralColor);
+      expect(component.getPriorityBadge('LOW')).toBe('outline');
+      expect(component.getPriorityBadge('MEDIUM')).toBe('secondary');
+      expect(component.getPriorityBadge('HIGH')).toBe('default');
+      expect(component.getPriorityBadge('CRITICAL')).toBe('destructive');
+      expect(component.getPriorityBadge('unknown')).toBe('outline');
     });
   });
 

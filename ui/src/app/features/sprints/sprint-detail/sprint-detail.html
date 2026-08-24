@@ -9,7 +9,7 @@
       <div>
         <div class="flex items-center gap-3">
           <h2 class="text-2xl font-bold text-foreground">{{ s.name }}</h2>
-          <span hlmBadge [class]="statusBadgeClass(s.status)">
+          <span hlmBadge [variant]="statusBadgeVariant(s.status)">
             {{ s.status }}
           </span>
         </div>
@@ -67,7 +67,7 @@
                   hlmBadge
                   variant="outline"
                   class="text-[10px] uppercase"
-                  [class]="getPriorityBadge(task.priority)"
+                  [variant]="getPriorityBadge(task.priority)"
                 >
                   {{ task.priority }}
                 </span>

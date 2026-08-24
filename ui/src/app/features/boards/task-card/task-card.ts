@@ -1,7 +1,7 @@
 import { Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import type { Task } from '@task-board/shared';
-import { PriorityColorMap, NeutralColor } from '@app/constants/priority';
+import { priorityBadgeVariant, type BadgeVariant } from '@app/constants/priority';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 
@@ -21,8 +21,8 @@ export class TaskCard {
   readonly taskClick = output<Task>();
   readonly dragStart = output<{ task: Task; dragEvent: DragEvent }>();
 
-  protected priorityColor(): string {
-    return (PriorityColorMap as Record<string, string>)[this.task().priority] ?? NeutralColor;
+  protected priorityVariant(): BadgeVariant {
+    return priorityBadgeVariant(this.task().priority);
   }
 
   protected taskLabel(): string {

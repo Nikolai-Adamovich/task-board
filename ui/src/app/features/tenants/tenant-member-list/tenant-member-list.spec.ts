@@ -24,7 +24,6 @@ import { TenantMemberList } from './tenant-member-list';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import { NeutralColor } from '@app/constants/priority';
 import type { TenantMember } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -296,18 +295,18 @@ describe('TenantMemberList', () => {
     });
 
     it('getRoleColor should return correct colors', () => {
-      expect(component.roleBadgeClass('OWNER')).toBe('bg-purple-100 text-purple-700');
-      expect(component.roleBadgeClass('ADMIN')).toBe('bg-blue-100 text-blue-700');
-      expect(component.roleBadgeClass('MEMBER')).toBe('bg-gray-100 text-gray-600');
-      expect(component.roleBadgeClass('unknown')).toBe(NeutralColor);
+      expect(component.roleBadgeVariant('OWNER')).toBe('default');
+      expect(component.roleBadgeVariant('ADMIN')).toBe('secondary');
+      expect(component.roleBadgeVariant('MEMBER')).toBe('outline');
+      expect(component.roleBadgeVariant('unknown')).toBe('outline');
     });
 
     it('getStatusColor should return correct colors', () => {
-      expect(component.memberStatusBadgeClass('ACTIVE')).toBe('bg-green-100 text-green-700');
-      expect(component.memberStatusBadgeClass('PENDING')).toBe('bg-amber-100 text-amber-700');
-      expect(component.memberStatusBadgeClass('DECLINED')).toBe('bg-red-100 text-red-700');
-      expect(component.memberStatusBadgeClass('ACCESS_REVOKED')).toBe('bg-red-100 text-red-700');
-      expect(component.memberStatusBadgeClass('unknown')).toBe(NeutralColor);
+      expect(component.memberStatusBadgeVariant('ACTIVE')).toBe('default');
+      expect(component.memberStatusBadgeVariant('PENDING')).toBe('secondary');
+      expect(component.memberStatusBadgeVariant('DECLINED')).toBe('destructive');
+      expect(component.memberStatusBadgeVariant('ACCESS_REVOKED')).toBe('destructive');
+      expect(component.memberStatusBadgeVariant('unknown')).toBe('outline');
     });
   });
 

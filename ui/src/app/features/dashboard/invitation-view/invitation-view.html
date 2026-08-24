@@ -18,7 +18,7 @@
               <div>
                 <h3 class="text-base font-semibold text-foreground">{{ invitation.tenantName }}</h3>
                 <div class="mt-1 flex items-center gap-2">
-                  <span hlmBadge [class]="roleBadgeClass(invitation.role)">{{ invitation.role }}</span>
+                  <span hlmBadge [variant]="roleBadgeVariant(invitation.role)">{{ invitation.role }}</span>
                   @if (invitation.invitedAt) {
                     <span class="text-xs text-muted-foreground">
                       {{ 'invitationView.invited' | transloco: { date: (invitation.invitedAt | date: 'mediumDate') } }}

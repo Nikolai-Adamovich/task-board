@@ -1,114 +1,111 @@
-/** Task priority levels with their corresponding Tailwind CSS color classes */
-export const PriorityColorMap = {
-  LOW: 'bg-blue-100 text-blue-700',
-  MEDIUM: 'bg-yellow-100 text-yellow-700',
-  HIGH: 'bg-orange-100 text-orange-700',
-  CRITICAL: 'bg-red-100 text-red-700',
+/**
+ * Semantic color mappings for badges and indicators.
+ *
+ * All badge maps resolve to Spartan `hlmBadge` variants (semantic theme tokens),
+ * so styling automatically follows light/dark themes. Dot indicators use
+ * semantic tokens with opacity gradation.
+ */
+
+/** Subset of `hlmBadge` variants used across the app. */
+export type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
+
+/** Task priority levels mapped to badge variants (ascending severity). */
+export const PriorityVariantMap = {
+  LOW: 'outline',
+  MEDIUM: 'secondary',
+  HIGH: 'default',
+  CRITICAL: 'destructive',
 } as const;
 
-export type PriorityColorMap = (typeof PriorityColorMap)[keyof typeof PriorityColorMap];
-
-/** Sprint status levels with their corresponding Tailwind CSS color classes */
-export const StatusColorMap = {
-  FUTURE: 'bg-blue-100 text-blue-700',
-  ACTIVE: 'bg-green-100 text-green-700',
-  COMPLETED: 'bg-gray-100 text-gray-600',
+/** Sprint status levels mapped to badge variants. */
+export const StatusVariantMap = {
+  FUTURE: 'secondary',
+  ACTIVE: 'default',
+  COMPLETED: 'outline',
 } as const;
 
-export type StatusColorMap = (typeof StatusColorMap)[keyof typeof StatusColorMap];
-
-/** Tenant role levels with their corresponding Tailwind CSS color classes */
-export const TenantRoleColorMap = {
-  OWNER: 'bg-purple-100 text-purple-700',
-  ADMIN: 'bg-blue-100 text-blue-700',
-  MEMBER: 'bg-gray-100 text-gray-600',
+/** Tenant role levels mapped to badge variants. */
+export const TenantRoleVariantMap = {
+  OWNER: 'default',
+  ADMIN: 'secondary',
+  MEMBER: 'outline',
 } as const;
 
-export type TenantRoleColorMap = (typeof TenantRoleColorMap)[keyof typeof TenantRoleColorMap];
-
-/** Member status levels with their corresponding Tailwind CSS color classes */
-export const MemberStatusColorMap = {
-  ACTIVE: 'bg-green-100 text-green-700',
-  PENDING: 'bg-amber-100 text-amber-700',
-  DECLINED: 'bg-red-100 text-red-700',
-  ACCESS_REVOKED: 'bg-red-100 text-red-700',
+/** Member status levels mapped to badge variants. */
+export const MemberStatusVariantMap = {
+  ACTIVE: 'default',
+  PENDING: 'secondary',
+  DECLINED: 'destructive',
+  ACCESS_REVOKED: 'destructive',
 } as const;
 
-export type MemberStatusColorMap = (typeof MemberStatusColorMap)[keyof typeof MemberStatusColorMap];
-
-/** Priority dot indicator colors for sprint-detail view */
+/** Priority dot indicator colors for sprint views (semantic tokens, ascending severity). */
 export const PriorityDotColorMap = {
-  LOW: 'bg-blue-500',
-  MEDIUM: 'bg-yellow-500',
-  HIGH: 'bg-orange-500',
-  CRITICAL: 'bg-red-500',
+  LOW: 'bg-primary/40',
+  MEDIUM: 'bg-primary/70',
+  HIGH: 'bg-destructive/70',
+  CRITICAL: 'bg-destructive',
 } as const;
 
-export type PriorityDotColorMap = (typeof PriorityDotColorMap)[keyof typeof PriorityDotColorMap];
-
-/** Tenant status with their corresponding Tailwind CSS color classes */
-export const TenantStatusColorMap = {
-  ACTIVE: 'bg-green-100 text-green-700',
-  ARCHIVED: 'bg-amber-100 text-amber-700',
-  DELETION_PENDING: 'bg-red-100 text-red-700',
+/** Tenant status mapped to badge variants. */
+export const TenantStatusVariantMap = {
+  ACTIVE: 'default',
+  ARCHIVED: 'secondary',
+  DELETION_PENDING: 'destructive',
 } as const;
 
-export type TenantStatusColorMap = (typeof TenantStatusColorMap)[keyof typeof TenantStatusColorMap];
-
-/** Project status with their corresponding Tailwind CSS color classes */
-export const ProjectStatusColorMap = {
-  ACTIVE: 'bg-green-100 text-green-700',
-  ARCHIVED: 'bg-amber-100 text-amber-700',
-  DELETION_PENDING: 'bg-red-100 text-red-700',
+/** Project status mapped to badge variants. */
+export const ProjectStatusVariantMap = {
+  ACTIVE: 'default',
+  ARCHIVED: 'secondary',
+  DELETION_PENDING: 'destructive',
 } as const;
 
-export type ProjectStatusColorMap = (typeof ProjectStatusColorMap)[keyof typeof ProjectStatusColorMap];
-
-/** Task-type badge colors keyed by task-type key (task/bug/story). Custom types fall back to neutral. */
-export const TaskTypeColorMap = {
-  TASK: 'bg-blue-100 text-blue-700',
-  BUG: 'bg-red-100 text-red-700',
-  STORY: 'bg-green-100 text-green-700',
+/** Semantic hlm-badge variants keyed by task-type key (task/bug/story). Custom types fall back to outline. */
+export const TaskTypeVariantMap = {
+  TASK: 'default',
+  BUG: 'destructive',
+  STORY: 'secondary',
 } as const;
 
-export type TaskTypeColorMap = (typeof TaskTypeColorMap)[keyof typeof TaskTypeColorMap];
+export type TaskTypeVariant = (typeof TaskTypeVariantMap)[keyof typeof TaskTypeVariantMap] | 'outline';
 
-/** Neutral fallback color for unknown values */
-export const NeutralColor = 'bg-gray-100 text-gray-700';
+/** Neutral fallback variant for unknown values */
+export const NeutralVariant: BadgeVariant = 'outline';
 
 /** Neutral fallback color for dot indicators */
-export const NeutralDotColor = 'bg-gray-500';
+export const NeutralDotColor = 'bg-muted-foreground';
 
 /**
- * Badge class lookup shared by sprint, tenant, and project statuses.
+ * Badge variant lookup shared by sprint, tenant, and project statuses.
  * Sprint (FUTURE/ACTIVE/COMPLETED) and tenant/project (ACTIVE/ARCHIVED/DELETION_PENDING)
- * values are merged — overlapping keys agree on the same color.
+ * values are merged — overlapping keys agree on the same variant.
  */
-const StatusBadgeColorMap: Record<string, string> = { ...StatusColorMap, ...TenantStatusColorMap };
+const StatusBadgeVariantMap: Record<string, BadgeVariant> = { ...StatusVariantMap, ...TenantStatusVariantMap };
 
-/** Resolve the badge classes for a task priority. Unknown values fall back to {@link NeutralColor}. */
-export function priorityBadgeClass(priority: string): string {
-  return (PriorityColorMap as Record<string, string>)[priority] ?? NeutralColor;
+/** Resolve the badge variant for a task priority. Unknown values fall back to {@link NeutralVariant}. */
+export function priorityBadgeVariant(priority: string): BadgeVariant {
+  return (PriorityVariantMap as Record<string, BadgeVariant>)[priority] ?? NeutralVariant;
 }
 
-/** Resolve the badge classes for a sprint/tenant/project status. Unknown values fall back to {@link NeutralColor}. */
-export function statusBadgeClass(status: string): string {
-  return StatusBadgeColorMap[status] ?? NeutralColor;
+/** Resolve the badge variant for a sprint/tenant/project status. Unknown values fall back to {@link NeutralVariant}. */
+export function statusBadgeVariant(status: string): BadgeVariant {
+  return StatusBadgeVariantMap[status] ?? NeutralVariant;
 }
 
-/** Resolve the badge classes for a tenant role. Unknown values fall back to {@link NeutralColor}. */
-export function roleBadgeClass(role: string): string {
-  return (TenantRoleColorMap as Record<string, string>)[role] ?? NeutralColor;
+/** Resolve the badge variant for a tenant role. Unknown values fall back to {@link NeutralVariant}. */
+export function roleBadgeVariant(role: string): BadgeVariant {
+  return (TenantRoleVariantMap as Record<string, BadgeVariant>)[role] ?? NeutralVariant;
 }
 
-/** Resolve the badge classes for a tenant member status. Unknown values fall back to {@link NeutralColor}. */
-export function memberStatusBadgeClass(status: string): string {
-  return (MemberStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
+/** Resolve the badge variant for a tenant member status. Unknown values fall back to {@link NeutralVariant}. */
+export function memberStatusBadgeVariant(status: string): BadgeVariant {
+  return (MemberStatusVariantMap as Record<string, BadgeVariant>)[status] ?? NeutralVariant;
 }
 
-/** Resolve the badge classes for a task type by its key (task/bug/story). Unknown keys fall back to {@link NeutralColor}. */
-export function taskTypeBadgeClass(key: string | null | undefined): string {
-  if (!key) return NeutralColor;
+/** Resolve the semantic badge variant for a task type by its key (task/bug/story). Unknown keys fall back to `'outline'`. */
+export function taskTypeBadgeVariant(key: string | null | undefined): TaskTypeVariant {
+  if (!key) return 'outline';
 
-  return (TaskTypeColorMap as Record<string, string>)[key.toUpperCase()] ?? NeutralColor;
+  return (TaskTypeVariantMap as Record<string, TaskTypeVariant>)[key.toUpperCase()] ?? 'outline';
 }

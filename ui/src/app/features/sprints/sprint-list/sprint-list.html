@@ -54,7 +54,7 @@
                       <h3 class="text-base font-semibold text-foreground group-hover:text-primary">
                         {{ sprint.name }}
                       </h3>
-                      <span hlmBadge [class]="statusBadgeClass(sprint.status)">
+                      <span hlmBadge [variant]="statusBadgeVariant(sprint.status)">
                         {{ sprint.status }}
                       </span>
                     </div>

@@ -2,7 +2,7 @@
  * Tests for the TaskCard component.
  *
  * Covers:
- * - priorityColor helper
+ * - priorityVariant helper
  * - taskLabel helper
  * - onDragStart emitting
  * - taskClick output
@@ -14,7 +14,6 @@ import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TaskCard } from './task-card';
 import { API_BASE_URL } from '@app/api-url.token';
-import { NeutralColor } from '@app/constants/priority';
 import type { Task } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -68,32 +67,32 @@ describe('TaskCard', () => {
     fixture.detectChanges();
   }
 
-  // ── priorityColor ──────────────────────────────────────────────────────
+  // ── priorityVariant ──────────────────────────────────────────────────────
 
-  describe('priorityColor', () => {
+  describe('priorityVariant', () => {
     it('should return correct color for LOW', () => {
       setup({ priority: 'LOW' });
-      expect(component.priorityColor()).toBe('bg-blue-100 text-blue-700');
+      expect(component.priorityVariant()).toBe('outline');
     });
 
     it('should return correct color for MEDIUM', () => {
       setup({ priority: 'MEDIUM' });
-      expect(component.priorityColor()).toBe('bg-yellow-100 text-yellow-700');
+      expect(component.priorityVariant()).toBe('secondary');
     });
 
     it('should return correct color for HIGH', () => {
       setup({ priority: 'HIGH' });
-      expect(component.priorityColor()).toBe('bg-orange-100 text-orange-700');
+      expect(component.priorityVariant()).toBe('default');
     });
 
     it('should return correct color for CRITICAL', () => {
       setup({ priority: 'CRITICAL' });
-      expect(component.priorityColor()).toBe('bg-red-100 text-red-700');
+      expect(component.priorityVariant()).toBe('destructive');
     });
 
     it('should return fallback for unknown priority', () => {
       setup({ priority: 'unknown' as Task['priority'] });
-      expect(component.priorityColor()).toBe(NeutralColor);
+      expect(component.priorityVariant()).toBe('outline');
     });
   });
 

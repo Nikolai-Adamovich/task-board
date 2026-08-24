@@ -8,7 +8,7 @@ import { finalize } from 'rxjs';
 import { SprintClient } from '@services/sprint-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
-import { statusBadgeClass } from '@app/constants/priority';
+import { statusBadgeVariant } from '@app/constants/priority';
 import { SprintStatus } from '@task-board/shared';
 import { canManageProject } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -65,7 +65,7 @@ interface SprintGroup {
 })
 export class SprintList implements OnInit {
   /** Shared badge-class helper (see constants/priority.ts) */
-  protected readonly statusBadgeClass = statusBadgeClass;
+  protected readonly statusBadgeVariant = statusBadgeVariant;
   private readonly notify = injectToasts();
   private readonly sprintClient = inject(SprintClient);
   private readonly authStore = inject(AuthStore);

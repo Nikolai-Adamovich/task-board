@@ -130,7 +130,7 @@
             </td>
             <td hlmTableCell class="font-medium">{{ task.title }}</td>
             <td hlmTableCell>
-              <span hlmBadge class="text-xs" [class]="taskTypeBadgeClass(typeKeyMap()[task.typeId])">
+              <span hlmBadge class="text-xs" [variant]="taskTypeBadgeVariant(typeKeyMap()[task.typeId])">
                 {{ typeMap()[task.typeId] || task.typeId }}
               </span>
             </td>
@@ -138,7 +138,7 @@
               <span hlmBadge variant="outline" class="text-xs">{{ statusMap()[task.statusId] || task.statusId }}</span>
             </td>
             <td hlmTableCell>
-              <span hlmBadge variant="outline" class="text-xs">{{ task.priority }}</span>
+              <span hlmBadge class="text-xs" [variant]="priorityBadgeVariant(task.priority)">{{ task.priority }}</span>
             </td>
             <td hlmTableCell class="text-xs text-muted-foreground">
               @if (task.assigneeSnapshot) {

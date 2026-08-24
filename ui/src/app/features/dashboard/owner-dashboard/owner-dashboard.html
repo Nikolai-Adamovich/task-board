@@ -45,8 +45,8 @@
                 <a hlmBtn variant="ghost" size="lg" [routerLink]="['/tenants', tenant.id]" class="font-bold">
                   <ng-icon name="lucideBuilding2" />{{ tenant.name }}</a
                 >
-                <span hlmBadge class="mt-0.5" [class]="roleBadgeClass(tenant.role)">{{ tenant.role }}</span>
-                <span hlmBadge [class]="statusBadgeClass(tenant.status)" class="mt-0.5">{{ tenant.status }}</span>
+                <span hlmBadge class="mt-0.5" [variant]="roleBadgeVariant(tenant.role)">{{ tenant.role }}</span>
+                <span hlmBadge [variant]="statusBadgeVariant(tenant.status)" class="mt-0.5">{{ tenant.status }}</span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -93,7 +93,7 @@
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <span hlmBadge [class]="priorityBadgeClass(task.priority)">{{ task.priority }}</span>
+              <span hlmBadge [variant]="priorityBadgeVariant(task.priority)">{{ task.priority }}</span>
               <ng-icon name="lucideArrowRight" class="size-4 text-muted-foreground" />
             </div>
           </a>

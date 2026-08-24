@@ -12,7 +12,7 @@
             <h2 class="text-2xl font-bold text-foreground">{{ p.name }}</h2>
             <span class="text-sm font-mono text-muted-foreground">[{{ p.key }}]</span>
             @if (p.status !== ProjectStatus.ACTIVE) {
-              <span hlmBadge [class]="statusBadgeClass(p.status)">{{ p.status }}</span>
+              <span hlmBadge [variant]="statusBadgeVariant(p.status)">{{ p.status }}</span>
             }
           </div>
           @if (p.description) {

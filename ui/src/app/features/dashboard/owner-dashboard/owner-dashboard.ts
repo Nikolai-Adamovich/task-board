@@ -13,7 +13,7 @@ import {
   lucideUsers,
   lucidePlus,
 } from '@ng-icons/lucide';
-import { priorityBadgeClass, statusBadgeClass, roleBadgeClass } from '@app/constants/priority';
+import { priorityBadgeVariant, statusBadgeVariant, roleBadgeVariant } from '@app/constants/priority';
 import type { TenantWithRole, MyTask } from '@app/types/frontend';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 
@@ -35,9 +35,9 @@ import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 })
 export class OwnerDashboard {
   /** Shared badge-class helpers (see constants/priority.ts) */
-  protected readonly priorityBadgeClass = priorityBadgeClass;
-  protected readonly statusBadgeClass = statusBadgeClass;
-  protected readonly roleBadgeClass = roleBadgeClass;
+  protected readonly priorityBadgeVariant = priorityBadgeVariant;
+  protected readonly statusBadgeVariant = statusBadgeVariant;
+  protected readonly roleBadgeVariant = roleBadgeVariant;
   readonly tenants = input<TenantWithRole[]>([]);
   readonly tasks = input<MyTask[]>([]);
 }

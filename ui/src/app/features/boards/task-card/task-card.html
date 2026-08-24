@@ -9,7 +9,7 @@
       <span class="shrink-0 text-xs font-mono text-muted-foreground">{{ taskLabel() }}</span>
       <h4 class="text-sm font-medium text-foreground line-clamp-2">{{ task().title }}</h4>
     </div>
-    <span hlmBadge variant="outline" class="shrink-0 text-[10px] uppercase" [class]="priorityColor()">
+    <span hlmBadge class="shrink-0 text-[10px] uppercase" [variant]="priorityVariant()">
       {{ task().priority }}
     </span>
   </div>

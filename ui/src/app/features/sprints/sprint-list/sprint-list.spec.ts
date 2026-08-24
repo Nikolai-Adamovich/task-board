@@ -20,7 +20,6 @@ import { SprintClient } from '@services/sprint-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import { NeutralColor } from '@app/constants/priority';
 import type { Sprint, User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -176,13 +175,13 @@ describe('SprintList', () => {
     beforeEach(() => setup());
 
     it('should return correct color for each status', () => {
-      expect(component.statusBadgeClass('FUTURE')).toBe('bg-blue-100 text-blue-700');
-      expect(component.statusBadgeClass('ACTIVE')).toBe('bg-green-100 text-green-700');
-      expect(component.statusBadgeClass('COMPLETED')).toBe('bg-gray-100 text-gray-600');
+      expect(component.statusBadgeVariant('FUTURE')).toBe('secondary');
+      expect(component.statusBadgeVariant('ACTIVE')).toBe('default');
+      expect(component.statusBadgeVariant('COMPLETED')).toBe('outline');
     });
 
     it('should return fallback for unknown', () => {
-      expect(component.statusBadgeClass('unknown')).toBe(NeutralColor);
+      expect(component.statusBadgeVariant('unknown')).toBe('outline');
     });
   });
 

@@ -11,7 +11,7 @@ import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideMail, lucideBuilding2 } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
 import type { MyInvitation } from '@app/types/frontend';
-import { roleBadgeClass } from '@app/constants/priority';
+import { roleBadgeVariant } from '@app/constants/priority';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,7 +36,7 @@ export class InvitationView {
   protected readonly acceptingId = signal<string | null>(null);
   protected readonly decliningId = signal<string | null>(null);
   /** Shared badge-class helper (see constants/priority.ts) */
-  protected readonly roleBadgeClass = roleBadgeClass;
+  protected readonly roleBadgeVariant = roleBadgeVariant;
 
   protected acceptInvitation(invitation: MyInvitation): void {
     this.acceptingId.set(invitation.id);

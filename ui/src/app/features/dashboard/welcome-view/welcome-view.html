@@ -64,7 +64,9 @@
                 <div>
                   <p class="text-sm font-medium text-foreground">{{ invitation.tenantName }}</p>
                   <p class="text-xs text-muted-foreground">
-                    <span hlmBadge class="mr-1" [class]="roleBadgeClass(invitation.role)">{{ invitation.role }}</span>
+                    <span hlmBadge class="mr-1" [variant]="roleBadgeVariant(invitation.role)">{{
+                      invitation.role
+                    }}</span>
                   </p>
                 </div>
                 <button

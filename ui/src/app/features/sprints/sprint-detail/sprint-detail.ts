@@ -10,7 +10,7 @@ import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { canManageProject } from '@app/shared/utils/role-utils';
-import { PriorityColorMap, NeutralColor, PriorityDotColorMap, NeutralDotColor } from '@app/constants/priority';
+import { PriorityDotColorMap, NeutralDotColor, priorityBadgeVariant, type BadgeVariant } from '@app/constants/priority';
 import { SprintStatus } from '@task-board/shared';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -19,7 +19,7 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { NgIcon } from '@ng-icons/core';
 import type { Sprint, Task } from '@task-board/shared';
 import { injectToasts } from '@app/shared/utils/toast-utils';
-import { statusBadgeClass } from '@app/constants/priority';
+import { statusBadgeVariant } from '@app/constants/priority';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
@@ -42,7 +42,7 @@ import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 })
 export class SprintDetail implements OnInit {
   /** Shared badge-class helper (see constants/priority.ts) */
-  protected readonly statusBadgeClass = statusBadgeClass;
+  protected readonly statusBadgeVariant = statusBadgeVariant;
   private readonly notify = injectToasts();
   private readonly sprintClient = inject(SprintClient);
   private readonly taskClient = inject(TaskClient);
@@ -65,8 +65,8 @@ export class SprintDetail implements OnInit {
     return (PriorityDotColorMap as Record<string, string>)[priority] ?? NeutralDotColor;
   }
 
-  protected getPriorityBadge(priority: string): string {
-    return (PriorityColorMap as Record<string, string>)[priority] ?? NeutralColor;
+  protected getPriorityBadge(priority: string): BadgeVariant {
+    return priorityBadgeVariant(priority);
   }
 
   /** Get available status transitions for the current sprint */

@@ -13,7 +13,7 @@ import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { TenantRole, TenantStatus } from '@task-board/shared';
-import { statusBadgeClass } from '@app/constants/priority';
+import { statusBadgeVariant } from '@app/constants/priority';
 import type { Project } from '@task-board/shared';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 
@@ -43,7 +43,7 @@ import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 })
 export class WorkspaceDetail implements OnInit {
   /** Shared badge-class helper (see constants/priority.ts) */
-  protected readonly statusBadgeClass = statusBadgeClass;
+  protected readonly statusBadgeVariant = statusBadgeVariant;
   private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   private readonly projectClient = inject(ProjectClient);

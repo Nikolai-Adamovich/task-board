@@ -98,27 +98,29 @@
               </span>
             </td>
             <td hlmTableCell>
-              <span hlmBadge [class]="roleBadgeClass(member.role)">
+              <span hlmBadge [variant]="roleBadgeVariant(member.role)">
                 {{ member.role }}
               </span>
             </td>
             <td hlmTableCell>
               @if (member.invitation?.status === InvitationStatus.PENDING) {
-                <span hlmBadge [class]="memberStatusBadgeClass('PENDING')"> {{ 'members.pending' | transloco }} </span>
+                <span hlmBadge [variant]="memberStatusBadgeVariant('PENDING')">
+                  {{ 'members.pending' | transloco }}
+                </span>
               } @else if (member.status === MemberStatus.ACTIVE) {
-                <span hlmBadge [class]="memberStatusBadgeClass(member.status)">
+                <span hlmBadge [variant]="memberStatusBadgeVariant(member.status)">
                   {{ 'members.active' | transloco }}
                 </span>
               } @else if (member.status === MemberStatus.ACCESS_REVOKED) {
-                <span hlmBadge [class]="memberStatusBadgeClass(member.status)">
+                <span hlmBadge [variant]="memberStatusBadgeVariant(member.status)">
                   {{ 'members.accessRevoked' | transloco }}
                 </span>
               } @else if (member.invitation?.status === InvitationStatus.DECLINED) {
-                <span hlmBadge [class]="memberStatusBadgeClass('DECLINED')">
+                <span hlmBadge [variant]="memberStatusBadgeVariant('DECLINED')">
                   {{ 'members.declined' | transloco }}
                 </span>
               } @else if (hasExpiredOrRevokedInvitation(member)) {
-                <span hlmBadge [class]="memberStatusBadgeClass('DECLINED')">
+                <span hlmBadge [variant]="memberStatusBadgeVariant('DECLINED')">
                   {{ member.invitation?.status }}
                 </span>
               }

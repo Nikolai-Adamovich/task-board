@@ -4,7 +4,7 @@
     <ng-icon name="lucideSettings" class="size-6 text-foreground" />
     <h2 class="text-2xl font-bold text-foreground">{{ 'tenantSettings.title' | transloco }}</h2>
     @if (currentStatus() !== TenantStatus.ACTIVE) {
-      <span hlmBadge [class]="statusBadgeClass(currentStatus())">
+      <span hlmBadge [variant]="statusBadgeVariant(currentStatus())">
         {{ currentStatus() }}
       </span>
     }

@@ -7,7 +7,7 @@
         <span hlmBadge variant="secondary">{{ role() }}</span>
       }
       @if (tenant()?.status && tenant()?.status !== TenantStatus.ACTIVE) {
-        <span hlmBadge [class]="statusBadgeClass(tenant()!.status)">{{ tenant()!.status }}</span>
+        <span hlmBadge [variant]="statusBadgeVariant(tenant()!.status)">{{ tenant()!.status }}</span>
       }
     </div>
     <!-- Description -->
@@ -74,7 +74,7 @@
                 }
               </div>
               @if (project.status !== 'ACTIVE') {
-                <span hlmBadge [class]="statusBadgeClass(project.status)" class="text-xs">
+                <span hlmBadge [variant]="statusBadgeVariant(project.status)" class="text-xs">
                   {{ project.status }}
                 </span>
               }

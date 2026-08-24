@@ -13,7 +13,6 @@ import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { MemberDashboard } from './member-dashboard';
 import { API_BASE_URL } from '@app/api-url.token';
-import { NeutralColor } from '@app/constants/priority';
 import type { MyTask } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -98,23 +97,23 @@ describe('MemberDashboard', () => {
     beforeEach(() => setup());
 
     it('should return correct color for CRITICAL', () => {
-      expect(component.priorityBadgeClass('CRITICAL')).toBe('bg-red-100 text-red-700');
+      expect(component.priorityBadgeVariant('CRITICAL')).toBe('destructive');
     });
 
     it('should return correct color for HIGH', () => {
-      expect(component.priorityBadgeClass('HIGH')).toBe('bg-orange-100 text-orange-700');
+      expect(component.priorityBadgeVariant('HIGH')).toBe('default');
     });
 
     it('should return correct color for MEDIUM', () => {
-      expect(component.priorityBadgeClass('MEDIUM')).toBe('bg-yellow-100 text-yellow-700');
+      expect(component.priorityBadgeVariant('MEDIUM')).toBe('secondary');
     });
 
     it('should return correct color for LOW', () => {
-      expect(component.priorityBadgeClass('LOW')).toBe('bg-blue-100 text-blue-700');
+      expect(component.priorityBadgeVariant('LOW')).toBe('outline');
     });
 
     it('should return fallback for unknown priority', () => {
-      expect(component.priorityBadgeClass('unknown')).toBe(NeutralColor);
+      expect(component.priorityBadgeVariant('unknown')).toBe('outline');
     });
   });
 });

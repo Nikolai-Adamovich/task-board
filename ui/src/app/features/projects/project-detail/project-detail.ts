@@ -18,7 +18,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import { TenantRole, ProjectRole, BoardType, ProjectStatus } from '@task-board/shared';
-import { statusBadgeClass } from '@app/constants/priority';
+import { statusBadgeVariant } from '@app/constants/priority';
 import type { Project, Board, CreateBoard } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { injectToasts } from '@app/shared/utils/toast-utils';
@@ -55,7 +55,7 @@ interface BoardFormModel {
 })
 export class ProjectDetail implements OnInit {
   /** Shared badge-class helper (see constants/priority.ts) */
-  protected readonly statusBadgeClass = statusBadgeClass;
+  protected readonly statusBadgeVariant = statusBadgeVariant;
   private readonly notify = injectToasts();
   private readonly projectClient = inject(ProjectClient);
   private readonly boardClient = inject(BoardClient);

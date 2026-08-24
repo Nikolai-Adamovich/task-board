@@ -160,11 +160,11 @@ describe('SprintBacklog', () => {
     beforeEach(() => setup());
 
     it('should return correct dot for each priority', () => {
-      expect(component.getPriorityDot('LOW')).toBe('bg-blue-500');
-      expect(component.getPriorityDot('MEDIUM')).toBe('bg-yellow-500');
-      expect(component.getPriorityDot('HIGH')).toBe('bg-orange-500');
-      expect(component.getPriorityDot('CRITICAL')).toBe('bg-red-500');
-      expect(component.getPriorityDot('unknown')).toBe('bg-gray-500');
+      expect(component.getPriorityDot('LOW')).toBe('bg-primary/40');
+      expect(component.getPriorityDot('MEDIUM')).toBe('bg-primary/70');
+      expect(component.getPriorityDot('HIGH')).toBe('bg-destructive/70');
+      expect(component.getPriorityDot('CRITICAL')).toBe('bg-destructive');
+      expect(component.getPriorityDot('unknown')).toBe('bg-muted-foreground');
     });
   });
 

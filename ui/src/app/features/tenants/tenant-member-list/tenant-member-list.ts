@@ -33,7 +33,7 @@ import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { Pagination } from '@app/shared/pagination/pagination';
-import { roleBadgeClass, memberStatusBadgeClass } from '@app/constants/priority';
+import { roleBadgeVariant, memberStatusBadgeVariant } from '@app/constants/priority';
 import type { TenantMember } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { MemberStatus, TenantRole, InvitationStatus } from '@task-board/shared';
@@ -98,8 +98,8 @@ interface ColumnDef {
 })
 export class TenantMemberList implements OnInit, OnDestroy {
   /** Shared badge-class + initials helpers (see constants/priority.ts / shared/utils) */
-  protected readonly roleBadgeClass = roleBadgeClass;
-  protected readonly memberStatusBadgeClass = memberStatusBadgeClass;
+  protected readonly roleBadgeVariant = roleBadgeVariant;
+  protected readonly memberStatusBadgeVariant = memberStatusBadgeVariant;
   protected readonly initials = initials;
   private readonly notify = injectToasts();
   private readonly tenantClient = inject(TenantClient);

@@ -10,7 +10,7 @@ import { SprintClient } from '@services/sprint-client';
 import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
-import { priorityBadgeClass } from '@app/constants/priority';
+import { priorityBadgeVariant } from '@app/constants/priority';
 import { TaskPriority, ProjectRole } from '@task-board/shared';
 import { hasMinProjectRole, hasMinTenantRole } from '@app/shared/utils/role-utils';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -74,7 +74,7 @@ interface SelectOption {
 })
 export class TaskDetail implements OnInit {
   /** Shared badge-class helpers (see constants/priority.ts) */
-  protected readonly priorityBadgeClass = priorityBadgeClass;
+  protected readonly priorityBadgeVariant = priorityBadgeVariant;
   private readonly notify = injectToasts();
   private readonly taskClient = inject(TaskClient);
   private readonly statusClient = inject(StatusClient);

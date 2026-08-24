@@ -13,7 +13,7 @@ import {
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { TenantRole, TenantStatus } from '@task-board/shared';
-import { statusBadgeClass } from '@app/constants/priority';
+import { statusBadgeVariant } from '@app/constants/priority';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -57,7 +57,7 @@ import { HlmAlertImports } from '@spartan-ng/helm/alert';
 })
 export class TenantSettings implements OnInit {
   /** Shared badge-class helper (see constants/priority.ts) */
-  protected readonly statusBadgeClass = statusBadgeClass;
+  protected readonly statusBadgeVariant = statusBadgeVariant;
   private readonly notify = injectToasts();
   private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);

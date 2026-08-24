@@ -28,7 +28,7 @@ import { AppliedFilterState } from '@features/filters/filter-panel/filter-panel'
 import { Subscription } from 'rxjs';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import type { Task, TaskPriority, FilterCriteria, FilterSort } from '@task-board/shared';
-import { taskTypeBadgeClass } from '@app/constants/priority';
+import { taskTypeBadgeVariant, priorityBadgeVariant } from '@app/constants/priority';
 
 interface TaskColumnDef {
   field: string;
@@ -94,8 +94,9 @@ export class TaskTable implements OnInit, OnDestroy {
   protected readonly typeMap = signal<Record<string, string>>({});
   /** Task-type id → type key (task/bug/story), used for badge coloring */
   protected readonly typeKeyMap = signal<Record<string, string>>({});
-  /** Shared badge-class helper (see constants/priority.ts) */
-  protected readonly taskTypeBadgeClass = taskTypeBadgeClass;
+  /** Shared badge-variant helpers (see constants/priority.ts) */
+  protected readonly taskTypeBadgeVariant = taskTypeBadgeVariant;
+  protected readonly priorityBadgeVariant = priorityBadgeVariant;
   protected readonly sprintMap = signal<Record<string, string>>({});
   protected readonly labelMap = signal<Record<string, string>>({});
   /** Column-level filter signals synced with URL query params */
