@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { MemberStatus, TenantRole, TenantStatus, InvitationStatus } from '@task-board/shared';
-import type { Tenant, TenantMember, CreateTenant, UpdateTenant } from '@task-board/shared';
+import type { Tenant, TenantMember, MyInvitation, CreateTenant, UpdateTenant } from '@task-board/shared';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
 import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
@@ -577,14 +577,16 @@ export class TenantService {
     await this.tenantMemberRepo.deleteById(memberId);
   }
 
-  async getMyInvitations(email: string): Promise<TenantMember[]> {
+  async getMyInvitations(email: string): Promise<MyInvitation[]> {
     const memberships = await this.tenantMemberRepo.findPendingByEmail(email);
-    const enriched: TenantMember[] = [];
+    const enriched: MyInvitation[] = [];
 
     for (const doc of memberships) {
       const user = doc.userId ? await this.userRepo.findById(doc.userId) : null;
+      const tenant = await this.tenantRepo.findById(doc.tenantId);
 
       enriched.push({
+        tenantName: tenant?.name ?? '',
         id: doc.id,
         tenantId: doc.tenantId,
         userId: doc.userId,

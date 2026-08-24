@@ -1,4 +1,5 @@
 import { Component, computed, inject, input, signal, OnInit } from '@angular/core';
+import { getTenantId } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
@@ -295,17 +296,6 @@ export class BoardView implements OnInit {
     const projectKey = this.projectStore.activeProject()?.key ?? task.projectId;
 
     // Navigate using route params (tenantId, projectKey from URL)
-    this.router.navigate(['/tenants', this.getTenantId(), 'projects', projectKey, 'tasks', task.id]);
-  }
-
-  private getTenantId(): string {
-    // Extract tenantId from the current route
-    let route = this.route;
-
-    while (route.parent) {
-      route = route.parent;
-    }
-
-    return route.snapshot.paramMap.get('tenantId') ?? '';
+    this.router.navigate(['/tenants', getTenantId(this.route), 'projects', projectKey, 'tasks', task.id]);
   }
 }

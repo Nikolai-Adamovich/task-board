@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
@@ -11,7 +11,6 @@ import { HlmDropdownMenuImports, HlmDropdownMenuTrigger } from '@spartan-ng/helm
 import type { TenantWithRole } from '@app/types/frontend';
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-tenant-switcher',
   imports: [NgIcon, HlmButtonImports, HlmDropdownMenuImports, HlmDropdownMenuTrigger, TranslocoPipe],
   providers: [provideIcons({ lucideChevronDown, lucideCheck, lucidePlus })],

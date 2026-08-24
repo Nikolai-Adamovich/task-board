@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { ExpandState } from '@task-board/shared';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -19,7 +19,6 @@ import { UserMenuThemeSheet } from './user-menu-theme-sheet/user-menu-theme-shee
 import { UserMenuZoomControls } from './user-menu-zoom-controls/user-menu-zoom-controls';
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-user-menu',
   imports: [
     RouterLink,

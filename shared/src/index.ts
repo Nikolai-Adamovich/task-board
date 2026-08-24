@@ -44,7 +44,15 @@ export type { User, CreateUser } from './types/user.js';
 
 export type { LoginRequest, RegisterRequest, AuthResponse, AcceptInvitation, InvitationDetails } from './types/auth.js';
 
-export type { IdentitySnapshot, Tenant, CreateTenant, UpdateTenant, Invitation, TenantMember } from './types/tenant.js';
+export type {
+  IdentitySnapshot,
+  Tenant,
+  CreateTenant,
+  UpdateTenant,
+  Invitation,
+  TenantMember,
+  MyInvitation,
+} from './types/tenant.js';
 
 export type { Project, CreateProject, UpdateProject, ProjectMember } from './types/project.js';
 

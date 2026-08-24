@@ -10,7 +10,7 @@ import type {
   AcceptInvitation,
   AuthResponse,
 } from '@task-board/shared';
-import type { TenantWithRole, MyInvitation, PendingInvitation } from '@app/types/frontend';
+import type { TenantWithRole, MyInvitation } from '@app/types/frontend';
 
 /**
  * Pure HTTP client for tenant endpoints — no state management.
@@ -124,13 +124,6 @@ export class TenantClient {
   /** Get pending invitations for the current user (cross-tenant). */
   getMyInvitations(): Observable<MyInvitation[]> {
     return this.http.get<{ data: MyInvitation[] }>(`${this.apiBaseUrl}/invitations/my`).pipe(map((res) => res.data));
-  }
-
-  /** Get pending invitations for a tenant (owner/admin view). */
-  getTenantPendingInvitations(tenantId: string): Observable<PendingInvitation[]> {
-    return this.http
-      .get<{ data: PendingInvitation[] }>(`${this.apiBaseUrl}/tenants/${tenantId}/invitations/pending`)
-      .pipe(map((res) => res.data));
   }
 
   /** Decline an invitation. */

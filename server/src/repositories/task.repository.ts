@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
+import type { Collection, Document } from 'mongodb';
 import type { Task, IdentitySnapshot } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -13,6 +13,9 @@ import type { Task, IdentitySnapshot } from '@task-board/shared';
 // - { projectId: 1, reporterId: 1, number: -1 }
 // - { projectId: 1, priority: 1, number: -1 }
 // - { projectId: 1, typeId: 1, number: -1 }
+
+/** Sort fields that require resolving relation names / snapshots / priority rank before sorting. */
+const SEMANTIC_SORT_FIELDS = new Set(['statusId', 'sprintId', 'labelIds', 'priority', 'assigneeId', 'reporterId']);
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
@@ -149,6 +152,26 @@ export class TaskRepository {
     const sortField = sort?.field ?? 'number';
     const sortDir = sort?.direction === 'asc' ? 1 : -1;
     const skip = (page - 1) * limit;
+
+    // Semantic sorts resolve relation names / priority rank instead of raw ids.
+    if (sort && SEMANTIC_SORT_FIELDS.has(sort.field)) {
+      const pipeline = this.buildSemanticSortPipeline(query, sort.field, sortDir, skip, limit);
+      const [docs, total] = await Promise.all([
+        this.collection.aggregate(pipeline).toArray(),
+        this.collection.countDocuments(query),
+      ]);
+
+      return {
+        data: docs.map((doc) => toDomain(doc as unknown as TaskDocument)),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+
     const [docs, total] = await Promise.all([
       this.collection
         .find(query)
@@ -168,6 +191,87 @@ export class TaskRepository {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /**
+   * Aggregation pipeline for sorts that cannot be expressed as a plain field sort:
+   * - `statusId` / `sprintId` → sort by the related status/sprint **name**
+   * - `labelIds` → sort by the alphabetically-first label name (tasks without labels last)
+   * - `priority` → sort by severity rank (LOW < MEDIUM < HIGH < CRITICAL)
+   */
+  private buildSemanticSortPipeline(
+    query: Record<string, unknown>,
+    field: string,
+    dir: 1 | -1,
+    skip: number,
+    limit: number,
+  ): Document[] {
+    const NO_VALUE = '\uffff'; // sorts after any real name
+    let addSortKey: Document;
+
+    if (field === 'priority') {
+      const rank: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3 };
+
+      addSortKey = {
+        $addFields: {
+          __sort: {
+            $switch: {
+              branches: Object.entries(rank).map(([priority, value]) => ({
+                case: { $eq: ['$priority', priority] },
+                then: value,
+              })),
+              default: Object.keys(rank).length,
+            },
+          },
+        },
+      };
+    } else if (field === 'labelIds') {
+      addSortKey = {
+        $addFields: {
+          __sort: {
+            $cond: [{ $gt: [{ $size: '$__refs' }, 0] }, { $min: '$__refs.name' }, NO_VALUE],
+          },
+        },
+      };
+    } else if (field === 'assigneeId' || field === 'reporterId') {
+      // Denormalized display-name snapshot is embedded in the task document — no lookup needed.
+      const snapshotField = field === 'assigneeId' ? 'assigneeSnapshot.displayName' : 'reporterSnapshot.displayName';
+
+      addSortKey = {
+        $addFields: { __sort: { $ifNull: [`$${snapshotField}`, NO_VALUE] } },
+      };
+    } else {
+      // statusId | sprintId — single reference, sort by its name
+      addSortKey = {
+        $addFields: { __sort: { $ifNull: [{ $first: '$__refs.name' }, NO_VALUE] } },
+      };
+    }
+
+    let lookup: Document[] = [];
+
+    if (field === 'labelIds') {
+      lookup = [{ $lookup: { from: 'labels', localField: 'labelIds', foreignField: 'id', as: '__refs' } }];
+    } else if (field === 'statusId' || field === 'sprintId') {
+      lookup = [
+        {
+          $lookup: {
+            from: field === 'statusId' ? 'statuses' : 'sprints',
+            localField: field,
+            foreignField: 'id',
+            as: '__refs',
+          },
+        },
+      ];
+    }
+
+    return [
+      { $match: query },
+      ...lookup,
+      addSortKey,
+      { $sort: { __sort: dir, number: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ];
   }
 
   async create(input: {

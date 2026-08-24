@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -11,7 +11,6 @@ import type { TenantWithRole, MyTask } from '@app/types/frontend';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-member-dashboard',
   imports: [HlmEmptyImports, RouterLink, TranslocoPipe, HlmCardImports, HlmButtonImports, HlmBadgeImports, NgIcon],
   providers: [provideIcons({ lucideBuilding2, lucideLayoutDashboard, lucideArrowRight })],

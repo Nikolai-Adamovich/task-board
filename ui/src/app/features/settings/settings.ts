@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
@@ -19,7 +19,6 @@ interface LanguageOption {
 @Component({
   selector: 'ui-settings',
   imports: [TranslocoPipe, HlmCardImports, HlmSelectImports, HlmButtonImports],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './settings.html',
 })
 export class Settings implements OnInit {

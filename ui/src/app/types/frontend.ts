@@ -9,25 +9,8 @@ import type { TaskPriority } from '@task-board/shared';
 /** Tenant enriched with the current user's role (returned by GET /api/tenants) */
 export type TenantWithRole = Tenant & { role: TenantRole };
 
-/** Cross-tenant invitation visible to the current user */
-export interface MyInvitation {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  role: TenantRole;
-  invitedEmail: string;
-  invitedAt: string;
-}
-
-/** Pending invitation within a specific tenant (owner/admin view) */
-export interface PendingInvitation {
-  id: string;
-  email: string;
-  role: TenantRole;
-  invitedBy: string;
-  invitedAt: string;
-  expiresAt: string;
-}
+/** Cross-tenant invitation visible to the current user (contract lives in shared) */
+export type { MyInvitation } from '@task-board/shared';
 
 /** Task summary for "My Tasks" cross-tenant dashboard */
 export interface MyTask {

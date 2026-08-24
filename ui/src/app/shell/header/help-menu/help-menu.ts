@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -7,7 +7,6 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-help-menu',
   standalone: true,
   imports: [RouterLink, NgIcon, HlmButtonImports, HlmDropdownMenuImports, TranslocoPipe],

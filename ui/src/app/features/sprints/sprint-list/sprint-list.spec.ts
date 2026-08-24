@@ -59,6 +59,7 @@ describe('SprintList', () => {
     isAuthenticated: () => boolean;
     token: () => string | null;
     tenantRole: () => string | null;
+    tenantId: ReturnType<typeof vi.fn>;
   };
 
   function setup(projectId?: string) {
@@ -72,6 +73,7 @@ describe('SprintList', () => {
       isAuthenticated: () => true,
       token: () => 'fake-jwt',
       tenantRole: () => 'OWNER',
+      tenantId: vi.fn().mockReturnValue('t1'),
     };
 
     TestBed.configureTestingModule({
@@ -144,6 +146,7 @@ describe('SprintList', () => {
         isAuthenticated: () => false,
         token: () => null,
         tenantRole: () => null,
+        tenantId: vi.fn().mockReturnValue('t1'),
       };
 
       TestBed.resetTestingModule();

@@ -70,6 +70,8 @@ export class SprintList implements OnInit {
   private readonly sprintClient = inject(SprintClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
+  /** Current tenant id for building sprint-detail links */
+  protected readonly tenantId = this.authStore.tenantId;
   /** Bound via withComponentInputBinding() — now receives project key from route */
   readonly projectKey = input<string>('');
   /** Resolved project UUID from the store */

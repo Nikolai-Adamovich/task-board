@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { Component, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -14,7 +14,6 @@ import type { MyInvitation } from '@app/types/frontend';
 import { roleBadgeVariant } from '@app/constants/priority';
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-welcome-view',
   imports: [RouterLink, TranslocoPipe, HlmCardImports, HlmButtonImports, HlmBadgeImports, HlmSpinnerImports, NgIcon],
   providers: [provideIcons({ lucideBuilding2, lucideCheck, lucideMail })],

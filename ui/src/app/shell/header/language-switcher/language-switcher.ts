@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCheck, lucideGlobe } from '@ng-icons/lucide';
@@ -11,7 +11,6 @@ export interface LanguageOption {
 }
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-language-switcher',
   imports: [NgIcon, HlmDropdownMenuItem, HlmDropdownMenu],
   providers: [provideIcons({ lucideGlobe, lucideCheck })],

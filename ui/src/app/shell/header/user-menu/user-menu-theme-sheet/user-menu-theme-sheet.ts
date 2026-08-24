@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, model, signal } from '@angular/core';
+import { Component, DestroyRef, effect, inject, model, signal } from '@angular/core';
 import { ExpandState } from '@task-board/shared';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -12,7 +12,6 @@ const MIN_BUTTON_WIDTH = 184;
 const GRID_GAP_X = 24;
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-user-menu-theme-sheet',
   standalone: true,
   imports: [HlmSheetImports, HlmButtonImports, TranslocoPipe],

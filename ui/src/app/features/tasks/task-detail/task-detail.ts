@@ -1,4 +1,5 @@
 import { Component, inject, input, signal, OnInit } from '@angular/core';
+import { getTenantId } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -382,18 +383,8 @@ export class TaskDetail implements OnInit {
         // Navigate using project key from store
         const projectKey = this.projectStore.activeProject()?.key ?? task.projectId;
 
-        this.router.navigate(['/tenants', this.getTenantId(), 'projects', projectKey]);
+        this.router.navigate(['/tenants', getTenantId(this.route), 'projects', projectKey]);
       },
     });
-  }
-
-  private getTenantId(): string {
-    let route = this.route;
-
-    while (route.parent) {
-      route = route.parent;
-    }
-
-    return route.snapshot.paramMap.get('tenantId') ?? '';
   }
 }

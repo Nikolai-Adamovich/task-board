@@ -1,4 +1,5 @@
 import { Component, computed, inject, input, signal, OnInit } from '@angular/core';
+import { getTenantId } from '@app/shared/utils/route-utils';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -18,7 +19,6 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { NgIcon } from '@ng-icons/core';
 import type { Sprint, Task } from '@task-board/shared';
-import { injectToasts } from '@app/shared/utils/toast-utils';
 import { statusBadgeVariant } from '@app/constants/priority';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
@@ -43,7 +43,6 @@ import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 export class SprintDetail implements OnInit {
   /** Shared badge-class helper (see constants/priority.ts) */
   protected readonly statusBadgeVariant = statusBadgeVariant;
-  private readonly notify = injectToasts();
   private readonly sprintClient = inject(SprintClient);
   private readonly taskClient = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
@@ -118,14 +117,14 @@ export class SprintDetail implements OnInit {
       next: () => {
         const projectKey = this.projectStore.activeProject()?.key ?? s.projectId;
 
-        this.router.navigate(['/tenants', this.getTenantId(), 'projects', projectKey]);
+        this.router.navigate(['/tenants', getTenantId(this.route), 'projects', projectKey]);
       },
       error: (err) => console.error(err),
     });
   }
 
   ngOnInit(): void {
-    this.tenantId.set(this.getTenantId());
+    this.tenantId.set(getTenantId(this.route));
     this.loadSprint();
   }
 
@@ -138,7 +137,6 @@ export class SprintDetail implements OnInit {
         next: (sprint) => {
           this.sprint.set(sprint);
           this.loadSprintTasks(sprint.projectId);
-          this.notify.success('toasts.updated');
         },
         error: (err) => console.error(err),
       });
@@ -157,15 +155,5 @@ export class SprintDetail implements OnInit {
         this.sprintTasks.update((list) => list.filter((t) => t.id !== task.id));
       },
     });
-  }
-
-  private getTenantId(): string {
-    let route = this.route;
-
-    while (route.parent) {
-      route = route.parent;
-    }
-
-    return route.snapshot.paramMap.get('tenantId') ?? '';
   }
 }

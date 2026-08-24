@@ -33,14 +33,11 @@
 
     <!-- Sprint tasks -->
     <section>
-      <div class="mb-4 flex items-center justify-between">
+      <div class="mb-4">
         <h3 class="text-lg font-semibold text-foreground">
           {{ 'sprintDetail.tasks' | transloco }}
           <span class="text-sm font-normal text-muted-foreground">({{ sprintTasks().length }})</span>
         </h3>
-        <button hlmBtn variant="outline" size="sm" [routerLink]="['/tenants', tenantId(), 'projects', s.projectId]">
-          {{ 'sprintDetail.backToProject' | transloco }}
-        </button>
       </div>
 
       @if (sprintTasks().length === 0) {

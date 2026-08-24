@@ -1,5 +1,6 @@
 import { Component, inject, input, signal, computed, OnInit, OnDestroy, viewChild } from '@angular/core';
 import { ProjectStore } from '@stores/project-store';
+import { getTenantId } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -405,10 +406,14 @@ export class TaskTable implements OnInit, OnDestroy {
   }
 
   protected goToTask(task: Task): void {
-    const tenantId = this.getTenantId();
-    const key = this.projectStore.activeProject()?.key ?? task.projectId;
+    const tenantId = getTenantId(this.route);
+    // The table only renders under projects/:projectKey — prefer the route param
+    // so the link is correct even before ProjectStore is hydrated.
+    const projectKey =
+      this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? task.projectId;
 
-    this.router.navigate(['/tenants', tenantId, 'projects', key, 'tasks', `${key}-${task.number}`]);
+    // Backend accepts KEY-NUMBER format for GET /tasks/:taskId
+    this.router.navigate(['/tenants', tenantId, 'projects', projectKey, 'tasks', `${projectKey}-${task.number}`]);
   }
 
   // ─── Create Task Dialog Handlers ──────────────────────────────────────────
@@ -674,11 +679,5 @@ export class TaskTable implements OnInit, OnDestroy {
       next: (members) =>
         this.memberOptions.set(members.map((m) => ({ id: m.userId, name: m.displayName ?? m.userId }))),
     });
-  }
-
-  private getTenantId(): string {
-    const match = this.router.url.match(/\/tenants\/([^/?#]+)/);
-
-    return match?.[1] ?? '';
   }
 }

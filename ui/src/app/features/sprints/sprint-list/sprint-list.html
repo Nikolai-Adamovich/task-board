@@ -46,7 +46,7 @@
             <div class="flex flex-col gap-2 rounded-b-lg border border-t-0 border-border bg-card p-3">
               @for (sprint of group.sprints; track sprint.id) {
                 <a
-                  [routerLink]="['/tenants', 'current', 'projects', sprint.projectId, 'sprints', sprint.id]"
+                  [routerLink]="['/tenants', tenantId(), 'projects', projectKey(), 'sprints', sprint.id]"
                   class="group flex items-center justify-between rounded-md border border-border bg-background p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
                 >
                   <div>

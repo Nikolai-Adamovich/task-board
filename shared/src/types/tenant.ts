@@ -70,3 +70,9 @@ export interface TenantMember {
   /** Last update timestamp (ISO 8601) */
   updatedAt: string;
 }
+
+/** Pending invitation for the authenticated user, enriched with the tenant name (GET /invitations/my) */
+export interface MyInvitation extends TenantMember {
+  /** Display name of the tenant the invitation belongs to */
+  tenantName: string;
+}

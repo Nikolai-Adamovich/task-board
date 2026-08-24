@@ -19,8 +19,32 @@ import type { MyInvitation } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockInvitations: MyInvitation[] = [
-  { id: 'inv1', tenantId: 't1', tenantName: 'Acme', role: 'MEMBER', invitedEmail: 'a@b.com', invitedAt: NOW },
-  { id: 'inv2', tenantId: 't2', tenantName: 'Globex', role: 'ADMIN', invitedEmail: 'c@d.com', invitedAt: NOW },
+  {
+    id: 'inv1',
+    tenantId: 't1',
+    tenantName: 'Acme',
+    userId: 'u1',
+    role: 'MEMBER',
+    status: 'ACTIVE',
+    invitation: { status: 'PENDING', tokenHash: 'hash', invitedBy: 'u9', invitedOn: NOW },
+    displayName: null,
+    email: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
+  {
+    id: 'inv2',
+    tenantId: 't2',
+    tenantName: 'Globex',
+    userId: 'u1',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    invitation: { status: 'PENDING', tokenHash: 'hash', invitedBy: 'u9', invitedOn: NOW },
+    displayName: null,
+    email: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
 ];
 
 describe('InvitationView', () => {
