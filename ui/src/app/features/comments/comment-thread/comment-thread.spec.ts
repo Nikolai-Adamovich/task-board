@@ -90,7 +90,13 @@ describe('CommentThread', () => {
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: CommentClient, useValue: commentClientMock },
-        { provide: AuthStore, useValue: { tenantRole: vi.fn().mockReturnValue(canEdit ? 'ADMIN' : null) } },
+        {
+          provide: AuthStore,
+          useValue: {
+            tenantRole: vi.fn().mockReturnValue(canEdit ? 'ADMIN' : null),
+            currentUser: vi.fn().mockReturnValue(null),
+          },
+        },
       ],
     });
 
@@ -128,7 +134,10 @@ describe('CommentThread', () => {
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: CommentClient, useValue: commentClientMock },
-        { provide: AuthStore, useValue: { tenantRole: vi.fn().mockReturnValue(null) } },
+        {
+          provide: AuthStore,
+          useValue: { tenantRole: vi.fn().mockReturnValue(null), currentUser: vi.fn().mockReturnValue(null) },
+        },
       ],
     });
 

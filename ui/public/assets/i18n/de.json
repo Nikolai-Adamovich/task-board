@@ -483,6 +483,7 @@
     "createDesc": "Erstelle ein neues Label für dieses Projekt."
   },
   "projectMembers": {
+    "email": "E-Mail",
     "addMemberDesc": "Füge ein bestehendes Workspace-Mitglied zu diesem Projekt hinzu."
   },
   "statusManager": {

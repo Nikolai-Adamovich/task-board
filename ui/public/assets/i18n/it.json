@@ -483,6 +483,7 @@
     "createDesc": "Crea una nuova etichetta per questo progetto."
   },
   "projectMembers": {
+    "email": "Email",
     "addMemberDesc": "Aggiungi un membro esistente del workspace a questo progetto."
   },
   "statusManager": {

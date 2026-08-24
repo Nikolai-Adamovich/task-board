@@ -100,7 +100,7 @@
                       </hlm-select-trigger>
                       <hlm-select-content *hlmSelectPortal>
                         <hlm-select-group>
-                          <hlm-select-item value="">All Roles</hlm-select-item>
+                          <hlm-select-item value="">{{ 'members.allRoles' | transloco }}</hlm-select-item>
                           @for (role of projectRoles; track role) {
                             <hlm-select-item [value]="role">{{ role }}</hlm-select-item>
                           }

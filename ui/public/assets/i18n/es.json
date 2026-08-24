@@ -483,6 +483,7 @@
     "createDesc": "Crea una nueva etiqueta para este proyecto."
   },
   "projectMembers": {
+    "email": "Correo electrónico",
     "addMemberDesc": "Añade un miembro existente del espacio de trabajo a este proyecto."
   },
   "statusManager": {

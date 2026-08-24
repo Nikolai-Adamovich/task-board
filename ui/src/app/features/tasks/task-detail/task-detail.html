@@ -276,11 +276,11 @@
                 [itemToString]="sprintItemToString"
               >
                 <hlm-select-trigger class="mt-1 w-full">
-                  <hlm-select-value placeholder="Backlog" />
+                  <hlm-select-value [placeholder]="'taskTable.backlog' | transloco" />
                 </hlm-select-trigger>
                 <hlm-select-content *hlmSelectPortal>
                   <hlm-select-group>
-                    <hlm-select-item value="">Backlog</hlm-select-item>
+                    <hlm-select-item value="">{{ 'taskTable.backlog' | transloco }}</hlm-select-item>
                     @for (opt of sprintOptions(); track opt.id) {
                       <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
                     }
@@ -290,7 +290,7 @@
             } @else if (t.sprintId) {
               <p class="mt-1 text-sm font-medium text-foreground">{{ sprintName() || t.sprintId }}</p>
             } @else {
-              <p class="mt-1 text-xs text-muted-foreground">Backlog</p>
+              <p class="mt-1 text-xs text-muted-foreground">{{ 'taskTable.backlog' | transloco }}</p>
             }
           </div>
         </hlm-card>

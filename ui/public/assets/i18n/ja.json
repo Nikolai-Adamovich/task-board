@@ -483,6 +483,7 @@
     "createDesc": "このプロジェクトに新しいラベルを作成します。"
   },
   "projectMembers": {
+    "email": "メールアドレス",
     "addMemberDesc": "既存のワークスペースメンバーをこのプロジェクトに追加します。"
   },
   "statusManager": {

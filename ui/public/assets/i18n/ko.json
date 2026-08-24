@@ -483,6 +483,7 @@
     "createDesc": "이 프로젝트에 새 라벨을 만듭니다."
   },
   "projectMembers": {
+    "email": "이메일",
     "addMemberDesc": "기존 워크스페이스 멤버를 이 프로젝트에 추가합니다."
   },
   "statusManager": {

@@ -1,4 +1,4 @@
-import { Component, inject, input, signal, OnInit } from '@angular/core';
+import { Component, computed, inject, input, signal, OnInit } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { CommentClient } from '@services/comment-client';
@@ -13,6 +13,7 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { finalize } from 'rxjs';
 import type { Comment } from '@task-board/shared';
 import { injectToasts } from '@app/shared/utils/toast-utils';
+import { initials } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
@@ -42,6 +43,8 @@ export class CommentThread implements OnInit {
   readonly currentUserId = input.required<string>();
   /** Whether the current user can moderate (admin/owner) */
   readonly canEdit = input<boolean>(false);
+  /** Initials of the current user for the new-comment avatar fallback */
+  protected readonly currentUserInitials = computed(() => initials(this.authStore.currentUser()?.displayName ?? null));
   protected readonly comments = signal<Comment[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');

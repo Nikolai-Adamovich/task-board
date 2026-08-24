@@ -11,6 +11,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TaskCard } from './task-card';
 import { API_BASE_URL } from '@app/api-url.token';
 import { NeutralColor } from '@app/constants/priority';
@@ -47,8 +48,9 @@ describe('TaskCard', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
 
-  function setup(taskOverrides: Partial<Task> = {}) {
+  function setup(taskOverrides: Partial<Task> = {}, projectKey = 'PROJ') {
     TestBed.configureTestingModule({
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -60,7 +62,7 @@ describe('TaskCard', () => {
     const fixture = TestBed.createComponent(TaskCard);
 
     fixture.componentRef.setInput('task', makeTask(taskOverrides));
-    fixture.componentRef.setInput('projectKey', 'PROJ');
+    fixture.componentRef.setInput('projectKey', projectKey);
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -104,23 +106,7 @@ describe('TaskCard', () => {
     });
 
     it('should return #number when projectKey is empty', () => {
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [
-          provideHttpClient(),
-          provideHttpClientTesting(),
-          provideRouter([]),
-          { provide: API_BASE_URL, useValue: 'http://localhost/api' },
-        ],
-      });
-
-      const fixture = TestBed.createComponent(TaskCard);
-
-      fixture.componentRef.setInput('task', makeTask({ number: 7 }));
-      fixture.componentRef.setInput('projectKey', '');
-      component = fixture.componentInstance;
-      fixture.detectChanges();
-
+      setup({ number: 7 }, '');
       expect(component.taskLabel()).toBe('#7');
     });
   });

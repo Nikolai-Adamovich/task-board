@@ -1,4 +1,5 @@
 import { Component, input, output } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import type { Task } from '@task-board/shared';
 import { PriorityColorMap, NeutralColor } from '@app/constants/priority';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -6,7 +7,7 @@ import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 
 @Component({
   selector: 'ui-task-card',
-  imports: [HlmBadgeImports, HlmAvatarImports],
+  imports: [TranslocoPipe, HlmBadgeImports, HlmAvatarImports],
   host: {
     class: 'block',
     draggable: 'true',

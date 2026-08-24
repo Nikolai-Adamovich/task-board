@@ -6,6 +6,7 @@ import {
   statusBadgeClass,
   roleBadgeClass,
   memberStatusBadgeClass,
+  taskTypeBadgeClass,
 } from './priority';
 
 describe('priorityBadgeClass', () => {
@@ -47,6 +48,24 @@ describe('roleBadgeClass', () => {
 
   it('should return the neutral fallback for unknown roles', () => {
     expect(roleBadgeClass('unknown')).toBe(NeutralColor);
+  });
+});
+
+describe('taskTypeBadgeClass', () => {
+  it('should return the mapped class for each built-in task type key', () => {
+    expect(taskTypeBadgeClass('TASK')).toBe('bg-blue-100 text-blue-700');
+    expect(taskTypeBadgeClass('BUG')).toBe('bg-red-100 text-red-700');
+    expect(taskTypeBadgeClass('STORY')).toBe('bg-green-100 text-green-700');
+  });
+
+  it('should be case-insensitive', () => {
+    expect(taskTypeBadgeClass('bug')).toBe('bg-red-100 text-red-700');
+  });
+
+  it('should return the neutral fallback for unknown or missing keys', () => {
+    expect(taskTypeBadgeClass('EPIC')).toBe(NeutralColor);
+    expect(taskTypeBadgeClass(undefined)).toBe(NeutralColor);
+    expect(taskTypeBadgeClass(null)).toBe(NeutralColor);
   });
 });
 

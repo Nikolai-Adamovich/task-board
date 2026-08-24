@@ -64,6 +64,15 @@ export const ProjectStatusColorMap = {
 
 export type ProjectStatusColorMap = (typeof ProjectStatusColorMap)[keyof typeof ProjectStatusColorMap];
 
+/** Task-type badge colors keyed by task-type key (task/bug/story). Custom types fall back to neutral. */
+export const TaskTypeColorMap = {
+  TASK: 'bg-blue-100 text-blue-700',
+  BUG: 'bg-red-100 text-red-700',
+  STORY: 'bg-green-100 text-green-700',
+} as const;
+
+export type TaskTypeColorMap = (typeof TaskTypeColorMap)[keyof typeof TaskTypeColorMap];
+
 /** Neutral fallback color for unknown values */
 export const NeutralColor = 'bg-gray-100 text-gray-700';
 
@@ -95,4 +104,11 @@ export function roleBadgeClass(role: string): string {
 /** Resolve the badge classes for a tenant member status. Unknown values fall back to {@link NeutralColor}. */
 export function memberStatusBadgeClass(status: string): string {
   return (MemberStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
+}
+
+/** Resolve the badge classes for a task type by its key (task/bug/story). Unknown keys fall back to {@link NeutralColor}. */
+export function taskTypeBadgeClass(key: string | null | undefined): string {
+  if (!key) return NeutralColor;
+
+  return (TaskTypeColorMap as Record<string, string>)[key.toUpperCase()] ?? NeutralColor;
 }

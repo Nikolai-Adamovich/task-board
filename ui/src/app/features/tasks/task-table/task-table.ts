@@ -28,6 +28,7 @@ import { AppliedFilterState } from '@features/filters/filter-panel/filter-panel'
 import { Subscription } from 'rxjs';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import type { Task, TaskPriority, FilterCriteria, FilterSort } from '@task-board/shared';
+import { taskTypeBadgeClass } from '@app/constants/priority';
 
 interface TaskColumnDef {
   field: string;
@@ -91,6 +92,10 @@ export class TaskTable implements OnInit, OnDestroy {
   protected readonly totalPages = signal(0);
   protected readonly statusMap = signal<Record<string, string>>({});
   protected readonly typeMap = signal<Record<string, string>>({});
+  /** Task-type id → type key (task/bug/story), used for badge coloring */
+  protected readonly typeKeyMap = signal<Record<string, string>>({});
+  /** Shared badge-class helper (see constants/priority.ts) */
+  protected readonly taskTypeBadgeClass = taskTypeBadgeClass;
   protected readonly sprintMap = signal<Record<string, string>>({});
   protected readonly labelMap = signal<Record<string, string>>({});
   /** Column-level filter signals synced with URL query params */
@@ -616,13 +621,16 @@ export class TaskTable implements OnInit, OnDestroy {
     this.taskTypeClient.list(this.projectId()).subscribe({
       next: (types) => {
         const map: Record<string, string> = {};
+        const keyMap: Record<string, string> = {};
         const opts: SelectOption[] = [];
 
         for (const t of types) {
           map[t.id] = t.name;
+          keyMap[t.id] = t.key;
           opts.push({ id: t.id, name: t.name });
         }
         this.typeMap.set(map);
+        this.typeKeyMap.set(keyMap);
         this.typeOptions.set(opts);
       },
     });

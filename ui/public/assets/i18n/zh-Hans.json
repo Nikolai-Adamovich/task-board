@@ -483,6 +483,7 @@
     "createDesc": "为此项目创建新标签。"
   },
   "projectMembers": {
+    "email": "邮箱",
     "addMemberDesc": "将现有工作区成员添加到此项目。"
   },
   "statusManager": {

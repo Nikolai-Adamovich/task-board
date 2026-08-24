@@ -83,7 +83,7 @@
       @if (canEdit()) {
         <div class="mt-6 flex gap-3">
           <hlm-avatar class="size-8 shrink-0">
-            <div hlmAvatarFallback class="text-xs font-medium">ME</div>
+            <div hlmAvatarFallback class="text-xs font-medium">{{ currentUserInitials() }}</div>
           </hlm-avatar>
           <div class="flex-1 gap-2">
             <textarea

@@ -483,6 +483,7 @@
     "createDesc": "Utwórz nową etykietę dla tego projektu."
   },
   "projectMembers": {
+    "email": "E-mail",
     "addMemberDesc": "Dodaj istniejącego członka obszaru roboczego do tego projektu."
   },
   "statusManager": {

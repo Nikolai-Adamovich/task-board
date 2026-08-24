@@ -320,6 +320,7 @@
     "loading": "Loading members…",
     "noMembers": "No additional members yet. Invite someone to collaborate.",
     "name": "Name",
+    "email": "Email",
     "actions": "Actions",
     "addMember": "Add Member",
     "addMemberTitle": "Add Member",
