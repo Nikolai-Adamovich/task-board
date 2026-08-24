@@ -1,6 +1,6 @@
 {
   "header": {
-    "search": "検索\u2026",
+    "search": "検索…",
     "clearSearch": "検索をクリア",
     "notifications": "通知",
     "noNotifications": "通知はありません",
@@ -44,7 +44,7 @@
       "email": "メールアドレス",
       "password": "パスワード",
       "submit": "サインイン",
-      "submitting": "サインイン中\u2026",
+      "submitting": "サインイン中…",
       "noAccount": "アカウントをお持ちでないですか？",
       "createOne": "新規作成",
       "failed": "サインインに失敗しました。もう一度お試しください。"
@@ -56,13 +56,13 @@
       "email": "メールアドレス",
       "password": "パスワード",
       "submit": "アカウント作成",
-      "submitting": "アカウント作成中\u2026",
+      "submitting": "アカウント作成中…",
       "hasAccount": "すでにアカウントをお持ちですか？",
       "signIn": "サインイン",
       "failed": "登録に失敗しました。もう一度お試しください。"
     },
     "invitation": {
-      "loading": "招待を読み込み中\u2026",
+      "loading": "招待を読み込み中…",
       "error": "招待エラー",
       "goToSignIn": "サインインへ",
       "title": "招待を受け入れる",
@@ -75,9 +75,9 @@
       "password": "パスワード",
       "confirmPassword": "パスワード確認",
       "accept": "招待を受け入れる",
-      "accepting": "受け入れ中\u2026",
+      "accepting": "受け入れ中…",
       "createAndAccept": "アカウント作成して受け入れる",
-      "creatingAccount": "アカウント作成中\u2026",
+      "creatingAccount": "アカウント作成中…",
       "hasAccount": "すでにアカウントをお持ちですか？",
       "signIn": "サインイン",
       "noToken": "招待トークンが提供されていません。",
@@ -174,22 +174,29 @@
     "slug": "スラッグ",
     "slugHint": "URLで使用されます。小文字、数字、ハイフンのみ。",
     "plan": "サブスクリプションプラン",
-    "planFree": "無料 \u2014 最大3プロジェクト、5ユーザー",
+    "planFree": "無料 — 最大3プロジェクト、5ユーザー",
     "submit": "ワークスペースを作成",
-    "submitting": "ワークスペース作成中\u2026",
+    "submitting": "ワークスペース作成中…",
     "failed": "ワークスペースの作成に失敗しました。もう一度お試しください。"
   },
   "settings": {
-    "title": "設定"
+    "title": "設定",
+    "theme": "テーマ",
+    "themeDescription": "アプリのカラーテーマを選択します。",
+    "zoom": "ズーム",
+    "zoomDescription": "インターフェースのフォントサイズを調整します。",
+    "resetZoom": "リセット",
+    "language": "言語",
+    "languageDescription": "表示言語を選択します。"
   },
   "tenantSettings": {
     "title": "テナント設定",
-    "loading": "設定を読み込み中\u2026",
+    "loading": "設定を読み込み中…",
     "general": "一般設定",
     "name": "名前",
     "slug": "スラッグ",
     "save": "変更を保存",
-    "saving": "保存中\u2026",
+    "saving": "保存中…",
     "dangerZone": "危険ゾーン",
     "dangerDescription": "テナントの削除は元に戻せません。このテナント内のすべてのプロジェクト、ボード、タスクが完全に削除されます。",
     "deleteTenant": "テナントを削除",
@@ -197,7 +204,8 @@
     "deleteConfirm": "この操作は元に戻せません。確認するには、以下にテナント名を入力してください。",
     "deleteName": "テナント名",
     "deletePlaceholder": "確認のためにテナント名を入力",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "deleteDesc": "完全な削除を確認するにはワークスペース名を入力してください。"
   },
   "upgrade": {
     "title": "プランのアップグレード",
@@ -215,12 +223,12 @@
     "advancedAnalytics": "高度な分析",
     "back": "戻る",
     "upgradeButton": "プレミアムにアップグレード",
-    "upgrading": "アップグレード中\u2026",
+    "upgrading": "アップグレード中…",
     "failed": "アップグレードに失敗しました。もう一度お試しください。"
   },
   "members": {
     "title": "メンバー",
-    "loading": "メンバーを読み込み中\u2026",
+    "loading": "メンバーを読み込み中…",
     "noMembers": "メンバーが見つかりません。",
     "pending": "保留中",
     "unknown": "不明",
@@ -237,25 +245,36 @@
     "removeMember": "メンバーを削除",
     "cancel": "キャンセル",
     "inviteButton": "招待",
-    "inviting": "招待中\u2026"
+    "inviting": "招待中…",
+    "inviteDesc": "メールで新しいメンバーを招待し、役割を選択します。",
+    "filterByName": "名前で絞り込み…",
+    "filterByEmail": "メールで絞り込み…",
+    "allRoles": "すべての役割",
+    "allStatuses": "すべてのステータス",
+    "statusActive": "アクティブ",
+    "statusAccessRevoked": "アクセス取り消し",
+    "roleOwner": "オーナー",
+    "roleAdmin": "管理者",
+    "roleMember": "メンバー"
   },
   "projects": {
     "title": "プロジェクト",
     "new": "新規プロジェクト",
-    "loading": "プロジェクトを読み込み中\u2026",
+    "loading": "プロジェクトを読み込み中…",
     "noProjects": "プロジェクトが見つかりません。最初のプロジェクトを作成してください。",
     "slug": "スラッグ: {{slug}}",
     "createTitle": "プロジェクトを作成",
     "name": "名前",
     "slugLabel": "スラッグ",
     "description": "説明",
-    "descriptionPlaceholder": "任意の説明\u2026",
+    "descriptionPlaceholder": "任意の説明…",
     "cancel": "キャンセル",
     "create": "プロジェクトを作成",
-    "creating": "作成中\u2026"
+    "creating": "作成中…",
+    "createDesc": "このワークスペースに新しいプロジェクトを作成します。"
   },
   "projectDetail": {
-    "loading": "プロジェクトを読み込み中\u2026",
+    "loading": "プロジェクトを読み込み中…",
     "sprints": "スプリント",
     "newBoard": "新規ボード",
     "boards": "ボード",
@@ -269,33 +288,37 @@
     "createBoardTitle": "ボードを作成",
     "boardName": "名前",
     "boardDescription": "説明",
-    "descriptionPlaceholder": "任意の説明\u2026",
+    "descriptionPlaceholder": "任意の説明…",
     "cancel": "キャンセル",
     "createBoardButton": "ボードを作成",
-    "creating": "作成中\u2026",
+    "creating": "作成中…",
     "addMemberTitle": "メンバーを追加",
     "userId": "ユーザーID",
     "userIdPlaceholder": "ユーザーIDを入力",
     "role": "役割",
     "addMemberButton": "メンバーを追加",
-    "adding": "追加中\u2026",
+    "adding": "追加中…",
     "removeMemberTitle": "メンバーを削除",
     "removeConfirm": "このメンバーをプロジェクトから削除してもよろしいですか？",
-    "removeButton": "削除"
+    "removeButton": "削除",
+    "createBoardDesc": "このプロジェクトに新しいボードを作成します。",
+    "deleteProjectDesc": "このプロジェクトは完全削除の対象になります。"
   },
   "boardView": {
-    "loading": "ボードを読み込み中\u2026",
+    "loading": "ボードを読み込み中…",
     "newTask": "新規タスク",
     "createTaskTitle": "タスクを作成",
     "title": "タイトル",
     "titlePlaceholder": "タスクのタイトル",
     "description": "説明",
-    "descriptionPlaceholder": "任意の説明\u2026",
+    "descriptionPlaceholder": "任意の説明…",
     "priority": "優先度",
     "column": "カラム",
     "cancel": "キャンセル",
     "create": "タスクを作成",
-    "creating": "作成中\u2026"
+    "creating": "作成中…",
+    "createTaskDesc": "このカラムに新しいタスクを追加します。",
+    "selectStatusDesc": "移動したタスクのステータスを選択します。"
   },
   "priority": {
     "low": "低",
@@ -308,12 +331,12 @@
     "noTasks": "タスクなし"
   },
   "taskDetail": {
-    "loading": "タスクを読み込み中\u2026",
+    "loading": "タスクを読み込み中…",
     "created": "{{date}}に作成",
     "updated": "{{date}}に更新",
     "cancel": "キャンセル",
     "save": "保存",
-    "saving": "保存中\u2026",
+    "saving": "保存中…",
     "edit": "編集",
     "title": "タイトル",
     "description": "説明",
@@ -332,7 +355,7 @@
   "sprints": {
     "title": "スプリント",
     "new": "新規スプリント",
-    "loading": "スプリントを読み込み中\u2026",
+    "loading": "スプリントを読み込み中…",
     "noSprints": "まだスプリントがありません。",
     "createFirst": "最初のスプリントを作成",
     "tasks": "{{count}}件のタスク",
@@ -343,13 +366,14 @@
     "startDate": "開始日",
     "endDate": "終了日",
     "goal": "目標",
-    "goalPlaceholder": "任意のスプリント目標\u2026",
+    "goalPlaceholder": "任意のスプリント目標…",
     "cancel": "キャンセル",
     "create": "スプリントを作成",
-    "creating": "作成中\u2026"
+    "creating": "作成中…",
+    "createDesc": "このプロジェクトに新しいスプリントを作成します。"
   },
   "sprintDetail": {
-    "loading": "スプリントを読み込み中\u2026",
+    "loading": "スプリントを読み込み中…",
     "tasks": "タスク",
     "backToProject": "プロジェクトに戻る",
     "noTasks": "このスプリントにタスクがありません。",
@@ -357,7 +381,7 @@
   },
   "sprintBacklog": {
     "backlog": "バックログ",
-    "loading": "バックログを読み込み中\u2026",
+    "loading": "バックログを読み込み中…",
     "allAssigned": "すべてのタスクがスプリントに割り当てられています。",
     "addToSprint": "スプリントに追加"
   },
@@ -412,9 +436,9 @@
     "namePlaceholder": "お名前",
     "email": "メールアドレス",
     "message": "メッセージ",
-    "messagePlaceholder": "問題や質問を説明してください\u2026",
+    "messagePlaceholder": "問題や質問を説明してください…",
     "submit": "送信",
-    "submitting": "送信中\u2026"
+    "submitting": "送信中…"
   },
   "validation": {
     "emailRequired": "メールアドレスは必須です",
@@ -444,5 +468,32 @@
   "errors": {
     "unexpected": "予期しないエラーが発生しました。もう一度お試しください。",
     "permissionDenied": "この操作を実行する権限がありません"
+  },
+  "toasts": {
+    "created": "作成しました",
+    "updated": "更新しました",
+    "deleted": "削除しました"
+  },
+  "common": {
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "delete": "削除"
+  },
+  "labelManager": {
+    "createDesc": "このプロジェクトに新しいラベルを作成します。"
+  },
+  "projectMembers": {
+    "addMemberDesc": "既存のワークスペースメンバーをこのプロジェクトに追加します。"
+  },
+  "statusManager": {
+    "createDesc": "このプロジェクトに新しいステータス列を作成します。",
+    "deleteDesc": "必要に応じて既存タスクの代替ステータスを選択します。"
+  },
+  "taskTypeManager": {
+    "createDesc": "このプロジェクトに新しいタスクタイプを作成します。",
+    "deleteDesc": "必要に応じて既存タスクの代替タイプを選択します。"
+  },
+  "taskTable": {
+    "filtersDesc": "ステータス・優先度・担当者などでタスクを絞り込みます。"
   }
 }

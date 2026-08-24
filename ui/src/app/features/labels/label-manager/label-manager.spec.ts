@@ -236,7 +236,7 @@ describe('LabelManager', () => {
 
     it('should close delete dialog on closed state', () => {
       component.showDeleteDialog.set(true);
-      component.onDeleteDialogStateChange('closed');
+      component.onDeleteDialogStateChange(false);
       expect(component.showDeleteDialog()).toBe(false);
       expect(component.deletingLabel()).toBeNull();
     });

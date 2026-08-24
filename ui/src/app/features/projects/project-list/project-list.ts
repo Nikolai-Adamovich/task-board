@@ -7,7 +7,6 @@ import { finalize } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
-import { HttpErrorResponse } from '@angular/common/http';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -18,6 +17,10 @@ import { NgIcon } from '@ng-icons/core';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Project } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 export interface CreateProjectForm {
   name: string;
@@ -28,6 +31,8 @@ export interface CreateProjectForm {
 @Component({
   selector: 'ui-project-list',
   imports: [
+    HlmAlertImports,
+    HlmEmptyImports,
     RouterLink,
     TranslocoPipe,
     FormField,
@@ -44,6 +49,7 @@ export interface CreateProjectForm {
   templateUrl: './project-list.html',
 })
 export class ProjectList implements OnInit {
+  private readonly notify = injectToasts();
   private readonly projectClient = inject(ProjectClient);
   private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
@@ -78,9 +84,10 @@ export class ProjectList implements OnInit {
                 this.projects.update((list) => [...list, project]);
                 this.showCreateModal.set(false);
                 f().reset({ name: '', key: '', description: '' });
+                this.notify.success('toasts.created');
               },
               error: (err) => {
-                this.error.set(this.getErrorMessage(err));
+                this.error.set(getErrorMessage(err));
               },
             });
         },
@@ -117,13 +124,5 @@ export class ProjectList implements OnInit {
           this.projects.set(projects);
         },
       });
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
   }
 }

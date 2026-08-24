@@ -1,6 +1,5 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import {
@@ -14,7 +13,7 @@ import {
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { TenantRole, TenantStatus } from '@task-board/shared';
-import { TenantStatusColorMap, NeutralColor } from '@app/constants/priority';
+import { statusBadgeClass } from '@app/constants/priority';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -24,10 +23,14 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 @Component({
   selector: 'ui-tenant-settings',
   imports: [
+    HlmAlertImports,
     TranslocoPipe,
     NgIcon,
     HlmButtonImports,
@@ -53,6 +56,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   templateUrl: './tenant-settings.html',
 })
 export class TenantSettings implements OnInit {
+  /** Shared badge-class helper (see constants/priority.ts) */
+  protected readonly statusBadgeClass = statusBadgeClass;
+  private readonly notify = injectToasts();
   private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
@@ -89,16 +95,12 @@ export class TenantSettings implements OnInit {
             await this.tenantStore.updateTenant(id, { name: this.model().name });
             this.router.navigate(['/']);
           } catch (err) {
-            this.error.set(this.getErrorMessage(err));
+            this.error.set(getErrorMessage(err));
           }
         },
       },
     },
   );
-
-  protected getStatusColor(status: string): string {
-    return (TenantStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
-  }
 
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
@@ -124,8 +126,11 @@ export class TenantSettings implements OnInit {
     if (!id) return;
 
     this.tenantStore.archiveTenant(id).then(
-      () => this.router.navigate(['/']),
-      (err) => this.error.set(this.getErrorMessage(err)),
+      () => {
+        this.notify.success('toasts.updated');
+        this.router.navigate(['/']);
+      },
+      (err) => this.error.set(getErrorMessage(err)),
     );
   }
 
@@ -134,9 +139,10 @@ export class TenantSettings implements OnInit {
 
     if (!id) return;
 
-    this.tenantStore.restoreTenant(id).catch((err) => {
-      this.error.set(this.getErrorMessage(err));
-    });
+    this.tenantStore.restoreTenant(id).then(
+      () => this.notify.success('toasts.updated'),
+      (err) => this.error.set(getErrorMessage(err)),
+    );
   }
 
   protected deleteTenant(): void {
@@ -149,7 +155,7 @@ export class TenantSettings implements OnInit {
         this.router.navigate(['/']);
       },
       (err) => {
-        this.error.set(this.getErrorMessage(err));
+        this.error.set(getErrorMessage(err));
       },
     );
   }
@@ -160,15 +166,7 @@ export class TenantSettings implements OnInit {
     if (!id) return;
 
     this.tenantStore.cancelDeletion(id).catch((err) => {
-      this.error.set(this.getErrorMessage(err));
+      this.error.set(getErrorMessage(err));
     });
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
   }
 }

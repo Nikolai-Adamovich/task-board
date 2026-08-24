@@ -18,13 +18,13 @@
         <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'filters.loading' | transloco }}</span>
       </div>
     } @else if (error()) {
-      <div class="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-        {{ error() | transloco }}
-      </div>
+      <hlm-alert variant="destructive">
+        <div hlmAlertDescription>{{ error() | transloco }}</div>
+      </hlm-alert>
     } @else {
       <!-- Save form -->
       @if (showSaveForm()) {
-        <div class="mb-4 space-y-3 rounded-md border p-3">
+        <div class="mb-4 flex flex-col gap-3 rounded-md border p-3">
           <hlm-field>
             <label hlmFieldLabel for="filter-name">{{ 'filters.name' | transloco }}</label>
             <input
@@ -52,7 +52,7 @@
       }
 
       <!-- Filter list -->
-      <div class="space-y-2">
+      <div class="flex flex-col gap-2">
         @for (filter of filters(); track filter.id) {
           <div class="flex items-center justify-between rounded-md border p-2">
             <button hlmBtn variant="ghost" size="sm" class="flex-1 justify-start text-sm" (click)="applyFilter(filter)">
@@ -77,21 +77,11 @@
 </hlm-card>
 
 <!-- Delete Confirmation Dialog -->
-<hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
-  <hlm-dialog-content *hlmDialogPortal>
-    <div class="space-y-4">
-      <h3 hlmDialogTitle>{{ 'filters.deleteTitle' | transloco }}</h3>
-      <p class="text-sm text-muted-foreground">
-        {{ 'filters.deleteConfirm' | transloco }}
-      </p>
-      <hlm-dialog-footer>
-        <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">
-          {{ 'filters.cancelDelete' | transloco }}
-        </button>
-        <button hlmBtn variant="destructive" (click)="deleteFilter()">
-          {{ 'filters.confirmDelete' | transloco }}
-        </button>
-      </hlm-dialog-footer>
-    </div>
-  </hlm-dialog-content>
-</hlm-dialog>
+<ui-confirm-dialog
+  [state]="showDeleteConfirm()"
+  titleKey="filters.deleteTitle"
+  messageKey="filters.deleteConfirm"
+  confirmLabelKey="filters.confirmDelete"
+  (confirmed)="deleteFilter()"
+  (stateChanged)="onDeleteDialogStateChange($event)"
+/>

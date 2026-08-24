@@ -32,7 +32,7 @@
     <div class="mb-4 flex items-center justify-between">
       <h2 class="text-lg font-semibold text-foreground">{{ 'ownerDashboard.myWorkspaces' | transloco }}</h2>
       <a hlmBtn variant="outline" size="sm" routerLink="/workspace/create">
-        <ng-icon name="lucidePlus" class="mr-1 h-4 w-4" />
+        <ng-icon name="lucidePlus" class="mr-1 size-4" />
         {{ 'ownerDashboard.createAnother' | transloco }}
       </a>
     </div>
@@ -45,21 +45,21 @@
                 <a hlmBtn variant="ghost" size="lg" [routerLink]="['/tenants', tenant.id]" class="font-bold">
                   <ng-icon name="lucideBuilding2" />{{ tenant.name }}</a
                 >
-                <span hlmBadge class="mt-0.5 bg-purple-100 text-purple-700">{{ tenant.role }}</span>
-                <span hlmBadge [class]="getStatusBadgeClass(tenant.status)" class="mt-0.5">{{ tenant.status }}</span>
+                <span hlmBadge class="mt-0.5" [class]="roleBadgeClass(tenant.role)">{{ tenant.role }}</span>
+                <span hlmBadge [class]="statusBadgeClass(tenant.status)" class="mt-0.5">{{ tenant.status }}</span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">
               <a hlmBtn variant="outline" size="sm" [routerLink]="['/tenants', tenant.id, 'projects']">
-                <ng-icon name="lucideLayoutDashboard" class="mr-1 h-3 w-3" />
+                <ng-icon name="lucideLayoutDashboard" class="mr-1 size-3" />
                 {{ 'ownerDashboard.projects' | transloco }}
               </a>
               <a hlmBtn variant="outline" size="sm" [routerLink]="['/tenants', tenant.id, 'settings']">
-                <ng-icon name="lucideSettings" class="mr-1 h-3 w-3" />
+                <ng-icon name="lucideSettings" class="mr-1 size-3" />
                 {{ 'ownerDashboard.settings' | transloco }}
               </a>
               <a hlmBtn variant="outline" size="sm" [routerLink]="['/tenants', tenant.id, 'settings', 'members']">
-                <ng-icon name="lucideUsers" class="mr-1 h-3 w-3" />
+                <ng-icon name="lucideUsers" class="mr-1 size-3" />
                 {{ 'ownerDashboard.members' | transloco }}
               </a>
             </div>
@@ -73,26 +73,28 @@
   <section>
     <h2 class="mb-4 text-lg font-semibold text-foreground">{{ 'ownerDashboard.myRecentTasks' | transloco }}</h2>
     @if (tasks().length === 0) {
-      <div class="rounded-lg border border-dashed border-border py-8 text-center">
-        <p class="text-sm text-muted-foreground">{{ 'ownerDashboard.noTasks' | transloco }}</p>
-      </div>
+      <hlm-empty>
+        <hlm-empty-header>
+          <div hlmEmptyTitle>{{ 'ownerDashboard.noTasks' | transloco }}</div>
+        </hlm-empty-header>
+      </hlm-empty>
     } @else {
-      <div class="space-y-3">
+      <div class="flex flex-col gap-3">
         @for (task of tasks().slice(0, 10); track task.id) {
           <a
             [routerLink]="['/tenants', task.tenantId, 'projects', task.projectId, 'tasks', task.id]"
             class="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
           >
             <div class="flex items-center gap-3">
-              <ng-icon name="lucideLayoutDashboard" class="h-4 w-4 text-muted-foreground" />
+              <ng-icon name="lucideLayoutDashboard" class="size-4 text-muted-foreground" />
               <div>
                 <p class="text-sm font-medium text-foreground">{{ task.title }}</p>
                 <p class="text-xs text-muted-foreground">{{ task.projectName }} · {{ task.columnTitle }}</p>
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <span hlmBadge [class]="getPriorityColor(task.priority)">{{ task.priority }}</span>
-              <ng-icon name="lucideArrowRight" class="h-4 w-4 text-muted-foreground" />
+              <span hlmBadge [class]="priorityBadgeClass(task.priority)">{{ task.priority }}</span>
+              <ng-icon name="lucideArrowRight" class="size-4 text-muted-foreground" />
             </div>
           </a>
         }

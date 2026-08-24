@@ -19,7 +19,7 @@
       @for (task of backlogTasks(); track task.id) {
         <div class="flex items-center justify-between px-4 py-3">
           <div class="flex items-center gap-3">
-            <span class="h-2 w-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
+            <span class="size-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
             <div>
               <p class="text-sm font-medium text-foreground">{{ task.title }}</p>
               @if (task.description) {

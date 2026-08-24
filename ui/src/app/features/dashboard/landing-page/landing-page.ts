@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -7,6 +7,7 @@ import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideLayoutDashboard, lucideUsers, lucideFolderKanban, lucideBuilding2 } from '@ng-icons/lucide';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-landing-page',
   imports: [RouterLink, TranslocoPipe, HlmCardImports, HlmButtonImports, NgIcon],
   providers: [provideIcons({ lucideLayoutDashboard, lucideUsers, lucideFolderKanban, lucideBuilding2 })],

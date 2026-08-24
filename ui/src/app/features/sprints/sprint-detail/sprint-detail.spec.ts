@@ -189,6 +189,7 @@ describe('SprintDetail', () => {
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -225,19 +226,19 @@ describe('SprintDetail', () => {
     beforeEach(() => setup());
 
     it('should return color for FUTURE', () => {
-      expect(component.getStatusColor('FUTURE')).toBe('bg-blue-100 text-blue-700');
+      expect(component.statusBadgeClass('FUTURE')).toBe('bg-blue-100 text-blue-700');
     });
 
     it('should return color for ACTIVE', () => {
-      expect(component.getStatusColor('ACTIVE')).toBe('bg-green-100 text-green-700');
+      expect(component.statusBadgeClass('ACTIVE')).toBe('bg-green-100 text-green-700');
     });
 
     it('should return color for COMPLETED', () => {
-      expect(component.getStatusColor('COMPLETED')).toBe('bg-gray-100 text-gray-600');
+      expect(component.statusBadgeClass('COMPLETED')).toBe('bg-gray-100 text-gray-600');
     });
 
     it('should return fallback for unknown', () => {
-      expect(component.getStatusColor('unknown')).toBe(NeutralColor);
+      expect(component.statusBadgeClass('unknown')).toBe(NeutralColor);
     });
   });
 

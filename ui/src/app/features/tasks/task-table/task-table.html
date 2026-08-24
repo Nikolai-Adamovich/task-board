@@ -10,7 +10,14 @@
         [value]="search()"
         (input)="onSearch($event)"
       />
-      <button hlmBtn variant="outline" size="sm" title="Filters" (click)="showFilterDialog.set(true)">
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        [attr.title]="'taskTable.filters' | transloco"
+        [attr.aria-label]="'taskTable.filters' | transloco"
+        (click)="showFilterDialog.set(true)"
+      >
         <ng-icon name="lucideFilter" />
       </button>
       <button hlmBtn size="sm" (click)="openCreateDialog()">
@@ -24,6 +31,7 @@
     <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'taskTable.filters' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'taskTable.filtersDesc' | transloco }}</p>
       </hlm-dialog-header>
       <ui-filter-panel
         [projectId]="projectId()"
@@ -43,22 +51,22 @@
               <div class="flex items-center gap-1">
                 <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort(col.field)">
                   <span>{{ col.labelKey | transloco }}</span>
-                  <span class="inline-flex h-3 w-3 shrink-0">
+                  <span class="inline-flex size-3 shrink-0">
                     @if (sortField() === col.field) {
                       <ng-icon
                         [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'"
-                        class="h-3 w-3"
+                        class="size-3"
                       />
                     }
                   </span>
                 </button>
                 @if (col.filterType !== 'none') {
                   <hlm-popover sideOffset="4">
-                    <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                    <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="size-6 shrink-0">
                       <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="col.getFilterValue()" />
                     </button>
                     <hlm-popover-content *hlmPopoverPortal [class]="col.popoverWidth ?? 'w-48'">
-                      <div class="space-y-2">
+                      <div class="flex flex-col gap-2">
                         @if (col.filterType === 'text') {
                           <input
                             hlmInput

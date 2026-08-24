@@ -1,6 +1,6 @@
 {
   "header": {
-    "search": "Cerca\u2026",
+    "search": "Cerca…",
     "clearSearch": "Cancella ricerca",
     "notifications": "Notifiche",
     "noNotifications": "Nessuna notifica",
@@ -44,7 +44,7 @@
       "email": "E-mail",
       "password": "Password",
       "submit": "Accedi",
-      "submitting": "Accesso in corso\u2026",
+      "submitting": "Accesso in corso…",
       "noAccount": "Non hai un account?",
       "createOne": "Creane uno",
       "failed": "Accesso fallito. Riprova."
@@ -56,13 +56,13 @@
       "email": "E-mail",
       "password": "Password",
       "submit": "Crea account",
-      "submitting": "Creazione account\u2026",
-      "hasAccount": "Hai gi\u00e0 un account?",
+      "submitting": "Creazione account…",
+      "hasAccount": "Hai già un account?",
       "signIn": "Accedi",
       "failed": "Registrazione fallita. Riprova."
     },
     "invitation": {
-      "loading": "Caricamento invito\u2026",
+      "loading": "Caricamento invito…",
       "error": "Errore di invito",
       "goToSignIn": "Vai all'accesso",
       "title": "Accetta Invito",
@@ -70,15 +70,15 @@
       "email": "E-mail",
       "workspace": "Workspace",
       "role": "Ruolo",
-      "existingUserHint": "Hai gi\u00e0 un account. Clicca qui sotto per accettare questo invito.",
+      "existingUserHint": "Hai già un account. Clicca qui sotto per accettare questo invito.",
       "displayName": "Nome visualizzato",
       "password": "Password",
       "confirmPassword": "Conferma Password",
       "accept": "Accetta Invito",
-      "accepting": "Accettazione in corso\u2026",
+      "accepting": "Accettazione in corso…",
       "createAndAccept": "Crea Account e Accetta",
-      "creatingAccount": "Creazione account\u2026",
-      "hasAccount": "Hai gi\u00e0 un account?",
+      "creatingAccount": "Creazione account…",
+      "hasAccount": "Hai già un account?",
       "signIn": "Accedi",
       "noToken": "Nessun token di invito fornito.",
       "invalidOrExpired": "Invito non valido o scaduto.",
@@ -93,11 +93,11 @@
     "signIn": "Accedi",
     "kanban": {
       "title": "Board Kanban",
-      "description": "Visualizza il tuo flusso di lavoro con board drag-and-drop. Traccia le attivit\u00e0 attraverso le colonne dal backlog al completamento."
+      "description": "Visualizza il tuo flusso di lavoro con board drag-and-drop. Traccia le attività attraverso le colonne dal backlog al completamento."
     },
     "sprints": {
       "title": "Sprint",
-      "description": "Pianifica e esegui gli sprint con facilit\u00e0. Monitora la velocit\u00e0 e consegna in tempo."
+      "description": "Pianifica e esegui gli sprint con facilità. Monitora la velocità e consegna in tempo."
     },
     "collaboration": {
       "title": "Collaborazione di Team",
@@ -105,7 +105,7 @@
     },
     "multiWorkspace": {
       "title": "Multi-Workspace",
-      "description": "Gestisci pi\u00f9 workspace per diversi team o clienti da un unico account."
+      "description": "Gestisci più workspace per diversi team o clienti da un unico account."
     }
   },
   "welcome": {
@@ -114,7 +114,7 @@
     "subtitle": "Iniziamo. Crea il tuo primo workspace per cominciare.",
     "createWorkspace": {
       "title": "Crea il tuo primo workspace",
-      "description": "Un workspace \u00e8 la base del tuo team. Crea progetti, gestisci le attivit\u00e0 e collabora con il tuo team.",
+      "description": "Un workspace è la base del tuo team. Crea progetti, gestisci le attività e collabora con il tuo team.",
       "button": "Crea Workspace"
     },
     "freePlan": {
@@ -138,7 +138,7 @@
   "ownerDashboard": {
     "title": "Dashboard Proprietario",
     "subtitle": "Gestisci i tuoi workspace e monitora i progressi del team.",
-    "totalTasks": "Attivit\u00e0 totali",
+    "totalTasks": "Attività totali",
     "workspaces": "Workspace",
     "myWorkspaces": "I miei Workspace",
     "createAnother": "Crea un altro workspace",
@@ -146,17 +146,17 @@
     "settings": "Impostazioni",
     "members": "Membri",
     "upgrade": "Aggiorna",
-    "myRecentTasks": "Le mie attivit\u00e0 recenti",
-    "noTasks": "Nessuna attivit\u00e0 assegnata a te ancora."
+    "myRecentTasks": "Le mie attività recenti",
+    "noTasks": "Nessuna attività assegnata a te ancora."
   },
   "memberDashboard": {
     "title": "Dashboard",
-    "subtitle": "I tuoi workspace e le attivit\u00e0 recenti a colpo d'occhio.",
-    "totalTasks": "Attivit\u00e0 totali",
+    "subtitle": "I tuoi workspace e le attività recenti a colpo d'occhio.",
+    "totalTasks": "Attività totali",
     "workspaces": "Workspace",
     "myWorkspaces": "I miei Workspace",
-    "myRecentTasks": "Le mie attivit\u00e0 recenti",
-    "noTasks": "Nessuna attivit\u00e0 assegnata a te ancora."
+    "myRecentTasks": "Le mie attività recenti",
+    "noTasks": "Nessuna attività assegnata a te ancora."
   },
   "workspace": {
     "defaultName": "Workspace",
@@ -174,35 +174,43 @@
     "slug": "Slug",
     "slugHint": "Usato negli URL. Solo lettere minuscole, numeri e trattini.",
     "plan": "Piano di Abbonamento",
-    "planFree": "Gratuito \u2014 Fino a 3 progetti e 5 utenti",
+    "planFree": "Gratuito — Fino a 3 progetti e 5 utenti",
     "submit": "Crea Workspace",
-    "submitting": "Creazione workspace\u2026",
+    "submitting": "Creazione workspace…",
     "failed": "Impossibile creare il workspace. Riprova."
   },
   "settings": {
-    "title": "Impostazioni"
+    "title": "Impostazioni",
+    "theme": "Tema",
+    "themeDescription": "Scegli il tema colori dell'app.",
+    "zoom": "Zoom",
+    "zoomDescription": "Regola la dimensione del carattere dell'interfaccia.",
+    "resetZoom": "Reimposta",
+    "language": "Lingua",
+    "languageDescription": "Scegli la lingua di visualizzazione."
   },
   "tenantSettings": {
     "title": "Impostazioni Tenant",
-    "loading": "Caricamento impostazioni\u2026",
+    "loading": "Caricamento impostazioni…",
     "general": "Impostazioni Generali",
     "name": "Nome",
     "slug": "Slug",
     "save": "Salva Modifiche",
-    "saving": "Salvataggio\u2026",
+    "saving": "Salvataggio…",
     "dangerZone": "Zona di Pericolo",
-    "dangerDescription": "L'eliminazione di un tenant \u00e8 irreversibile. Tutti i progetti, le board e le attivit\u00e0 all'interno di questo tenant verranno rimossi permanentemente.",
+    "dangerDescription": "L'eliminazione di un tenant è irreversibile. Tutti i progetti, le board e le attività all'interno di questo tenant verranno rimossi permanentemente.",
     "deleteTenant": "Elimina Tenant",
     "deleteTitle": "Elimina Tenant",
-    "deleteConfirm": "Questa azione non pu\u00f2 essere annullata. Per confermare, digita il nome del tenant qui sotto.",
+    "deleteConfirm": "Questa azione non può essere annullata. Per confermare, digita il nome del tenant qui sotto.",
     "deleteName": "Nome del Tenant",
     "deletePlaceholder": "Digita il nome del tenant per confermare",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "deleteDesc": "Digita il nome del workspace per confermare l'eliminazione definitiva."
   },
   "upgrade": {
     "title": "Aggiorna Piano",
     "successTitle": "Sei su Premium!",
-    "successDescription": "Il tuo workspace \u00e8 stato aggiornato al piano Premium. Goditi progetti e utenti illimitati.",
+    "successDescription": "Il tuo workspace è stato aggiornato al piano Premium. Goditi progetti e utenti illimitati.",
     "backToSettings": "Torna alle Impostazioni",
     "currentPlan": "Piano Attuale",
     "freeLimit": "Fino a 3 progetti, 5 utenti per workspace",
@@ -215,12 +223,12 @@
     "advancedAnalytics": "Analisi avanzate",
     "back": "Indietro",
     "upgradeButton": "Aggiorna a Premium",
-    "upgrading": "Aggiornamento\u2026",
+    "upgrading": "Aggiornamento…",
     "failed": "Aggiornamento fallito. Riprova."
   },
   "members": {
     "title": "Membri",
-    "loading": "Caricamento membri\u2026",
+    "loading": "Caricamento membri…",
     "noMembers": "Nessun membro trovato.",
     "pending": "In sospeso",
     "unknown": "Sconosciuto",
@@ -237,25 +245,36 @@
     "removeMember": "Rimuovi membro",
     "cancel": "Annulla",
     "inviteButton": "Invita",
-    "inviting": "Invito in corso\u2026"
+    "inviting": "Invito in corso…",
+    "inviteDesc": "Invita un nuovo membro via e-mail e scegli il suo ruolo.",
+    "filterByName": "Filtra per nome…",
+    "filterByEmail": "Filtra per e-mail…",
+    "allRoles": "Tutti i ruoli",
+    "allStatuses": "Tutti gli stati",
+    "statusActive": "Attivo",
+    "statusAccessRevoked": "Accesso revocato",
+    "roleOwner": "Proprietario",
+    "roleAdmin": "Amministratore",
+    "roleMember": "Membro"
   },
   "projects": {
     "title": "Progetti",
     "new": "Nuovo Progetto",
-    "loading": "Caricamento progetti\u2026",
+    "loading": "Caricamento progetti…",
     "noProjects": "Nessun progetto trovato. Crea il tuo primo progetto per iniziare.",
     "slug": "Slug: {{slug}}",
     "createTitle": "Crea Progetto",
     "name": "Nome",
     "slugLabel": "Slug",
     "description": "Descrizione",
-    "descriptionPlaceholder": "Descrizione opzionale\u2026",
+    "descriptionPlaceholder": "Descrizione opzionale…",
     "cancel": "Annulla",
     "create": "Crea Progetto",
-    "creating": "Creazione\u2026"
+    "creating": "Creazione…",
+    "createDesc": "Crea un nuovo progetto in questo workspace."
   },
   "projectDetail": {
-    "loading": "Caricamento progetto\u2026",
+    "loading": "Caricamento progetto…",
     "sprints": "Sprint",
     "newBoard": "Nuova Board",
     "boards": "Board",
@@ -269,33 +288,37 @@
     "createBoardTitle": "Crea Board",
     "boardName": "Nome",
     "boardDescription": "Descrizione",
-    "descriptionPlaceholder": "Descrizione opzionale\u2026",
+    "descriptionPlaceholder": "Descrizione opzionale…",
     "cancel": "Annulla",
     "createBoardButton": "Crea Board",
-    "creating": "Creazione\u2026",
+    "creating": "Creazione…",
     "addMemberTitle": "Aggiungi Membro",
     "userId": "ID Utente",
     "userIdPlaceholder": "Inserisci l'ID utente",
     "role": "Ruolo",
     "addMemberButton": "Aggiungi Membro",
-    "adding": "Aggiunta in corso\u2026",
+    "adding": "Aggiunta in corso…",
     "removeMemberTitle": "Rimuovi Membro",
     "removeConfirm": "Sei sicuro di voler rimuovere questo membro dal progetto?",
-    "removeButton": "Rimuovi"
+    "removeButton": "Rimuovi",
+    "createBoardDesc": "Crea una nuova bacheca per questo progetto.",
+    "deleteProjectDesc": "Il progetto verrà programmato per l'eliminazione definitiva."
   },
   "boardView": {
-    "loading": "Caricamento board\u2026",
-    "newTask": "Nuova Attivit\u00e0",
-    "createTaskTitle": "Crea Attivit\u00e0",
+    "loading": "Caricamento board…",
+    "newTask": "Nuova Attività",
+    "createTaskTitle": "Crea Attività",
     "title": "Titolo",
-    "titlePlaceholder": "Titolo dell'attivit\u00e0",
+    "titlePlaceholder": "Titolo dell'attività",
     "description": "Descrizione",
-    "descriptionPlaceholder": "Descrizione opzionale\u2026",
-    "priority": "Priorit\u00e0",
+    "descriptionPlaceholder": "Descrizione opzionale…",
+    "priority": "Priorità",
     "column": "Colonna",
     "cancel": "Annulla",
-    "create": "Crea Attivit\u00e0",
-    "creating": "Creazione\u2026"
+    "create": "Crea Attività",
+    "creating": "Creazione…",
+    "createTaskDesc": "Aggiungi una nuova attività a questa colonna.",
+    "selectStatusDesc": "Scegli lo stato dell'attività spostata."
   },
   "priority": {
     "low": "Bassa",
@@ -304,38 +327,38 @@
     "critical": "Critica"
   },
   "columnView": {
-    "addTask": "Aggiungi attivit\u00e0 alla colonna",
-    "noTasks": "Nessuna attivit\u00e0"
+    "addTask": "Aggiungi attività alla colonna",
+    "noTasks": "Nessuna attività"
   },
   "taskDetail": {
-    "loading": "Caricamento attivit\u00e0\u2026",
+    "loading": "Caricamento attività…",
     "created": "Creata il {{date}}",
     "updated": "Aggiornata il {{date}}",
     "cancel": "Annulla",
     "save": "Salva",
-    "saving": "Salvataggio\u2026",
+    "saving": "Salvataggio…",
     "edit": "Modifica",
     "title": "Titolo",
     "description": "Descrizione",
-    "descriptionPlaceholder": "Descrizione dell'attivit\u00e0 (supporta markdown)",
+    "descriptionPlaceholder": "Descrizione dell'attività (supporta markdown)",
     "noDescription": "Nessuna descrizione",
-    "priority": "Priorit\u00e0",
+    "priority": "Priorità",
     "assignees": "Assegnatari",
     "unassigned": "Non assegnato",
     "actions": "Azioni",
-    "deleteTask": "Elimina Attivit\u00e0",
-    "deleteTitle": "Elimina Attivit\u00e0",
-    "deleteConfirm": "Sei sicuro di voler eliminare questa attivit\u00e0? Questa azione non pu\u00f2 essere annullata.",
+    "deleteTask": "Elimina Attività",
+    "deleteTitle": "Elimina Attività",
+    "deleteConfirm": "Sei sicuro di voler eliminare questa attività? Questa azione non può essere annullata.",
     "cancelDelete": "Annulla",
     "confirmDelete": "Elimina"
   },
   "sprints": {
     "title": "Sprint",
     "new": "Nuovo Sprint",
-    "loading": "Caricamento sprint\u2026",
+    "loading": "Caricamento sprint…",
     "noSprints": "Nessuno sprint ancora.",
     "createFirst": "Crea il primo sprint",
-    "tasks": "{{count}} attivit\u00e0",
+    "tasks": "{{count}} attività",
     "sprintsCount": "{{count}} sprint",
     "toggle": "Attiva/disattiva",
     "createTitle": "Crea Sprint",
@@ -343,106 +366,134 @@
     "startDate": "Data di Inizio",
     "endDate": "Data di Fine",
     "goal": "Obiettivo",
-    "goalPlaceholder": "Obiettivo opzionale dello sprint\u2026",
+    "goalPlaceholder": "Obiettivo opzionale dello sprint…",
     "cancel": "Annulla",
     "create": "Crea Sprint",
-    "creating": "Creazione\u2026"
+    "creating": "Creazione…",
+    "createDesc": "Crea un nuovo sprint per questo progetto."
   },
   "sprintDetail": {
-    "loading": "Caricamento sprint\u2026",
-    "tasks": "Attivit\u00e0",
+    "loading": "Caricamento sprint…",
+    "tasks": "Attività",
     "backToProject": "Torna al Progetto",
-    "noTasks": "Nessuna attivit\u00e0 in questo sprint.",
+    "noTasks": "Nessuna attività in questo sprint.",
     "removeFromSprint": "Rimuovi dallo sprint"
   },
   "sprintBacklog": {
     "backlog": "Backlog",
-    "loading": "Caricamento backlog\u2026",
-    "allAssigned": "Tutte le attivit\u00e0 sono assegnate a sprint.",
+    "loading": "Caricamento backlog…",
+    "allAssigned": "Tutte le attività sono assegnate a sprint.",
     "addToSprint": "Aggiungi allo Sprint"
   },
   "docs": {
     "title": "Documentazione",
-    "intro": "{{brand}} \u00e8 un'applicazione moderna e collaborativa di gestione progetti, progettata per aiutare i team a organizzare, tracciare e consegnare il lavoro in modo efficiente. Riunisce board, colonne, attivit\u00e0 e sprint in un workspace unificato che si adatta al flusso di lavoro del tuo team.",
+    "intro": "{{brand}} è un'applicazione moderna e collaborativa di gestione progetti, progettata per aiutare i team a organizzare, tracciare e consegnare il lavoro in modo efficiente. Riunisce board, colonne, attività e sprint in un workspace unificato che si adatta al flusso di lavoro del tuo team.",
     "brand": "Task Board",
-    "keyFeatures": "Funzionalit\u00e0 Principali",
+    "keyFeatures": "Funzionalità Principali",
     "workspaces": "Workspace e Progetti",
-    "workspacesDesc": "Crea workspace isolati per diversi team o clienti, ognuno contenente pi\u00f9 progetti con le proprie board e impostazioni.",
+    "workspacesDesc": "Crea workspace isolati per diversi team o clienti, ognuno contenente più progetti con le proprie board e impostazioni.",
     "boardManagement": "Gestione Board e Colonne",
-    "boardManagementDesc": "Organizza le attivit\u00e0 in colonne personalizzabili (ad es. Da Fare, In Corso, Completato) con supporto drag-and-drop per una facile prioritizzazione.",
-    "taskTracking": "Tracciamento Attivit\u00e0",
-    "taskTrackingDesc": "Crea, assegna e traccia le attivit\u00e0 con dettagli completi incluse descrizioni, etichette, priorit\u00e0 e date di scadenza.",
+    "boardManagementDesc": "Organizza le attività in colonne personalizzabili (ad es. Da Fare, In Corso, Completato) con supporto drag-and-drop per una facile prioritizzazione.",
+    "taskTracking": "Tracciamento Attività",
+    "taskTrackingDesc": "Crea, assegna e traccia le attività con dettagli completi incluse descrizioni, etichette, priorità e date di scadenza.",
     "sprintPlanning": "Pianificazione Sprint",
-    "sprintPlanningDesc": "Pianifica iterazioni usando sprint, assegna attivit\u00e0 a sprint specifici e monitora i progressi con viste in stile burndown.",
+    "sprintPlanningDesc": "Pianifica iterazioni usando sprint, assegna attività a sprint specifici e monitora i progressi con viste in stile burndown.",
     "teamCollaboration": "Collaborazione di Team",
     "teamCollaborationDesc": "Invita i membri del team via e-mail, assegna ruoli (Proprietario, Amministratore, Membro) e collabora in tempo reale in workspace condivisi.",
     "rbac": "Controllo degli Accessi Basato sui Ruoli",
     "rbacDesc": "Permessi granulari assicurano che i membri del team accedano solo alle risorse appropriate per il loro ruolo.",
     "techStack": "Stack Tecnologico",
-    "techStackDesc": "Task Board \u00e8 costruito con uno stack moderno orientato a TypeScript. Il frontend \u00e8 alimentato da Angular con componenti Spartan UI e Tailwind CSS per lo stile. Il backend gira su Cloudflare Workers con un livello dati MongoDB. Definizioni di tipi condivise e schemi di validazione garantiscono la sicurezza dei tipi end-to-end tra client e server."
+    "techStackDesc": "Task Board è costruito con uno stack moderno orientato a TypeScript. Il frontend è alimentato da Angular con componenti Spartan UI e Tailwind CSS per lo stile. Il backend gira su Cloudflare Workers con un livello dati MongoDB. Definizioni di tipi condivise e schemi di validazione garantiscono la sicurezza dei tipi end-to-end tra client e server."
   },
   "faq": {
     "title": "Domande Frequenti",
     "q1": {
-      "question": "Cos'\u00e8 Task Board?",
-      "answer": "Task Board \u00e8 un'applicazione collaborativa di gestione progetti che aiuta i team a organizzare il lavoro usando board, colonne, attivit\u00e0 e sprint. Supporta pi\u00f9 workspace, controllo degli accessi basato sui ruoli e collaborazione in tempo reale."
+      "question": "Cos'è Task Board?",
+      "answer": "Task Board è un'applicazione collaborativa di gestione progetti che aiuta i team a organizzare il lavoro usando board, colonne, attività e sprint. Supporta più workspace, controllo degli accessi basato sui ruoli e collaborazione in tempo reale."
     },
     "q2": {
       "question": "Come creo un progetto?",
-      "answer": "Naviga nel tuo workspace, clicca sulla sezione \u00abProgetti\u00bb e usa il pulsante \u00abCrea Progetto\u00bb. Dovrai fornire un nome del progetto e una descrizione opzionale. I progetti sono associati al tuo workspace corrente."
+      "answer": "Naviga nel tuo workspace, clicca sulla sezione «Progetti» e usa il pulsante «Crea Progetto». Dovrai fornire un nome del progetto e una descrizione opzionale. I progetti sono associati al tuo workspace corrente."
     },
     "q3": {
       "question": "Come invito i membri del team?",
-      "answer": "Vai nelle impostazioni del tuo workspace e apri la scheda \u00abMembri\u00bb. Clicca su \u00abInvita Membro\u00bb, inserisci il loro indirizzo e-mail e assegna un ruolo (Proprietario, Amministratore o Membro). Riceveranno un invito via e-mail per unirsi al tuo workspace."
+      "answer": "Vai nelle impostazioni del tuo workspace e apri la scheda «Membri». Clicca su «Invita Membro», inserisci il loro indirizzo e-mail e assegna un ruolo (Proprietario, Amministratore o Membro). Riceveranno un invito via e-mail per unirsi al tuo workspace."
     },
     "q4": {
       "question": "Quali sono i livelli di abbonamento?",
-      "answer": "Task Board offre i livelli Gratuito, Pro e Enterprise. Il livello Gratuito include la gestione base di board e attivit\u00e0. Pro aggiunge funzionalit\u00e0 avanzate come sprint e analisi. Enterprise include supporto prioritario, SSO e workspace illimitati."
+      "answer": "Task Board offre i livelli Gratuito, Pro e Enterprise. Il livello Gratuito include la gestione base di board e attività. Pro aggiunge funzionalità avanzate come sprint e analisi. Enterprise include supporto prioritario, SSO e workspace illimitati."
     },
     "q5": {
       "question": "Come cambio il mio tema?",
-      "answer": "Clicca sul tuo avatar nell'angolo in alto a destra per aprire il menu utente. Da l\u00ec puoi alternare tra la modalit\u00e0 chiara e scura e regolare il livello di zoom dell'interfaccia secondo le tue preferenze."
+      "answer": "Clicca sul tuo avatar nell'angolo in alto a destra per aprire il menu utente. Da lì puoi alternare tra la modalità chiara e scura e regolare il livello di zoom dell'interfaccia secondo le tue preferenze."
     }
   },
   "support": {
     "title": "Supporto",
-    "description": "Hai una domanda o hai bisogno di aiuto? Compila il modulo qui sotto e il nostro team di supporto ti risponder\u00e0.",
-    "success": "Il tuo messaggio \u00e8 stato inviato con successo. Ti risponderemo presto.",
+    "description": "Hai una domanda o hai bisogno di aiuto? Compila il modulo qui sotto e il nostro team di supporto ti risponderà.",
+    "success": "Il tuo messaggio è stato inviato con successo. Ti risponderemo presto.",
     "name": "Nome",
     "namePlaceholder": "Il tuo nome",
     "email": "E-mail",
     "message": "Messaggio",
-    "messagePlaceholder": "Descrivi il tuo problema o domanda\u2026",
+    "messagePlaceholder": "Descrivi il tuo problema o domanda…",
     "submit": "Invia",
-    "submitting": "Invio in corso\u2026"
+    "submitting": "Invio in corso…"
   },
   "validation": {
-    "emailRequired": "L'e-mail \u00e8 obbligatoria",
+    "emailRequired": "L'e-mail è obbligatoria",
     "emailInvalid": "Indirizzo e-mail non valido",
-    "passwordRequired": "La password \u00e8 obbligatoria",
+    "passwordRequired": "La password è obbligatoria",
     "passwordMin": "La password deve essere di almeno 8 caratteri",
     "passwordMax": "La password deve essere di al massimo 128 caratteri",
-    "nameRequired": "Il nome \u00e8 obbligatorio",
+    "nameRequired": "Il nome è obbligatorio",
     "nameMax": "Il nome deve essere di al massimo 200 caratteri",
-    "displayNameRequired": "Il nome visualizzato \u00e8 obbligatorio",
+    "displayNameRequired": "Il nome visualizzato è obbligatorio",
     "displayNameMax": "Il nome visualizzato deve essere di al massimo 100 caratteri",
-    "slugRequired": "Lo slug \u00e8 obbligatorio",
+    "slugRequired": "Lo slug è obbligatorio",
     "slugMin": "Lo slug deve essere di almeno 2 caratteri",
     "slugMax": "Lo slug deve essere di al massimo 80 caratteri",
-    "titleRequired": "Il titolo \u00e8 obbligatorio",
-    "columnRequired": "La colonna \u00e8 obbligatoria",
-    "boardNameRequired": "Il nome della board \u00e8 obbligatorio",
-    "userIdRequired": "L'ID utente \u00e8 obbligatorio",
-    "roleRequired": "Il ruolo \u00e8 obbligatorio",
-    "workspaceNameRequired": "Il nome del workspace \u00e8 obbligatorio",
+    "titleRequired": "Il titolo è obbligatorio",
+    "columnRequired": "La colonna è obbligatoria",
+    "boardNameRequired": "Il nome della board è obbligatorio",
+    "userIdRequired": "L'ID utente è obbligatorio",
+    "roleRequired": "Il ruolo è obbligatorio",
+    "workspaceNameRequired": "Il nome del workspace è obbligatorio",
     "confirmPasswordRequired": "Per favore, conferma la tua password",
-    "messageRequired": "Il messaggio \u00e8 obbligatorio",
+    "messageRequired": "Il messaggio è obbligatorio",
     "messageMax": "Il messaggio deve essere di al massimo 2000 caratteri",
-    "startDateRequired": "La data di inizio \u00e8 obbligatoria",
-    "endDateRequired": "La data di fine \u00e8 obbligatoria"
+    "startDateRequired": "La data di inizio è obbligatoria",
+    "endDateRequired": "La data di fine è obbligatoria"
   },
   "errors": {
-    "unexpected": "Si \u00e8 verificato un errore imprevisto. Riprova.",
+    "unexpected": "Si è verificato un errore imprevisto. Riprova.",
     "permissionDenied": "Non hai il permesso per eseguire questa azione"
+  },
+  "toasts": {
+    "created": "Creato con successo",
+    "updated": "Aggiornato con successo",
+    "deleted": "Eliminato con successo"
+  },
+  "common": {
+    "cancel": "Annulla",
+    "confirm": "Conferma",
+    "delete": "Elimina"
+  },
+  "labelManager": {
+    "createDesc": "Crea una nuova etichetta per questo progetto."
+  },
+  "projectMembers": {
+    "addMemberDesc": "Aggiungi un membro esistente del workspace a questo progetto."
+  },
+  "statusManager": {
+    "createDesc": "Crea una nuova colonna di stato per questo progetto.",
+    "deleteDesc": "Facoltativamente scegli uno stato sostitutivo per le attività esistenti."
+  },
+  "taskTypeManager": {
+    "createDesc": "Crea un nuovo tipo di attività per questo progetto.",
+    "deleteDesc": "Facoltativamente scegli un tipo sostitutivo per le attività esistenti."
+  },
+  "taskTable": {
+    "filtersDesc": "Filtra le attività per stato, priorità, assegnatario e altro."
   }
 }

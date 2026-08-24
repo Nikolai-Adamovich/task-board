@@ -176,13 +176,13 @@ describe('SprintList', () => {
     beforeEach(() => setup());
 
     it('should return correct color for each status', () => {
-      expect(component.getStatusColor('FUTURE')).toBe('bg-blue-100 text-blue-700');
-      expect(component.getStatusColor('ACTIVE')).toBe('bg-green-100 text-green-700');
-      expect(component.getStatusColor('COMPLETED')).toBe('bg-gray-100 text-gray-600');
+      expect(component.statusBadgeClass('FUTURE')).toBe('bg-blue-100 text-blue-700');
+      expect(component.statusBadgeClass('ACTIVE')).toBe('bg-green-100 text-green-700');
+      expect(component.statusBadgeClass('COMPLETED')).toBe('bg-gray-100 text-gray-600');
     });
 
     it('should return fallback for unknown', () => {
-      expect(component.getStatusColor('unknown')).toBe(NeutralColor);
+      expect(component.statusBadgeClass('unknown')).toBe(NeutralColor);
     });
   });
 

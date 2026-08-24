@@ -1,14 +1,14 @@
 <div class="mx-auto max-w-3xl px-4 py-8">
   <h1 class="mb-6 text-2xl font-bold">{{ 'docs.title' | transloco }}</h1>
 
-  <div class="prose prose-sm max-w-none space-y-4 text-muted-foreground">
+  <div class="prose prose-sm max-w-none flex flex-col gap-4 text-muted-foreground">
     <p>
       <strong class="text-foreground">{{ 'docs.brand' | transloco }}</strong>
       {{ 'docs.intro' | transloco: { brand: ('docs.brand' | transloco) } }}
     </p>
 
     <h2 class="text-lg font-semibold text-foreground">{{ 'docs.keyFeatures' | transloco }}</h2>
-    <ul class="list-inside list-disc space-y-1">
+    <ul class="list-inside list-disc flex flex-col gap-1">
       <li>
         <strong>{{ 'docs.workspaces' | transloco }}</strong> — {{ 'docs.workspacesDesc' | transloco }}
       </li>

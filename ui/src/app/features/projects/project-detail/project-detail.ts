@@ -3,7 +3,6 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucidePlus, lucideTrash2, lucideArchive, lucideRotateCcw, lucideXCircle } from '@ng-icons/lucide';
-import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
@@ -19,9 +18,13 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import { TenantRole, ProjectRole, BoardType, ProjectStatus } from '@task-board/shared';
-import { ProjectStatusColorMap, NeutralColor } from '@app/constants/priority';
+import { statusBadgeClass } from '@app/constants/priority';
 import type { Project, Board, CreateBoard } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 interface BoardFormModel {
   name: string;
@@ -31,6 +34,8 @@ interface BoardFormModel {
 @Component({
   selector: 'ui-project-detail',
   imports: [
+    HlmAlertImports,
+    HlmEmptyImports,
     RouterLink,
     TranslocoPipe,
     NgIcon,
@@ -49,6 +54,9 @@ interface BoardFormModel {
   templateUrl: './project-detail.html',
 })
 export class ProjectDetail implements OnInit {
+  /** Shared badge-class helper (see constants/priority.ts) */
+  protected readonly statusBadgeClass = statusBadgeClass;
+  private readonly notify = injectToasts();
   private readonly projectClient = inject(ProjectClient);
   private readonly boardClient = inject(BoardClient);
   private readonly authStore = inject(AuthStore);
@@ -109,17 +117,13 @@ export class ProjectDetail implements OnInit {
               f().reset({ name: '', type: BoardType.KANBAN });
             },
             error: (err) => {
-              this.error.set(this.getErrorMessage(err));
+              this.error.set(getErrorMessage(err));
             },
           });
         },
       },
     },
   );
-
-  protected getStatusColor(status: string): string {
-    return (ProjectStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
-  }
 
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
@@ -173,7 +177,7 @@ export class ProjectDetail implements OnInit {
           this.loadBoards();
         },
         error: (err) => {
-          this.error.set(this.getErrorMessage(err));
+          this.error.set(getErrorMessage(err));
         },
       });
   }
@@ -190,8 +194,9 @@ export class ProjectDetail implements OnInit {
     this.projectClient.archive(this.projectId()).subscribe({
       next: () => {
         this.project.update((p) => (p ? { ...p, status: ProjectStatus.ARCHIVED } : p));
+        this.notify.success('toasts.updated');
       },
-      error: (err) => this.error.set(this.getErrorMessage(err)),
+      error: (err) => this.error.set(getErrorMessage(err)),
     });
   }
 
@@ -199,8 +204,9 @@ export class ProjectDetail implements OnInit {
     this.projectClient.restore(this.projectId()).subscribe({
       next: () => {
         this.project.update((p) => (p ? { ...p, status: ProjectStatus.ACTIVE, deletionScheduledAt: null } : p));
+        this.notify.success('toasts.updated');
       },
-      error: (err) => this.error.set(this.getErrorMessage(err)),
+      error: (err) => this.error.set(getErrorMessage(err)),
     });
   }
 
@@ -208,8 +214,9 @@ export class ProjectDetail implements OnInit {
     this.projectClient.delete(this.projectId()).subscribe({
       next: () => {
         this.project.update((p) => (p ? { ...p, status: ProjectStatus.DELETION_PENDING } : p));
+        this.notify.success('toasts.deleted');
       },
-      error: (err) => this.error.set(this.getErrorMessage(err)),
+      error: (err) => this.error.set(getErrorMessage(err)),
     });
   }
 
@@ -218,15 +225,7 @@ export class ProjectDetail implements OnInit {
       next: () => {
         this.project.update((p) => (p ? { ...p, status: ProjectStatus.ACTIVE, deletionScheduledAt: null } : p));
       },
-      error: (err) => this.error.set(this.getErrorMessage(err)),
+      error: (err) => this.error.set(getErrorMessage(err)),
     });
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
   }
 }

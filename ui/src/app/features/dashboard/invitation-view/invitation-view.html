@@ -6,19 +6,19 @@
   </div>
 
   <!-- Invitation Cards -->
-  <div class="space-y-4">
+  <div class="flex flex-col gap-4">
     @for (invitation of invitations(); track invitation.id) {
       <hlm-card>
         <div hlmCardContent class="pt-6">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
-              <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <ng-icon name="lucideBuilding2" class="h-5 w-5 text-primary" />
+              <div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                <ng-icon name="lucideBuilding2" class="size-5 text-primary" />
               </div>
               <div>
                 <h3 class="text-base font-semibold text-foreground">{{ invitation.tenantName }}</h3>
                 <div class="mt-1 flex items-center gap-2">
-                  <span hlmBadge class="bg-blue-100 text-blue-700">{{ invitation.role }}</span>
+                  <span hlmBadge [class]="roleBadgeClass(invitation.role)">{{ invitation.role }}</span>
                   @if (invitation.invitedAt) {
                     <span class="text-xs text-muted-foreground">
                       {{ 'invitationView.invited' | transloco: { date: (invitation.invitedAt | date: 'mediumDate') } }}
@@ -36,7 +36,7 @@
                 [disabled]="decliningId() === invitation.id || acceptingId() === invitation.id"
               >
                 @if (decliningId() === invitation.id) {
-                  <hlm-spinner class="mr-1 h-3 w-3" />
+                  <hlm-spinner class="mr-1 size-3" />
                 }
                 {{ 'invitationView.decline' | transloco }}
               </button>
@@ -47,7 +47,7 @@
                 [disabled]="acceptingId() === invitation.id || decliningId() === invitation.id"
               >
                 @if (acceptingId() === invitation.id) {
-                  <hlm-spinner class="mr-1 h-3 w-3" />
+                  <hlm-spinner class="mr-1 size-3" />
                 }
                 {{ 'invitationView.accept' | transloco }}
               </button>

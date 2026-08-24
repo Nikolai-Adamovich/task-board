@@ -58,15 +58,16 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'boardView.createTaskTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'boardView.createTaskDesc' | transloco }}</p>
       </hlm-dialog-header>
 
       @if (error()) {
-        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() | transloco }}
-        </div>
+        <hlm-alert variant="destructive" class="mb-4">
+          <div hlmAlertDescription>{{ error() | transloco }}</div>
+        </hlm-alert>
       }
 
-      <form id="create-task-form" [formRoot]="newTaskForm" class="space-y-4">
+      <form id="create-task-form" [formRoot]="newTaskForm" class="flex flex-col gap-4">
         <hlm-field>
           <label hlmFieldLabel for="task-title">{{ 'boardView.title' | transloco }}</label>
           <input
@@ -159,12 +160,13 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'boardView.selectStatus' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'boardView.selectStatusDesc' | transloco }}</p>
       </hlm-dialog-header>
       <p class="text-sm text-muted-foreground mb-4">
         {{ 'boardView.multiStatusHint' | transloco }}
       </p>
       @if (pendingDrop(); as pd) {
-        <div class="space-y-2">
+        <div class="flex flex-col gap-2">
           @for (statusId of pd.targetColumn.statusIds; track statusId) {
             <button hlmBtn variant="outline" class="w-full justify-start" (click)="applyStatusSelection(statusId)">
               {{ statusMap()[statusId] || statusId }}

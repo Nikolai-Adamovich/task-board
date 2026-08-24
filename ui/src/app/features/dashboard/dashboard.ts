@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { TenantRole } from '@task-board/shared';
 import { AuthStore } from '@stores/auth-store';
@@ -19,6 +19,7 @@ type DashboardState =
   'visitor' | 'new-user' | 'pending-invitations' | typeof TenantRole.MEMBER | typeof TenantRole.OWNER;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-dashboard',
   imports: [HlmSpinnerImports, LandingPage, WelcomeView, InvitationView, MemberDashboard, OwnerDashboard],
   templateUrl: './dashboard.html',

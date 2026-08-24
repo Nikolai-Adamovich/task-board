@@ -1,6 +1,8 @@
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
+import { TranslocoService } from '@jsverse/transloco';
+import { toast } from '@spartan-ng/brain/sonner';
 import { AuthStore } from '@stores/auth-store';
 import type { ErrorResponse } from '@task-board/shared';
 
@@ -101,6 +103,7 @@ function extractErrorMessage(error: HttpErrorResponse): string {
  */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const authStore = inject(AuthStore);
+  const transloco = inject(TranslocoService);
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
@@ -108,6 +111,12 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
       // Attach the user-friendly message for downstream error handlers
       (error as HttpErrorResponse & { userMessage?: string }).userMessage = userMessage;
+
+      // Surface unexpected errors (network failures / server errors) as toasts.
+      // Expected client errors (4xx) are handled inline by the calling component.
+      if (error.status === 0 || error.status >= 500) {
+        toast.error(transloco.translate(userMessage));
+      }
 
       switch (error.status) {
         case 401:

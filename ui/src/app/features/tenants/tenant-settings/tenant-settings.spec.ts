@@ -148,7 +148,7 @@ describe('TenantSettings', () => {
       submit(component.settingsForm);
 
       await new Promise((r) => setTimeout(r, 0));
-      expect(component.error()).toBe('errors.unexpected');
+      expect(component.error()).toBe('fail');
       expect(component.loading()).toBe(false);
     });
   });
@@ -181,7 +181,7 @@ describe('TenantSettings', () => {
       component.deleteTenant();
 
       await new Promise((r) => setTimeout(r, 0));
-      expect(component.error()).toBe('errors.unexpected');
+      expect(component.error()).toBe('fail');
       expect(component.loading()).toBe(false);
     });
   });

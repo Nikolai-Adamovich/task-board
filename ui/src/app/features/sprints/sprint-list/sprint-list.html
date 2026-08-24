@@ -14,19 +14,23 @@
       <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'sprints.loading' | transloco }}</span>
     </div>
   } @else if (sprints().length === 0) {
-    <div class="rounded-lg border border-dashed border-border py-12 text-center">
-      <ng-icon name="lucideCalendar" class="mx-auto h-12 w-12 text-muted-foreground" />
-      <p class="mt-4 text-sm text-muted-foreground">{{ 'sprints.noSprints' | transloco }}</p>
-      @if (canCreate()) {
-        <button hlmBtn class="mt-4" (click)="showCreateModal.set(true)">{{ 'sprints.createFirst' | transloco }}</button>
-      }
-    </div>
+    <hlm-empty>
+      <hlm-empty-header>
+        <hlm-empty-media variant="icon"><ng-icon name="lucideCalendar" /></hlm-empty-media>
+        <div hlmEmptyTitle>{{ 'sprints.noSprints' | transloco }}</div>
+      </hlm-empty-header>
+      <hlm-empty-content>
+        @if (canCreate()) {
+          <button hlmBtn (click)="showCreateModal.set(true)">{{ 'sprints.createFirst' | transloco }}</button>
+        }
+      </hlm-empty-content>
+    </hlm-empty>
   } @else {
     <!-- Grouped by status: Active, Future, Completed -->
-    <div class="space-y-6">
+    <div class="flex flex-col gap-6">
       @for (group of sprintGroups(); track group.label) {
         <hlm-collapsible [expanded]="isGroupExpanded(group.label)" (expandedChange)="toggleGroup(group.label)">
-          <div class="flex items-center justify-between rounded-t-lg border border-border bg-surface-50 px-4 py-3">
+          <div class="flex items-center justify-between rounded-t-lg border border-border bg-muted/40 px-4 py-3">
             <div class="flex items-center gap-3">
               <h3 class="text-lg font-semibold text-foreground">{{ group.labelKey | transloco }}</h3>
               <span hlmBadge variant="secondary">{{
@@ -39,7 +43,7 @@
             </button>
           </div>
           <hlm-collapsible-content>
-            <div class="space-y-2 rounded-b-lg border border-t-0 border-border bg-card p-3">
+            <div class="flex flex-col gap-2 rounded-b-lg border border-t-0 border-border bg-card p-3">
               @for (sprint of group.sprints; track sprint.id) {
                 <a
                   [routerLink]="['/tenants', 'current', 'projects', sprint.projectId, 'sprints', sprint.id]"
@@ -50,7 +54,7 @@
                       <h3 class="text-base font-semibold text-foreground group-hover:text-primary">
                         {{ sprint.name }}
                       </h3>
-                      <span hlmBadge [class]="getStatusColor(sprint.status)">
+                      <span hlmBadge [class]="statusBadgeClass(sprint.status)">
                         {{ sprint.status }}
                       </span>
                     </div>
@@ -60,7 +64,7 @@
                   </div>
                   <ng-icon
                     name="lucideChevronRight"
-                    class="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1"
+                    class="size-5 text-muted-foreground transition-transform group-hover:translate-x-1"
                   />
                 </a>
               }
@@ -76,15 +80,16 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'sprints.createTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'sprints.createDesc' | transloco }}</p>
       </hlm-dialog-header>
 
       @if (error()) {
-        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() | transloco }}
-        </div>
+        <hlm-alert variant="destructive" class="mb-4">
+          <div hlmAlertDescription>{{ error() | transloco }}</div>
+        </hlm-alert>
       }
 
-      <form id="create-sprint-form" [formRoot]="newSprintForm" class="space-y-4">
+      <form id="create-sprint-form" [formRoot]="newSprintForm" class="flex flex-col gap-4">
         <hlm-field>
           <label hlmFieldLabel for="sprint-name">{{ 'sprints.name' | transloco }}</label>
           <input hlmInput id="sprint-name" type="text" [formField]="newSprintForm.name" placeholder="Sprint 1" />

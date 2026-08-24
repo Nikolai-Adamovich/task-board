@@ -8,8 +8,10 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { finalize } from 'rxjs';
-import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import type { Filter, FilterCriteria, FilterSort, CreateFilter } from '@task-board/shared';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
 export interface AppliedFilterState {
   filters: FilterCriteria;
@@ -19,6 +21,8 @@ export interface AppliedFilterState {
 @Component({
   selector: 'ui-filter-panel',
   imports: [
+    ConfirmDialog,
+    HlmAlertImports,
     TranslocoPipe,
     HlmButtonImports,
     HlmSpinnerImports,
@@ -30,6 +34,7 @@ export interface AppliedFilterState {
   templateUrl: './filter-panel.html',
 })
 export class FilterPanel implements OnInit {
+  private readonly notify = injectToasts();
   private readonly filterClient = inject(FilterClient);
   /** Project ID to load filters for */
   readonly projectId = input.required<string>();
@@ -107,6 +112,7 @@ export class FilterPanel implements OnInit {
           this.filters.update((list) => [...list, filter]);
           this.filterName.set('');
           this.showSaveForm.set(false);
+          this.notify.success('toasts.created');
         },
         error: () => {
           this.error.set('filters.createError');
@@ -123,8 +129,8 @@ export class FilterPanel implements OnInit {
     this.showDeleteConfirm.set(true);
   }
 
-  protected onDeleteDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
+  protected onDeleteDialogStateChange(open: boolean): void {
+    if (!open) {
       this.showDeleteConfirm.set(false);
       this.filterToDelete.set(null);
     }
@@ -140,6 +146,7 @@ export class FilterPanel implements OnInit {
         this.filters.update((list) => list.filter((f) => f.id !== filter.id));
         this.showDeleteConfirm.set(false);
         this.filterToDelete.set(null);
+        this.notify.success('toasts.deleted');
       },
       error: () => {
         this.error.set('filters.deleteError');

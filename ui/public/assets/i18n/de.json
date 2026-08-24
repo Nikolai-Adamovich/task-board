@@ -1,6 +1,6 @@
 {
   "header": {
-    "search": "Suchen\u2026",
+    "search": "Suchen…",
     "clearSearch": "Suche löschen",
     "notifications": "Benachrichtigungen",
     "noNotifications": "Keine Benachrichtigungen",
@@ -44,7 +44,7 @@
       "email": "E-Mail",
       "password": "Passwort",
       "submit": "Anmelden",
-      "submitting": "Anmeldung läuft\u2026",
+      "submitting": "Anmeldung läuft…",
       "noAccount": "Noch kein Konto?",
       "createOne": "Konto erstellen",
       "failed": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut."
@@ -56,13 +56,13 @@
       "email": "E-Mail",
       "password": "Passwort",
       "submit": "Konto erstellen",
-      "submitting": "Konto wird erstellt\u2026",
+      "submitting": "Konto wird erstellt…",
       "hasAccount": "Bereits ein Konto?",
       "signIn": "Anmelden",
       "failed": "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut."
     },
     "invitation": {
-      "loading": "Einladung wird geladen\u2026",
+      "loading": "Einladung wird geladen…",
       "error": "Einladungsfehler",
       "goToSignIn": "Zur Anmeldung",
       "title": "Einladung annehmen",
@@ -75,9 +75,9 @@
       "password": "Passwort",
       "confirmPassword": "Passwort bestätigen",
       "accept": "Einladung annehmen",
-      "accepting": "Einladung wird angenommen\u2026",
+      "accepting": "Einladung wird angenommen…",
       "createAndAccept": "Konto erstellen & annehmen",
-      "creatingAccount": "Konto wird erstellt\u2026",
+      "creatingAccount": "Konto wird erstellt…",
       "hasAccount": "Bereits ein Konto?",
       "signIn": "Anmelden",
       "noToken": "Kein Einladungstoken bereitgestellt.",
@@ -174,22 +174,29 @@
     "slug": "Slug",
     "slugHint": "Wird in URLs verwendet. Nur Kleinbuchstaben, Zahlen und Bindestriche.",
     "plan": "Abonnementplan",
-    "planFree": "Kostenlos \u2014 Bis zu 3 Projekte und 5 Benutzer",
+    "planFree": "Kostenlos — Bis zu 3 Projekte und 5 Benutzer",
     "submit": "Arbeitsbereich erstellen",
-    "submitting": "Arbeitsbereich wird erstellt\u2026",
+    "submitting": "Arbeitsbereich wird erstellt…",
     "failed": "Arbeitsbereich konnte nicht erstellt werden. Bitte versuchen Sie es erneut."
   },
   "settings": {
-    "title": "Einstellungen"
+    "title": "Einstellungen",
+    "theme": "Design",
+    "themeDescription": "Wähle das Farbschema der App.",
+    "zoom": "Zoom",
+    "zoomDescription": "Passe die Schriftgröße der Oberfläche an.",
+    "resetZoom": "Zurücksetzen",
+    "language": "Sprache",
+    "languageDescription": "Wähle die Anzeigesprache."
   },
   "tenantSettings": {
     "title": "Mandanteneinstellungen",
-    "loading": "Einstellungen werden geladen\u2026",
+    "loading": "Einstellungen werden geladen…",
     "general": "Allgemeine Einstellungen",
     "name": "Name",
     "slug": "Slug",
     "save": "Änderungen speichern",
-    "saving": "Wird gespeichert\u2026",
+    "saving": "Wird gespeichert…",
     "dangerZone": "Gefahrenzone",
     "dangerDescription": "Das Löschen eines Mandanten ist unwiderruflich. Alle Projekte, Boards und Aufgaben in diesem Mandanten werden dauerhaft entfernt.",
     "deleteTenant": "Mandant löschen",
@@ -197,7 +204,8 @@
     "deleteConfirm": "Diese Aktion kann nicht rückgängig gemacht werden. Zur Bestätigung geben Sie den Mandantennamen unten ein.",
     "deleteName": "Mandantenname",
     "deletePlaceholder": "Mandantennamen zur Bestätigung eingeben",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "deleteDesc": "Gib den Workspace-Namen ein, um die endgültige Löschung zu bestätigen."
   },
   "upgrade": {
     "title": "Plan upgraden",
@@ -215,12 +223,12 @@
     "advancedAnalytics": "Erweiterte Analytik",
     "back": "Zurück",
     "upgradeButton": "Auf Premium upgraden",
-    "upgrading": "Upgrade läuft\u2026",
+    "upgrading": "Upgrade läuft…",
     "failed": "Upgrade fehlgeschlagen. Bitte versuchen Sie es erneut."
   },
   "members": {
     "title": "Mitglieder",
-    "loading": "Mitglieder werden geladen\u2026",
+    "loading": "Mitglieder werden geladen…",
     "noMembers": "Keine Mitglieder gefunden.",
     "pending": "Ausstehend",
     "unknown": "Unbekannt",
@@ -237,25 +245,36 @@
     "removeMember": "Mitglied entfernen",
     "cancel": "Abbrechen",
     "inviteButton": "Einladen",
-    "inviting": "Einladung läuft\u2026"
+    "inviting": "Einladung läuft…",
+    "inviteDesc": "Lade ein neues Mitglied per E-Mail ein und wähle seine Rolle.",
+    "filterByName": "Nach Name filtern …",
+    "filterByEmail": "Nach E-Mail filtern …",
+    "allRoles": "Alle Rollen",
+    "allStatuses": "Alle Status",
+    "statusActive": "Aktiv",
+    "statusAccessRevoked": "Zugriff entzogen",
+    "roleOwner": "Eigentümer",
+    "roleAdmin": "Administrator",
+    "roleMember": "Mitglied"
   },
   "projects": {
     "title": "Projekte",
     "new": "Neues Projekt",
-    "loading": "Projekte werden geladen\u2026",
+    "loading": "Projekte werden geladen…",
     "noProjects": "Keine Projekte gefunden. Erstellen Sie Ihr erstes Projekt, um zu beginnen.",
     "slug": "Slug: {{slug}}",
     "createTitle": "Projekt erstellen",
     "name": "Name",
     "slugLabel": "Slug",
     "description": "Beschreibung",
-    "descriptionPlaceholder": "Optionale Beschreibung\u2026",
+    "descriptionPlaceholder": "Optionale Beschreibung…",
     "cancel": "Abbrechen",
     "create": "Projekt erstellen",
-    "creating": "Wird erstellt\u2026"
+    "creating": "Wird erstellt…",
+    "createDesc": "Erstelle ein neues Projekt in diesem Workspace."
   },
   "projectDetail": {
-    "loading": "Projekt wird geladen\u2026",
+    "loading": "Projekt wird geladen…",
     "sprints": "Sprints",
     "newBoard": "Neues Board",
     "boards": "Boards",
@@ -269,33 +288,37 @@
     "createBoardTitle": "Board erstellen",
     "boardName": "Name",
     "boardDescription": "Beschreibung",
-    "descriptionPlaceholder": "Optionale Beschreibung\u2026",
+    "descriptionPlaceholder": "Optionale Beschreibung…",
     "cancel": "Abbrechen",
     "createBoardButton": "Board erstellen",
-    "creating": "Wird erstellt\u2026",
+    "creating": "Wird erstellt…",
     "addMemberTitle": "Mitglied hinzufügen",
     "userId": "Benutzer-ID",
     "userIdPlaceholder": "Benutzer-ID eingeben",
     "role": "Rolle",
     "addMemberButton": "Mitglied hinzufügen",
-    "adding": "Wird hinzugefügt\u2026",
+    "adding": "Wird hinzugefügt…",
     "removeMemberTitle": "Mitglied entfernen",
     "removeConfirm": "Sind Sie sicher, dass Sie dieses Mitglied aus dem Projekt entfernen möchten?",
-    "removeButton": "Entfernen"
+    "removeButton": "Entfernen",
+    "createBoardDesc": "Erstelle ein neues Board für dieses Projekt.",
+    "deleteProjectDesc": "Das Projekt wird zur endgültigen Löschung vorgemerkt."
   },
   "boardView": {
-    "loading": "Board wird geladen\u2026",
+    "loading": "Board wird geladen…",
     "newTask": "Neue Aufgabe",
     "createTaskTitle": "Aufgabe erstellen",
     "title": "Titel",
     "titlePlaceholder": "Aufgabentitel",
     "description": "Beschreibung",
-    "descriptionPlaceholder": "Optionale Beschreibung\u2026",
+    "descriptionPlaceholder": "Optionale Beschreibung…",
     "priority": "Priorität",
     "column": "Spalte",
     "cancel": "Abbrechen",
     "create": "Aufgabe erstellen",
-    "creating": "Wird erstellt\u2026"
+    "creating": "Wird erstellt…",
+    "createTaskDesc": "Neue Aufgabe zu dieser Spalte hinzufügen.",
+    "selectStatusDesc": "Wähle den Status für die verschobene Aufgabe."
   },
   "priority": {
     "low": "Niedrig",
@@ -308,12 +331,12 @@
     "noTasks": "Keine Aufgaben"
   },
   "taskDetail": {
-    "loading": "Aufgabe wird geladen\u2026",
+    "loading": "Aufgabe wird geladen…",
     "created": "Erstellt am {{date}}",
     "updated": "Aktualisiert am {{date}}",
     "cancel": "Abbrechen",
     "save": "Speichern",
-    "saving": "Wird gespeichert\u2026",
+    "saving": "Wird gespeichert…",
     "edit": "Bearbeiten",
     "title": "Titel",
     "description": "Beschreibung",
@@ -332,7 +355,7 @@
   "sprints": {
     "title": "Sprints",
     "new": "Neuer Sprint",
-    "loading": "Sprints werden geladen\u2026",
+    "loading": "Sprints werden geladen…",
     "noSprints": "Noch keine Sprints.",
     "createFirst": "Ersten Sprint erstellen",
     "tasks": "{{count}} Aufgaben",
@@ -343,13 +366,14 @@
     "startDate": "Startdatum",
     "endDate": "Enddatum",
     "goal": "Ziel",
-    "goalPlaceholder": "Optionales Sprint-Ziel\u2026",
+    "goalPlaceholder": "Optionales Sprint-Ziel…",
     "cancel": "Abbrechen",
     "create": "Sprint erstellen",
-    "creating": "Wird erstellt\u2026"
+    "creating": "Wird erstellt…",
+    "createDesc": "Erstelle einen neuen Sprint für dieses Projekt."
   },
   "sprintDetail": {
-    "loading": "Sprint wird geladen\u2026",
+    "loading": "Sprint wird geladen…",
     "tasks": "Aufgaben",
     "backToProject": "Zurück zum Projekt",
     "noTasks": "Keine Aufgaben in diesem Sprint.",
@@ -357,7 +381,7 @@
   },
   "sprintBacklog": {
     "backlog": "Backlog",
-    "loading": "Backlog wird geladen\u2026",
+    "loading": "Backlog wird geladen…",
     "allAssigned": "Alle Aufgaben sind Sprints zugewiesen.",
     "addToSprint": "Zum Sprint hinzufügen"
   },
@@ -389,11 +413,11 @@
     },
     "q2": {
       "question": "Wie erstelle ich ein Projekt?",
-      "answer": "Navigieren Sie zu Ihrem Arbeitsbereich, klicken Sie auf den Bereich \u201eProjekte\u201c und verwenden Sie die Schaltfläche \u201eProjekt erstellen\u201c. Sie müssen einen Projektnamen und eine optionale Beschreibung angeben. Projekte sind auf Ihren aktuellen Arbeitsbereich beschränkt."
+      "answer": "Navigieren Sie zu Ihrem Arbeitsbereich, klicken Sie auf den Bereich „Projekte“ und verwenden Sie die Schaltfläche „Projekt erstellen“. Sie müssen einen Projektnamen und eine optionale Beschreibung angeben. Projekte sind auf Ihren aktuellen Arbeitsbereich beschränkt."
     },
     "q3": {
       "question": "Wie lade ich Teammitglieder ein?",
-      "answer": "Gehen Sie zu Ihren Arbeitsbereichseinstellungen und öffnen Sie die Registerkarte \u201eMitglieder\u201c. Klicken Sie auf \u201eMitglied einladen\u201c, geben Sie die E-Mail-Adresse ein und weisen Sie eine Rolle zu (Eigentümer, Administrator oder Mitglied). Sie erhalten eine E-Mail-Einladung, Ihrem Arbeitsbereich beizutreten."
+      "answer": "Gehen Sie zu Ihren Arbeitsbereichseinstellungen und öffnen Sie die Registerkarte „Mitglieder“. Klicken Sie auf „Mitglied einladen“, geben Sie die E-Mail-Adresse ein und weisen Sie eine Rolle zu (Eigentümer, Administrator oder Mitglied). Sie erhalten eine E-Mail-Einladung, Ihrem Arbeitsbereich beizutreten."
     },
     "q4": {
       "question": "Was sind Abonnementstufen?",
@@ -412,9 +436,9 @@
     "namePlaceholder": "Ihr Name",
     "email": "E-Mail",
     "message": "Nachricht",
-    "messagePlaceholder": "Beschreiben Sie Ihr Problem oder Ihre Frage\u2026",
+    "messagePlaceholder": "Beschreiben Sie Ihr Problem oder Ihre Frage…",
     "submit": "Senden",
-    "submitting": "Wird gesendet\u2026"
+    "submitting": "Wird gesendet…"
   },
   "validation": {
     "emailRequired": "E-Mail ist erforderlich",
@@ -444,5 +468,32 @@
   "errors": {
     "unexpected": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
     "permissionDenied": "Sie haben keine Berechtigung, diese Aktion auszuführen"
+  },
+  "toasts": {
+    "created": "Erfolgreich erstellt",
+    "updated": "Erfolgreich aktualisiert",
+    "deleted": "Erfolgreich gelöscht"
+  },
+  "common": {
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen",
+    "delete": "Löschen"
+  },
+  "labelManager": {
+    "createDesc": "Erstelle ein neues Label für dieses Projekt."
+  },
+  "projectMembers": {
+    "addMemberDesc": "Füge ein bestehendes Workspace-Mitglied zu diesem Projekt hinzu."
+  },
+  "statusManager": {
+    "createDesc": "Erstelle eine neue Statusspalte für dieses Projekt.",
+    "deleteDesc": "Wähle optional einen Ersatzstatus für bestehende Aufgaben."
+  },
+  "taskTypeManager": {
+    "createDesc": "Erstelle einen neuen Aufgabentyp für dieses Projekt.",
+    "deleteDesc": "Wähle optional einen Ersatztyp für bestehende Aufgaben."
+  },
+  "taskTable": {
+    "filtersDesc": "Filtere Aufgaben nach Status, Priorität, Zuweisung und mehr."
   }
 }

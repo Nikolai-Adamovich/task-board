@@ -1,7 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { HttpErrorResponse } from '@angular/common/http';
 import { form, FormField, FormRoot, schema, required, email, minLength, maxLength } from '@angular/forms/signals';
 import { AuthStore } from '@stores/auth-store';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -9,6 +8,8 @@ import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 interface RegisterModel {
   displayName: string;
@@ -19,6 +20,7 @@ interface RegisterModel {
 
 @Component({
   imports: [
+    HlmAlertImports,
     RouterLink,
     TranslocoPipe,
     FormField,
@@ -74,25 +76,10 @@ export class Register {
             });
             await this.router.navigateByUrl('/');
           } catch (err) {
-            this.error.set(this.getErrorMessage(err));
+            this.error.set(getErrorMessage(err));
           }
         },
       },
     },
   );
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      const body = err.error;
-
-      if (body?.error?.code) {
-        return 'errors.serverError';
-      }
-      if (body?.error?.message) {
-        return body.error.message;
-      }
-    }
-
-    return 'auth.register.failed';
-  }
 }

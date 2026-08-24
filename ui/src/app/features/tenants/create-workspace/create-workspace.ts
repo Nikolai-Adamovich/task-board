@@ -12,6 +12,7 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 interface WorkspaceModel {
   name: string;
@@ -20,6 +21,7 @@ interface WorkspaceModel {
 
 @Component({
   imports: [
+    HlmAlertImports,
     TranslocoPipe,
     FormField,
     FormRoot,

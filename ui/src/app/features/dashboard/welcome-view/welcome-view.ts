@@ -1,4 +1,4 @@
-import { Component, input, output, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -11,8 +11,10 @@ import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideBuilding2, lucideCheck, lucideMail } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
 import type { MyInvitation } from '@app/types/frontend';
+import { roleBadgeClass } from '@app/constants/priority';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-welcome-view',
   imports: [RouterLink, TranslocoPipe, HlmCardImports, HlmButtonImports, HlmBadgeImports, HlmSpinnerImports, NgIcon],
   providers: [provideIcons({ lucideBuilding2, lucideCheck, lucideMail })],
@@ -24,6 +26,8 @@ export class WelcomeView {
   readonly invitations = input<MyInvitation[]>([]);
   readonly invitationHandled = output();
   protected readonly acceptingId = signal<string | null>(null);
+  /** Shared badge-class helper (see constants/priority.ts) */
+  protected readonly roleBadgeClass = roleBadgeClass;
 
   protected acceptInvitation(invitation: MyInvitation): void {
     this.acceptingId.set(invitation.id);

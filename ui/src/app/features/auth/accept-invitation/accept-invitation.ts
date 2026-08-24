@@ -13,6 +13,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import type { InvitationDetails } from '@task-board/shared';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 interface InvitationFormModel {
   displayName: string;
@@ -22,6 +23,7 @@ interface InvitationFormModel {
 
 @Component({
   imports: [
+    HlmAlertImports,
     RouterLink,
     TranslocoPipe,
     FormField,

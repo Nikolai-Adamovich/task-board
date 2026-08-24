@@ -13,12 +13,14 @@ import { ProjectClient } from '@services/project-client';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { TenantRole, TenantStatus } from '@task-board/shared';
-import { TenantStatusColorMap, NeutralColor } from '@app/constants/priority';
+import { statusBadgeClass } from '@app/constants/priority';
 import type { Project } from '@task-board/shared';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 
 @Component({
   selector: 'ui-workspace-detail',
   imports: [
+    HlmEmptyImports,
     RouterLink,
     TranslocoPipe,
     NgIcon,
@@ -40,6 +42,8 @@ import type { Project } from '@task-board/shared';
   templateUrl: './workspace-detail.html',
 })
 export class WorkspaceDetail implements OnInit {
+  /** Shared badge-class helper (see constants/priority.ts) */
+  protected readonly statusBadgeClass = statusBadgeClass;
   private readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   private readonly projectClient = inject(ProjectClient);
@@ -54,10 +58,6 @@ export class WorkspaceDetail implements OnInit {
 
     return r === TenantRole.OWNER || r === TenantRole.ADMIN;
   });
-
-  protected getStatusColor(status: string): string {
-    return (TenantStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
-  }
 
   async ngOnInit(): Promise<void> {
     try {

@@ -11,6 +11,9 @@ import { TaskClient } from '@services/task-client';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import type { TaskPriority, CreateTask } from '@task-board/shared';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { HlmCheckboxImports } from '@spartan-ng/helm/checkbox';
 
 export interface SelectOption {
   id: string;
@@ -31,6 +34,8 @@ interface CreateTaskForm {
 @Component({
   selector: 'ui-create-task-dialog',
   imports: [
+    HlmCheckboxImports,
+    HlmAlertImports,
     TranslocoPipe,
     FormField,
     FormRoot,
@@ -45,6 +50,7 @@ interface CreateTaskForm {
   templateUrl: './create-task-dialog.html',
 })
 export class CreateTaskDialog {
+  private readonly notify = injectToasts();
   private readonly taskClient = inject(TaskClient);
   readonly projectId = input.required<string>();
   readonly open = input(false);
@@ -104,6 +110,7 @@ export class CreateTaskDialog {
             next: () => {
               this.dialogClosed.emit();
               this.taskCreated.emit();
+              this.notify.success('toasts.created');
             },
             error: () => {
               this.createError.set('taskTable.createError');

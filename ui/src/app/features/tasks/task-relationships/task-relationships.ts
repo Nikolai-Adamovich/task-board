@@ -11,12 +11,16 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { finalize } from 'rxjs';
-import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import type { TaskRelationship } from '@task-board/shared';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'ui-task-relationships',
   imports: [
+    ConfirmDialog,
+    HlmAlertImports,
     TranslocoPipe,
     HlmButtonImports,
     HlmSpinnerImports,
@@ -30,6 +34,7 @@ import type { TaskRelationship } from '@task-board/shared';
   templateUrl: './task-relationships.html',
 })
 export class TaskRelationships implements OnInit {
+  private readonly notify = injectToasts();
   private readonly relationshipClient = inject(TaskRelationshipClient);
   /** Current task ID */
   readonly taskId = input.required<string>();
@@ -88,6 +93,7 @@ export class TaskRelationships implements OnInit {
           this.relationships.update((list) => [...list, rel]);
           this.targetTaskId.set('');
           this.showCreateForm.set(false);
+          this.notify.success('toasts.created');
         },
         error: () => {
           this.error.set('relationships.createError');
@@ -100,8 +106,8 @@ export class TaskRelationships implements OnInit {
     this.showDeleteConfirm.set(true);
   }
 
-  protected onDeleteDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
+  protected onDeleteDialogStateChange(open: boolean): void {
+    if (!open) {
       this.showDeleteConfirm.set(false);
       this.relationshipToDelete.set(null);
     }

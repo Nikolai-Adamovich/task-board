@@ -8,7 +8,8 @@ import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import { HttpErrorResponse } from '@angular/common/http';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 interface LoginModel {
   email: string;
@@ -17,6 +18,7 @@ interface LoginModel {
 
 @Component({
   imports: [
+    HlmAlertImports,
     RouterLink,
     TranslocoPipe,
     FormField,
@@ -51,23 +53,12 @@ export class Login {
             await this.authStore.login(this.model());
             await this.router.navigateByUrl('/');
           } catch (err) {
-            this.error.set(this.getErrorMessage(err));
+            this.error.set(getErrorMessage(err));
           }
         },
       },
     },
   );
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      const userMsg = (err as HttpErrorResponse & { userMessage?: string }).userMessage;
-
-      if (userMsg) return userMsg;
-      return err.error?.message ?? err.message;
-    }
-
-    return 'auth.login.failed';
-  }
 
   protected onSubmit(): void {
     submit(this.loginForm);

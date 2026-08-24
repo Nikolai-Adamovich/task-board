@@ -2,7 +2,7 @@
   <!-- Page header -->
   <div class="mb-6 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <ng-icon name="lucideShield" class="h-6 w-6 text-foreground" />
+      <ng-icon name="lucideShield" class="size-6 text-foreground" />
       <h2 class="text-2xl font-bold text-foreground">{{ 'members.title' | transloco }}</h2>
     </div>
     @if (canManage()) {
@@ -22,21 +22,21 @@
               <div class="flex items-center gap-1">
                 <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort(col.field)">
                   <span>{{ col.labelKey | transloco }}</span>
-                  <span class="inline-flex h-3 w-3 shrink-0">
+                  <span class="inline-flex size-3 shrink-0">
                     @if (sortField() === col.field) {
                       <ng-icon
                         [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'"
-                        class="h-3 w-3"
+                        class="size-3"
                       />
                     }
                   </span>
                 </button>
                 <hlm-popover sideOffset="4">
-                  <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                  <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="size-6 shrink-0">
                     <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="getFilterValue(col.field)" />
                   </button>
                   <hlm-popover-content *hlmPopoverPortal [class]="col.popoverWidth">
-                    <div class="space-y-2">
+                    <div class="flex flex-col gap-2">
                       @if (col.filterType === 'text') {
                         <input
                           hlmInput
@@ -44,7 +44,7 @@
                           class="h-8 w-full"
                           [value]="getFilterValue(col.field)"
                           (input)="onColumnFilterChange(col.field, $any($event.target).value)"
-                          [placeholder]="col.placeholder ?? ''"
+                          [placeholder]="col.placeholderKey ? (col.placeholderKey | transloco) : ''"
                         />
                       } @else {
                         <hlm-select
@@ -52,13 +52,15 @@
                           (valueChange)="onColumnFilterChange(col.field, $any($event))"
                         >
                           <hlm-select-trigger class="w-full" size="sm">
-                            <hlm-select-value [placeholder]="col.selectAllLabel ?? ''" />
+                            <hlm-select-value
+                              [placeholder]="col.selectAllLabelKey ? (col.selectAllLabelKey | transloco) : ''"
+                            />
                           </hlm-select-trigger>
                           <hlm-select-content *hlmSelectPortal>
                             <hlm-select-group>
-                              <hlm-select-item value="">{{ col.selectAllLabel }}</hlm-select-item>
+                              <hlm-select-item value="">{{ col.selectAllLabelKey | transloco }}</hlm-select-item>
                               @for (opt of col.selectOptions ?? []; track opt.value) {
-                                <hlm-select-item [value]="opt.value">{{ opt.label }}</hlm-select-item>
+                                <hlm-select-item [value]="opt.value">{{ opt.labelKey | transloco }}</hlm-select-item>
                               }
                             </hlm-select-group>
                           </hlm-select-content>
@@ -80,9 +82,9 @@
           <tr hlmTableRow>
             <td hlmTableCell>
               <div class="flex items-center gap-3">
-                <hlm-avatar class="h-8 w-8">
+                <hlm-avatar class="size-8">
                   <div hlmAvatarFallback class="text-xs font-medium">
-                    {{ getInitials(member.displayName ?? member.email ?? '??') }}
+                    {{ initials(member.displayName ?? member.email ?? '??') }}
                   </div>
                 </hlm-avatar>
                 <span class="text-sm text-foreground">
@@ -96,23 +98,27 @@
               </span>
             </td>
             <td hlmTableCell>
-              <span hlmBadge [class]="getRoleColor(member.role)">
+              <span hlmBadge [class]="roleBadgeClass(member.role)">
                 {{ member.role }}
               </span>
             </td>
             <td hlmTableCell>
               @if (member.invitation?.status === InvitationStatus.PENDING) {
-                <span hlmBadge [class]="getStatusColor('PENDING')"> {{ 'members.pending' | transloco }} </span>
+                <span hlmBadge [class]="memberStatusBadgeClass('PENDING')"> {{ 'members.pending' | transloco }} </span>
               } @else if (member.status === MemberStatus.ACTIVE) {
-                <span hlmBadge [class]="getStatusColor(member.status)"> {{ 'members.active' | transloco }} </span>
+                <span hlmBadge [class]="memberStatusBadgeClass(member.status)">
+                  {{ 'members.active' | transloco }}
+                </span>
               } @else if (member.status === MemberStatus.ACCESS_REVOKED) {
-                <span hlmBadge [class]="getStatusColor(member.status)">
+                <span hlmBadge [class]="memberStatusBadgeClass(member.status)">
                   {{ 'members.accessRevoked' | transloco }}
                 </span>
               } @else if (member.invitation?.status === InvitationStatus.DECLINED) {
-                <span hlmBadge [class]="getStatusColor('DECLINED')"> {{ 'members.declined' | transloco }} </span>
+                <span hlmBadge [class]="memberStatusBadgeClass('DECLINED')">
+                  {{ 'members.declined' | transloco }}
+                </span>
               } @else if (hasExpiredOrRevokedInvitation(member)) {
-                <span hlmBadge [class]="getStatusColor('DECLINED')">
+                <span hlmBadge [class]="memberStatusBadgeClass('DECLINED')">
                   {{ member.invitation?.status }}
                 </span>
               }
@@ -138,9 +144,9 @@
                         [title]="'members.restoreAccess' | transloco"
                       >
                         @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="h-4 w-4" />
+                          <hlm-spinner class="size-4" />
                         } @else {
-                          <ng-icon name="lucideRotateCcw" class="h-4 w-4 text-green-600" />
+                          <ng-icon name="lucideRotateCcw" class="size-4 text-green-600" />
                         }
                       </button>
                     }
@@ -156,9 +162,9 @@
                         [title]="'members.reinvite' | transloco"
                       >
                         @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="h-4 w-4" />
+                          <hlm-spinner class="size-4" />
                         } @else {
-                          <ng-icon name="lucideMail" class="h-4 w-4 text-blue-600" />
+                          <ng-icon name="lucideMail" class="size-4 text-blue-600" />
                         }
                       </button>
                     }
@@ -176,9 +182,9 @@
                         [title]="'members.revokeAccess' | transloco"
                       >
                         @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="h-4 w-4" />
+                          <hlm-spinner class="size-4" />
                         } @else {
-                          <ng-icon name="lucideBan" class="h-4 w-4 text-orange-600" />
+                          <ng-icon name="lucideBan" class="size-4 text-orange-600" />
                         }
                       </button>
                     }
@@ -194,9 +200,9 @@
                         [title]="'members.resendInvitation' | transloco"
                       >
                         @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="h-4 w-4" />
+                          <hlm-spinner class="size-4" />
                         } @else {
-                          <ng-icon name="lucideRefreshCw" class="h-4 w-4 text-blue-600" />
+                          <ng-icon name="lucideRefreshCw" class="size-4 text-blue-600" />
                         }
                       </button>
                     }
@@ -215,9 +221,9 @@
                         [title]="'members.permanentlyDelete' | transloco"
                       >
                         @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="h-4 w-4" />
+                          <hlm-spinner class="size-4" />
                         } @else {
-                          <ng-icon name="lucideSkull" class="h-4 w-4 text-destructive" />
+                          <ng-icon name="lucideSkull" class="size-4 text-destructive" />
                         }
                       </button>
                     }
@@ -232,9 +238,9 @@
                       [title]="'members.removeMember' | transloco"
                     >
                       @if (removingUserId() === member.userId) {
-                        <hlm-spinner class="h-4 w-4" />
+                        <hlm-spinner class="size-4" />
                       } @else {
-                        <ng-icon name="lucideTrash2" class="h-4 w-4 text-destructive" />
+                        <ng-icon name="lucideTrash2" class="size-4 text-destructive" />
                       }
                     </button>
                   </div>
@@ -267,15 +273,16 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'members.inviteTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'members.inviteDesc' | transloco }}</p>
       </hlm-dialog-header>
 
       @if (error()) {
-        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() | transloco }}
-        </div>
+        <hlm-alert variant="destructive" class="mb-4">
+          <div hlmAlertDescription>{{ error() | transloco }}</div>
+        </hlm-alert>
       }
 
-      <form id="invite-form" [formRoot]="inviteForm" class="space-y-4">
+      <form id="invite-form" [formRoot]="inviteForm" class="flex flex-col gap-4">
         <hlm-field>
           <label hlmFieldLabel for="invite-email">{{ 'members.email' | transloco }}</label>
           <input

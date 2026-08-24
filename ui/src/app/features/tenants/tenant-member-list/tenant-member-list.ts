@@ -1,5 +1,5 @@
 import { Component, inject, input, signal, computed, OnInit, OnDestroy } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
@@ -20,7 +20,6 @@ import { finalize } from 'rxjs';
 import { form, FormRoot, FormField, schema, required } from '@angular/forms/signals';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
-import { PreferencesStore } from '@stores/preferences-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -34,11 +33,14 @@ import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { Pagination } from '@app/shared/pagination/pagination';
-import { TenantRoleColorMap, MemberStatusColorMap, NeutralColor } from '@app/constants/priority';
-import { HttpErrorResponse } from '@angular/common/http';
+import { roleBadgeClass, memberStatusBadgeClass } from '@app/constants/priority';
 import type { TenantMember } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { MemberStatus, TenantRole, InvitationStatus } from '@task-board/shared';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage, initials } from '@app/shared/utils/error-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { useMemberTable } from '@app/shared/member-list/member-table';
 
 interface InviteFormModel {
   email: string;
@@ -50,14 +52,15 @@ interface ColumnDef {
   labelKey: string;
   filterType: 'text' | 'select';
   popoverWidth: string;
-  placeholder?: string;
-  selectAllLabel?: string;
-  selectOptions?: { value: string; label: string }[];
+  placeholderKey?: string;
+  selectAllLabelKey?: string;
+  selectOptions?: { value: string; labelKey: string }[];
 }
 
 @Component({
   selector: 'ui-tenant-member-list',
   imports: [
+    HlmAlertImports,
     FormRoot,
     FormField,
     TranslocoPipe,
@@ -94,10 +97,13 @@ interface ColumnDef {
   templateUrl: './tenant-member-list.html',
 })
 export class TenantMemberList implements OnInit, OnDestroy {
+  /** Shared badge-class + initials helpers (see constants/priority.ts / shared/utils) */
+  protected readonly roleBadgeClass = roleBadgeClass;
+  protected readonly memberStatusBadgeClass = memberStatusBadgeClass;
+  protected readonly initials = initials;
+  private readonly notify = injectToasts();
   private readonly tenantClient = inject(TenantClient);
   private readonly authStore = inject(AuthStore);
-  private readonly preferencesStore = inject(PreferencesStore);
-  private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private queryParamsSub?: Subscription;
   /** Bound via withComponentInputBinding() */
@@ -129,9 +135,10 @@ export class TenantMemberList implements OnInit, OnDestroy {
               this.showInviteDialog.set(false);
               f().reset({ email: '', role: TenantRole.MEMBER });
               this.loadMembers();
+              this.notify.success('toasts.created');
             },
             error: (err) => {
-              this.error.set(this.getErrorMessage(err));
+              this.error.set(getErrorMessage(err));
             },
           });
         },
@@ -145,24 +152,53 @@ export class TenantMemberList implements OnInit, OnDestroy {
 
     return role === TenantRole.OWNER || role === TenantRole.ADMIN;
   });
-  /** Pagination */
-  protected readonly page = signal(1);
-  protected readonly pageSize = signal(this.preferencesStore.pageSize());
-  protected readonly total = computed(() => this.filteredMembers().length);
-  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
-  protected readonly paginatedMembers = computed(() => {
-    const start = (this.page() - 1) * this.pageSize();
-
-    return this.filteredMembers().slice(start, start + this.pageSize());
+  /**
+   * Shared sort / column-filter / pagination machinery (see shared/member-list).
+   * Filter and sort state is synced to URL query params.
+   */
+  private readonly table = useMemberTable<TenantMember>({
+    source: this.members,
+    filters: {
+      name: { matches: (m, q) => (m.displayName ?? m.email ?? m.userId ?? '').toLowerCase().includes(q) },
+      email: { matches: (m, q) => (m.email ?? '').toLowerCase().includes(q) },
+      role: { matches: (m, q) => m.role === q },
+      status: { matches: (m, q) => m.status === q },
+    },
+    sorters: {
+      name: (m) => m.displayName ?? m.email ?? m.userId ?? '',
+      email: (m) => m.email ?? '',
+      role: (m) => m.role,
+      status: (m) => m.status,
+    },
+    load: () => this.loadMembers(),
   });
-  /** Column sorting */
-  protected readonly sortField = signal('');
-  protected readonly sortDirection = signal<'asc' | 'desc'>('asc');
-  /** Column-level filter signals */
-  protected readonly filterName = signal('');
-  protected readonly filterEmail = signal('');
-  protected readonly filterRole = signal('');
-  protected readonly filterStatus = signal('');
+  protected readonly page = this.table.page;
+  protected readonly pageSize = this.table.pageSize;
+  protected readonly total = this.table.total;
+  protected readonly totalPages = this.table.totalPages;
+  protected readonly paginatedMembers = this.table.paginated;
+  protected readonly sortField = this.table.sortField;
+  protected readonly sortDirection = this.table.sortDirection;
+
+  protected toggleSort(field: string): void {
+    this.table.toggleSort(field);
+  }
+
+  protected getFilterValue(field: string): string {
+    return this.table.getFilterValue(field);
+  }
+
+  protected onColumnFilterChange(field: string, value: string): void {
+    this.table.onColumnFilterChange(field, value);
+  }
+
+  protected onPageChange(newPage: number): void {
+    this.table.onPageChange(newPage);
+  }
+
+  protected onPageSizeChange(newSize: number): void {
+    this.table.onPageSizeChange(newSize);
+  }
   /** Column definitions for table headers */
   protected readonly columns: ColumnDef[] = [
     {
@@ -170,181 +206,38 @@ export class TenantMemberList implements OnInit, OnDestroy {
       labelKey: 'members.name',
       filterType: 'text',
       popoverWidth: 'w-56',
-      placeholder: 'Filter by name...',
+      placeholderKey: 'members.filterByName',
     },
     {
       field: 'email',
       labelKey: 'members.email',
       filterType: 'text',
       popoverWidth: 'w-56',
-      placeholder: 'Filter by email...',
+      placeholderKey: 'members.filterByEmail',
     },
     {
       field: 'role',
       labelKey: 'members.role',
       filterType: 'select',
       popoverWidth: 'w-48',
-      selectAllLabel: 'All Roles',
-      selectOptions: Object.values(TenantRole).map((r) => ({ value: r, label: r })),
+      selectAllLabelKey: 'members.allRoles',
+      selectOptions: Object.values(TenantRole).map((r) => ({
+        value: r,
+        labelKey: 'members.role' + r.charAt(0) + r.slice(1).toLowerCase(),
+      })),
     },
     {
       field: 'status',
       labelKey: 'members.status',
       filterType: 'select',
       popoverWidth: 'w-48',
-      selectAllLabel: 'All Statuses',
+      selectAllLabelKey: 'members.allStatuses',
       selectOptions: [
-        { value: 'ACTIVE', label: 'Active' },
-        { value: 'ACCESS_REVOKED', label: 'Access Revoked' },
+        { value: 'ACTIVE', labelKey: 'members.statusActive' },
+        { value: 'ACCESS_REVOKED', labelKey: 'members.statusAccessRevoked' },
       ],
     },
   ];
-  /** Members sorted by the current sort column */
-  protected readonly sortedMembers = computed(() => {
-    const list = [...this.members()];
-    const field = this.sortField();
-    const dir = this.sortDirection() === 'asc' ? 1 : -1;
-
-    if (!field) return list;
-
-    return list.sort((a, b) => {
-      let valA: string;
-      let valB: string;
-
-      switch (field) {
-        case 'name':
-          valA = a.displayName ?? a.email ?? a.userId ?? '';
-          valB = b.displayName ?? b.email ?? b.userId ?? '';
-          break;
-
-        case 'email':
-          valA = a.email ?? '';
-          valB = b.email ?? '';
-          break;
-
-        case 'role':
-          valA = a.role;
-          valB = b.role;
-          break;
-
-        case 'status':
-          valA = a.status;
-          valB = b.status;
-          break;
-
-        default:
-          return 0;
-      }
-
-      return valA.localeCompare(valB) * dir;
-    });
-  });
-  /** Members filtered by column filters */
-  protected readonly filteredMembers = computed(() => {
-    let list = this.sortedMembers();
-    const name = this.filterName().toLowerCase();
-    const role = this.filterRole();
-    const status = this.filterStatus();
-    const email = this.filterEmail().toLowerCase();
-
-    if (name) {
-      list = list.filter((m) => {
-        const display = (m.displayName ?? m.email ?? m.userId ?? '').toLowerCase();
-
-        return display.includes(name);
-      });
-    }
-
-    if (email) {
-      list = list.filter((m) => (m.email ?? '').toLowerCase().includes(email));
-    }
-
-    if (role) {
-      list = list.filter((m) => m.role === role);
-    }
-
-    if (status) {
-      list = list.filter((m) => m.status === status);
-    }
-
-    return list;
-  });
-
-  protected getFilterValue(field: string): string {
-    switch (field) {
-      case 'name':
-        return this.filterName();
-
-      case 'email':
-        return this.filterEmail();
-
-      case 'role':
-        return this.filterRole();
-
-      case 'status':
-        return this.filterStatus();
-
-      default:
-        return '';
-    }
-  }
-
-  protected toggleSort(field: string): void {
-    if (this.sortField() === field) {
-      if (this.sortDirection() === 'asc') {
-        this.sortDirection.set('desc');
-      } else {
-        // Was desc → clear sort entirely
-        this.sortField.set('');
-        this.sortDirection.set('asc');
-      }
-    } else {
-      this.sortField.set(field);
-      this.sortDirection.set('asc');
-    }
-    this.syncToUrl();
-  }
-
-  /** Handle column filter changes from popover dropdowns/inputs */
-  protected onColumnFilterChange(filterName: string, value: string): void {
-    switch (filterName) {
-      case 'name':
-        this.filterName.set(value);
-        break;
-
-      case 'email':
-        this.filterEmail.set(value);
-        break;
-
-      case 'role':
-        this.filterRole.set(value);
-        break;
-
-      case 'status':
-        this.filterStatus.set(value);
-        break;
-    }
-    this.page.set(1);
-    this.syncToUrl();
-  }
-
-  protected onPageChange(newPage: number): void {
-    this.page.set(newPage);
-  }
-
-  protected onPageSizeChange(newSize: number): void {
-    this.pageSize.set(newSize);
-    this.preferencesStore.setPageSize(newSize);
-    this.page.set(1);
-  }
-
-  protected getRoleColor(role: string): string {
-    return (TenantRoleColorMap as Record<string, string>)[role] ?? NeutralColor;
-  }
-
-  protected getStatusColor(status: string): string {
-    return (MemberStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
-  }
 
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
@@ -353,48 +246,14 @@ export class TenantMemberList implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Sync URL query params → component state
+    // Sync URL query params → table state, then load
     this.queryParamsSub = this.route.queryParams.subscribe((params) => {
-      this.filterName.set(params['name'] ?? '');
-      this.filterEmail.set(params['email'] ?? '');
-      this.filterRole.set(params['role'] ?? '');
-      this.filterStatus.set(params['status'] ?? '');
-
-      const sortParam = params['sort'] ?? '';
-
-      if (sortParam) {
-        const [field, direction] = sortParam.split(':');
-
-        this.sortField.set(field ?? '');
-        this.sortDirection.set((direction === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc');
-      } else {
-        this.sortField.set('');
-        this.sortDirection.set('asc');
-      }
-
-      this.loadMembers();
+      this.table.syncFromParams(params);
     });
   }
 
   ngOnDestroy(): void {
     this.queryParamsSub?.unsubscribe();
-  }
-
-  /** Sync all filter/sort state to URL query params */
-  private syncToUrl(): void {
-    const queryParams: Record<string, string | null> = {
-      name: this.filterName() || null,
-      email: this.filterEmail() || null,
-      role: this.filterRole() || null,
-      status: this.filterStatus() || null,
-      sort: this.sortField() ? `${this.sortField()}:${this.sortDirection()}` : null,
-    };
-
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams,
-      replaceUrl: true,
-    });
   }
 
   private loadMembers(): void {
@@ -415,6 +274,7 @@ export class TenantMemberList implements OnInit, OnDestroy {
     this.tenantClient.updateMemberRole(this.tenantId(), member.userId, newRole as TenantRole).subscribe({
       next: (updated) => {
         this.members.update((list) => list.map((m) => (m.userId === updated.userId ? updated : m)));
+        this.notify.success('toasts.updated');
       },
     });
   }
@@ -430,6 +290,7 @@ export class TenantMemberList implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.members.update((list) => list.filter((m) => m.userId !== member.userId));
+          this.notify.success('toasts.deleted');
         },
       });
   }
@@ -508,29 +369,10 @@ export class TenantMemberList implements OnInit, OnDestroy {
     return member.role === TenantRole.OWNER;
   }
 
-  protected getInitials(name: string | null): string {
-    if (!name) return '??';
-
-    const parts = name.trim().split(/\s+/);
-
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  }
-
   /** Check if a member has an expired or revoked invitation */
   protected hasExpiredOrRevokedInvitation(member: TenantMember): boolean {
     return (
       member.invitation?.status === InvitationStatus.EXPIRED || member.invitation?.status === InvitationStatus.REVOKED
     );
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
   }
 }

@@ -2,7 +2,6 @@ import { Component, computed, inject, input, OnInit, signal } from '@angular/cor
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucidePlus, lucidePencil, lucideTrash2, lucideCheck, lucideX, lucideGripVertical } from '@ng-icons/lucide';
-import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { StatusClient } from '@services/status-client';
 import { AuthStore } from '@stores/auth-store';
@@ -19,6 +18,10 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Status, CreateStatus } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 interface CreateStatusForm {
   name: string;
@@ -27,6 +30,8 @@ interface CreateStatusForm {
 @Component({
   selector: 'ui-status-manager',
   imports: [
+    HlmAlertImports,
+    HlmEmptyImports,
     TranslocoPipe,
     NgIcon,
     HlmButtonImports,
@@ -44,6 +49,7 @@ interface CreateStatusForm {
   templateUrl: './status-manager.html',
 })
 export class StatusManager implements OnInit {
+  private readonly notify = injectToasts();
   private readonly statusClient = inject(StatusClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
@@ -83,9 +89,10 @@ export class StatusManager implements OnInit {
               this.statuses.update((list) => [...list, status]);
               this.showCreateDialog.set(false);
               f().reset({ name: '' });
+              this.notify.success('toasts.created');
             },
             error: (err) => {
-              this.error.set(this.getErrorMessage(err));
+              this.error.set(getErrorMessage(err));
             },
           });
         },
@@ -124,9 +131,10 @@ export class StatusManager implements OnInit {
         next: (updated) => {
           this.statuses.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
           this.cancelEdit();
+          this.notify.success('toasts.updated');
         },
         error: (err) => {
-          this.error.set(this.getErrorMessage(err));
+          this.error.set(getErrorMessage(err));
         },
       });
   }
@@ -168,14 +176,14 @@ export class StatusManager implements OnInit {
     this.statusClient.update(a.id, { position: b.position }).subscribe({
       next: () => checkDone(),
       error: (err) => {
-        this.error.set(this.getErrorMessage(err));
+        this.error.set(getErrorMessage(err));
         this.saving.set(false);
       },
     });
     this.statusClient.update(b.id, { position: a.position }).subscribe({
       next: () => checkDone(),
       error: (err) => {
-        this.error.set(this.getErrorMessage(err));
+        this.error.set(getErrorMessage(err));
         this.saving.set(false);
       },
     });
@@ -204,9 +212,10 @@ export class StatusManager implements OnInit {
           this.statuses.update((list) => list.filter((s) => s.id !== status.id));
           this.showDeleteDialog.set(false);
           this.deletingStatus.set(null);
+          this.notify.success('toasts.deleted');
         },
         error: (err) => {
-          this.error.set(this.getErrorMessage(err));
+          this.error.set(getErrorMessage(err));
         },
       });
   }
@@ -239,15 +248,8 @@ export class StatusManager implements OnInit {
           this.statuses.set(statuses.sort((a, b) => a.position - b.position));
         },
         error: (err) => {
-          this.error.set(this.getErrorMessage(err));
+          this.error.set(getErrorMessage(err));
         },
       });
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-    return 'errors.unexpected';
   }
 }

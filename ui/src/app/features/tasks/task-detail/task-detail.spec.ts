@@ -181,23 +181,23 @@ describe('TaskDetail', () => {
     beforeEach(() => setup());
 
     it('should return correct color for LOW', () => {
-      expect(component.getPriorityColor('LOW')).toBe('bg-blue-100 text-blue-700');
+      expect(component.priorityBadgeClass('LOW')).toBe('bg-blue-100 text-blue-700');
     });
 
     it('should return correct color for MEDIUM', () => {
-      expect(component.getPriorityColor('MEDIUM')).toBe('bg-yellow-100 text-yellow-700');
+      expect(component.priorityBadgeClass('MEDIUM')).toBe('bg-yellow-100 text-yellow-700');
     });
 
     it('should return correct color for HIGH', () => {
-      expect(component.getPriorityColor('HIGH')).toBe('bg-orange-100 text-orange-700');
+      expect(component.priorityBadgeClass('HIGH')).toBe('bg-orange-100 text-orange-700');
     });
 
     it('should return correct color for CRITICAL', () => {
-      expect(component.getPriorityColor('CRITICAL')).toBe('bg-red-100 text-red-700');
+      expect(component.priorityBadgeClass('CRITICAL')).toBe('bg-red-100 text-red-700');
     });
 
     it('should return fallback color for unknown priority', () => {
-      expect(component.getPriorityColor('unknown')).toBe(NeutralColor);
+      expect(component.priorityBadgeClass('unknown')).toBe(NeutralColor);
     });
   });
 

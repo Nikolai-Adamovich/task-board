@@ -288,26 +288,26 @@ describe('TenantMemberList', () => {
     });
 
     it('getInitials should return first 2 chars uppercased', () => {
-      expect(component.getInitials('abcdef')).toBe('AB');
+      expect(component.initials('abcdef')).toBe('AB');
     });
 
     it('getInitials should return ?? for null', () => {
-      expect(component.getInitials(null)).toBe('??');
+      expect(component.initials(null)).toBe('??');
     });
 
     it('getRoleColor should return correct colors', () => {
-      expect(component.getRoleColor('OWNER')).toBe('bg-purple-100 text-purple-700');
-      expect(component.getRoleColor('ADMIN')).toBe('bg-blue-100 text-blue-700');
-      expect(component.getRoleColor('MEMBER')).toBe('bg-gray-100 text-gray-600');
-      expect(component.getRoleColor('unknown')).toBe(NeutralColor);
+      expect(component.roleBadgeClass('OWNER')).toBe('bg-purple-100 text-purple-700');
+      expect(component.roleBadgeClass('ADMIN')).toBe('bg-blue-100 text-blue-700');
+      expect(component.roleBadgeClass('MEMBER')).toBe('bg-gray-100 text-gray-600');
+      expect(component.roleBadgeClass('unknown')).toBe(NeutralColor);
     });
 
     it('getStatusColor should return correct colors', () => {
-      expect(component.getStatusColor('ACTIVE')).toBe('bg-green-100 text-green-700');
-      expect(component.getStatusColor('PENDING')).toBe('bg-amber-100 text-amber-700');
-      expect(component.getStatusColor('DECLINED')).toBe('bg-red-100 text-red-700');
-      expect(component.getStatusColor('ACCESS_REVOKED')).toBe('bg-red-100 text-red-700');
-      expect(component.getStatusColor('unknown')).toBe(NeutralColor);
+      expect(component.memberStatusBadgeClass('ACTIVE')).toBe('bg-green-100 text-green-700');
+      expect(component.memberStatusBadgeClass('PENDING')).toBe('bg-amber-100 text-amber-700');
+      expect(component.memberStatusBadgeClass('DECLINED')).toBe('bg-red-100 text-red-700');
+      expect(component.memberStatusBadgeClass('ACCESS_REVOKED')).toBe('bg-red-100 text-red-700');
+      expect(component.memberStatusBadgeClass('unknown')).toBe(NeutralColor);
     });
   });
 

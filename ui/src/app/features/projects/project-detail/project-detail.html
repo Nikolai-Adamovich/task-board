@@ -12,7 +12,7 @@
             <h2 class="text-2xl font-bold text-foreground">{{ p.name }}</h2>
             <span class="text-sm font-mono text-muted-foreground">[{{ p.key }}]</span>
             @if (p.status !== ProjectStatus.ACTIVE) {
-              <span hlmBadge [class]="getStatusColor(p.status)">{{ p.status }}</span>
+              <span hlmBadge [class]="statusBadgeClass(p.status)">{{ p.status }}</span>
             }
           </div>
           @if (p.description) {
@@ -37,14 +37,18 @@
     <section class="mb-8">
       <h3 class="mb-4 text-lg font-semibold text-foreground">{{ 'projectDetail.boards' | transloco }}</h3>
       @if (boards().length === 0) {
-        <div class="rounded-lg border border-dashed border-border py-8 text-center">
-          <p class="text-sm text-muted-foreground">{{ 'projectDetail.noBoards' | transloco }}</p>
+        <hlm-empty>
+          <hlm-empty-header>
+            <div hlmEmptyTitle>{{ 'projectDetail.noBoards' | transloco }}</div>
+          </hlm-empty-header>
           @if (p.status === ProjectStatus.ACTIVE) {
-            <button hlmBtn class="mt-3" size="sm" (click)="showCreateBoard.set(true)">
-              {{ 'projectDetail.createBoard' | transloco }}
-            </button>
+            <hlm-empty-content>
+              <button hlmBtn size="sm" (click)="showCreateBoard.set(true)">
+                {{ 'projectDetail.createBoard' | transloco }}
+              </button>
+            </hlm-empty-content>
           }
-        </div>
+        </hlm-empty>
       } @else {
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           @for (board of boards(); track board.id) {
@@ -108,15 +112,16 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'projectDetail.createBoardTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'projectDetail.createBoardDesc' | transloco }}</p>
       </hlm-dialog-header>
 
       @if (error()) {
-        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() | transloco }}
-        </div>
+        <hlm-alert variant="destructive" class="mb-4">
+          <div hlmAlertDescription>{{ error() | transloco }}</div>
+        </hlm-alert>
       }
 
-      <form id="create-board-form" [formRoot]="createBoardForm" class="space-y-4">
+      <form id="create-board-form" [formRoot]="createBoardForm" class="flex flex-col gap-4">
         <hlm-field>
           <label hlmFieldLabel for="board-name">{{ 'projectDetail.boardName' | transloco }}</label>
           <input hlmInput id="board-name" type="text" [formField]="createBoardForm.name" placeholder="Sprint Board" />
@@ -153,8 +158,9 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'projectDetail.deleteProjectTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'projectDetail.deleteProjectDesc' | transloco }}</p>
       </hlm-dialog-header>
-      <div class="space-y-4">
+      <div class="flex flex-col gap-4">
         <p class="text-sm text-muted-foreground">
           {{ 'projectDetail.deleteProjectWarning' | transloco }}
         </p>

@@ -1,15 +1,15 @@
 <hlm-dialog [state]="open() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
   <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
-    <div class="space-y-4">
+    <div class="flex flex-col gap-4">
       <h3 hlmDialogTitle>{{ 'taskTable.createTaskTitle' | transloco }}</h3>
 
       @if (createError()) {
-        <div class="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ createError() | transloco }}
-        </div>
+        <hlm-alert variant="destructive">
+          <div hlmAlertDescription>{{ createError() | transloco }}</div>
+        </hlm-alert>
       }
 
-      <form id="create-task-form" [formRoot]="createForm" class="space-y-4">
+      <form id="create-task-form" [formRoot]="createForm" class="flex flex-col gap-4">
         <!-- Title -->
         <hlm-field>
           <label hlmFieldLabel for="create-title">{{ 'taskTable.taskTitle' | transloco }}</label>
@@ -147,17 +147,16 @@
             <span class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{{
               'taskTable.labels' | transloco
             }}</span>
-            <div class="max-h-32 overflow-y-auto rounded-md border p-2 space-y-1">
+            <div class="max-h-32 overflow-y-auto rounded-md border p-2 flex flex-col gap-1">
               @for (opt of labelOptions(); track opt.id) {
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
+                <span class="flex items-center gap-2 text-sm">
+                  <hlm-checkbox
                     [checked]="isLabelSelected(opt.id)"
-                    (change)="toggleLabel(opt.id)"
-                    class="h-3.5 w-3.5 rounded border-border"
+                    (checkedChange)="toggleLabel($any($event))"
+                    [ariaLabel]="opt.name"
                   />
                   {{ opt.name }}
-                </label>
+                </span>
               } @empty {
                 <span class="text-xs text-muted-foreground">—</span>
               }

@@ -7,7 +7,7 @@
         <span hlmBadge variant="secondary">{{ role() }}</span>
       }
       @if (tenant()?.status && tenant()?.status !== TenantStatus.ACTIVE) {
-        <span hlmBadge [class]="getStatusColor(tenant()!.status)">{{ tenant()!.status }}</span>
+        <span hlmBadge [class]="statusBadgeClass(tenant()!.status)">{{ tenant()!.status }}</span>
       }
     </div>
     <!-- Description -->
@@ -20,11 +20,11 @@
   @if (isOwnerOrAdmin()) {
     <div class="mb-8 flex flex-wrap gap-3">
       <a hlmBtn variant="outline" [routerLink]="['/tenants', tenant()?.id, 'settings']">
-        <ng-icon name="lucideSettings" class="mr-2 h-4 w-4" />
+        <ng-icon name="lucideSettings" class="mr-2 size-4" />
         {{ 'workspace.settings' | transloco }}
       </a>
       <a hlmBtn variant="outline" [routerLink]="['/tenants', tenant()?.id, 'settings', 'members']">
-        <ng-icon name="lucideUsers" class="mr-2 h-4 w-4" />
+        <ng-icon name="lucideUsers" class="mr-2 size-4" />
         {{ 'workspace.members' | transloco }}
       </a>
     </div>
@@ -35,7 +35,7 @@
     <div class="flex items-center justify-between">
       <h2 class="text-lg font-semibold text-foreground">{{ 'workspace.projects' | transloco }}</h2>
       <button hlmBtn variant="ghost" size="sm" hlmCollapsibleTrigger>
-        <ng-icon [name]="projectsExpanded() ? 'lucideChevronDown' : 'lucideChevronRight'" class="h-4 w-4" />
+        <ng-icon [name]="projectsExpanded() ? 'lucideChevronDown' : 'lucideChevronRight'" class="size-4" />
       </button>
     </div>
     <hlm-collapsible-content>
@@ -44,22 +44,26 @@
           <hlm-spinner />
         </div>
       } @else if (projects().length === 0) {
-        <div class="rounded-lg border border-dashed border-border py-8 text-center">
-          <p class="text-sm text-muted-foreground">{{ 'workspace.noProjects' | transloco }}</p>
+        <hlm-empty>
+          <hlm-empty-header>
+            <div hlmEmptyTitle>{{ 'workspace.noProjects' | transloco }}</div>
+          </hlm-empty-header>
           @if (isOwnerOrAdmin()) {
-            <a hlmBtn variant="outline" size="sm" class="mt-3" [routerLink]="['/tenants', tenant()?.id, 'projects']">
-              {{ 'workspace.createFirst' | transloco }}
-            </a>
+            <hlm-empty-content>
+              <a hlmBtn variant="outline" size="sm" [routerLink]="['/tenants', tenant()?.id, 'projects']">
+                {{ 'workspace.createFirst' | transloco }}
+              </a>
+            </hlm-empty-content>
           }
-        </div>
+        </hlm-empty>
       } @else {
-        <div class="mt-4 space-y-2">
+        <div class="mt-4 flex flex-col gap-2">
           @for (project of projects(); track project.id) {
             <a
               [routerLink]="['/tenants', tenant()?.id, 'projects', project.id]"
-              class="flex items-center gap-3 rounded-md border border-border p-3 transition-colors hover:bg-surface-50"
+              class="flex items-center gap-3 rounded-md border border-border p-3 transition-colors hover:bg-muted/50"
             >
-              <ng-icon name="lucideFolder" class="h-4 w-4 text-muted-foreground" />
+              <ng-icon name="lucideFolder" class="size-4 text-muted-foreground" />
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <p class="text-sm font-medium text-foreground">{{ project.name }}</p>
@@ -70,7 +74,7 @@
                 }
               </div>
               @if (project.status !== 'ACTIVE') {
-                <span hlmBadge [class]="getStatusColor(project.status)" class="text-xs">
+                <span hlmBadge [class]="statusBadgeClass(project.status)" class="text-xs">
                   {{ project.status }}
                 </span>
               }

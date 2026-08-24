@@ -11,12 +11,16 @@ import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { finalize } from 'rxjs';
-import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import type { Comment } from '@task-board/shared';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'ui-comment-thread',
   imports: [
+    ConfirmDialog,
+    HlmAlertImports,
     DatePipe,
     TranslocoPipe,
     HlmButtonImports,
@@ -29,6 +33,7 @@ import type { Comment } from '@task-board/shared';
   templateUrl: './comment-thread.html',
 })
 export class CommentThread implements OnInit {
+  private readonly notify = injectToasts();
   private readonly commentClient = inject(CommentClient);
   private readonly authStore = inject(AuthStore);
   /** Task ID to load comments for */
@@ -83,6 +88,7 @@ export class CommentThread implements OnInit {
         next: (comment) => {
           this.comments.update((list) => [...list, comment]);
           this.newBody.set('');
+          this.notify.success('toasts.created');
         },
         error: () => {
           this.error.set('comments.createError');
@@ -113,6 +119,7 @@ export class CommentThread implements OnInit {
         next: (updated) => {
           this.comments.update((list) => list.map((c) => (c.id === commentId ? updated : c)));
           this.cancelEdit();
+          this.notify.success('toasts.updated');
         },
         error: () => {
           this.error.set('comments.updateError');
@@ -125,8 +132,8 @@ export class CommentThread implements OnInit {
     this.showDeleteConfirm.set(true);
   }
 
-  protected onDeleteDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
+  protected onDeleteDialogStateChange(open: boolean): void {
+    if (!open) {
       this.showDeleteConfirm.set(false);
       this.commentToDelete.set(null);
     }

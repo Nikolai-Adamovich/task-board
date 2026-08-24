@@ -9,7 +9,7 @@
       <div>
         <div class="flex items-center gap-3">
           <h2 class="text-2xl font-bold text-foreground">{{ s.name }}</h2>
-          <span hlmBadge [class]="getStatusColor(s.status)">
+          <span hlmBadge [class]="statusBadgeClass(s.status)">
             {{ s.status }}
           </span>
         </div>
@@ -44,15 +44,17 @@
       </div>
 
       @if (sprintTasks().length === 0) {
-        <div class="rounded-lg border border-dashed border-border py-8 text-center">
-          <p class="text-sm text-muted-foreground">{{ 'sprintDetail.noTasks' | transloco }}</p>
-        </div>
+        <hlm-empty>
+          <hlm-empty-header>
+            <div hlmEmptyTitle>{{ 'sprintDetail.noTasks' | transloco }}</div>
+          </hlm-empty-header>
+        </hlm-empty>
       } @else {
-        <div class="space-y-2">
+        <div class="flex flex-col gap-2">
           @for (task of sprintTasks(); track task.id) {
             <div class="flex items-center justify-between rounded-lg border border-border bg-card p-3">
               <div class="flex items-center gap-3">
-                <span class="h-2 w-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
+                <span class="size-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
                 <a
                   [routerLink]="['/tenants', tenantId(), 'projects', task.projectId, 'tasks', task.id]"
                   class="text-sm font-medium text-foreground hover:text-primary hover:underline"
@@ -89,25 +91,14 @@
   </div>
 
   <!-- Delete Sprint Confirmation Dialog -->
-  <hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
-      <div class="space-y-4">
-        <h3 hlmDialogTitle>{{ 'sprintDetail.deleteTitle' | transloco }}</h3>
-        <p class="text-sm text-muted-foreground">
-          {{ 'sprintDetail.deleteConfirm' | transloco }}
-        </p>
-        <p class="text-sm text-amber-600">
-          {{ 'sprintDetail.deleteWarning' | transloco }}
-        </p>
-        <hlm-dialog-footer>
-          <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">
-            {{ 'sprintDetail.cancelDelete' | transloco }}
-          </button>
-          <button hlmBtn variant="destructive" (click)="deleteSprint()">
-            {{ 'sprintDetail.confirmDelete' | transloco }}
-          </button>
-        </hlm-dialog-footer>
-      </div>
-    </hlm-dialog-content>
-  </hlm-dialog>
+  <ui-confirm-dialog
+    [state]="showDeleteConfirm()"
+    titleKey="sprintDetail.deleteTitle"
+    messageKey="sprintDetail.deleteConfirm"
+    confirmLabelKey="sprintDetail.confirmDelete"
+    (confirmed)="deleteSprint()"
+    (stateChanged)="onDeleteDialogStateChange($event)"
+  >
+    <p class="text-sm text-amber-600">{{ 'sprintDetail.deleteWarning' | transloco }}</p>
+  </ui-confirm-dialog>
 }

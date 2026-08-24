@@ -10,7 +10,7 @@ import { SprintClient } from '@services/sprint-client';
 import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
-import { PriorityColorMap, NeutralColor } from '@app/constants/priority';
+import { priorityBadgeClass } from '@app/constants/priority';
 import { TaskPriority, ProjectRole } from '@task-board/shared';
 import { hasMinProjectRole, hasMinTenantRole } from '@app/shared/utils/role-utils';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -31,6 +31,10 @@ import type { Task } from '@task-board/shared';
 import { CommentThread } from '@features/comments/comment-thread/comment-thread';
 import { TaskRelationships } from '@features/tasks/task-relationships/task-relationships';
 import { MilkdownEditor } from '@app/shared/milkdown-editor/milkdown-editor';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
 export interface EditTaskForm {
   title: string;
@@ -46,6 +50,8 @@ interface SelectOption {
 @Component({
   selector: 'ui-task-detail',
   imports: [
+    ConfirmDialog,
+    HlmAlertImports,
     DatePipe,
     TranslocoPipe,
     FormField,
@@ -67,6 +73,9 @@ interface SelectOption {
   templateUrl: './task-detail.html',
 })
 export class TaskDetail implements OnInit {
+  /** Shared badge-class helpers (see constants/priority.ts) */
+  protected readonly priorityBadgeClass = priorityBadgeClass;
+  private readonly notify = injectToasts();
   private readonly taskClient = inject(TaskClient);
   private readonly statusClient = inject(StatusClient);
   private readonly taskTypeClient = inject(TaskTypeClient);
@@ -134,6 +143,7 @@ export class TaskDetail implements OnInit {
               next: (updated) => {
                 this.task.set(updated);
                 this.isEditing.set(false);
+                this.notify.success('toasts.updated');
               },
               error: (err) => {
                 if (err instanceof HttpErrorResponse && err.status === 409) {
@@ -142,7 +152,7 @@ export class TaskDetail implements OnInit {
                   );
                   this.showConflictDialog.set(true);
                 } else {
-                  this.error.set(this.getErrorMessage(err));
+                  this.error.set(getErrorMessage(err));
                 }
               },
             });
@@ -172,7 +182,7 @@ export class TaskDetail implements OnInit {
           this.resolveRelatedEntities(task);
           this.loadEditOptions(task.projectId);
         },
-        error: (err) => this.error.set(this.getErrorMessage(err)),
+        error: (err) => this.error.set(getErrorMessage(err)),
       });
   }
 
@@ -236,10 +246,6 @@ export class TaskDetail implements OnInit {
       next: (members) =>
         this.memberOptions.set(members.map((m) => ({ id: m.userId, name: m.displayName ?? m.userId }))),
     });
-  }
-
-  protected getPriorityColor(priority: string): string {
-    return (PriorityColorMap as Record<string, string>)[priority] ?? NeutralColor;
   }
 
   protected taskLabel(): string {
@@ -335,7 +341,7 @@ export class TaskDetail implements OnInit {
           );
           this.showConflictDialog.set(true);
         } else {
-          this.error.set(this.getErrorMessage(err));
+          this.error.set(getErrorMessage(err));
         }
       },
     });
@@ -346,14 +352,14 @@ export class TaskDetail implements OnInit {
     this.showDeleteConfirm.set(true);
   }
 
-  protected onDeleteDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
+  protected onDeleteDialogStateChange(open: boolean): void {
+    if (!open) {
       this.showDeleteConfirm.set(false);
       this.taskToDelete.set(null);
     }
   }
 
-  protected onConflictDialogStateChange(state: BrnDialogState): void {
+  onConflictDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showConflictDialog.set(false);
     }
@@ -389,16 +395,5 @@ export class TaskDetail implements OnInit {
     }
 
     return route.snapshot.paramMap.get('tenantId') ?? '';
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      const userMsg = (err as HttpErrorResponse & { userMessage?: string }).userMessage;
-
-      if (userMsg) return userMsg;
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
   }
 }

@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
@@ -29,6 +29,7 @@ import { PreferencesStore } from '@stores/preferences-store';
 import { TenantSwitcher } from '../tenant-switcher/tenant-switcher';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-sidebar',
   imports: [RouterLink, RouterLinkActive, HlmSidebarImports, HlmButtonImports, NgIcon, TenantSwitcher, TranslocoPipe],
   providers: [

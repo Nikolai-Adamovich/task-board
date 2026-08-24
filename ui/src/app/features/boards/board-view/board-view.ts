@@ -11,7 +11,6 @@ import { StatusClient } from '@services/status-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { canWrite } from '@app/shared/utils/role-utils';
-import { HttpErrorResponse } from '@angular/common/http';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -26,6 +25,9 @@ import type { Board, BoardColumn, Task } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { TaskCard } from '../task-card/task-card';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 interface CreateTaskForm {
   title: string;
@@ -38,6 +40,7 @@ interface CreateTaskForm {
 @Component({
   selector: 'ui-board-view',
   imports: [
+    HlmAlertImports,
     TranslocoPipe,
     FormField,
     TaskCard,
@@ -57,6 +60,7 @@ interface CreateTaskForm {
   templateUrl: './board-view.html',
 })
 export class BoardView implements OnInit {
+  private readonly notify = injectToasts();
   private readonly boardClient = inject(BoardClient);
   private readonly taskClient = inject(TaskClient);
   private readonly statusClient = inject(StatusClient);
@@ -120,6 +124,7 @@ export class BoardView implements OnInit {
               next: (task) => {
                 this.tasks.update((list) => [...list, task]);
                 this.showCreateTask.set(false);
+                this.notify.success('toasts.created');
                 f().reset({
                   title: '',
                   description: '',
@@ -129,7 +134,7 @@ export class BoardView implements OnInit {
                 });
               },
               error: (err) => {
-                this.error.set(this.getErrorMessage(err));
+                this.error.set(getErrorMessage(err));
               },
             });
         },
@@ -302,13 +307,5 @@ export class BoardView implements OnInit {
     }
 
     return route.snapshot.paramMap.get('tenantId') ?? '';
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
   }
 }

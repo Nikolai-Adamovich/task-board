@@ -1,0 +1,30 @@
+<hlm-dialog [state]="state() ? 'open' : 'closed'" (stateChanged)="onStateChanged($event)">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-md">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ titleKey() | transloco: titleParams() }}</h3>
+      @if (messageKey()) {
+        <p hlmDialogDescription>{{ messageKey() | transloco: messageParams() }}</p>
+      }
+    </hlm-dialog-header>
+
+    <ng-content />
+
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose [disabled]="loading()">
+        {{ cancelLabelKey() | transloco }}
+      </button>
+      <button
+        hlmBtn
+        [variant]="destructive() ? 'destructive' : 'default'"
+        (click)="confirmed.emit()"
+        [disabled]="loading()"
+      >
+        @if (loading()) {
+          <hlm-spinner />
+        } @else {
+          {{ confirmLabelKey() | transloco }}
+        }
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>

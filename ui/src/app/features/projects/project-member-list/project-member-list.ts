@@ -1,5 +1,5 @@
 import { Component, inject, input, signal, computed, OnInit, OnDestroy } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
@@ -17,7 +17,6 @@ import { form, FormRoot, FormField, schema, required } from '@angular/forms/sign
 import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
-import { PreferencesStore } from '@stores/preferences-store';
 import { canManageProject } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -33,13 +32,19 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { ProjectRole } from '@task-board/shared';
-import { HttpErrorResponse } from '@angular/common/http';
 import type { ProjectMember } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
+import { useMemberTable } from '@app/shared/member-list/member-table';
 
 @Component({
   selector: 'ui-project-member-list',
   imports: [
+    ConfirmDialog,
+    HlmAlertImports,
     FormRoot,
     FormField,
     TranslocoPipe,
@@ -72,11 +77,10 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   templateUrl: './project-member-list.html',
 })
 export class ProjectMemberList implements OnInit, OnDestroy {
+  private readonly notify = injectToasts();
   private readonly projectClient = inject(ProjectClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
-  private readonly preferencesStore = inject(PreferencesStore);
-  private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private queryParamsSub?: Subscription;
   /** Bound via withComponentInputBinding() — now receives project key from route */
@@ -97,83 +101,59 @@ export class ProjectMemberList implements OnInit, OnDestroy {
   protected readonly isAdmin = computed(() => {
     return canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole());
   });
-  /** Pagination */
-  protected readonly page = signal(1);
-  protected readonly pageSize = signal(this.preferencesStore.pageSize());
-  protected readonly total = computed(() => this.filteredMembers().length);
-  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
-  protected readonly paginatedMembers = computed(() => {
-    const start = (this.page() - 1) * this.pageSize();
-
-    return this.filteredMembers().slice(start, start + this.pageSize());
+  /**
+   * Shared sort / column-filter / pagination machinery (see shared/member-list).
+   * Filter and sort state is synced to URL query params.
+   */
+  private readonly table = useMemberTable<ProjectMember>({
+    source: this.members,
+    filters: {
+      name: { matches: (m, q) => (m.displayName ?? m.userId).toLowerCase().includes(q) },
+      email: { matches: (m, q) => (m.email ?? '').toLowerCase().includes(q) },
+      role: { matches: (m, q) => m.role === q },
+    },
+    sorters: {
+      displayName: (m) => m.displayName ?? m.userId,
+      email: (m) => m.email ?? '',
+      role: (m) => m.role,
+    },
+    load: () => this.loadMembers(),
   });
-  /** Column sorting */
-  protected readonly sortField = signal('');
-  protected readonly sortDirection = signal<'asc' | 'desc'>('asc');
-  /** Column-level filter signals */
-  protected readonly filterName = signal('');
-  protected readonly filterEmail = signal('');
-  protected readonly filterRole = signal('');
-  /** Members sorted by the current sort column */
-  protected readonly sortedMembers = computed(() => {
-    const list = [...this.members()];
-    const field = this.sortField();
-    const dir = this.sortDirection() === 'asc' ? 1 : -1;
+  protected readonly page = this.table.page;
+  protected readonly pageSize = this.table.pageSize;
+  protected readonly total = this.table.total;
+  protected readonly totalPages = this.table.totalPages;
+  protected readonly paginatedMembers = this.table.paginated;
+  protected readonly sortField = this.table.sortField;
+  protected readonly sortDirection = this.table.sortDirection;
 
-    if (!field) return list;
+  protected filterName(): string {
+    return this.table.getFilterValue('name');
+  }
 
-    return list.sort((a, b) => {
-      let valA: string;
-      let valB: string;
+  protected filterEmail(): string {
+    return this.table.getFilterValue('email');
+  }
 
-      switch (field) {
-        case 'displayName':
-          valA = a.displayName ?? a.userId;
-          valB = b.displayName ?? b.userId;
-          break;
+  protected filterRole(): string {
+    return this.table.getFilterValue('role');
+  }
 
-        case 'email':
-          valA = a.email ?? '';
-          valB = b.email ?? '';
-          break;
+  protected toggleSort(field: string): void {
+    this.table.toggleSort(field);
+  }
 
-        case 'role':
-          valA = a.role;
-          valB = b.role;
-          break;
+  protected onColumnFilterChange(field: string, value: string): void {
+    this.table.onColumnFilterChange(field, value);
+  }
 
-        default:
-          return 0;
-      }
+  protected onPageChange(newPage: number): void {
+    this.table.onPageChange(newPage);
+  }
 
-      return valA.localeCompare(valB) * dir;
-    });
-  });
-  /** Members filtered by column filters */
-  protected readonly filteredMembers = computed(() => {
-    let list = this.sortedMembers();
-    const name = this.filterName().toLowerCase();
-    const role = this.filterRole();
-    const email = this.filterEmail().toLowerCase();
-
-    if (name) {
-      list = list.filter((m) => {
-        const display = (m.displayName ?? m.userId).toLowerCase();
-
-        return display.includes(name);
-      });
-    }
-
-    if (email) {
-      list = list.filter((m) => (m.email ?? '').toLowerCase().includes(email));
-    }
-
-    if (role) {
-      list = list.filter((m) => m.role === role);
-    }
-
-    return list;
-  });
+  protected onPageSizeChange(newSize: number): void {
+    this.table.onPageSizeChange(newSize);
+  }
   private readonly memberModel = signal<{ userId: string; role: string }>({
     userId: '',
     role: ProjectRole.EDITOR,
@@ -195,60 +175,16 @@ export class ProjectMemberList implements OnInit, OnDestroy {
                 this.loadMembers();
                 this.showAddMember.set(false);
                 f().reset({ userId: '', role: ProjectRole.EDITOR });
+                this.notify.success('toasts.created');
               },
               error: (err) => {
-                this.error.set(this.getErrorMessage(err));
+                this.error.set(getErrorMessage(err));
               },
             });
         },
       },
     },
   );
-
-  protected toggleSort(field: string): void {
-    if (this.sortField() === field) {
-      if (this.sortDirection() === 'asc') {
-        this.sortDirection.set('desc');
-      } else {
-        // Was desc → clear sort entirely
-        this.sortField.set('');
-        this.sortDirection.set('asc');
-      }
-    } else {
-      this.sortField.set(field);
-      this.sortDirection.set('asc');
-    }
-    this.syncToUrl();
-  }
-
-  /** Handle column filter changes from popover dropdowns/inputs */
-  protected onColumnFilterChange(filterName: string, value: string): void {
-    switch (filterName) {
-      case 'name':
-        this.filterName.set(value);
-        break;
-
-      case 'email':
-        this.filterEmail.set(value);
-        break;
-
-      case 'role':
-        this.filterRole.set(value);
-        break;
-    }
-    this.page.set(1);
-    this.syncToUrl();
-  }
-
-  protected onPageChange(newPage: number): void {
-    this.page.set(newPage);
-  }
-
-  protected onPageSizeChange(newSize: number): void {
-    this.pageSize.set(newSize);
-    this.preferencesStore.setPageSize(newSize);
-    this.page.set(1);
-  }
 
   /** Get the effective role for a member (pending change or current role) */
   protected getEffectiveRole(member: ProjectMember): string {
@@ -285,9 +221,10 @@ export class ProjectMemberList implements OnInit, OnDestroy {
             Object.fromEntries(Object.entries(map).filter(([k]) => k !== member.userId)),
           );
           this.loadMembers();
+          this.notify.success('toasts.updated');
         },
         error: (err) => {
-          this.error.set(this.getErrorMessage(err));
+          this.error.set(getErrorMessage(err));
         },
       });
   }
@@ -312,67 +249,36 @@ export class ProjectMemberList implements OnInit, OnDestroy {
           this.loadMembers();
           this.showRemoveConfirm.set(false);
           this.memberToRemove.set(null);
+          this.notify.success('toasts.deleted');
         },
         error: (err) => {
-          this.error.set(this.getErrorMessage(err));
+          this.error.set(getErrorMessage(err));
         },
       });
   }
 
-  protected onAddMemberDialogStateChange(state: BrnDialogState): void {
+  onAddMemberDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showAddMember.set(false);
     }
   }
 
-  protected onRemoveDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
+  protected onRemoveDialogStateChange(open: boolean): void {
+    if (!open) {
       this.showRemoveConfirm.set(false);
       this.memberToRemove.set(null);
     }
   }
 
   ngOnInit(): void {
-    // Sync URL query params → component state
+    // Sync URL query params → table state, then load
     this.queryParamsSub = this.route.queryParams.subscribe((params) => {
-      this.filterName.set(params['name'] ?? '');
-      this.filterEmail.set(params['email'] ?? '');
-      this.filterRole.set(params['role'] ?? '');
-
-      const sortParam = params['sort'] ?? '';
-
-      if (sortParam) {
-        const [field, direction] = sortParam.split(':');
-
-        this.sortField.set(field ?? '');
-        this.sortDirection.set((direction === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc');
-      } else {
-        this.sortField.set('');
-        this.sortDirection.set('asc');
-      }
-
-      this.loadMembers();
+      this.table.syncFromParams(params);
     });
   }
 
   ngOnDestroy(): void {
     this.queryParamsSub?.unsubscribe();
-  }
-
-  /** Sync all filter/sort state to URL query params */
-  private syncToUrl(): void {
-    const queryParams: Record<string, string | null> = {
-      name: this.filterName() || null,
-      email: this.filterEmail() || null,
-      role: this.filterRole() || null,
-      sort: this.sortField() ? `${this.sortField()}:${this.sortDirection()}` : null,
-    };
-
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams,
-      replaceUrl: true,
-    });
   }
 
   private loadMembers(): void {
@@ -386,13 +292,5 @@ export class ProjectMemberList implements OnInit, OnDestroy {
           this.members.set(members);
         },
       });
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
   }
 }

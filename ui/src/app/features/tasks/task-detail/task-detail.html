@@ -4,9 +4,9 @@
   </div>
 } @else if (error()) {
   <div class="mx-auto max-w-3xl px-4 py-8">
-    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-      {{ error() | transloco }}
-    </div>
+    <hlm-alert variant="destructive" class="mb-4">
+      <div hlmAlertDescription>{{ error() | transloco }}</div>
+    </hlm-alert>
   </div>
 } @else if (task(); as t) {
   <div class="mx-auto max-w-3xl">
@@ -20,7 +20,7 @@
             hlmBadge
             variant="outline"
             class="text-xs font-semibold uppercase"
-            [class]="getPriorityColor(t.priority)"
+            [class]="priorityBadgeClass(t.priority)"
           >
             {{ t.priority }}
           </span>
@@ -58,12 +58,12 @@
 
     <!-- Content -->
     <div class="grid gap-6 lg:grid-cols-3">
-      <div class="lg:col-span-2 space-y-6">
+      <div class="lg:col-span-2 flex flex-col gap-6">
         <!-- Title & Description -->
         <hlm-card>
           <div hlmCardContent>
             @if (isEditing()) {
-              <form id="edit-task-form" [formRoot]="editForm" class="space-y-4">
+              <form id="edit-task-form" [formRoot]="editForm" class="flex flex-col gap-4">
                 <hlm-field>
                   <label hlmFieldLabel for="edit-title">{{ 'taskDetail.title' | transloco }}</label>
                   <input hlmInput id="edit-title" type="text" [formField]="editForm.title" />
@@ -91,7 +91,7 @@
       </div>
 
       <!-- Sidebar -->
-      <div class="space-y-4">
+      <div class="flex flex-col gap-4">
         <!-- Status -->
         <hlm-card>
           <div hlmCardContent>
@@ -193,7 +193,7 @@
             </h4>
             <div class="mt-2 flex items-center gap-2">
               @if (t.reporterSnapshot) {
-                <hlm-avatar class="h-6 w-6">
+                <hlm-avatar class="size-6">
                   <div hlmAvatarFallback class="text-[10px] font-medium">
                     {{ t.reporterSnapshot.displayName.substring(0, 2).toUpperCase() }}
                   </div>
@@ -233,7 +233,7 @@
                 </hlm-select>
               } @else if (t.assigneeSnapshot) {
                 <div class="flex items-center gap-2">
-                  <hlm-avatar class="h-6 w-6">
+                  <hlm-avatar class="size-6">
                     <div hlmAvatarFallback class="text-[10px] font-medium">
                       {{ t.assigneeSnapshot.displayName.substring(0, 2).toUpperCase() }}
                     </div>
@@ -324,29 +324,20 @@
     }
 
     <!-- Delete Confirmation Dialog -->
-    <hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
-      <hlm-dialog-content *hlmDialogPortal>
-        <div class="space-y-4">
-          <h3 hlmDialogTitle>{{ 'taskDetail.deleteTitle' | transloco: { key: taskLabel() } }}</h3>
-          <p class="text-sm text-muted-foreground">
-            {{ 'taskDetail.deleteConfirm' | transloco }}
-          </p>
-          <hlm-dialog-footer>
-            <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">
-              {{ 'taskDetail.cancelDelete' | transloco }}
-            </button>
-            <button hlmBtn variant="destructive" (click)="deleteTask()">
-              {{ 'taskDetail.confirmDelete' | transloco }}
-            </button>
-          </hlm-dialog-footer>
-        </div>
-      </hlm-dialog-content>
-    </hlm-dialog>
+    <ui-confirm-dialog
+      [state]="showDeleteConfirm()"
+      titleKey="taskDetail.deleteTitle"
+      [titleParams]="{ key: taskLabel() }"
+      messageKey="taskDetail.deleteConfirm"
+      confirmLabelKey="taskDetail.confirmDelete"
+      (confirmed)="deleteTask()"
+      (stateChanged)="onDeleteDialogStateChange($event)"
+    />
 
     <!-- Conflict Resolution Dialog -->
     <hlm-dialog [state]="showConflictDialog() ? 'open' : 'closed'" (stateChanged)="onConflictDialogStateChange($event)">
       <hlm-dialog-content *hlmDialogPortal>
-        <div class="space-y-4">
+        <div class="flex flex-col gap-4">
           <h3 hlmDialogTitle>{{ 'taskDetail.conflictTitle' | transloco }}</h3>
           <p class="text-sm text-muted-foreground">
             {{ conflictMessage() | transloco }}

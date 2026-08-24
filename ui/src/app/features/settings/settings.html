@@ -1,5 +1,74 @@
 <div class="mx-auto max-w-3xl px-4 py-8">
   <h1 class="mb-6 text-2xl font-bold">{{ 'settings.title' | transloco }}</h1>
 
-  <p class="text-muted-foreground">User preferences will be available here.</p>
+  <div class="flex flex-col gap-4">
+    <!-- Theme -->
+    <div hlmCard>
+      <div hlmCardHeader>
+        <h3 hlmCardTitle>{{ 'settings.theme' | transloco }}</h3>
+        <p hlmCardDescription>{{ 'settings.themeDescription' | transloco }}</p>
+      </div>
+      <div hlmCardContent>
+        <hlm-select [value]="theme()" (valueChange)="onThemeChange($any($event))">
+          <hlm-select-trigger class="w-64" size="sm">
+            <hlm-select-value [placeholder]="themeName(theme())" />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-group>
+              @for (t of themes(); track t.id) {
+                <hlm-select-item [value]="t.id">{{ t.name }}</hlm-select-item>
+              }
+            </hlm-select-group>
+          </hlm-select-content>
+        </hlm-select>
+      </div>
+    </div>
+
+    <!-- Zoom -->
+    <div hlmCard>
+      <div hlmCardHeader>
+        <h3 hlmCardTitle>{{ 'settings.zoom' | transloco }}</h3>
+        <p hlmCardDescription>{{ 'settings.zoomDescription' | transloco }}</p>
+      </div>
+      <div hlmCardContent class="flex items-center gap-3">
+        <hlm-select [value]="$any(zoom())" (valueChange)="onZoomChange($any($event))">
+          <hlm-select-trigger class="w-32" size="sm">
+            <hlm-select-value />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-group>
+              @for (z of zoomValues; track z) {
+                <hlm-select-item [value]="$any(z)">{{ z }}%</hlm-select-item>
+              }
+            </hlm-select-group>
+          </hlm-select-content>
+        </hlm-select>
+        <button hlmBtn variant="outline" size="sm" (click)="onZoomChange(100)">
+          {{ 'settings.resetZoom' | transloco }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Language -->
+    <div hlmCard>
+      <div hlmCardHeader>
+        <h3 hlmCardTitle>{{ 'settings.language' | transloco }}</h3>
+        <p hlmCardDescription>{{ 'settings.languageDescription' | transloco }}</p>
+      </div>
+      <div hlmCardContent>
+        <hlm-select [value]="language()" (valueChange)="onLanguageChange($any($event))">
+          <hlm-select-trigger class="w-64" size="sm">
+            <hlm-select-value />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-group>
+              @for (lang of availableLangs(); track lang.id) {
+                <hlm-select-item [value]="lang.id">{{ lang.label }}</hlm-select-item>
+              }
+            </hlm-select-group>
+          </hlm-select-content>
+        </hlm-select>
+      </div>
+    </div>
+  </div>
 </div>

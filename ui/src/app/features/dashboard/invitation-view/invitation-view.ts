@@ -1,4 +1,4 @@
-import { Component, input, output, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -11,8 +11,10 @@ import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideMail, lucideBuilding2 } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
 import type { MyInvitation } from '@app/types/frontend';
+import { roleBadgeClass } from '@app/constants/priority';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-invitation-view',
   imports: [
     RouterLink,
@@ -33,6 +35,8 @@ export class InvitationView {
   readonly invitationHandled = output();
   protected readonly acceptingId = signal<string | null>(null);
   protected readonly decliningId = signal<string | null>(null);
+  /** Shared badge-class helper (see constants/priority.ts) */
+  protected readonly roleBadgeClass = roleBadgeClass;
 
   protected acceptInvitation(invitation: MyInvitation): void {
     this.acceptingId.set(invitation.id);

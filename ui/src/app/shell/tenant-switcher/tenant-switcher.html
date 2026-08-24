@@ -5,15 +5,7 @@
       {{ 'tenantSwitcher.createWorkspace' | transloco }}
     </button>
   } @else {
-    <button
-      hlmBtn
-      variant="outline"
-      size="lg"
-      class="w-full"
-      (click)="toggleDropdown()"
-      aria-haspopup="listbox"
-      [attr.aria-expanded]="isOpen()"
-    >
+    <button hlmBtn variant="outline" size="lg" class="w-full" [hlmDropdownMenuTrigger]="tenantMenu">
       @if (tenantStore.activeTenant(); as tenant) {
         <span class="font-medium">{{ tenant.name }}</span>
       } @else {
@@ -22,21 +14,10 @@
       <ng-icon name="lucideChevronDown" class="ml-1" />
     </button>
 
-    @if (isOpen()) {
-      <div
-        class="absolute left-0 z-50 mt-1 w-full rounded-md border border-border bg-popover py-1 shadow-lg"
-        role="listbox"
-      >
+    <ng-template #tenantMenu>
+      <div hlmDropdownMenu class="w-full min-w-56">
         @for (tenant of tenantStore.tenants(); track tenant.id) {
-          <button
-            class="flex w-full items-center px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-            [class.bg-primary/10]="isActive(tenant)"
-            [class.text-primary]="isActive(tenant)"
-            [class.text-foreground]="!isActive(tenant)"
-            role="option"
-            [attr.aria-selected]="isActive(tenant)"
-            (click)="selectTenant(tenant)"
-          >
+          <button hlmDropdownMenuItem (click)="selectTenant(tenant)">
             {{ tenant.name }}
             @if (isActive(tenant)) {
               <ng-icon name="lucideCheck" class="ml-auto text-primary" />
@@ -45,16 +26,12 @@
         } @empty {
           <div class="px-3 py-2 text-sm text-muted-foreground">{{ 'tenantSwitcher.noWorkspaces' | transloco }}</div>
         }
-        <div class="border-t border-border">
-          <button
-            class="flex w-full items-center px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            (click)="navigateToCreate()"
-          >
-            <ng-icon name="lucidePlus" class="mr-2 h-4 w-4" />
-            {{ 'tenantSwitcher.createWorkspace' | transloco }}
-          </button>
-        </div>
+        <hlm-dropdown-menu-separator />
+        <button hlmDropdownMenuItem (click)="navigateToCreate()">
+          <ng-icon name="lucidePlus" />
+          {{ 'tenantSwitcher.createWorkspace' | transloco }}
+        </button>
       </div>
-    }
+    </ng-template>
   }
 </div>

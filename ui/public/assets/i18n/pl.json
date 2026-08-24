@@ -1,6 +1,6 @@
 {
   "header": {
-    "search": "Szukaj\u2026",
+    "search": "Szukaj…",
     "clearSearch": "Wyczyść szukanie",
     "notifications": "Powiadomienia",
     "noNotifications": "Brak powiadomień",
@@ -44,7 +44,7 @@
       "email": "E-mail",
       "password": "Hasło",
       "submit": "Zaloguj się",
-      "submitting": "Logowanie\u2026",
+      "submitting": "Logowanie…",
       "noAccount": "Nie masz konta?",
       "createOne": "Utwórz konto",
       "failed": "Logowanie nie powiodło się. Spróbuj ponownie."
@@ -56,13 +56,13 @@
       "email": "E-mail",
       "password": "Hasło",
       "submit": "Utwórz konto",
-      "submitting": "Tworzenie konta\u2026",
+      "submitting": "Tworzenie konta…",
       "hasAccount": "Masz już konto?",
       "signIn": "Zaloguj się",
       "failed": "Rejestracja nie powiodła się. Spróbuj ponownie."
     },
     "invitation": {
-      "loading": "Ładowanie zaproszenia\u2026",
+      "loading": "Ładowanie zaproszenia…",
       "error": "Błąd zaproszenia",
       "goToSignIn": "Przejdź do logowania",
       "title": "Akceptuj zaproszenie",
@@ -75,9 +75,9 @@
       "password": "Hasło",
       "confirmPassword": "Potwierdź hasło",
       "accept": "Akceptuj zaproszenie",
-      "accepting": "Akceptowanie\u2026",
+      "accepting": "Akceptowanie…",
       "createAndAccept": "Utwórz konto i zaakceptuj",
-      "creatingAccount": "Tworzenie konta\u2026",
+      "creatingAccount": "Tworzenie konta…",
       "hasAccount": "Masz już konto?",
       "signIn": "Zaloguj się",
       "noToken": "Nie podano tokenu zaproszenia.",
@@ -174,22 +174,29 @@
     "slug": "Slug",
     "slugHint": "Używany w adresach URL. Tylko małe litery, cyfry i myślniki.",
     "plan": "Plan subskrypcji",
-    "planFree": "Darmowy \u2014 Do 3 projektów i 5 użytkowników",
+    "planFree": "Darmowy — Do 3 projektów i 5 użytkowników",
     "submit": "Utwórz przestrzeń roboczą",
-    "submitting": "Tworzenie przestrzeni roboczej\u2026",
+    "submitting": "Tworzenie przestrzeni roboczej…",
     "failed": "Nie udało się utworzyć przestrzeni roboczej. Spróbuj ponownie."
   },
   "settings": {
-    "title": "Ustawienia"
+    "title": "Ustawienia",
+    "theme": "Motyw",
+    "themeDescription": "Wybierz motyw kolorystyczny aplikacji.",
+    "zoom": "Powiększenie",
+    "zoomDescription": "Dostosuj rozmiar czcionki interfejsu.",
+    "resetZoom": "Resetuj",
+    "language": "Język",
+    "languageDescription": "Wybierz język wyświetlania."
   },
   "tenantSettings": {
     "title": "Ustawienia dzierżawy",
-    "loading": "Ładowanie ustawień\u2026",
+    "loading": "Ładowanie ustawień…",
     "general": "Ustawienia ogólne",
     "name": "Nazwa",
     "slug": "Slug",
     "save": "Zapisz zmiany",
-    "saving": "Zapisywanie\u2026",
+    "saving": "Zapisywanie…",
     "dangerZone": "Strefa niebezpieczna",
     "dangerDescription": "Usunięcie dzierżawy jest nieodwracalne. Wszystkie projekty, tablice i zadania w tej dzierżawie zostaną trwale usunięte.",
     "deleteTenant": "Usuń dzierżawę",
@@ -197,7 +204,8 @@
     "deleteConfirm": "Tej operacji nie można cofnąć. Aby potwierdzić, wpisz nazwę dzierżawy poniżej.",
     "deleteName": "Nazwa dzierżawy",
     "deletePlaceholder": "Wpisz nazwę dzierżawy, aby potwierdzić",
-    "cancel": "Anuluj"
+    "cancel": "Anuluj",
+    "deleteDesc": "Wpisz nazwę obszaru roboczego, aby potwierdzić trwałe usunięcie."
   },
   "upgrade": {
     "title": "Ulepsz plan",
@@ -215,12 +223,12 @@
     "advancedAnalytics": "Zaawansowana analityka",
     "back": "Wstecz",
     "upgradeButton": "Ulepsz do Premium",
-    "upgrading": "Ulepszanie\u2026",
+    "upgrading": "Ulepszanie…",
     "failed": "Nie udało się ulepszyć. Spróbuj ponownie."
   },
   "members": {
     "title": "Członkowie",
-    "loading": "Ładowanie członków\u2026",
+    "loading": "Ładowanie członków…",
     "noMembers": "Nie znaleziono członków.",
     "pending": "Oczekujący",
     "unknown": "Nieznany",
@@ -237,25 +245,36 @@
     "removeMember": "Usuń członka",
     "cancel": "Anuluj",
     "inviteButton": "Zaproś",
-    "inviting": "Zapraszanie\u2026"
+    "inviting": "Zapraszanie…",
+    "inviteDesc": "Zaproś nowego członka przez e-mail i wybierz jego rolę.",
+    "filterByName": "Filtruj według nazwy…",
+    "filterByEmail": "Filtruj według e-maila…",
+    "allRoles": "Wszystkie role",
+    "allStatuses": "Wszystkie statusy",
+    "statusActive": "Aktywny",
+    "statusAccessRevoked": "Dostęp odebrany",
+    "roleOwner": "Właściciel",
+    "roleAdmin": "Administrator",
+    "roleMember": "Członek"
   },
   "projects": {
     "title": "Projekty",
     "new": "Nowy projekt",
-    "loading": "Ładowanie projektów\u2026",
+    "loading": "Ładowanie projektów…",
     "noProjects": "Nie znaleziono projektów. Utwórz swój pierwszy projekt, aby rozpocząć.",
     "slug": "Slug: {{slug}}",
     "createTitle": "Utwórz projekt",
     "name": "Nazwa",
     "slugLabel": "Slug",
     "description": "Opis",
-    "descriptionPlaceholder": "Opcjonalny opis\u2026",
+    "descriptionPlaceholder": "Opcjonalny opis…",
     "cancel": "Anuluj",
     "create": "Utwórz projekt",
-    "creating": "Tworzenie\u2026"
+    "creating": "Tworzenie…",
+    "createDesc": "Utwórz nowy projekt w tym obszarze roboczym."
   },
   "projectDetail": {
-    "loading": "Ładowanie projektu\u2026",
+    "loading": "Ładowanie projektu…",
     "sprints": "Sprinty",
     "newBoard": "Nowa tablica",
     "boards": "Tablice",
@@ -269,33 +288,37 @@
     "createBoardTitle": "Utwórz tablicę",
     "boardName": "Nazwa",
     "boardDescription": "Opis",
-    "descriptionPlaceholder": "Opcjonalny opis\u2026",
+    "descriptionPlaceholder": "Opcjonalny opis…",
     "cancel": "Anuluj",
     "createBoardButton": "Utwórz tablicę",
-    "creating": "Tworzenie\u2026",
+    "creating": "Tworzenie…",
     "addMemberTitle": "Dodaj członka",
     "userId": "ID użytkownika",
     "userIdPlaceholder": "Wprowadź ID użytkownika",
     "role": "Rola",
     "addMemberButton": "Dodaj członka",
-    "adding": "Dodawanie\u2026",
+    "adding": "Dodawanie…",
     "removeMemberTitle": "Usuń członka",
     "removeConfirm": "Czy na pewno chcesz usunąć tego członka z projektu?",
-    "removeButton": "Usuń"
+    "removeButton": "Usuń",
+    "createBoardDesc": "Utwórz nową tablicę dla tego projektu.",
+    "deleteProjectDesc": "Projekt zostanie zaplanowany do trwałego usunięcia."
   },
   "boardView": {
-    "loading": "Ładowanie tablicy\u2026",
+    "loading": "Ładowanie tablicy…",
     "newTask": "Nowe zadanie",
     "createTaskTitle": "Utwórz zadanie",
     "title": "Tytuł",
     "titlePlaceholder": "Tytuł zadania",
     "description": "Opis",
-    "descriptionPlaceholder": "Opcjonalny opis\u2026",
+    "descriptionPlaceholder": "Opcjonalny opis…",
     "priority": "Priorytet",
     "column": "Kolumna",
     "cancel": "Anuluj",
     "create": "Utwórz zadanie",
-    "creating": "Tworzenie\u2026"
+    "creating": "Tworzenie…",
+    "createTaskDesc": "Dodaj nowe zadanie do tej kolumny.",
+    "selectStatusDesc": "Wybierz status przeniesionego zadania."
   },
   "priority": {
     "low": "Niski",
@@ -308,12 +331,12 @@
     "noTasks": "Brak zadań"
   },
   "taskDetail": {
-    "loading": "Ładowanie zadania\u2026",
+    "loading": "Ładowanie zadania…",
     "created": "Utworzono {{date}}",
     "updated": "Zaktualizowano {{date}}",
     "cancel": "Anuluj",
     "save": "Zapisz",
-    "saving": "Zapisywanie\u2026",
+    "saving": "Zapisywanie…",
     "edit": "Edytuj",
     "title": "Tytuł",
     "description": "Opis",
@@ -332,7 +355,7 @@
   "sprints": {
     "title": "Sprinty",
     "new": "Nowy sprint",
-    "loading": "Ładowanie sprintów\u2026",
+    "loading": "Ładowanie sprintów…",
     "noSprints": "Brak sprintów.",
     "createFirst": "Utwórz pierwszy sprint",
     "tasks": "{{count}} zadań",
@@ -343,13 +366,14 @@
     "startDate": "Data rozpoczęcia",
     "endDate": "Data zakończenia",
     "goal": "Cel",
-    "goalPlaceholder": "Opcjonalny cel sprintu\u2026",
+    "goalPlaceholder": "Opcjonalny cel sprintu…",
     "cancel": "Anuluj",
     "create": "Utwórz sprint",
-    "creating": "Tworzenie\u2026"
+    "creating": "Tworzenie…",
+    "createDesc": "Utwórz nowy sprint dla tego projektu."
   },
   "sprintDetail": {
-    "loading": "Ładowanie sprintu\u2026",
+    "loading": "Ładowanie sprintu…",
     "tasks": "Zadania",
     "backToProject": "Powrót do projektu",
     "noTasks": "Brak zadań w tym sprincie.",
@@ -357,7 +381,7 @@
   },
   "sprintBacklog": {
     "backlog": "Backlog",
-    "loading": "Ładowanie backlogu\u2026",
+    "loading": "Ładowanie backlogu…",
     "allAssigned": "Wszystkie zadania są przypisane do sprintów.",
     "addToSprint": "Dodaj do sprintu"
   },
@@ -389,11 +413,11 @@
     },
     "q2": {
       "question": "Jak utworzyć projekt?",
-      "answer": "Przejdź do swojej przestrzeni roboczej, kliknij sekcję \u201eProjekty\u201c i użyj przycisku \u201eUtwórz projekt\u201c. Będziesz musiał podać nazwę projektu i opcjonalny opis. Projekty są przypisane do bieżącej przestrzeni roboczej."
+      "answer": "Przejdź do swojej przestrzeni roboczej, kliknij sekcję „Projekty“ i użyj przycisku „Utwórz projekt“. Będziesz musiał podać nazwę projektu i opcjonalny opis. Projekty są przypisane do bieżącej przestrzeni roboczej."
     },
     "q3": {
       "question": "Jak zaprosić członków zespołu?",
-      "answer": "Przejdź do ustawień przestrzeni roboczej i otwórz zakładkę \u201eCzłonkowie\u201c. Kliknij \u201eZaproś członka\u201c, wpisz adres e-mail i przypisz rolę (Właściciel, Administrator lub Członek). Otrzymają e-mail z zaproszeniem do dołączenia do Twojej przestrzeni roboczej."
+      "answer": "Przejdź do ustawień przestrzeni roboczej i otwórz zakładkę „Członkowie“. Kliknij „Zaproś członka“, wpisz adres e-mail i przypisz rolę (Właściciel, Administrator lub Członek). Otrzymają e-mail z zaproszeniem do dołączenia do Twojej przestrzeni roboczej."
     },
     "q4": {
       "question": "Czym są poziomy subskrypcji?",
@@ -412,9 +436,9 @@
     "namePlaceholder": "Twoje imię",
     "email": "E-mail",
     "message": "Wiadomość",
-    "messagePlaceholder": "Opisz swój problem lub pytanie\u2026",
+    "messagePlaceholder": "Opisz swój problem lub pytanie…",
     "submit": "Wyślij",
-    "submitting": "Wysyłanie\u2026"
+    "submitting": "Wysyłanie…"
   },
   "validation": {
     "emailRequired": "E-mail jest wymagany",
@@ -444,5 +468,32 @@
   "errors": {
     "unexpected": "Wystąpił nieoczekiwany błąd. Spróbuj ponownie.",
     "permissionDenied": "Nie masz uprawnień do wykonania tej operacji"
+  },
+  "toasts": {
+    "created": "Utworzono pomyślnie",
+    "updated": "Zaktualizowano pomyślnie",
+    "deleted": "Usunięto pomyślnie"
+  },
+  "common": {
+    "cancel": "Anuluj",
+    "confirm": "Potwierdź",
+    "delete": "Usuń"
+  },
+  "labelManager": {
+    "createDesc": "Utwórz nową etykietę dla tego projektu."
+  },
+  "projectMembers": {
+    "addMemberDesc": "Dodaj istniejącego członka obszaru roboczego do tego projektu."
+  },
+  "statusManager": {
+    "createDesc": "Utwórz nową kolumnę statusu dla tego projektu.",
+    "deleteDesc": "Opcjonalnie wybierz zastępczy status dla istniejących zadań."
+  },
+  "taskTypeManager": {
+    "createDesc": "Utwórz nowy typ zadania dla tego projektu.",
+    "deleteDesc": "Opcjonalnie wybierz zastępczy typ dla istniejących zadań."
+  },
+  "taskTable": {
+    "filtersDesc": "Filtruj zadania według statusu, priorytetu, przypisania i więcej."
   }
 }

@@ -1,10 +1,10 @@
 <div class="mx-auto max-w-3xl">
   <!-- Page header -->
   <div class="mb-6 flex items-center gap-3">
-    <ng-icon name="lucideSettings" class="h-6 w-6 text-foreground" />
+    <ng-icon name="lucideSettings" class="size-6 text-foreground" />
     <h2 class="text-2xl font-bold text-foreground">{{ 'tenantSettings.title' | transloco }}</h2>
     @if (currentStatus() !== TenantStatus.ACTIVE) {
-      <span hlmBadge [class]="getStatusColor(currentStatus())">
+      <span hlmBadge [class]="statusBadgeClass(currentStatus())">
         {{ currentStatus() }}
       </span>
     }
@@ -22,12 +22,12 @@
       </hlm-card-header>
       <div hlmCardContent>
         @if (error()) {
-          <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-            {{ error() | transloco }}
-          </div>
+          <hlm-alert variant="destructive" class="mb-4">
+            <div hlmAlertDescription>{{ error() | transloco }}</div>
+          </hlm-alert>
         }
 
-        <form id="settings-form" [formRoot]="settingsForm" class="space-y-4">
+        <form id="settings-form" [formRoot]="settingsForm" class="flex flex-col gap-4">
           <hlm-field>
             <label hlmFieldLabel for="tenant-name">{{ 'tenantSettings.name' | transloco }}</label>
             <input hlmInput id="tenant-name" type="text" [formField]="settingsForm.name" placeholder="Tenant Name" />
@@ -95,8 +95,9 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'tenantSettings.deleteTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'tenantSettings.deleteDesc' | transloco }}</p>
       </hlm-dialog-header>
-      <div class="space-y-4">
+      <div class="flex flex-col gap-4">
         <p class="text-sm text-muted-foreground">
           {{ 'tenantSettings.deleteConfirm' | transloco }}
         </p>

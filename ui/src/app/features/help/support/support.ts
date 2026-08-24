@@ -6,8 +6,9 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import { HttpErrorResponse } from '@angular/common/http';
 import { SupportClient } from '@services/support-client';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 interface SupportModel {
   name: string;
@@ -18,6 +19,7 @@ interface SupportModel {
 @Component({
   selector: 'ui-support',
   imports: [
+    HlmAlertImports,
     TranslocoPipe,
     FormRoot,
     FormField,
@@ -63,19 +65,11 @@ export class Support {
                 this.createdAt.set(Date.now());
               },
               error: (err) => {
-                this.error.set(this.getErrorMessage(err));
+                this.error.set(getErrorMessage(err));
               },
             });
         },
       },
     },
   );
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
-  }
 }

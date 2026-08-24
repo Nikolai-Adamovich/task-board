@@ -1,10 +1,11 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { PreferencesStore } from '@stores/preferences-store';
 import { getNextZoom } from '../../zoom.util';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'ui-user-menu-zoom-controls',
   standalone: true,
   imports: [HlmButtonImports, TranslocoPipe],

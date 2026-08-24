@@ -1,4 +1,4 @@
-<div class="flex min-h-screen items-center justify-center bg-surface-50">
+<div class="flex min-h-screen items-center justify-center bg-muted/50">
   @if (loading()) {
     <div class="flex items-center justify-center">
       <hlm-spinner />
@@ -10,9 +10,9 @@
         <h3 hlmCardTitle>{{ 'auth.invitation.error' | transloco }}</h3>
       </hlm-card-header>
       <div hlmCardContent>
-        <div class="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() | transloco }}
-        </div>
+        <hlm-alert variant="destructive">
+          <div hlmAlertDescription>{{ error() | transloco }}</div>
+        </hlm-alert>
       </div>
       <hlm-card-footer>
         <a routerLink="/auth/login" hlmBtn variant="outline" class="w-full">{{
@@ -29,13 +29,13 @@
 
       <div hlmCardContent>
         @if (error()) {
-          <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-            {{ error() | transloco }}
-          </div>
+          <hlm-alert variant="destructive" class="mb-4">
+            <div hlmAlertDescription>{{ error() | transloco }}</div>
+          </hlm-alert>
         }
 
         <!-- Invitation details (readonly) -->
-        <div class="mb-4 space-y-2 rounded-md bg-muted/50 p-3">
+        <div class="mb-4 flex flex-col gap-2 rounded-md bg-muted/50 p-3">
           <div class="flex items-center justify-between">
             <span class="text-sm text-muted-foreground">{{ 'auth.invitation.email' | transloco }}</span>
             <span class="text-sm font-medium text-foreground">{{ inv.email }}</span>

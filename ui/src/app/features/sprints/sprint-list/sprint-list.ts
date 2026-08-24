@@ -8,8 +8,7 @@ import { finalize } from 'rxjs';
 import { SprintClient } from '@services/sprint-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
-import { HttpErrorResponse } from '@angular/common/http';
-import { StatusColorMap, NeutralColor } from '@app/constants/priority';
+import { statusBadgeClass } from '@app/constants/priority';
 import { SprintStatus } from '@task-board/shared';
 import { canManageProject } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -24,6 +23,10 @@ import { NgIcon } from '@ng-icons/core';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Sprint } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 export interface CreateSprintForm {
   name: string;
@@ -40,6 +43,8 @@ interface SprintGroup {
 @Component({
   selector: 'ui-sprint-list',
   imports: [
+    HlmAlertImports,
+    HlmEmptyImports,
     RouterLink,
     DatePipe,
     TranslocoPipe,
@@ -59,6 +64,9 @@ interface SprintGroup {
   templateUrl: './sprint-list.html',
 })
 export class SprintList implements OnInit {
+  /** Shared badge-class helper (see constants/priority.ts) */
+  protected readonly statusBadgeClass = statusBadgeClass;
+  private readonly notify = injectToasts();
   private readonly sprintClient = inject(SprintClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
@@ -99,9 +107,10 @@ export class SprintList implements OnInit {
                 this.sprints.update((list) => [...list, sprint]);
                 this.showCreateModal.set(false);
                 f().reset({ name: '', startDate: '', endDate: '' });
+                this.notify.success('toasts.created');
               },
               error: (err) => {
-                this.error.set(this.getErrorMessage(err));
+                this.error.set(getErrorMessage(err));
               },
             });
         },
@@ -163,20 +172,8 @@ export class SprintList implements OnInit {
           this.sprints.set(sprints);
         },
         error: (err) => {
-          this.error.set(this.getErrorMessage(err));
+          this.error.set(getErrorMessage(err));
         },
       });
-  }
-
-  protected getStatusColor(status: string): string {
-    return (StatusColorMap as Record<string, string>)[status] ?? NeutralColor;
-  }
-
-  private getErrorMessage(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      return err.error?.message ?? err.message;
-    }
-
-    return 'errors.unexpected';
   }
 }

@@ -3,7 +3,8 @@
     [currentPage]="page()"
     [totalItems]="total()"
     [itemsPerPage]="pageSize()"
-    [pageSizes]="[10, 20, 30, 50, 70, 100]"
+    [pageSizes]="pageSizes()"
+    [showEdges]="showEdges()"
     (currentPageChange)="onCurrentPageChange($event)"
     (itemsPerPageChange)="onItemsPerPageChange($event)"
   />

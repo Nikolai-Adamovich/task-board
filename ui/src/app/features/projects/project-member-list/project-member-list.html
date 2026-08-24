@@ -19,18 +19,18 @@
             <div class="flex items-center gap-1">
               <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort('displayName')">
                 <span>{{ 'projectMembers.name' | transloco }}</span>
-                <span class="inline-flex h-3 w-3 shrink-0">
+                <span class="inline-flex size-3 shrink-0">
                   @if (sortField() === 'displayName') {
-                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="h-3 w-3" />
+                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="size-3" />
                   }
                 </span>
               </button>
               <hlm-popover sideOffset="4">
-                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="size-6 shrink-0">
                   <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="filterName()" />
                 </button>
                 <hlm-popover-content *hlmPopoverPortal class="w-56">
-                  <div class="space-y-2">
+                  <div class="flex flex-col gap-2">
                     <span class="text-xs font-medium">{{ 'projectMembers.name' | transloco }}</span>
                     <input
                       hlmInput
@@ -38,7 +38,7 @@
                       class="h-8 w-full"
                       [value]="filterName()"
                       (input)="onColumnFilterChange('name', $any($event.target).value)"
-                      placeholder="Filter by name..."
+                      [placeholder]="$any('members.filterByName' | transloco)"
                     />
                   </div>
                 </hlm-popover-content>
@@ -50,18 +50,18 @@
             <div class="flex items-center gap-1">
               <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort('email')">
                 <span>{{ 'projectMembers.email' | transloco }}</span>
-                <span class="inline-flex h-3 w-3 shrink-0">
+                <span class="inline-flex size-3 shrink-0">
                   @if (sortField() === 'email') {
-                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="h-3 w-3" />
+                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="size-3" />
                   }
                 </span>
               </button>
               <hlm-popover sideOffset="4">
-                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="size-6 shrink-0">
                   <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="filterEmail()" />
                 </button>
                 <hlm-popover-content *hlmPopoverPortal class="w-56">
-                  <div class="space-y-2">
+                  <div class="flex flex-col gap-2">
                     <span class="text-xs font-medium">{{ 'projectMembers.email' | transloco }}</span>
                     <input
                       hlmInput
@@ -69,7 +69,7 @@
                       class="h-8 w-full"
                       [value]="filterEmail()"
                       (input)="onColumnFilterChange('email', $any($event.target).value)"
-                      placeholder="Filter by email..."
+                      [placeholder]="$any('members.filterByEmail' | transloco)"
                     />
                   </div>
                 </hlm-popover-content>
@@ -81,22 +81,22 @@
             <div class="flex items-center gap-1">
               <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort('role')">
                 <span>{{ 'projectMembers.role' | transloco }}</span>
-                <span class="inline-flex h-3 w-3 shrink-0">
+                <span class="inline-flex size-3 shrink-0">
                   @if (sortField() === 'role') {
-                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="h-3 w-3" />
+                    <ng-icon [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="size-3" />
                   }
                 </span>
               </button>
               <hlm-popover sideOffset="4">
-                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="h-6 w-6 shrink-0">
+                <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="size-6 shrink-0">
                   <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="filterRole()" />
                 </button>
                 <hlm-popover-content *hlmPopoverPortal class="w-48">
-                  <div class="space-y-2">
+                  <div class="flex flex-col gap-2">
                     <span class="text-xs font-medium">{{ 'projectMembers.role' | transloco }}</span>
                     <hlm-select [value]="filterRole()" (valueChange)="onColumnFilterChange('role', $any($event))">
                       <hlm-select-trigger class="w-full" size="sm">
-                        <hlm-select-value placeholder="All Roles" />
+                        <hlm-select-value [placeholder]="$any('members.allRoles' | transloco)" />
                       </hlm-select-trigger>
                       <hlm-select-content *hlmSelectPortal>
                         <hlm-select-group>
@@ -122,7 +122,7 @@
           <tr hlmTableRow>
             <td hlmTableCell>
               <div class="flex items-center gap-3">
-                <hlm-avatar class="h-8 w-8">
+                <hlm-avatar class="size-8">
                   <div hlmAvatarFallback class="text-xs font-medium">
                     {{ (member.displayName ?? '??').substring(0, 2).toUpperCase() }}
                   </div>
@@ -160,9 +160,9 @@
                       [disabled]="savingUserId() === member.userId"
                     >
                       @if (savingUserId() === member.userId) {
-                        <hlm-spinner class="mr-1 h-3 w-3" />
+                        <hlm-spinner class="mr-1 size-3" />
                       } @else {
-                        <ng-icon name="lucideSave" class="mr-1 h-3 w-3" />
+                        <ng-icon name="lucideSave" class="mr-1 size-3" />
                       }
                       {{ 'projectMembers.save' | transloco }}
                     </button>
@@ -178,7 +178,7 @@
                   hlmBtn
                   variant="ghost"
                   size="icon"
-                  class="h-8 w-8 text-destructive hover:text-destructive"
+                  class="size-8 text-destructive hover:text-destructive"
                   (click)="confirmRemoveMember(member)"
                   [attr.aria-label]="'projectMembers.removeMember' | transloco"
                 >
@@ -212,15 +212,16 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'projectMembers.addMemberTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'projectMembers.addMemberDesc' | transloco }}</p>
       </hlm-dialog-header>
 
       @if (error()) {
-        <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-          {{ error() | transloco }}
-        </div>
+        <hlm-alert variant="destructive" class="mb-4">
+          <div hlmAlertDescription>{{ error() | transloco }}</div>
+        </hlm-alert>
       }
 
-      <form id="add-member-form" [formRoot]="addMemberForm" class="space-y-4">
+      <form id="add-member-form" [formRoot]="addMemberForm" class="flex flex-col gap-4">
         <hlm-field>
           <label hlmFieldLabel for="member-userid">{{ 'projectMembers.userId' | transloco }}</label>
           <input
@@ -260,21 +261,13 @@
   </hlm-dialog>
 
   <!-- Remove Member Confirmation Modal -->
-  <hlm-dialog [state]="showRemoveConfirm() ? 'open' : 'closed'" (stateChanged)="onRemoveDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
-      <hlm-dialog-header>
-        <h3 hlmDialogTitle>{{ 'projectMembers.removeMemberTitle' | transloco }}</h3>
-      </hlm-dialog-header>
-      <p class="text-sm text-muted-foreground">
-        {{ 'projectMembers.removeConfirm' | transloco }}
-      </p>
-      <hlm-dialog-footer>
-        <button hlmBtn variant="outline" hlmDialogClose>{{ 'projectMembers.cancel' | transloco }}</button>
-        <button hlmBtn variant="destructive" (click)="removeMember()">
-          <ng-icon name="lucideTrash2" class="mr-1" />
-          {{ 'projectMembers.removeButton' | transloco }}
-        </button>
-      </hlm-dialog-footer>
-    </hlm-dialog-content>
-  </hlm-dialog>
+  <ui-confirm-dialog
+    [state]="showRemoveConfirm()"
+    titleKey="projectMembers.removeMemberTitle"
+    messageKey="projectMembers.removeConfirm"
+    confirmLabelKey="common.delete"
+    [loading]="removingUserId() !== null"
+    (confirmed)="removeMember()"
+    (stateChanged)="onRemoveDialogStateChange($event)"
+  />
 </div>

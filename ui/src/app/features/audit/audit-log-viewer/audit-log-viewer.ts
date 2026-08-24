@@ -10,13 +10,17 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
-import { HlmNumberedPagination } from '@spartan-ng/helm/pagination';
+import { Pagination } from '@app/shared/pagination/pagination';
 import { AuditEntityType } from '@task-board/shared';
 import type { AuditEvent, PaginatedResponse } from '@task-board/shared';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 @Component({
   selector: 'ui-audit-log-viewer',
   imports: [
+    HlmAlertImports,
+    HlmEmptyImports,
     TranslocoPipe,
     NgIcon,
     HlmCardImports,
@@ -24,7 +28,7 @@ import type { AuditEvent, PaginatedResponse } from '@task-board/shared';
     HlmBadgeImports,
     HlmSpinnerImports,
     HlmSelectImports,
-    HlmNumberedPagination,
+    Pagination,
   ],
   providers: [provideIcons({ lucideHistory, lucideFilter })],
   templateUrl: './audit-log-viewer.html',

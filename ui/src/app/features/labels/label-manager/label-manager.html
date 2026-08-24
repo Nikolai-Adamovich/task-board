@@ -10,9 +10,9 @@
   </div>
 
   @if (error()) {
-    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
-      {{ error() | transloco }}
-    </div>
+    <hlm-alert variant="destructive" class="mb-4">
+      <div hlmAlertDescription>{{ error() | transloco }}</div>
+    </hlm-alert>
   }
 
   @if (loading()) {
@@ -20,15 +20,19 @@
       <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'labelManager.loading' | transloco }}</span>
     </div>
   } @else if (labels().length === 0) {
-    <div class="rounded-lg border border-dashed border-border py-12 text-center">
-      <ng-icon name="lucideTag" class="mx-auto h-12 w-12 text-muted-foreground" />
-      <p class="mt-4 text-sm text-muted-foreground">{{ 'labelManager.noLabels' | transloco }}</p>
-      @if (canManage()) {
-        <button hlmBtn class="mt-4" (click)="showCreateDialog.set(true)">
-          {{ 'labelManager.createFirst' | transloco }}
-        </button>
-      }
-    </div>
+    <hlm-empty>
+      <hlm-empty-header>
+        <hlm-empty-media variant="icon"><ng-icon name="lucideTag" /></hlm-empty-media>
+        <div hlmEmptyTitle>{{ 'labelManager.noLabels' | transloco }}</div>
+      </hlm-empty-header>
+      <hlm-empty-content>
+        @if (canManage()) {
+          <button hlmBtn (click)="showCreateDialog.set(true)">
+            {{ 'labelManager.createFirst' | transloco }}
+          </button>
+        }
+      </hlm-empty-content>
+    </hlm-empty>
   } @else {
     <div class="flex flex-wrap gap-2">
       @for (label of labels(); track label.id) {
@@ -48,7 +52,7 @@
                 hlmBtn
                 variant="ghost"
                 size="icon"
-                class="h-7 w-7 text-green-600"
+                class="size-7 text-green-600"
                 (click)="saveEdit(label)"
                 [disabled]="saving()"
                 [attr.aria-label]="'labelManager.save' | transloco"
@@ -59,7 +63,7 @@
                 hlmBtn
                 variant="ghost"
                 size="icon"
-                class="h-7 w-7"
+                class="size-7"
                 (click)="cancelEdit()"
                 [attr.aria-label]="'labelManager.cancel' | transloco"
               >
@@ -74,21 +78,21 @@
                   hlmBtn
                   variant="ghost"
                   size="icon"
-                  class="h-6 w-6"
+                  class="size-6"
                   (click)="startEdit(label)"
                   [attr.aria-label]="'labelManager.edit' | transloco"
                 >
-                  <ng-icon name="lucidePencil" class="h-3 w-3" />
+                  <ng-icon name="lucidePencil" class="size-3" />
                 </button>
                 <button
                   hlmBtn
                   variant="ghost"
                   size="icon"
-                  class="h-6 w-6 text-destructive hover:text-destructive"
+                  class="size-6 text-destructive hover:text-destructive"
                   (click)="confirmDelete(label)"
                   [attr.aria-label]="'labelManager.delete' | transloco"
                 >
-                  <ng-icon name="lucideTrash2" class="h-3 w-3" />
+                  <ng-icon name="lucideTrash2" class="size-3" />
                 </button>
               </div>
             }
@@ -103,9 +107,10 @@
     <hlm-dialog-content *hlmDialogPortal>
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'labelManager.createTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'labelManager.createDesc' | transloco }}</p>
       </hlm-dialog-header>
 
-      <form id="create-label-form" [formRoot]="createForm" class="space-y-4">
+      <form id="create-label-form" [formRoot]="createForm" class="flex flex-col gap-4">
         <hlm-field>
           <label hlmFieldLabel for="label-name">{{ 'labelManager.name' | transloco }}</label>
           <input hlmInput id="label-name" type="text" [formField]="createForm.name" placeholder="feature" />
@@ -130,25 +135,14 @@
   </hlm-dialog>
 
   <!-- Delete Label Confirmation Dialog -->
-  <hlm-dialog [state]="showDeleteDialog() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
-      <hlm-dialog-header>
-        <h3 hlmDialogTitle>{{ 'labelManager.deleteTitle' | transloco }}</h3>
-      </hlm-dialog-header>
-      <p class="text-sm text-muted-foreground">
-        {{ 'labelManager.deleteConfirm' | transloco: { name: deletingLabel()?.name } }}
-      </p>
-      <hlm-dialog-footer>
-        <button hlmBtn variant="outline" hlmDialogClose>{{ 'labelManager.cancel' | transloco }}</button>
-        <button hlmBtn variant="destructive" (click)="deleteLabel()" [disabled]="saving()">
-          @if (saving()) {
-            <hlm-spinner /> {{ 'labelManager.deleting' | transloco }}
-          } @else {
-            <ng-icon name="lucideTrash2" class="mr-1" />
-            {{ 'labelManager.deleteButton' | transloco }}
-          }
-        </button>
-      </hlm-dialog-footer>
-    </hlm-dialog-content>
-  </hlm-dialog>
+  <ui-confirm-dialog
+    [state]="showDeleteDialog()"
+    titleKey="labelManager.deleteTitle"
+    messageKey="labelManager.deleteConfirm"
+    [messageParams]="{ name: deletingLabel()?.name }"
+    confirmLabelKey="common.delete"
+    [loading]="saving()"
+    (confirmed)="deleteLabel()"
+    (stateChanged)="onDeleteDialogStateChange($event)"
+  />
 </div>

@@ -1,6 +1,6 @@
 {
   "header": {
-    "search": "Rechercher\u2026",
+    "search": "Rechercher…",
     "clearSearch": "Effacer la recherche",
     "notifications": "Notifications",
     "noNotifications": "Aucune notification",
@@ -44,7 +44,7 @@
       "email": "E-mail",
       "password": "Mot de passe",
       "submit": "Se connecter",
-      "submitting": "Connexion en cours\u2026",
+      "submitting": "Connexion en cours…",
       "noAccount": "Pas encore de compte ?",
       "createOne": "Créer un compte",
       "failed": "Échec de la connexion. Veuillez réessayer."
@@ -56,13 +56,13 @@
       "email": "E-mail",
       "password": "Mot de passe",
       "submit": "Créer le compte",
-      "submitting": "Création du compte\u2026",
+      "submitting": "Création du compte…",
       "hasAccount": "Vous avez déjà un compte ?",
       "signIn": "Se connecter",
       "failed": "Échec de l'inscription. Veuillez réessayer."
     },
     "invitation": {
-      "loading": "Chargement de l'invitation\u2026",
+      "loading": "Chargement de l'invitation…",
       "error": "Erreur d'invitation",
       "goToSignIn": "Aller à la connexion",
       "title": "Accepter l'invitation",
@@ -75,9 +75,9 @@
       "password": "Mot de passe",
       "confirmPassword": "Confirmer le mot de passe",
       "accept": "Accepter l'invitation",
-      "accepting": "Acceptation en cours\u2026",
+      "accepting": "Acceptation en cours…",
       "createAndAccept": "Créer un compte et accepter",
-      "creatingAccount": "Création du compte\u2026",
+      "creatingAccount": "Création du compte…",
       "hasAccount": "Vous avez déjà un compte ?",
       "signIn": "Se connecter",
       "noToken": "Aucun jeton d'invitation fourni.",
@@ -174,22 +174,29 @@
     "slug": "Slug",
     "slugHint": "Utilisé dans les URL. Lettres minuscules, chiffres et tirets uniquement.",
     "plan": "Plan d'abonnement",
-    "planFree": "Gratuit \u2014 Jusqu'à 3 projets et 5 utilisateurs",
+    "planFree": "Gratuit — Jusqu'à 3 projets et 5 utilisateurs",
     "submit": "Créer l'espace de travail",
-    "submitting": "Création de l'espace de travail\u2026",
+    "submitting": "Création de l'espace de travail…",
     "failed": "Échec de la création de l'espace de travail. Veuillez réessayer."
   },
   "settings": {
-    "title": "Paramètres"
+    "title": "Paramètres",
+    "theme": "Thème",
+    "themeDescription": "Choisissez le thème de couleurs de l'application.",
+    "zoom": "Zoom",
+    "zoomDescription": "Ajustez la taille de police de l'interface.",
+    "resetZoom": "Réinitialiser",
+    "language": "Langue",
+    "languageDescription": "Choisissez la langue d'affichage."
   },
   "tenantSettings": {
     "title": "Paramètres du locataire",
-    "loading": "Chargement des paramètres\u2026",
+    "loading": "Chargement des paramètres…",
     "general": "Paramètres généraux",
     "name": "Nom",
     "slug": "Slug",
     "save": "Enregistrer les modifications",
-    "saving": "Enregistrement\u2026",
+    "saving": "Enregistrement…",
     "dangerZone": "Zone de danger",
     "dangerDescription": "La suppression d'un locataire est irréversible. Tous les projets, tableaux et tâches de ce locataire seront définitivement supprimés.",
     "deleteTenant": "Supprimer le locataire",
@@ -197,7 +204,8 @@
     "deleteConfirm": "Cette action est irréversible. Pour confirmer, tapez le nom du locataire ci-dessous.",
     "deleteName": "Nom du locataire",
     "deletePlaceholder": "Tapez le nom du locataire pour confirmer",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "deleteDesc": "Saisissez le nom de l'espace de travail pour confirmer la suppression définitive."
   },
   "upgrade": {
     "title": "Mettre à niveau le plan",
@@ -215,12 +223,12 @@
     "advancedAnalytics": "Analytique avancée",
     "back": "Retour",
     "upgradeButton": "Passer à Premium",
-    "upgrading": "Mise à niveau\u2026",
+    "upgrading": "Mise à niveau…",
     "failed": "Échec de la mise à niveau. Veuillez réessayer."
   },
   "members": {
     "title": "Membres",
-    "loading": "Chargement des membres\u2026",
+    "loading": "Chargement des membres…",
     "noMembers": "Aucun membre trouvé.",
     "pending": "En attente",
     "unknown": "Inconnu",
@@ -237,25 +245,36 @@
     "removeMember": "Retirer le membre",
     "cancel": "Annuler",
     "inviteButton": "Inviter",
-    "inviting": "Invitation en cours\u2026"
+    "inviting": "Invitation en cours…",
+    "inviteDesc": "Invitez un nouveau membre par e-mail et choisissez son rôle.",
+    "filterByName": "Filtrer par nom…",
+    "filterByEmail": "Filtrer par e-mail…",
+    "allRoles": "Tous les rôles",
+    "allStatuses": "Tous les statuts",
+    "statusActive": "Actif",
+    "statusAccessRevoked": "Accès révoqué",
+    "roleOwner": "Propriétaire",
+    "roleAdmin": "Administrateur",
+    "roleMember": "Membre"
   },
   "projects": {
     "title": "Projets",
     "new": "Nouveau projet",
-    "loading": "Chargement des projets\u2026",
+    "loading": "Chargement des projets…",
     "noProjects": "Aucun projet trouvé. Créez votre premier projet pour commencer.",
     "slug": "Slug : {{slug}}",
     "createTitle": "Créer un projet",
     "name": "Nom",
     "slugLabel": "Slug",
     "description": "Description",
-    "descriptionPlaceholder": "Description optionnelle\u2026",
+    "descriptionPlaceholder": "Description optionnelle…",
     "cancel": "Annuler",
     "create": "Créer le projet",
-    "creating": "Création\u2026"
+    "creating": "Création…",
+    "createDesc": "Créez un nouveau projet dans cet espace de travail."
   },
   "projectDetail": {
-    "loading": "Chargement du projet\u2026",
+    "loading": "Chargement du projet…",
     "sprints": "Sprints",
     "newBoard": "Nouveau tableau",
     "boards": "Tableaux",
@@ -269,33 +288,37 @@
     "createBoardTitle": "Créer un tableau",
     "boardName": "Nom",
     "boardDescription": "Description",
-    "descriptionPlaceholder": "Description optionnelle\u2026",
+    "descriptionPlaceholder": "Description optionnelle…",
     "cancel": "Annuler",
     "createBoardButton": "Créer le tableau",
-    "creating": "Création\u2026",
+    "creating": "Création…",
     "addMemberTitle": "Ajouter un membre",
     "userId": "ID utilisateur",
     "userIdPlaceholder": "Entrez l'ID utilisateur",
     "role": "Rôle",
     "addMemberButton": "Ajouter le membre",
-    "adding": "Ajout en cours\u2026",
+    "adding": "Ajout en cours…",
     "removeMemberTitle": "Retirer le membre",
     "removeConfirm": "Êtes-vous sûr de vouloir retirer ce membre du projet ?",
-    "removeButton": "Retirer"
+    "removeButton": "Retirer",
+    "createBoardDesc": "Créez un nouveau tableau pour ce projet.",
+    "deleteProjectDesc": "Le projet sera programmé pour suppression définitive."
   },
   "boardView": {
-    "loading": "Chargement du tableau\u2026",
+    "loading": "Chargement du tableau…",
     "newTask": "Nouvelle tâche",
     "createTaskTitle": "Créer une tâche",
     "title": "Titre",
     "titlePlaceholder": "Titre de la tâche",
     "description": "Description",
-    "descriptionPlaceholder": "Description optionnelle\u2026",
+    "descriptionPlaceholder": "Description optionnelle…",
     "priority": "Priorité",
     "column": "Colonne",
     "cancel": "Annuler",
     "create": "Créer la tâche",
-    "creating": "Création\u2026"
+    "creating": "Création…",
+    "createTaskDesc": "Ajouter une nouvelle tâche à cette colonne.",
+    "selectStatusDesc": "Choisissez le statut de la tâche déplacée."
   },
   "priority": {
     "low": "Basse",
@@ -308,12 +331,12 @@
     "noTasks": "Aucune tâche"
   },
   "taskDetail": {
-    "loading": "Chargement de la tâche\u2026",
+    "loading": "Chargement de la tâche…",
     "created": "Créée le {{date}}",
     "updated": "Mise à jour le {{date}}",
     "cancel": "Annuler",
     "save": "Enregistrer",
-    "saving": "Enregistrement\u2026",
+    "saving": "Enregistrement…",
     "edit": "Modifier",
     "title": "Titre",
     "description": "Description",
@@ -332,7 +355,7 @@
   "sprints": {
     "title": "Sprints",
     "new": "Nouveau sprint",
-    "loading": "Chargement des sprints\u2026",
+    "loading": "Chargement des sprints…",
     "noSprints": "Aucun sprint pour le moment.",
     "createFirst": "Créer le premier sprint",
     "tasks": "{{count}} tâches",
@@ -343,13 +366,14 @@
     "startDate": "Date de début",
     "endDate": "Date de fin",
     "goal": "Objectif",
-    "goalPlaceholder": "Objectif optionnel du sprint\u2026",
+    "goalPlaceholder": "Objectif optionnel du sprint…",
     "cancel": "Annuler",
     "create": "Créer le sprint",
-    "creating": "Création\u2026"
+    "creating": "Création…",
+    "createDesc": "Créez un nouveau sprint pour ce projet."
   },
   "sprintDetail": {
-    "loading": "Chargement du sprint\u2026",
+    "loading": "Chargement du sprint…",
     "tasks": "Tâches",
     "backToProject": "Retour au projet",
     "noTasks": "Aucune tâche dans ce sprint.",
@@ -357,7 +381,7 @@
   },
   "sprintBacklog": {
     "backlog": "Backlog",
-    "loading": "Chargement du backlog\u2026",
+    "loading": "Chargement du backlog…",
     "allAssigned": "Toutes les tâches sont assignées à des sprints.",
     "addToSprint": "Ajouter au sprint"
   },
@@ -412,9 +436,9 @@
     "namePlaceholder": "Votre nom",
     "email": "E-mail",
     "message": "Message",
-    "messagePlaceholder": "Décrivez votre problème ou votre question\u2026",
+    "messagePlaceholder": "Décrivez votre problème ou votre question…",
     "submit": "Envoyer",
-    "submitting": "Envoi en cours\u2026"
+    "submitting": "Envoi en cours…"
   },
   "validation": {
     "emailRequired": "L'e-mail est requis",
@@ -444,5 +468,32 @@
   "errors": {
     "unexpected": "Une erreur inattendue s'est produite. Veuillez réessayer.",
     "permissionDenied": "Vous n'avez pas la permission d'effectuer cette action"
+  },
+  "toasts": {
+    "created": "Créé avec succès",
+    "updated": "Mis à jour avec succès",
+    "deleted": "Supprimé avec succès"
+  },
+  "common": {
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "delete": "Supprimer"
+  },
+  "labelManager": {
+    "createDesc": "Créez une nouvelle étiquette pour ce projet."
+  },
+  "projectMembers": {
+    "addMemberDesc": "Ajoutez un membre existant de l'espace de travail à ce projet."
+  },
+  "statusManager": {
+    "createDesc": "Créez une nouvelle colonne de statut pour ce projet.",
+    "deleteDesc": "Choisissez éventuellement un statut de remplacement pour les tâches existantes."
+  },
+  "taskTypeManager": {
+    "createDesc": "Créez un nouveau type de tâche pour ce projet.",
+    "deleteDesc": "Choisissez éventuellement un type de remplacement pour les tâches existantes."
+  },
+  "taskTable": {
+    "filtersDesc": "Filtrez les tâches par statut, priorité, assigné et plus."
   }
 }

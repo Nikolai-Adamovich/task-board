@@ -10,25 +10,24 @@ import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { canManageProject } from '@app/shared/utils/role-utils';
-import {
-  PriorityColorMap,
-  StatusColorMap,
-  NeutralColor,
-  PriorityDotColorMap,
-  NeutralDotColor,
-} from '@app/constants/priority';
+import { PriorityColorMap, NeutralColor, PriorityDotColorMap, NeutralDotColor } from '@app/constants/priority';
 import { SprintStatus } from '@task-board/shared';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { NgIcon } from '@ng-icons/core';
-import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import type { Sprint, Task } from '@task-board/shared';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { statusBadgeClass } from '@app/constants/priority';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'ui-sprint-detail',
   imports: [
+    ConfirmDialog,
+    HlmEmptyImports,
     RouterLink,
     DatePipe,
     TranslocoPipe,
@@ -42,6 +41,9 @@ import type { Sprint, Task } from '@task-board/shared';
   templateUrl: './sprint-detail.html',
 })
 export class SprintDetail implements OnInit {
+  /** Shared badge-class helper (see constants/priority.ts) */
+  protected readonly statusBadgeClass = statusBadgeClass;
+  private readonly notify = injectToasts();
   private readonly sprintClient = inject(SprintClient);
   private readonly taskClient = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
@@ -58,10 +60,6 @@ export class SprintDetail implements OnInit {
   protected readonly canManage = computed(() => {
     return canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole());
   });
-
-  protected getStatusColor(status: string): string {
-    return (StatusColorMap as Record<string, string>)[status] ?? NeutralColor;
-  }
 
   protected getPriorityDot(priority: string): string {
     return (PriorityDotColorMap as Record<string, string>)[priority] ?? NeutralDotColor;
@@ -105,8 +103,8 @@ export class SprintDetail implements OnInit {
     });
   }
 
-  protected onDeleteDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
+  protected onDeleteDialogStateChange(open: boolean): void {
+    if (!open) {
       this.showDeleteConfirm.set(false);
     }
   }
@@ -140,6 +138,7 @@ export class SprintDetail implements OnInit {
         next: (sprint) => {
           this.sprint.set(sprint);
           this.loadSprintTasks(sprint.projectId);
+          this.notify.success('toasts.updated');
         },
         error: (err) => console.error(err),
       });

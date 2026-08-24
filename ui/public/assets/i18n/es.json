@@ -1,6 +1,6 @@
 {
   "header": {
-    "search": "Buscar\u2026",
+    "search": "Buscar…",
     "clearSearch": "Limpiar búsqueda",
     "notifications": "Notificaciones",
     "noNotifications": "Sin notificaciones",
@@ -44,7 +44,7 @@
       "email": "Correo electrónico",
       "password": "Contraseña",
       "submit": "Iniciar sesión",
-      "submitting": "Iniciando sesión\u2026",
+      "submitting": "Iniciando sesión…",
       "noAccount": "¿No tienes una cuenta?",
       "createOne": "Crear una",
       "failed": "Error al iniciar sesión. Por favor, inténtalo de nuevo."
@@ -56,13 +56,13 @@
       "email": "Correo electrónico",
       "password": "Contraseña",
       "submit": "Crear cuenta",
-      "submitting": "Creando cuenta\u2026",
+      "submitting": "Creando cuenta…",
       "hasAccount": "¿Ya tienes una cuenta?",
       "signIn": "Iniciar sesión",
       "failed": "Error en el registro. Por favor, inténtalo de nuevo."
     },
     "invitation": {
-      "loading": "Cargando invitación\u2026",
+      "loading": "Cargando invitación…",
       "error": "Error de invitación",
       "goToSignIn": "Ir a iniciar sesión",
       "title": "Aceptar invitación",
@@ -75,9 +75,9 @@
       "password": "Contraseña",
       "confirmPassword": "Confirmar contraseña",
       "accept": "Aceptar invitación",
-      "accepting": "Aceptando\u2026",
+      "accepting": "Aceptando…",
       "createAndAccept": "Crear cuenta y aceptar",
-      "creatingAccount": "Creando cuenta\u2026",
+      "creatingAccount": "Creando cuenta…",
       "hasAccount": "¿Ya tienes una cuenta?",
       "signIn": "Iniciar sesión",
       "noToken": "No se proporcionó token de invitación.",
@@ -174,22 +174,29 @@
     "slug": "Slug",
     "slugHint": "Se usa en URLs. Solo letras minúsculas, números y guiones.",
     "plan": "Plan de suscripción",
-    "planFree": "Gratis \u2014 Hasta 3 proyectos y 5 usuarios",
+    "planFree": "Gratis — Hasta 3 proyectos y 5 usuarios",
     "submit": "Crear espacio de trabajo",
-    "submitting": "Creando espacio de trabajo\u2026",
+    "submitting": "Creando espacio de trabajo…",
     "failed": "Error al crear el espacio de trabajo. Por favor, inténtalo de nuevo."
   },
   "settings": {
-    "title": "Configuración"
+    "title": "Configuración",
+    "theme": "Tema",
+    "themeDescription": "Elige el tema de colores de la aplicación.",
+    "zoom": "Zoom",
+    "zoomDescription": "Ajusta el tamaño de fuente de la interfaz.",
+    "resetZoom": "Restablecer",
+    "language": "Idioma",
+    "languageDescription": "Elige el idioma de visualización."
   },
   "tenantSettings": {
     "title": "Configuración del inquilino",
-    "loading": "Cargando configuración\u2026",
+    "loading": "Cargando configuración…",
     "general": "Configuración general",
     "name": "Nombre",
     "slug": "Slug",
     "save": "Guardar cambios",
-    "saving": "Guardando\u2026",
+    "saving": "Guardando…",
     "dangerZone": "Zona de peligro",
     "dangerDescription": "Eliminar un inquilino es irreversible. Todos los proyectos, tableros y tareas dentro de este inquilino se eliminarán permanentemente.",
     "deleteTenant": "Eliminar inquilino",
@@ -197,7 +204,8 @@
     "deleteConfirm": "Esta acción no se puede deshacer. Para confirmar, escribe el nombre del inquilino a continuación.",
     "deleteName": "Nombre del inquilino",
     "deletePlaceholder": "Escribe el nombre del inquilino para confirmar",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "deleteDesc": "Escribe el nombre del espacio de trabajo para confirmar la eliminación permanente."
   },
   "upgrade": {
     "title": "Mejorar plan",
@@ -215,12 +223,12 @@
     "advancedAnalytics": "Analítica avanzada",
     "back": "Atrás",
     "upgradeButton": "Mejorar a Premium",
-    "upgrading": "Mejorando\u2026",
+    "upgrading": "Mejorando…",
     "failed": "Error al mejorar. Por favor, inténtalo de nuevo."
   },
   "members": {
     "title": "Miembros",
-    "loading": "Cargando miembros\u2026",
+    "loading": "Cargando miembros…",
     "noMembers": "No se encontraron miembros.",
     "pending": "Pendiente",
     "unknown": "Desconocido",
@@ -237,25 +245,36 @@
     "removeMember": "Eliminar miembro",
     "cancel": "Cancelar",
     "inviteButton": "Invitar",
-    "inviting": "Invitando\u2026"
+    "inviting": "Invitando…",
+    "inviteDesc": "Invita a un nuevo miembro por correo y elige su rol.",
+    "filterByName": "Filtrar por nombre…",
+    "filterByEmail": "Filtrar por correo…",
+    "allRoles": "Todos los roles",
+    "allStatuses": "Todos los estados",
+    "statusActive": "Activo",
+    "statusAccessRevoked": "Acceso revocado",
+    "roleOwner": "Propietario",
+    "roleAdmin": "Administrador",
+    "roleMember": "Miembro"
   },
   "projects": {
     "title": "Proyectos",
     "new": "Nuevo proyecto",
-    "loading": "Cargando proyectos\u2026",
+    "loading": "Cargando proyectos…",
     "noProjects": "No se encontraron proyectos. Crea tu primer proyecto para empezar.",
     "slug": "Slug: {{slug}}",
     "createTitle": "Crear proyecto",
     "name": "Nombre",
     "slugLabel": "Slug",
     "description": "Descripción",
-    "descriptionPlaceholder": "Descripción opcional\u2026",
+    "descriptionPlaceholder": "Descripción opcional…",
     "cancel": "Cancelar",
     "create": "Crear proyecto",
-    "creating": "Creando\u2026"
+    "creating": "Creando…",
+    "createDesc": "Crea un nuevo proyecto en este espacio de trabajo."
   },
   "projectDetail": {
-    "loading": "Cargando proyecto\u2026",
+    "loading": "Cargando proyecto…",
     "sprints": "Sprints",
     "newBoard": "Nuevo tablero",
     "boards": "Tableros",
@@ -269,33 +288,37 @@
     "createBoardTitle": "Crear tablero",
     "boardName": "Nombre",
     "boardDescription": "Descripción",
-    "descriptionPlaceholder": "Descripción opcional\u2026",
+    "descriptionPlaceholder": "Descripción opcional…",
     "cancel": "Cancelar",
     "createBoardButton": "Crear tablero",
-    "creating": "Creando\u2026",
+    "creating": "Creando…",
     "addMemberTitle": "Agregar miembro",
     "userId": "ID de usuario",
     "userIdPlaceholder": "Introduce el ID de usuario",
     "role": "Rol",
     "addMemberButton": "Agregar miembro",
-    "adding": "Agregando\u2026",
+    "adding": "Agregando…",
     "removeMemberTitle": "Eliminar miembro",
     "removeConfirm": "¿Estás seguro de que quieres eliminar a este miembro del proyecto?",
-    "removeButton": "Eliminar"
+    "removeButton": "Eliminar",
+    "createBoardDesc": "Crea un nuevo tablero para este proyecto.",
+    "deleteProjectDesc": "El proyecto se programará para eliminación permanente."
   },
   "boardView": {
-    "loading": "Cargando tablero\u2026",
+    "loading": "Cargando tablero…",
     "newTask": "Nueva tarea",
     "createTaskTitle": "Crear tarea",
     "title": "Título",
     "titlePlaceholder": "Título de la tarea",
     "description": "Descripción",
-    "descriptionPlaceholder": "Descripción opcional\u2026",
+    "descriptionPlaceholder": "Descripción opcional…",
     "priority": "Prioridad",
     "column": "Columna",
     "cancel": "Cancelar",
     "create": "Crear tarea",
-    "creating": "Creando\u2026"
+    "creating": "Creando…",
+    "createTaskDesc": "Añadir una nueva tarea a esta columna.",
+    "selectStatusDesc": "Elige el estado de la tarea movida."
   },
   "priority": {
     "low": "Baja",
@@ -308,12 +331,12 @@
     "noTasks": "Sin tareas"
   },
   "taskDetail": {
-    "loading": "Cargando tarea\u2026",
+    "loading": "Cargando tarea…",
     "created": "Creada el {{date}}",
     "updated": "Actualizada el {{date}}",
     "cancel": "Cancelar",
     "save": "Guardar",
-    "saving": "Guardando\u2026",
+    "saving": "Guardando…",
     "edit": "Editar",
     "title": "Título",
     "description": "Descripción",
@@ -332,7 +355,7 @@
   "sprints": {
     "title": "Sprints",
     "new": "Nuevo sprint",
-    "loading": "Cargando sprints\u2026",
+    "loading": "Cargando sprints…",
     "noSprints": "Aún no hay sprints.",
     "createFirst": "Crear primer sprint",
     "tasks": "{{count}} tareas",
@@ -343,13 +366,14 @@
     "startDate": "Fecha de inicio",
     "endDate": "Fecha de fin",
     "goal": "Objetivo",
-    "goalPlaceholder": "Objetivo opcional del sprint\u2026",
+    "goalPlaceholder": "Objetivo opcional del sprint…",
     "cancel": "Cancelar",
     "create": "Crear sprint",
-    "creating": "Creando\u2026"
+    "creating": "Creando…",
+    "createDesc": "Crea un nuevo sprint para este proyecto."
   },
   "sprintDetail": {
-    "loading": "Cargando sprint\u2026",
+    "loading": "Cargando sprint…",
     "tasks": "Tareas",
     "backToProject": "Volver al proyecto",
     "noTasks": "No hay tareas en este sprint.",
@@ -357,7 +381,7 @@
   },
   "sprintBacklog": {
     "backlog": "Backlog",
-    "loading": "Cargando backlog\u2026",
+    "loading": "Cargando backlog…",
     "allAssigned": "Todas las tareas están asignadas a sprints.",
     "addToSprint": "Agregar al sprint"
   },
@@ -412,9 +436,9 @@
     "namePlaceholder": "Tu nombre",
     "email": "Correo electrónico",
     "message": "Mensaje",
-    "messagePlaceholder": "Describe tu problema o pregunta\u2026",
+    "messagePlaceholder": "Describe tu problema o pregunta…",
     "submit": "Enviar",
-    "submitting": "Enviando\u2026"
+    "submitting": "Enviando…"
   },
   "validation": {
     "emailRequired": "El correo electrónico es obligatorio",
@@ -444,5 +468,32 @@
   "errors": {
     "unexpected": "Ocurrió un error inesperado. Por favor, inténtalo de nuevo.",
     "permissionDenied": "No tienes permiso para realizar esta acción"
+  },
+  "toasts": {
+    "created": "Creado con éxito",
+    "updated": "Actualizado con éxito",
+    "deleted": "Eliminado con éxito"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "delete": "Eliminar"
+  },
+  "labelManager": {
+    "createDesc": "Crea una nueva etiqueta para este proyecto."
+  },
+  "projectMembers": {
+    "addMemberDesc": "Añade un miembro existente del espacio de trabajo a este proyecto."
+  },
+  "statusManager": {
+    "createDesc": "Crea una nueva columna de estado para este proyecto.",
+    "deleteDesc": "Opcionalmente elige un estado de reemplazo para las tareas existentes."
+  },
+  "taskTypeManager": {
+    "createDesc": "Crea un nuevo tipo de tarea para este proyecto.",
+    "deleteDesc": "Opcionalmente elige un tipo de reemplazo para las tareas existentes."
+  },
+  "taskTable": {
+    "filtersDesc": "Filtra tareas por estado, prioridad, responsable y más."
   }
 }

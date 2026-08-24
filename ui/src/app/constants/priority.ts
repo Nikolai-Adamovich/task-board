@@ -69,3 +69,30 @@ export const NeutralColor = 'bg-gray-100 text-gray-700';
 
 /** Neutral fallback color for dot indicators */
 export const NeutralDotColor = 'bg-gray-500';
+
+/**
+ * Badge class lookup shared by sprint, tenant, and project statuses.
+ * Sprint (FUTURE/ACTIVE/COMPLETED) and tenant/project (ACTIVE/ARCHIVED/DELETION_PENDING)
+ * values are merged — overlapping keys agree on the same color.
+ */
+const StatusBadgeColorMap: Record<string, string> = { ...StatusColorMap, ...TenantStatusColorMap };
+
+/** Resolve the badge classes for a task priority. Unknown values fall back to {@link NeutralColor}. */
+export function priorityBadgeClass(priority: string): string {
+  return (PriorityColorMap as Record<string, string>)[priority] ?? NeutralColor;
+}
+
+/** Resolve the badge classes for a sprint/tenant/project status. Unknown values fall back to {@link NeutralColor}. */
+export function statusBadgeClass(status: string): string {
+  return StatusBadgeColorMap[status] ?? NeutralColor;
+}
+
+/** Resolve the badge classes for a tenant role. Unknown values fall back to {@link NeutralColor}. */
+export function roleBadgeClass(role: string): string {
+  return (TenantRoleColorMap as Record<string, string>)[role] ?? NeutralColor;
+}
+
+/** Resolve the badge classes for a tenant member status. Unknown values fall back to {@link NeutralColor}. */
+export function memberStatusBadgeClass(status: string): string {
+  return (MemberStatusColorMap as Record<string, string>)[status] ?? NeutralColor;
+}
