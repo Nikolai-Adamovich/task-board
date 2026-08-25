@@ -1,5 +1,5 @@
 import type { BooleanInput, NumberInput } from '@angular/cdk/coercion';
-import { ChangeDetectionStrategy, Component, booleanAttribute, computed, input, numberAttribute } from '@angular/core';
+import { Component, booleanAttribute, computed, input, numberAttribute } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleCheck, lucideInfo, lucideLoader2, lucideOctagonX, lucideTriangleAlert } from '@ng-icons/lucide';
 import { BrnSonnerImports, type ToasterProps } from '@spartan-ng/brain/sonner';
@@ -10,7 +10,6 @@ import type { ClassValue } from 'clsx';
   selector: 'hlm-toaster',
   imports: [BrnSonnerImports, NgIcon],
   providers: [provideIcons({ lucideCircleCheck, lucideInfo, lucideTriangleAlert, lucideOctagonX, lucideLoader2 })],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <brn-sonner-toaster
       [class]="_computedClass()"

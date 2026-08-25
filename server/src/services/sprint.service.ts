@@ -1,3 +1,4 @@
+import { ProjectStatus, SprintStatus } from '@task-board/shared';
 import type { Sprint, CreateSprint, UpdateSprint } from '@task-board/shared';
 import { AppError, NotFoundError } from '../errors/app-error.js';
 import { SprintRepository } from '../repositories/sprint.repository.js';
@@ -41,7 +42,7 @@ export class SprintService {
       throw new NotFoundError('Project not found');
     }
 
-    if (project.status !== 'ACTIVE') {
+    if (project.status !== ProjectStatus.ACTIVE) {
       throw new AppError(400, 'PROJECT_ARCHIVED', 'Cannot create sprints in an archived project');
     }
 
@@ -94,7 +95,7 @@ export class SprintService {
       updates.status = input.status;
 
       // Starting sprint: set startDate to now if null, endDate to now if null (spec §7.4)
-      if (input.status === 'ACTIVE') {
+      if (input.status === SprintStatus.ACTIVE) {
         if (!sprint.startDate && !input.startDate) {
           updates.startDate = new Date();
         }
@@ -104,7 +105,7 @@ export class SprintService {
       }
 
       // Completing sprint: set endDate to now if null
-      if (input.status === 'COMPLETED') {
+      if (input.status === SprintStatus.COMPLETED) {
         if (!sprint.endDate && !input.endDate) {
           updates.endDate = new Date();
         }

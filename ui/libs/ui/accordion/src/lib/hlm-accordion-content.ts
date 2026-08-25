@@ -1,10 +1,9 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { Component } from '@angular/core';
 import { BrnAccordionContent } from '@spartan-ng/brain/accordion';
 import { classes } from '@spartan-ng/helm/utils';
 
 @Component({
   selector: 'hlm-accordion-content',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   hostDirectives: [{ directive: BrnAccordionContent, inputs: ['style'] }],
   host: {
     'data-slot': 'accordion-content',

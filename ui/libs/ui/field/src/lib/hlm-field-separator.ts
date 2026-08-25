@@ -1,11 +1,10 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { Component } from '@angular/core';
 import { HlmSeparator } from '@spartan-ng/helm/separator';
 import { classes } from '@spartan-ng/helm/utils';
 
 @Component({
   selector: 'hlm-field-separator',
   imports: [HlmSeparator],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   host: { 'data-slot': 'field-separator' },
   template: `
     <hlm-separator class="absolute inset-0 top-1/2" />

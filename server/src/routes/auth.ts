@@ -2,14 +2,6 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { AuthService } from '../services/auth.service.js';
-import { UserRepository } from '../repositories/user.repository.js';
-import { TenantRepository } from '../repositories/tenant.repository.js';
-import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
-import { getCollection } from '../db/mongo.js';
-import type { UserDocument } from '../repositories/user.repository.js';
-import type { TenantDocument } from '../repositories/tenant.repository.js';
-import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
 import { RegisterRequestSchema, LoginRequestSchema, AcceptInvitationSchema } from '../schemas/auth.js';
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────────
@@ -28,13 +20,8 @@ export function createAuthRoutes(): Hono<AppEnv> {
    * Returns 201 with { data: { id, email, displayName, avatarUrl } }.
    */
   router.post('/register', validateBody(RegisterRequestSchema), async (c) => {
-    const body = c.get('validatedBody' as never) as {
-      email: string;
-      password: string;
-      displayName: string;
-    };
-    const service = createAuthService(c);
-    const result = await service.register(body);
+    const body = c.req.valid('json');
+    const result = await c.get('svc').auth.register(body);
 
     return c.json({ data: result }, 201);
   });
@@ -44,12 +31,8 @@ export function createAuthRoutes(): Hono<AppEnv> {
    * Returns 200 with { data: { token, user: { id, email, displayName, avatarUrl } } }.
    */
   router.post('/login', validateBody(LoginRequestSchema), async (c) => {
-    const body = c.get('validatedBody' as never) as {
-      email: string;
-      password: string;
-    };
-    const service = createAuthService(c);
-    const result = await service.login(body);
+    const body = c.req.valid('json');
+    const result = await c.get('svc').auth.login(body);
 
     return c.json({ data: result }, 200);
   });
@@ -60,9 +43,8 @@ export function createAuthRoutes(): Hono<AppEnv> {
    * Returns 200 with { data: { token, user } }.
    */
   router.post('/accept-invitation', validateBody(AcceptInvitationSchema), async (c) => {
-    const body = c.get('validatedBody' as never) as { token: string; password?: string; displayName?: string };
-    const service = createAuthService(c);
-    const result = await service.acceptInvitation(body);
+    const body = c.req.valid('json');
+    const result = await c.get('svc').auth.acceptInvitation(body);
 
     return c.json({ data: result }, 200);
   });
@@ -74,8 +56,7 @@ export function createAuthRoutes(): Hono<AppEnv> {
    */
   router.get('/invitations/:token', async (c) => {
     const token = c.req.param('token');
-    const service = createAuthService(c);
-    const result = await service.getInvitationDetails(token);
+    const result = await c.get('svc').auth.getInvitationDetails(token);
 
     return c.json({ data: result }, 200);
   });
@@ -87,21 +68,10 @@ export function createAuthRoutes(): Hono<AppEnv> {
    */
   router.get('/me', authMiddleware, async (c) => {
     const userId = c.get('userId');
-    const service = createAuthService(c);
-    const user = await service.me(userId);
+    const user = await c.get('svc').auth.me(userId);
 
     return c.json({ data: user }, 200);
   });
 
   return router;
-}
-
-// ─── Factory Helper ──────────────────────────────────────────────────────────
-
-function createAuthService(c: { env: { JWT_SECRET: string } }): AuthService {
-  const userRepo = new UserRepository(getCollection<UserDocument>('users'));
-  const tenantRepo = new TenantRepository(getCollection<TenantDocument>('tenants'));
-  const tenantMemberRepo = new TenantMemberRepository(getCollection<TenantMemberDocument>('tenant_members'));
-
-  return new AuthService(userRepo, tenantRepo, tenantMemberRepo, c.env.JWT_SECRET);
 }

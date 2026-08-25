@@ -36,6 +36,7 @@ describe('TaskTypeManager', () => {
   let taskTypeClientMock: {
     list: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
+    reorder: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
@@ -43,6 +44,14 @@ describe('TaskTypeManager', () => {
   function setup() {
     taskTypeClientMock = {
       list: vi.fn().mockReturnValue(of([...mockTaskTypes])),
+      reorder: vi.fn().mockImplementation((_pid: string, items: { id: string; position: number }[]) =>
+        of(
+          mockTaskTypes.map((t) => ({
+            ...t,
+            position: items.find((i) => i.id === t.id)?.position ?? t.position,
+          })),
+        ),
+      ),
       create: vi
         .fn()
         .mockImplementation((_pid: string, data: { key: string; name: string; icon: string; position: number }) =>
@@ -225,12 +234,16 @@ describe('TaskTypeManager', () => {
 
     it('should swap positions when moving up', () => {
       component.moveUp(mockTaskTypes[1]);
-      expect(taskTypeClientMock.update).toHaveBeenCalledTimes(2);
+      expect(taskTypeClientMock.reorder).toHaveBeenCalledTimes(1);
+      expect(taskTypeClientMock.reorder).toHaveBeenCalledWith('p1', [
+        { id: mockTaskTypes[1].id, position: mockTaskTypes[0].position },
+        { id: mockTaskTypes[0].id, position: mockTaskTypes[1].position },
+      ]);
     });
 
     it('should not move last item down', () => {
       component.moveDown(mockTaskTypes[2]);
-      expect(taskTypeClientMock.update).not.toHaveBeenCalled();
+      expect(taskTypeClientMock.reorder).not.toHaveBeenCalled();
     });
   });
 

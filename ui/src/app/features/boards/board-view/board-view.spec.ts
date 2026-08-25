@@ -337,7 +337,7 @@ describe('BoardView', () => {
   describe('goToTask', () => {
     beforeEach(() => setup());
 
-    it('should navigate to the task detail route', () => {
+    it('should navigate to the task detail route using the KEY-number format', () => {
       const task = mockTasks[0];
 
       component.goToTask(task);
@@ -346,9 +346,9 @@ describe('BoardView', () => {
         '/tenants',
         't1',
         'projects',
-        task.projectId,
+        't1',
         'tasks',
-        task.id,
+        `t1-${task.number}`,
       ]);
     });
   });

@@ -44,6 +44,7 @@ describe('StatusManager', () => {
   let statusClientMock: {
     list: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
+    reorder: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
@@ -51,6 +52,14 @@ describe('StatusManager', () => {
   function setup() {
     statusClientMock = {
       list: vi.fn().mockReturnValue(of([...mockStatuses])),
+      reorder: vi.fn().mockImplementation((_pid: string, items: { id: string; position: number }[]) =>
+        of(
+          mockStatuses.map((s) => ({
+            ...s,
+            position: items.find((i) => i.id === s.id)?.position ?? s.position,
+          })),
+        ),
+      ),
       create: vi.fn().mockImplementation((_pid: string, data: { name: string; position: number }) =>
         of({
           data: {
@@ -221,17 +230,21 @@ describe('StatusManager', () => {
 
     it('should swap positions when moving up', () => {
       component.moveUp(mockStatuses[1]);
-      expect(statusClientMock.update).toHaveBeenCalledTimes(2);
+      expect(statusClientMock.reorder).toHaveBeenCalledTimes(1);
+      expect(statusClientMock.reorder).toHaveBeenCalledWith('p1', [
+        { id: mockStatuses[1].id, position: mockStatuses[0].position },
+        { id: mockStatuses[0].id, position: mockStatuses[1].position },
+      ]);
     });
 
     it('should not move last item down', () => {
       component.moveDown(mockStatuses[2]);
-      expect(statusClientMock.update).not.toHaveBeenCalled();
+      expect(statusClientMock.reorder).not.toHaveBeenCalled();
     });
 
     it('should swap positions when moving down', () => {
       component.moveDown(mockStatuses[0]);
-      expect(statusClientMock.update).toHaveBeenCalledTimes(2);
+      expect(statusClientMock.reorder).toHaveBeenCalledTimes(1);
     });
   });
 

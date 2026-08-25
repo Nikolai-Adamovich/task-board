@@ -1,14 +1,5 @@
 import type { BooleanInput, NumberInput } from '@angular/cdk/coercion';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  booleanAttribute,
-  computed,
-  input,
-  model,
-  numberAttribute,
-  untracked,
-} from '@angular/core';
+import { Component, booleanAttribute, computed, input, model, numberAttribute, untracked } from '@angular/core';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmPagination } from './hlm-pagination';
 import { HlmPaginationContent } from './hlm-pagination-content';
@@ -30,21 +21,20 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
     HlmPaginationEllipsis,
     HlmSelectImports,
   ],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex items-center justify-between gap-2 px-4 py-2">
       <div class="flex items-center gap-1 text-sm text-nowrap text-gray-600">
         <b>{{ totalItems() }}</b>
-        total items |
+        {{ totalItemsLabel() }} |
         <b>{{ _lastPageNumber() }}</b>
-        pages
+        {{ pagesLabel() }}
       </div>
 
       <nav hlmPagination>
         <ul hlmPaginationContent>
           @if (showEdges() && !_isFirstPageActive()) {
             <li hlmPaginationItem (click)="goToPrevious()">
-              <hlm-pagination-previous />
+              <hlm-pagination-previous [text]="previousText()" />
             </li>
           }
 
@@ -62,7 +52,7 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
 
           @if (showEdges() && !_isLastPageActive()) {
             <li hlmPaginationItem (click)="goToNext()">
-              <hlm-pagination-next />
+              <hlm-pagination-next [text]="nextText()" />
             </li>
           }
         </ul>
@@ -123,6 +113,15 @@ export class HlmNumberedPagination {
    * Defaults to [10, 20, 50, 100]
    */
   public readonly pageSizes = input<number[]>([10, 20, 50, 100]);
+
+  /** Label for "total items" text. */
+  public readonly totalItemsLabel = input<string>('total items');
+  /** Label for "pages" text. */
+  public readonly pagesLabel = input<string>('pages');
+  /** Text for the "Previous" button. */
+  public readonly previousText = input<string>('Previous');
+  /** Text for the "Next" button. */
+  public readonly nextText = input<string>('Next');
 
   protected readonly _pageSizesWithCurrent = computed(() => {
     const pageSizes = this.pageSizes();

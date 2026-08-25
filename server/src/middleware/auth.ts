@@ -1,64 +1,18 @@
 import { createMiddleware } from 'hono/factory';
+import { verify } from 'hono/jwt';
 import { UnauthorizedError } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';
 import type { User } from '@task-board/shared';
 
-// ─── JWT Decoding Utilities (Web Crypto API — Workers compatible) ─────────────
+// ─── JWT Verification (hono/jwt — Workers compatible) ────────────────────────
 
+/** Claims carried by the access token (see AuthService#generateToken) */
 interface JwtPayload {
   sub: string;
   email: string;
   displayName?: string;
   avatarUrl?: string | null;
-  iat: number;
-  exp: number;
-}
-
-/**
- * Decode and verify a JWT using the Web Crypto API (HMAC-SHA256).
- * Compatible with Cloudflare Workers — no Node.js crypto dependency.
- *
- * @param token - The JWT string (header.payload.signature)
- * @param secret - The HMAC secret key
- * @returns The decoded payload
- * @throws If the token is invalid, expired, or the signature doesn't match
- */
-async function verifyJwt(token: string, secret: string): Promise<JwtPayload> {
-  const parts = token.split('.');
-
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWT format');
-  }
-
-  const headerB64 = parts[0] ?? '';
-  const payloadB64 = parts[1] ?? '';
-  const signatureB64 = parts[2] ?? '';
-  // Import the secret as an HMAC key
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
-    'verify',
-  ]);
-  // Decode the signature from base64url
-  const signature = Uint8Array.from(atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
-  // Verify the signature
-  const data = encoder.encode(`${headerB64}.${payloadB64}`);
-  const isValid = await crypto.subtle.verify('HMAC', key, signature, data);
-
-  if (!isValid) {
-    throw new Error('Invalid JWT signature');
-  }
-
-  // Decode the payload
-  const payloadJson = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
-  const payload = JSON.parse(payloadJson) as JwtPayload;
-  // Check expiration
-  const now = Math.floor(Date.now() / 1000);
-
-  if (payload.exp && payload.exp < now) {
-    throw new Error('JWT has expired');
-  }
-
-  return payload;
+  exp?: number;
 }
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
@@ -96,7 +50,8 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   let payload: JwtPayload;
 
   try {
-    payload = await verifyJwt(token, jwtSecret);
+    // hono/jwt verifies the algorithm, the signature and `exp` in one call
+    payload = (await verify(token, jwtSecret, 'HS256')) as unknown as JwtPayload;
   } catch {
     throw new UnauthorizedError('Invalid or expired token');
   }

@@ -5,6 +5,10 @@
     [itemsPerPage]="pageSize()"
     [pageSizes]="pageSizes()"
     [showEdges]="showEdges()"
+    [totalItemsLabel]="'pagination.totalItems' | transloco"
+    [pagesLabel]="'pagination.pages' | transloco"
+    [previousText]="'pagination.previous' | transloco"
+    [nextText]="'pagination.next' | transloco"
     (currentPageChange)="onCurrentPageChange($event)"
     (itemsPerPageChange)="onItemsPerPageChange($event)"
   />

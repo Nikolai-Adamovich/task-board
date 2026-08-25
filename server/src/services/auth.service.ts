@@ -1,3 +1,4 @@
+import { sign } from 'hono/jwt';
 import { MemberStatus, InvitationStatus } from '@task-board/shared';
 import type {
   User,
@@ -12,39 +13,18 @@ import { UserRepository } from '../repositories/user.repository.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
 import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
 
-// ─── JWT Utilities (Web Crypto API — Workers compatible) ─────────────────────
+// ─── JWT Utilities (hono/jwt — Workers compatible) ───────────────────────────
 
-interface JwtPayload {
+/** Claims carried by the access token */
+export interface JwtPayload {
   sub: string;
   email: string;
   displayName: string;
   tenantId: string | null;
   tenantRole: TenantRole | null;
-  iat: number;
-  exp: number;
-}
-
-function base64UrlEncode(data: string): string {
-  return btoa(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function signJwt(payload: JwtPayload, secret: string): Promise<string> {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const headerB64 = base64UrlEncode(JSON.stringify(header));
-  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
-    'sign',
-  ]);
-  const data = encoder.encode(`${headerB64}.${payloadB64}`);
-  const signatureBuffer = await crypto.subtle.sign('HMAC', key, data);
-  const signatureArray = new Uint8Array(signatureBuffer);
-  const signatureB64 = btoa(String.fromCharCode(...signatureArray))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  return `${headerB64}.${payloadB64}.${signatureB64}`;
+  iat?: number;
+  exp?: number;
+  [key: string]: unknown;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -52,11 +32,13 @@ async function signJwt(payload: JwtPayload, secret: string): Promise<string> {
 const BCRYPT_SALT_ROUNDS = 10;
 const TOKEN_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
 
-/** Create a deterministic SHA-256 hash of a token for storage/lookup */
+/** Create a deterministic SHA-256 hash of a token for storage/lookup (Web Crypto — Workers compatible) */
 async function hashToken(token: string): Promise<string> {
-  const crypto = await import('node:crypto');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
 
-  return crypto.createHash('sha256').update(token).digest('hex');
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 // ─── Auth Service ────────────────────────────────────────────────────────────
@@ -230,6 +212,6 @@ export class AuthService {
       exp: now + TOKEN_EXPIRY_SECONDS,
     };
 
-    return signJwt(payload, this.jwtSecret);
+    return sign(payload, this.jwtSecret, 'HS256');
   }
 }

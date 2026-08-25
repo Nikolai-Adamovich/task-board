@@ -1,3 +1,5 @@
+import type { ErrorCode } from '@task-board/shared';
+
 /**
  * Structured application error classes for the v5 error model.
  *
@@ -5,28 +7,8 @@
  * Error codes and HTTP status codes match the technical specification §7.3.
  */
 
-/** All v5 error codes from the technical specification §14.3. */
-export type ErrorCode =
-  | 'UNAUTHORIZED'
-  | 'FORBIDDEN'
-  | 'NOT_FOUND'
-  | 'VALIDATION_ERROR'
-  | 'CONFLICT'
-  | 'TASK_VERSION_CONFLICT'
-  | 'DUPLICATE_PROJECT_KEY'
-  | 'DUPLICATE_LABEL'
-  | 'DUPLICATE_STATUS'
-  | 'INVALID_STATUS_REPLACEMENT'
-  | 'INVALID_SPRINT_DATES'
-  | 'INVITATION_EXPIRED'
-  | 'INVITATION_REVOKED'
-  | 'INVITATION_ALREADY_ACCEPTED'
-  | 'PROJECT_ARCHIVED'
-  | 'TENANT_ARCHIVED'
-  | 'PROJECT_KEY_IMMUTABLE'
-  | 'TASK_TYPE_IN_USE'
-  | 'STATUS_IN_USE'
-  | 'INTERNAL_ERROR';
+/** All v5 error codes — single source of truth in `@task-board/shared`. */
+export type { ErrorCode };
 
 // ─── Base Error ─────────────────────────────────────────────────────────────
 

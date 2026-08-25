@@ -1,5 +1,5 @@
+import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
 import type { Comment, IdentitySnapshot } from '@task-board/shared';
 
 export interface CommentDocument {
@@ -25,13 +25,9 @@ function toDomain(doc: CommentDocument): Comment {
   };
 }
 
-export class CommentRepository {
-  constructor(private readonly collection: Collection<CommentDocument>) {}
-
-  async findById(id: string): Promise<Comment | null> {
-    const doc = await this.collection.findOne({ id });
-
-    return doc ? toDomain(doc) : null;
+export class CommentRepository extends BaseRepository<CommentDocument, Comment> {
+  protected toDomain(doc: CommentDocument): Comment {
+    return toDomain(doc);
   }
 
   async findByTask(taskId: string): Promise<Comment[]> {
@@ -69,12 +65,6 @@ export class CommentRepository {
     );
 
     return result ? toDomain(result) : null;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
-
-    return result.deletedCount > 0;
   }
 
   async deleteByTask(taskId: string): Promise<void> {

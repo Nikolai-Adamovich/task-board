@@ -1,5 +1,5 @@
+import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
 import type { TaskType } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -37,13 +37,9 @@ function toDomain(doc: TaskTypeDocument): TaskType {
 
 // ─── TaskType Repository ─────────────────────────────────────────────────────
 
-export class TaskTypeRepository {
-  constructor(private readonly collection: Collection<TaskTypeDocument>) {}
-
-  async findById(id: string): Promise<TaskType | null> {
-    const doc = await this.collection.findOne({ id });
-
-    return doc ? toDomain(doc) : null;
+export class TaskTypeRepository extends BaseRepository<TaskTypeDocument, TaskType> {
+  protected toDomain(doc: TaskTypeDocument): TaskType {
+    return toDomain(doc);
   }
 
   async findByProject(projectId: string): Promise<TaskType[]> {
@@ -114,10 +110,19 @@ export class TaskTypeRepository {
     return result ? toDomain(result) : null;
   }
 
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
+  /** Bulk-update positions in one pass (used by the reorder endpoint). */
+  async reorderPositions(items: { id: string; position: number }[]): Promise<void> {
+    if (items.length === 0) return;
 
-    return result.deletedCount > 0;
+    const now = new Date();
+    const operations = items.map((item) => ({
+      updateOne: {
+        filter: { id: item.id },
+        update: { $set: { position: item.position, updatedAt: now } },
+      },
+    }));
+
+    await this.collection.bulkWrite(operations);
   }
 
   /**

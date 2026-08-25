@@ -1,5 +1,5 @@
+import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
 import type { Label } from '@task-board/shared';
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
@@ -29,13 +29,9 @@ function toDomain(doc: LabelDocument): Label {
 
 // ─── Label Repository ────────────────────────────────────────────────────────
 
-export class LabelRepository {
-  constructor(private readonly collection: Collection<LabelDocument>) {}
-
-  async findById(id: string): Promise<Label | null> {
-    const doc = await this.collection.findOne({ id });
-
-    return doc ? toDomain(doc) : null;
+export class LabelRepository extends BaseRepository<LabelDocument, Label> {
+  protected toDomain(doc: LabelDocument): Label {
+    return toDomain(doc);
   }
 
   async findByProject(projectId: string): Promise<Label[]> {
@@ -73,12 +69,6 @@ export class LabelRepository {
     );
 
     return result ? toDomain(result) : null;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
-
-    return result.deletedCount > 0;
   }
 
   /**

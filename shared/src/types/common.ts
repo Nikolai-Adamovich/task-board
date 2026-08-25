@@ -81,7 +81,8 @@ export type ErrorCode =
   | 'TENANT_ARCHIVED'
   | 'PROJECT_KEY_IMMUTABLE'
   | 'TASK_TYPE_IN_USE'
-  | 'STATUS_IN_USE';
+  | 'STATUS_IN_USE'
+  | 'INTERNAL_ERROR';
 
 /** Standard error response returned by API endpoints on failure */
 export interface ErrorResponse {

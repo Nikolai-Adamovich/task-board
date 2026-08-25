@@ -1,15 +1,5 @@
 import type { BooleanInput } from '@angular/cdk/coercion';
-import {
-  booleanAttribute,
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  forwardRef,
-  inject,
-  input,
-  linkedSignal,
-  output,
-} from '@angular/core';
+import { booleanAttribute, Component, computed, forwardRef, inject, input, linkedSignal, output } from '@angular/core';
 import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronDown } from '@ng-icons/lucide';
@@ -32,7 +22,6 @@ export const HLM_NATIVE_SELECT_VALUE_ACCESSOR = {
     provideIcons({ lucideChevronDown }),
     provideBrnLabelable(forwardRef(() => HlmNativeSelect)),
   ],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   hostDirectives: [BrnFieldControl],
   host: {
     'data-slot': 'native-select-wrapper',

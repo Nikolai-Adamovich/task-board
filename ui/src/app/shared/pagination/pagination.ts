@@ -1,9 +1,10 @@
 import { Component, booleanAttribute, input, output } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmNumberedPagination } from '@spartan-ng/helm/pagination';
 
 @Component({
   selector: 'ui-pagination',
-  imports: [HlmNumberedPagination],
+  imports: [HlmNumberedPagination, TranslocoPipe],
   templateUrl: './pagination.html',
 })
 export class Pagination {

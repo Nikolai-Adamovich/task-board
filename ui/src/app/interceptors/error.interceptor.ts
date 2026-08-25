@@ -6,7 +6,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { AuthStore } from '@stores/auth-store';
 import type { ErrorResponse } from '@task-board/shared';
 
-/** Map of error codes to user-friendly message keys */
+/** Map of error codes (see `ErrorCode` in @task-board/shared) to message keys */
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   VALIDATION_ERROR: 'errors.validation',
   NOT_FOUND: 'errors.notFound',
@@ -15,8 +15,6 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   FORBIDDEN: 'errors.forbidden',
   CONFLICT: 'errors.conflict',
   INTERNAL_ERROR: 'errors.serverError',
-  EMAIL_ALREADY_EXISTS: 'errors.emailAlreadyExists',
-  INVALID_CREDENTIALS: 'errors.invalidCredentials',
   DUPLICATE_PROJECT_KEY: 'errors.duplicateProjectKey',
   DUPLICATE_LABEL: 'errors.duplicateLabel',
   DUPLICATE_STATUS: 'errors.duplicateStatus',
@@ -118,9 +116,16 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         toast.error(transloco.translate(userMessage));
       }
 
+      // Auto-logout on 401 — but NOT for auth endpoints themselves:
+      // a failed login attempt returns 401 INVALID_CREDENTIALS and must not
+      // wipe the session or trigger a redundant navigation.
+      const isAuthRequest = req.url.includes('/auth/');
+
       switch (error.status) {
         case 401:
-          authStore.logout();
+          if (!isAuthRequest) {
+            authStore.logout();
+          }
           break;
 
         case 403:

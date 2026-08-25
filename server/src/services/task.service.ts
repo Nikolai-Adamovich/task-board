@@ -1,5 +1,7 @@
+import { ProjectStatus } from '@task-board/shared';
+import { ensurePermission } from './rbac.service.js';
 import type { Task, CreateTask, UpdateTask, IdentitySnapshot, AuditChange } from '@task-board/shared';
-import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
+import { AppError, ConflictError, NotFoundError } from '../errors/app-error.js';
 import { TaskRepository, type TaskQueryOptions, type PaginatedResult } from '../repositories/task.repository.js';
 import { CounterService } from './counter.service.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
@@ -49,6 +51,11 @@ export class TaskService {
     return this.taskRepo.findByProject(projectId, options);
   }
 
+  /** Tasks assigned to the user across all tenants ("My Tasks"). */
+  async getMyTasks(userId: string, limit = 50): Promise<Task[]> {
+    return this.taskRepo.findAssignedTo(userId, limit);
+  }
+
   async getTask(id: string): Promise<Task> {
     const task = await this.taskRepo.findById(id);
 
@@ -87,12 +94,12 @@ export class TaskService {
       throw new NotFoundError('Project not found');
     }
 
-    if (project.status !== 'ACTIVE') {
+    if (project.status !== ProjectStatus.ACTIVE) {
       throw new AppError(400, 'PROJECT_ARCHIVED', 'Cannot create tasks in an archived project');
     }
 
     // Validate EDITOR+ role
-    this.requireEditorOrAbove(userRole, projectRole);
+    ensurePermission('create_task', userRole, projectRole);
 
     // Validate cross-project references
     await this.validateCrossProjectRefs(projectId, {
@@ -317,20 +324,6 @@ export class TaskService {
       if (!member) {
         throw new NotFoundError(`User ${refs.assigneeId} is not a member of project ${projectId}`);
       }
-    }
-  }
-
-  /**
-   * Require EDITOR or above role (PROJECT_ADMIN, EDITOR, or tenant admin bypass).
-   */
-  private requireEditorOrAbove(tenantRole: string, projectRole?: string): void {
-    // Tenant OWNER/ADMIN bypass
-    if (tenantRole === 'OWNER' || tenantRole === 'ADMIN') {
-      return;
-    }
-
-    if (!projectRole || (projectRole !== 'PROJECT_ADMIN' && projectRole !== 'EDITOR')) {
-      throw new ForbiddenError('Insufficient permissions. Requires EDITOR or PROJECT_ADMIN role.');
     }
   }
 }

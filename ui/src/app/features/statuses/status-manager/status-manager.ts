@@ -164,29 +164,24 @@ export class StatusManager implements OnInit {
   private swapPositions(a: Status, b: Status): void {
     this.saving.set(true);
 
-    let completed = 0;
-    const checkDone = () => {
-      completed++;
-      if (completed === 2) {
-        this.saving.set(false);
-        this.loadStatuses();
-      }
-    };
+    // Single bulk reorder — no risk of inconsistent positions on partial failure
+    this.statusClient
+      .reorder(this.projectId(), [
+        { id: a.id, position: b.position },
+        { id: b.id, position: a.position },
+      ])
+      .subscribe({
+        next: (updated) => {
+          const updatedById = new Map(updated.map((s) => [s.id, s]));
 
-    this.statusClient.update(a.id, { position: b.position }).subscribe({
-      next: () => checkDone(),
-      error: (err) => {
-        this.error.set(getErrorMessage(err));
-        this.saving.set(false);
-      },
-    });
-    this.statusClient.update(b.id, { position: a.position }).subscribe({
-      next: () => checkDone(),
-      error: (err) => {
-        this.error.set(getErrorMessage(err));
-        this.saving.set(false);
-      },
-    });
+          this.statuses.update((list) => list.map((s) => updatedById.get(s.id) ?? s));
+          this.saving.set(false);
+        },
+        error: (err) => {
+          this.error.set(getErrorMessage(err));
+          this.saving.set(false);
+        },
+      });
   }
 
   protected confirmDelete(status: Status): void {

@@ -30,6 +30,23 @@ export class TaskTypeService {
     return this.taskTypeRepo.findByProject(projectId);
   }
 
+  /**
+   * Reorder task types in a single bulk pass (transactional alternative to
+   * two sequential PATCH calls that could leave positions inconsistent).
+   */
+  async reorder(projectId: string, items: { id: string; position: number }[]): Promise<TaskType[]> {
+    const taskTypes = await this.taskTypeRepo.findByProject(projectId);
+    const knownIds = new Set(taskTypes.map((t) => t.id));
+
+    if (!items.every((item) => knownIds.has(item.id))) {
+      throw new NotFoundError('Task type not found in this project');
+    }
+
+    await this.taskTypeRepo.reorderPositions(items);
+
+    return this.taskTypeRepo.findByProject(projectId);
+  }
+
   async createTaskType(projectId: string, input: CreateTaskType, userId?: string): Promise<TaskType> {
     const existing = await this.taskTypeRepo.findByProjectAndKey(projectId, input.key);
 

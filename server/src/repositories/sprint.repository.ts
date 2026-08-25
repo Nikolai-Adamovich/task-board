@@ -1,5 +1,5 @@
+import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
 import type { Sprint, SprintStatus } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -38,13 +38,9 @@ function toDomain(doc: SprintDocument): Sprint {
 
 // ─── Sprint Repository ───────────────────────────────────────────────────────
 
-export class SprintRepository {
-  constructor(private readonly collection: Collection<SprintDocument>) {}
-
-  async findById(id: string): Promise<Sprint | null> {
-    const doc = await this.collection.findOne({ id });
-
-    return doc ? toDomain(doc) : null;
+export class SprintRepository extends BaseRepository<SprintDocument, Sprint> {
+  protected toDomain(doc: SprintDocument): Sprint {
+    return toDomain(doc);
   }
 
   async findByProject(projectId: string): Promise<Sprint[]> {
@@ -89,12 +85,6 @@ export class SprintRepository {
     const result = await this.collection.findOneAndUpdate({ id }, { $set: updateFields }, { returnDocument: 'after' });
 
     return result ? toDomain(result) : null;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
-
-    return result.deletedCount > 0;
   }
 
   /**

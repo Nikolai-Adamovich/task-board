@@ -4,6 +4,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTenantRoutes } from './tenants.js';
+import { TenantService } from '../services/tenant.service.js';
+import { TenantMemberService } from '../services/tenant-member.service.js';
 import { errorHandler } from '../middleware/error-handler.js';
 import type { AppEnv } from '../types/context.js';
 
@@ -43,6 +45,11 @@ vi.mock('../services/tenant.service.js', () => ({
     archiveTenant: vi.fn().mockResolvedValue(undefined),
     restoreTenant: vi.fn().mockResolvedValue(undefined),
     cancelDeletion: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+vi.mock('../services/tenant-member.service.js', () => ({
+  TenantMemberService: vi.fn().mockImplementation(() => ({
     getTenantMembers: vi.fn().mockResolvedValue([mockMember]),
     inviteUser: vi.fn().mockResolvedValue(mockMember),
     updateMemberRole: vi.fn().mockResolvedValue(mockMember),
@@ -58,6 +65,14 @@ const TEST_ENV = { JWT_SECRET: 'test-secret', MONGODB_URI: '', ALLOWED_ORIGINS: 
 
 function createTestApp() {
   const app = new Hono<AppEnv>();
+
+  app.use('/api/*', async (c, next) => {
+    const MockTenants = TenantService as unknown as new () => InstanceType<typeof TenantService>;
+    const MockMembers = TenantMemberService as unknown as new () => InstanceType<typeof TenantMemberService>;
+
+    c.set('svc', { tenants: new MockTenants(), tenantMembers: new MockMembers() } as never);
+    await next();
+  });
 
   app.onError(errorHandler);
 

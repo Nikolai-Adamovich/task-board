@@ -24,3 +24,10 @@ export const UpdateStatusSchema = z.object({
 export const DeleteStatusSchema = z.object({
   replacementStatusId: uuid().optional(),
 });
+
+/**
+ * Schema for reordering statuses in bulk.
+ */
+export const ReorderStatusSchema = z.object({
+  items: z.array(z.object({ id: uuid(), position: z.number().int().nonnegative() })).min(1),
+});

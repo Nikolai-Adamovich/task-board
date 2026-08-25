@@ -678,7 +678,23 @@
     "next": "Next"
   },
   "milkdownEditor": {
-    "loading": "Loading editor…"
+    "loading": "Loading editor…",
+    "toolbar": "Formatting toolbar",
+    "bold": "Bold",
+    "italic": "Italic",
+    "inlineCode": "Inline code",
+    "bulletList": "Bullet list",
+    "orderedList": "Numbered list",
+    "blockquote": "Quote",
+    "codeBlock": "Code block",
+    "raw": "Raw",
+    "wysiwyg": "WYSIWYG",
+    "showRaw": "Show raw markdown",
+    "showWysiwyg": "Show rich text editor",
+    "rawPlaceholder": "Write markdown here…",
+    "link": "Link",
+    "horizontalRule": "Horizontal rule",
+    "strikethrough": "Strikethrough"
   },
   "taskTable": {
     "title": "Tasks",
@@ -728,7 +744,9 @@
     "previous": "Previous",
     "next": "Next",
     "results": "{{total}} results",
-    "perPage": "per page"
+    "perPage": "per page",
+    "totalItems": "total items",
+    "pages": "pages"
   },
   "errors": {
     "unexpected": "An unexpected error occurred. Please try again.",

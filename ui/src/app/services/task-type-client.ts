@@ -24,6 +24,13 @@ export class TaskTypeClient {
   }
 
   /** Update an existing task type */
+  /** Reorder task types in one bulk pass */
+  reorder(projectId: string, items: { id: string; position: number }[]): Observable<TaskType[]> {
+    return this.http
+      .patch<{ data: TaskType[] }>(`${this.baseUrl}/projects/${projectId}/task-types/reorder`, { items })
+      .pipe(map((res) => res.data));
+  }
+
   update(taskTypeId: string, data: UpdateTaskType): Observable<TaskType> {
     return this.http
       .patch<{ data: TaskType }>(`${this.baseUrl}/task-types/${taskTypeId}`, data)

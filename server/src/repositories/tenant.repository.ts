@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
+import { BaseRepository } from './base.repository.js';
 import { TenantStatus } from '@task-board/shared';
 import type { Tenant } from '@task-board/shared';
 
@@ -35,13 +35,9 @@ function toDomain(doc: TenantDocument): Tenant {
 
 // ─── Tenant Repository ───────────────────────────────────────────────────────
 
-export class TenantRepository {
-  constructor(private readonly collection: Collection<TenantDocument>) {}
-
-  async findById(id: string): Promise<Tenant | null> {
-    const doc = await this.collection.findOne({ id });
-
-    return doc ? toDomain(doc) : null;
+export class TenantRepository extends BaseRepository<TenantDocument, Tenant> {
+  protected toDomain(doc: TenantDocument): Tenant {
+    return toDomain(doc);
   }
 
   async findAll(): Promise<Tenant[]> {
@@ -77,11 +73,5 @@ export class TenantRepository {
     );
 
     return result ? toDomain(result) : null;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
-
-    return result.deletedCount > 0;
   }
 }

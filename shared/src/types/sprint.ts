@@ -30,7 +30,9 @@ export interface CreateSprint {
 /** Update sprint request body type */
 export interface UpdateSprint {
   name?: string;
-  startDate?: string;
-  endDate?: string;
+  /** `null` clears the date */
+  startDate?: string | null;
+  /** `null` clears the date */
+  endDate?: string | null;
   status?: SprintStatus;
 }

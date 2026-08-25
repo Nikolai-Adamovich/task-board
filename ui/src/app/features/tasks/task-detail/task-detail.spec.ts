@@ -57,7 +57,7 @@ describe('TaskDetail', () => {
   };
   let authStoreMock: { currentUser: ReturnType<typeof vi.fn>; tenantRole: ReturnType<typeof vi.fn> };
 
-  function setup(taskOverrides: Partial<Task> = {}) {
+  async function setup(taskOverrides: Partial<Task> = {}) {
     const task = { ...mockTask, ...taskOverrides };
 
     taskClientMock = {
@@ -104,28 +104,34 @@ describe('TaskDetail', () => {
 
     component = fixture.componentInstance;
     fixture.detectChanges();
+    // rxResource resolves asynchronously — poll until the task signal populates
+    for (let i = 0; i < 100 && !component.task(); i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      fixture.detectChanges();
+    }
   }
 
   // ── Loading ─────────────────────────────────────────────────────
 
   describe('loading', () => {
-    it('should call taskClient.getById on init', () => {
-      setup();
+    it('should call taskClient.getById on init', async () => {
+      await setup();
       expect(taskClientMock.getById).toHaveBeenCalledWith('tk000000-0000-0000-0000-000000000001');
     });
 
-    it('should populate task signal after loading', () => {
-      setup();
+    it('should populate task signal after loading', async () => {
+      await setup();
       expect(component.task()).toBeTruthy();
       expect(component.task().title).toBe('Test Task');
     });
 
-    it('should set loading to false after successful load', () => {
-      setup();
-      expect(component.loading()).toBe(false);
+    it('should populate the task and clear error after successful load', async () => {
+      await setup();
+      expect(component.task()).toBeTruthy();
+      expect(component.error()).toBe('');
     });
 
-    it('should set loading to false on error', () => {
+    it('should set loading to false on error', async () => {
       taskClientMock = {
         getById: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
         update: vi.fn(),
@@ -169,7 +175,12 @@ describe('TaskDetail', () => {
       component = fixture.componentInstance;
       fixture.detectChanges();
 
-      expect(component.loading()).toBe(false);
+      // rxResource settles asynchronously — give it a moment to settle
+      for (let i = 0; i < 20 && !component.task(); i++) {
+        await new Promise((r) => setTimeout(r, 10));
+        fixture.detectChanges();
+      }
+
       expect(component.task()).toBeNull();
     });
   });
@@ -179,23 +190,23 @@ describe('TaskDetail', () => {
   describe('getPriorityColor', () => {
     beforeEach(() => setup());
 
-    it('should return correct color for LOW', () => {
+    it('should return correct color for LOW', async () => {
       expect(component.priorityBadgeVariant('LOW')).toBe('outline');
     });
 
-    it('should return correct color for MEDIUM', () => {
+    it('should return correct color for MEDIUM', async () => {
       expect(component.priorityBadgeVariant('MEDIUM')).toBe('secondary');
     });
 
-    it('should return correct color for HIGH', () => {
+    it('should return correct color for HIGH', async () => {
       expect(component.priorityBadgeVariant('HIGH')).toBe('default');
     });
 
-    it('should return correct color for CRITICAL', () => {
+    it('should return correct color for CRITICAL', async () => {
       expect(component.priorityBadgeVariant('CRITICAL')).toBe('destructive');
     });
 
-    it('should return fallback color for unknown priority', () => {
+    it('should return fallback color for unknown priority', async () => {
       expect(component.priorityBadgeVariant('unknown')).toBe('outline');
     });
   });
@@ -205,7 +216,7 @@ describe('TaskDetail', () => {
   describe('taskLabel', () => {
     beforeEach(() => setup());
 
-    it('should return #number', () => {
+    it('should return #number', async () => {
       expect(component.taskLabel()).toBe('#1');
     });
   });
@@ -215,7 +226,7 @@ describe('TaskDetail', () => {
   describe('edit flow', () => {
     beforeEach(() => setup());
 
-    it('should populate edit form when startEdit is called', () => {
+    it('should populate edit form when startEdit is called', async () => {
       component.startEdit();
 
       expect(component.isEditing()).toBe(true);
@@ -224,7 +235,7 @@ describe('TaskDetail', () => {
       expect(component.model().priority).toBe('HIGH');
     });
 
-    it('should reset form when cancelEdit is called', () => {
+    it('should reset form when cancelEdit is called', async () => {
       component.startEdit();
       component.cancelEdit();
 
@@ -234,7 +245,7 @@ describe('TaskDetail', () => {
       expect(component.model().priority).toBe('MEDIUM');
     });
 
-    it('should call taskClient.update with version on saveTask', () => {
+    it('should call taskClient.update with version on saveTask', async () => {
       component.startEdit();
       component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
       submit(component.editForm);
@@ -245,34 +256,34 @@ describe('TaskDetail', () => {
       );
     });
 
-    it('should update task signal after successful save', () => {
+    it('should update task signal after successful save', async () => {
       component.startEdit();
       component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
       submit(component.editForm);
 
       expect(component.task().title).toBe('Updated Title');
       expect(component.isEditing()).toBe(false);
-      expect(component.loading()).toBe(false);
     });
 
-    it('should set saving to false on error', () => {
+    it('should stay in edit mode when save fails', async () => {
       taskClientMock.update.mockReturnValueOnce(throwError(() => new Error('fail')));
       component.startEdit();
       submit(component.editForm);
 
-      expect(component.loading()).toBe(false);
+      expect(component.isEditing()).toBe(true);
+      expect(component.error()).not.toBe('');
     });
   });
 
   // ── canDelete ──────────────────────────────────────────────────
 
   describe('canDelete', () => {
-    it('should return true when user is authenticated', () => {
-      setup();
+    it('should return true when user is authenticated', async () => {
+      await setup();
       expect(component.canDelete()).toBe(true);
     });
 
-    it('should return false when user is not authenticated', () => {
+    it('should return false when user is not authenticated', async () => {
       authStoreMock = {
         currentUser: vi.fn().mockReturnValue(null),
         tenantRole: vi.fn().mockReturnValue(null),
@@ -325,7 +336,7 @@ describe('TaskDetail', () => {
   describe('optimistic concurrency', () => {
     beforeEach(() => setup());
 
-    it('should show conflict dialog on 409 response', () => {
+    it('should show conflict dialog on 409 response', async () => {
       const conflictError = new HttpErrorResponse({
         status: 409,
         error: { error: { code: 'TASK_VERSION_CONFLICT', message: 'Version conflict' } },
@@ -340,7 +351,7 @@ describe('TaskDetail', () => {
       expect(component.conflictMessage()).toBe('taskDetail.conflictHint');
     });
 
-    it('should reload task and close conflict dialog on reloadAfterConflict', () => {
+    it('should reload task and close conflict dialog on reloadAfterConflict', async () => {
       component.showConflictDialog.set(true);
       component.reloadAfterConflict();
 

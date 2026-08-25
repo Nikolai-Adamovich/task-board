@@ -36,6 +36,23 @@ export class StatusService {
     return this.statusRepo.findByProject(projectId);
   }
 
+  /**
+   * Reorder statuses in a single bulk pass (transactional alternative to
+   * two sequential PATCH calls that could leave positions inconsistent).
+   */
+  async reorder(projectId: string, items: { id: string; position: number }[]): Promise<Status[]> {
+    const statuses = await this.statusRepo.findByProject(projectId);
+    const knownIds = new Set(statuses.map((s) => s.id));
+
+    if (!items.every((item) => knownIds.has(item.id))) {
+      throw new NotFoundError('Status not found in this project');
+    }
+
+    await this.statusRepo.reorderPositions(items);
+
+    return this.statusRepo.findByProject(projectId);
+  }
+
   async createStatus(projectId: string, input: CreateStatus, userId?: string): Promise<Status> {
     const normalizedName = input.name.toLowerCase().trim();
     const existing = await this.statusRepo.findByProjectAndNormalizedName(projectId, normalizedName);

@@ -177,29 +177,24 @@ export class TaskTypeManager implements OnInit {
   private swapPositions(a: TaskType, b: TaskType): void {
     this.saving.set(true);
 
-    let completed = 0;
-    const checkDone = () => {
-      completed++;
-      if (completed === 2) {
-        this.saving.set(false);
-        this.loadTaskTypes();
-      }
-    };
+    // Single bulk reorder — no risk of inconsistent positions on partial failure
+    this.taskTypeClient
+      .reorder(this.projectId(), [
+        { id: a.id, position: b.position },
+        { id: b.id, position: a.position },
+      ])
+      .subscribe({
+        next: (updated) => {
+          const updatedById = new Map(updated.map((t) => [t.id, t]));
 
-    this.taskTypeClient.update(a.id, { position: b.position }).subscribe({
-      next: () => checkDone(),
-      error: (err) => {
-        this.error.set(getErrorMessage(err));
-        this.saving.set(false);
-      },
-    });
-    this.taskTypeClient.update(b.id, { position: a.position }).subscribe({
-      next: () => checkDone(),
-      error: (err) => {
-        this.error.set(getErrorMessage(err));
-        this.saving.set(false);
-      },
-    });
+          this.taskTypes.update((list) => list.map((t) => updatedById.get(t.id) ?? t));
+          this.saving.set(false);
+        },
+        error: (err) => {
+          this.error.set(getErrorMessage(err));
+          this.saving.set(false);
+        },
+      });
   }
 
   protected confirmDelete(taskType: TaskType): void {

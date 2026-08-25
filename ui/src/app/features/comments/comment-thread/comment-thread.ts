@@ -1,9 +1,10 @@
-import { Component, computed, inject, input, signal, OnInit } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { CommentClient } from '@services/comment-client';
 import { AuthStore } from '@stores/auth-store';
-import { hasMinTenantRole, hasMinProjectRole } from '@app/shared/utils/role-utils';
+import { ProjectStore } from '@stores/project-store';
+import { canWrite } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -11,11 +12,13 @@ import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { finalize } from 'rxjs';
+import { rxResource } from '@angular/core/rxjs-interop';
 import type { Comment } from '@task-board/shared';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { initials } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
+import { MilkdownEditor } from '@app/shared/milkdown-editor/milkdown-editor';
 
 @Component({
   selector: 'ui-comment-thread',
@@ -30,13 +33,15 @@ import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
     HlmTextareaImports,
     HlmAvatarImports,
     HlmDialogImports,
+    MilkdownEditor,
   ],
   templateUrl: './comment-thread.html',
 })
-export class CommentThread implements OnInit {
+export class CommentThread {
   private readonly notify = injectToasts();
   private readonly commentClient = inject(CommentClient);
   private readonly authStore = inject(AuthStore);
+  private readonly projectStore = inject(ProjectStore);
   /** Task ID to load comments for */
   readonly taskId = input.required<string>();
   /** Current user's ID — used to determine edit/delete permissions */
@@ -45,9 +50,15 @@ export class CommentThread implements OnInit {
   readonly canEdit = input<boolean>(false);
   /** Initials of the current user for the new-comment avatar fallback */
   protected readonly currentUserInitials = computed(() => initials(this.authStore.currentUser()?.displayName ?? null));
-  protected readonly comments = signal<Comment[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal('');
+  private readonly commentsResource = rxResource({
+    params: () => ({ taskId: this.taskId() }),
+    stream: ({ params }) => this.commentClient.list(params.taskId),
+    defaultValue: [],
+  });
+  protected readonly comments = computed(() => (this.commentsResource.hasValue() ? this.commentsResource.value() : []));
+  private readonly loadError = computed(() => (this.commentsResource.error() ? 'comments.loadError' : ''));
+  private readonly actionError = signal('');
+  protected readonly error = computed(() => this.actionError() || this.loadError());
   // New comment form
   protected readonly newBody = signal('');
   protected readonly submitting = signal(false);
@@ -55,28 +66,11 @@ export class CommentThread implements OnInit {
   protected readonly editingId = signal<string | null>(null);
   protected readonly editBody = signal('');
   protected readonly savingEdit = signal(false);
+  /** Whether the inline edit editor has finished initializing (swap views only when ready) */
+  protected readonly editReady = signal(false);
   // Delete confirmation
   protected readonly showDeleteConfirm = signal(false);
   protected readonly commentToDelete = signal<Comment | null>(null);
-
-  ngOnInit(): void {
-    this.loadComments();
-  }
-
-  protected loadComments(): void {
-    this.loading.set(true);
-    this.commentClient
-      .list(this.taskId())
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (data) => {
-          this.comments.set(data);
-        },
-        error: () => {
-          this.error.set('comments.loadError');
-        },
-      });
-  }
 
   protected submitComment(): void {
     const body = this.newBody().trim();
@@ -89,12 +83,16 @@ export class CommentThread implements OnInit {
       .pipe(finalize(() => this.submitting.set(false)))
       .subscribe({
         next: (comment) => {
-          this.comments.update((list) => [...list, comment]);
+          if (this.commentsResource.hasValue()) {
+            this.commentsResource.value.update((list) => [...list, comment]);
+          } else {
+            this.commentsResource.reload();
+          }
           this.newBody.set('');
           this.notify.success('toasts.created');
         },
         error: () => {
-          this.error.set('comments.createError');
+          this.actionError.set('comments.createError');
         },
       });
   }
@@ -102,11 +100,23 @@ export class CommentThread implements OnInit {
   protected startEdit(comment: Comment): void {
     this.editingId.set(comment.id);
     this.editBody.set(comment.body);
+    // Keep the display view visible until the edit editor signals readiness
+    this.editReady.set(false);
   }
 
   protected cancelEdit(): void {
     this.editingId.set(null);
     this.editBody.set('');
+    this.editReady.set(false);
+  }
+
+  /** A comment is visually in edit mode only once its editor is initialized */
+  protected isEditing(comment: Comment): boolean {
+    return this.editingId() === comment.id && this.editReady();
+  }
+
+  protected onEditReady(): void {
+    this.editReady.set(true);
   }
 
   protected saveEdit(commentId: string): void {
@@ -120,12 +130,16 @@ export class CommentThread implements OnInit {
       .pipe(finalize(() => this.savingEdit.set(false)))
       .subscribe({
         next: (updated) => {
-          this.comments.update((list) => list.map((c) => (c.id === commentId ? updated : c)));
+          if (this.commentsResource.hasValue()) {
+            this.commentsResource.value.update((list) => list.map((c) => (c.id === commentId ? updated : c)));
+          } else {
+            this.commentsResource.reload();
+          }
           this.cancelEdit();
           this.notify.success('toasts.updated');
         },
         error: () => {
-          this.error.set('comments.updateError');
+          this.actionError.set('comments.updateError');
         },
       });
   }
@@ -149,12 +163,16 @@ export class CommentThread implements OnInit {
 
     this.commentClient.delete(comment.id).subscribe({
       next: () => {
-        this.comments.update((list) => list.filter((c) => c.id !== comment.id));
+        if (this.commentsResource.hasValue()) {
+          this.commentsResource.value.update((list) => list.filter((c) => c.id !== comment.id));
+        } else {
+          this.commentsResource.reload();
+        }
         this.showDeleteConfirm.set(false);
         this.commentToDelete.set(null);
       },
       error: () => {
-        this.error.set('comments.deleteError');
+        this.actionError.set('comments.deleteError');
       },
     });
   }
@@ -163,18 +181,7 @@ export class CommentThread implements OnInit {
   protected canModifyComment(comment: Comment): boolean {
     if (comment.authorId === this.currentUserId()) return true;
 
-    const tenantRole = this.authStore.tenantRole();
-
-    if (hasMinTenantRole(tenantRole, 'ADMIN')) return true;
-
-    return hasMinProjectRole(tenantRole, 'EDITOR');
-  }
-
-  protected onNewBodyInput(event: Event): void {
-    this.newBody.set((event.target as HTMLTextAreaElement).value);
-  }
-
-  protected onEditBodyInput(event: Event): void {
-    this.editBody.set((event.target as HTMLTextAreaElement).value);
+    // Moderators: project Editor+ or tenant Admin+ (see canWrite)
+    return canWrite(this.projectStore.projectRole(), this.authStore.tenantRole());
   }
 }

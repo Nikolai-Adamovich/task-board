@@ -1,21 +1,10 @@
 import { BooleanInput } from '@angular/cdk/coercion';
-import {
-  booleanAttribute,
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  EffectRef,
-  inject,
-  input,
-  OnDestroy,
-} from '@angular/core';
+import { booleanAttribute, Component, computed, effect, EffectRef, inject, input, OnDestroy } from '@angular/core';
 import { BrnField, BrnFieldA11yService } from '@spartan-ng/brain/field';
 import { classes } from '@spartan-ng/helm/utils';
 
 @Component({
   selector: 'hlm-field-error',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     role: 'alert',
     'data-slot': 'field-error',

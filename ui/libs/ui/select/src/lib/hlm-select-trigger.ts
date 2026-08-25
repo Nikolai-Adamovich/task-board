@@ -1,5 +1,5 @@
 import type { BooleanInput } from '@angular/cdk/coercion';
-import { booleanAttribute, ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { booleanAttribute, Component, computed, input } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronDown } from '@ng-icons/lucide';
 import { BrnFieldControlDescribedBy } from '@spartan-ng/brain/field';
@@ -11,7 +11,6 @@ import type { ClassValue } from 'clsx';
   selector: 'hlm-select-trigger',
   imports: [NgIcon, BrnSelectTrigger, BrnFieldControlDescribedBy],
   providers: [provideIcons({ lucideChevronDown })],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button
       brnSelectTrigger

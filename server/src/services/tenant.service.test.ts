@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TenantService } from './tenant.service.js';
+import { TenantMemberService } from './tenant-member.service.js';
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
 
@@ -84,13 +85,20 @@ describe('TenantService', () => {
   let userRepo: ReturnType<typeof createMockUserRepo>;
   let emailService: ReturnType<typeof createMockEmailService>;
   let service: TenantService;
+  let memberService: TenantMemberService;
 
   beforeEach(() => {
     tenantRepo = createMockTenantRepo();
     memberRepo = createMockTenantMemberRepo();
     userRepo = createMockUserRepo();
     emailService = createMockEmailService();
-    service = new TenantService(tenantRepo as never, memberRepo as never, userRepo as never, emailService as never);
+    service = new TenantService(tenantRepo as never, memberRepo as never, userRepo as never);
+    memberService = new TenantMemberService(
+      tenantRepo as never,
+      memberRepo as never,
+      userRepo as never,
+      emailService as never,
+    );
   });
 
   // ── createTenant ────────────────────────────────────────────────────────
@@ -251,7 +259,7 @@ describe('TenantService', () => {
 
   // ── inviteUser ──────────────────────────────────────────────────────────
 
-  describe('inviteUser', () => {
+  describe('inviteUser (TenantMemberService)', () => {
     it('creates a pending invitation for existing user and sends email', async () => {
       memberRepo.findByUserAndTenant.mockResolvedValueOnce(makeMember({ role: 'OWNER' }));
       tenantRepo.findById.mockResolvedValue(makeTenant());
@@ -260,7 +268,7 @@ describe('TenantService', () => {
       userRepo.findById.mockResolvedValue({ id: 'user-1', displayName: 'Owner' });
       memberRepo.create.mockResolvedValue(makeMember({ userId: 'user-2', role: 'MEMBER' }));
 
-      const result = await service.inviteUser('user-1', 'tenant-1', 'invited@example.com', 'MEMBER');
+      const result = await memberService.inviteUser('user-1', 'tenant-1', 'invited@example.com', 'MEMBER');
 
       expect(result.invitation).toBeDefined();
       expect(memberRepo.create).toHaveBeenCalledWith(
@@ -288,7 +296,7 @@ describe('TenantService', () => {
       );
       memberRepo.update.mockResolvedValue(makeMember());
 
-      await service.revokeInvitation('user-1', 'tenant-1', 'member-1');
+      await memberService.revokeInvitation('user-1', 'tenant-1', 'member-1');
 
       expect(memberRepo.update).toHaveBeenCalledWith('member-1', {
         invitation: expect.objectContaining({ status: 'REVOKED' }),
@@ -308,7 +316,7 @@ describe('TenantService', () => {
       );
       memberRepo.update.mockResolvedValue(makeMember());
 
-      await service.declineInvitation('member-1', 'user-2');
+      await memberService.declineInvitation('member-1', 'user-2');
 
       expect(memberRepo.update).toHaveBeenCalledWith('member-1', {
         invitation: expect.objectContaining({ status: 'DECLINED' }),
@@ -325,7 +333,7 @@ describe('TenantService', () => {
         .mockResolvedValueOnce(makeMember({ userId: 'user-2', role: 'MEMBER' }));
       memberRepo.updateRole.mockResolvedValue(makeMember({ userId: 'user-2', role: 'ADMIN' }));
 
-      const result = await service.updateMemberRole('user-1', 'tenant-1', 'user-2', 'ADMIN');
+      const result = await memberService.updateMemberRole('user-1', 'tenant-1', 'user-2', 'ADMIN');
 
       expect(result.role).toBe('ADMIN');
     });
@@ -335,7 +343,9 @@ describe('TenantService', () => {
         .mockResolvedValueOnce(makeMember({ role: 'ADMIN' }))
         .mockResolvedValueOnce(makeMember({ userId: 'owner-1', role: 'OWNER' }));
 
-      await expect(service.updateMemberRole('user-1', 'tenant-1', 'owner-1', 'MEMBER')).rejects.toThrow("owner's role");
+      await expect(memberService.updateMemberRole('user-1', 'tenant-1', 'owner-1', 'MEMBER')).rejects.toThrow(
+        "owner's role",
+      );
     });
   });
 
@@ -348,7 +358,7 @@ describe('TenantService', () => {
         .mockResolvedValueOnce(makeMember({ userId: 'user-2', role: 'MEMBER' }));
       memberRepo.delete.mockResolvedValue(true);
 
-      await service.removeMember('user-1', 'tenant-1', 'user-2');
+      await memberService.removeMember('user-1', 'tenant-1', 'user-2');
 
       expect(memberRepo.delete).toHaveBeenCalledWith('tenant-1', 'user-2');
     });
@@ -362,7 +372,7 @@ describe('TenantService', () => {
       memberRepo.findById.mockResolvedValue(makeMember({ userId: 'user-2', status: 'ACCESS_REVOKED' }));
       memberRepo.update.mockResolvedValue(makeMember({ userId: 'user-2', status: 'ACTIVE' }));
 
-      await service.restoreMembership('user-1', 'tenant-1', 'member-1');
+      await memberService.restoreMembership('user-1', 'tenant-1', 'member-1');
 
       expect(memberRepo.update).toHaveBeenCalledWith('member-1', { status: 'ACTIVE' });
     });
@@ -377,7 +387,7 @@ describe('TenantService', () => {
         .mockResolvedValueOnce({ id: 'user-1', displayName: 'Alice', email: 'alice@example.com' })
         .mockResolvedValueOnce({ id: 'user-2', displayName: 'Bob', email: 'bob@example.com' });
 
-      const result = await service.getTenantMembers('tenant-1');
+      const result = await memberService.getTenantMembers('tenant-1');
 
       expect(result).toHaveLength(2);
       expect(result[0].displayName).toBe('Alice');
@@ -390,7 +400,7 @@ describe('TenantService', () => {
       memberRepo.findByTenant.mockResolvedValue([makeMember()]);
       userRepo.findById.mockResolvedValue(null);
 
-      const result = await service.getTenantMembers('tenant-1');
+      const result = await memberService.getTenantMembers('tenant-1');
 
       expect(result).toHaveLength(1);
       expect(result[0].displayName).toBeNull();

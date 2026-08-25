@@ -23,6 +23,13 @@ export class StatusClient {
       .pipe(map((res) => res.data));
   }
 
+  /** Reorder statuses in one bulk pass */
+  reorder(projectId: string, items: { id: string; position: number }[]): Observable<Status[]> {
+    return this.http
+      .patch<{ data: Status[] }>(`${this.baseUrl}/projects/${projectId}/statuses/reorder`, { items })
+      .pipe(map((res) => res.data));
+  }
+
   /** Update an existing status */
   update(statusId: string, data: UpdateStatus): Observable<Status> {
     return this.http.patch<{ data: Status }>(`${this.baseUrl}/statuses/${statusId}`, data).pipe(map((res) => res.data));

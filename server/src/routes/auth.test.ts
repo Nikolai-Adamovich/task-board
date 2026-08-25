@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createAuthRoutes } from './auth.js';
+import { AuthService } from '../services/auth.service.js';
 import { errorHandler } from '../middleware/error-handler.js';
 import type { AppEnv } from '../types/context.js';
 
@@ -51,6 +52,12 @@ function createTestApp() {
   const app = new Hono<AppEnv>();
 
   app.onError(errorHandler);
+  app.use('*', async (c, next) => {
+    const MockAuth = AuthService as unknown as new () => InstanceType<typeof AuthService>;
+
+    c.set('svc', { auth: new MockAuth() } as never);
+    await next();
+  });
   app.route('/api/auth', createAuthRoutes());
 
   return app;

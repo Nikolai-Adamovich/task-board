@@ -2,11 +2,7 @@
   <div hlmCardContent>
     <h3 class="text-sm font-medium text-foreground mb-4">{{ 'comments.title' | transloco }}</h3>
 
-    @if (loading()) {
-      <div class="flex items-center justify-center py-6">
-        <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'comments.loading' | transloco }}</span>
-      </div>
-    } @else if (error()) {
+    @if (error()) {
       <hlm-alert variant="destructive">
         <div hlmAlertDescription>{{ error() | transloco }}</div>
       </hlm-alert>
@@ -29,32 +25,13 @@
                 }
               </div>
 
-              @if (editingId() === comment.id) {
-                <!-- Inline edit mode -->
-                <div class="mt-2 flex flex-col gap-2">
-                  <textarea
-                    hlmTextarea
-                    rows="3"
-                    class="w-full"
-                    [value]="editBody()"
-                    (input)="onEditBodyInput($event)"
-                  ></textarea>
-                  <div class="flex gap-2">
-                    <button hlmBtn size="sm" (click)="saveEdit(comment.id)" [disabled]="savingEdit()">
-                      @if (savingEdit()) {
-                        <hlm-spinner class="mr-1" /> {{ 'comments.saving' | transloco }}
-                      } @else {
-                        {{ 'comments.save' | transloco }}
-                      }
-                    </button>
-                    <button hlmBtn variant="outline" size="sm" (click)="cancelEdit()">
-                      {{ 'comments.cancel' | transloco }}
-                    </button>
-                  </div>
-                </div>
-              } @else {
-                <!-- Display mode -->
-                <p class="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{{ comment.body }}</p>
+              <!-- Display mode: stays mounted so Cancel never re-initializes it -->
+              <div [class.hidden]="isEditing(comment)">
+                <ui-milkdown-editor
+                  class="mt-1 text-sm text-muted-foreground"
+                  [content]="comment.body"
+                  [readOnly]="true"
+                />
                 @if (canModifyComment(comment)) {
                   <div class="mt-1 flex gap-2">
                     <button hlmBtn variant="ghost" size="sm" class="h-6 px-2 text-xs" (click)="startEdit(comment)">
@@ -71,6 +48,29 @@
                     </button>
                   </div>
                 }
+              </div>
+
+              <!-- Inline edit mode: mounted while editing, revealed only once the editor is ready -->
+              @if (editingId() === comment.id) {
+                <div class="mt-2 flex flex-col gap-2" [class.hidden]="!editReady()">
+                  <ui-milkdown-editor
+                    [content]="editBody()"
+                    (contentChange)="editBody.set($event)"
+                    (readyChange)="onEditReady()"
+                  />
+                  <div class="flex gap-2">
+                    <button hlmBtn size="sm" (click)="saveEdit(comment.id)" [disabled]="savingEdit()">
+                      @if (savingEdit()) {
+                        <hlm-spinner class="mr-1" /> {{ 'comments.saving' | transloco }}
+                      } @else {
+                        {{ 'comments.save' | transloco }}
+                      }
+                    </button>
+                    <button hlmBtn variant="outline" size="sm" (click)="cancelEdit()">
+                      {{ 'comments.cancel' | transloco }}
+                    </button>
+                  </div>
+                </div>
               }
             </div>
           </div>
@@ -86,14 +86,7 @@
             <div hlmAvatarFallback class="text-xs font-medium">{{ currentUserInitials() }}</div>
           </hlm-avatar>
           <div class="flex-1 gap-2">
-            <textarea
-              hlmTextarea
-              rows="3"
-              class="w-full"
-              [placeholder]="'comments.placeholder' | transloco"
-              [value]="newBody()"
-              (input)="onNewBodyInput($event)"
-            ></textarea>
+            <ui-milkdown-editor [content]="newBody()" (contentChange)="newBody.set($event)" />
             <button hlmBtn size="sm" (click)="submitComment()" [disabled]="!newBody().trim() || submitting()">
               @if (submitting()) {
                 <hlm-spinner class="mr-1" /> {{ 'comments.submitting' | transloco }}

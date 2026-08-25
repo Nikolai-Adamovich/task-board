@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createProjectRoutes } from './projects.js';
+import { ProjectService } from '../services/project.service.js';
 import { errorHandler } from '../middleware/error-handler.js';
 import type { AppEnv } from '../types/context.js';
 
@@ -70,9 +71,12 @@ function createTestApp() {
   app.onError(errorHandler);
 
   app.use('/api/*', async (c, next) => {
+    const MockProjects = ProjectService as unknown as new () => InstanceType<typeof ProjectService>;
+
     c.set('userId', VALID_UUID);
     c.set('tenantId', '550e8400-e29b-41d4-a716-446655440000');
     c.set('tenantRole', 'OWNER');
+    c.set('svc', { projects: new MockProjects() } as never);
     await next();
   });
 

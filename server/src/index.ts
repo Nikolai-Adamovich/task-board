@@ -7,7 +7,9 @@ import { connectMongo, runWithDb } from './db/mongo.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { authMiddleware } from './middleware/auth.js';
 import { tenantContextMiddleware } from './middleware/tenant-context.js';
+import { provideServices } from './middleware/services.js';
 import { routeRegistry } from './routes/index.js';
+import { createCrossTenantTaskRoutes } from './routes/tasks.js';
 import { createInvitationRoutes } from './routes/invitations.js';
 import { createUserPreferencesRoutes } from './routes/user-preferences.js';
 
@@ -17,14 +19,25 @@ const app = new Hono<AppEnv>();
 
 // ── Global middleware (order matters) ──────────────────────────────────────────
 app.use('*', logger());
+
+// CORS middleware memoized per config value: `c.env` only exists per request,
+// but ALLOWED_ORIGINS is immutable for a deployment, so we rebuild the
+// middleware only when the configured value actually changes.
+let corsConfigCache: string | null = null;
+let corsMiddleware: ReturnType<typeof cors> | null = null;
+
 app.use('*', async (c, next) => {
   const allowedOrigins = c.env?.ALLOWED_ORIGINS ?? '*';
-  const corsMiddleware = cors({
-    origin: allowedOrigins === '*' ? '*' : allowedOrigins.split(',').map((o: string) => o.trim()),
-    allowMethods: [...(Object.values(HttpMethod) as string[]), 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
-    maxAge: 86400,
-  });
+
+  if (!corsMiddleware || corsConfigCache !== allowedOrigins) {
+    corsConfigCache = allowedOrigins;
+    corsMiddleware = cors({
+      origin: allowedOrigins === '*' ? '*' : allowedOrigins.split(',').map((o: string) => o.trim()),
+      allowMethods: [...(Object.values(HttpMethod) as string[]), 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
+      maxAge: 86400,
+    });
+  }
 
   return corsMiddleware(c, next);
 });
@@ -55,6 +68,10 @@ app.use('/api/*', async (c, next) => {
 // Error handler
 app.onError(errorHandler);
 
+// Request-scoped service graph (must run after the DB middleware above,
+// so getCollection() resolves within the request's AsyncLocalStorage context)
+app.use('/api/*', provideServices);
+
 // ── Health check (no auth required) ───────────────────────────────────────────
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -77,43 +94,7 @@ app.route('/api/invitations', createInvitationRoutes());
 app.route('/api', createUserPreferencesRoutes());
 
 // ── Cross-tenant "My Tasks" route (auth only — no tenant context needed) ──────
-app.get('/api/tasks/my', async (c) => {
-  const userId = c.get('userId');
-  const { getCollection } = await import('./db/mongo.js');
-  const collection = getCollection<{
-    id: string;
-    projectId: string;
-    number: number;
-    typeId: string;
-    title: string;
-    statusId: string;
-    priority: string;
-    assigneeId: string | null;
-    sprintId: string | null;
-    labelIds: string[];
-    version: number;
-    createdAt: Date;
-    updatedAt: Date;
-  }>('tasks');
-  const docs = await collection.find({ assigneeId: userId }).sort({ updatedAt: -1 }).limit(50).toArray();
-  const tasks = docs.map((doc) => ({
-    id: doc.id,
-    projectId: doc.projectId,
-    number: doc.number,
-    typeId: doc.typeId,
-    title: doc.title,
-    statusId: doc.statusId,
-    priority: doc.priority,
-    assigneeId: doc.assigneeId,
-    sprintId: doc.sprintId,
-    labelIds: doc.labelIds,
-    version: doc.version,
-    createdAt: doc.createdAt.toISOString(),
-    updatedAt: doc.updatedAt.toISOString(),
-  }));
-
-  return c.json({ data: tasks });
-});
+app.route('/api', createCrossTenantTaskRoutes());
 
 // ── Tenant-scoped routes (auth + tenant context required) ─────────────────────
 // Use a sub-app so tenantContextMiddleware ONLY applies to these routes,

@@ -1,4 +1,5 @@
 import type { ErrorHandler } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 
 // Re-export error classes from the dedicated errors module.
@@ -61,6 +62,21 @@ export const errorHandler: ErrorHandler = (err, c) => {
           code: 'VALIDATION_ERROR',
           message: 'Request validation failed',
           details,
+        },
+      },
+      400,
+    );
+  }
+
+  // ── Malformed JSON body → keep the VALIDATION_ERROR contract ─────────────
+  // Hono's built-in validator throws an HTTPException before @hono/zod-validator
+  // can run its hook, so we normalize it here.
+  if (err instanceof HTTPException && err.status === 400 && err.message.includes('Malformed JSON')) {
+    return c.json(
+      {
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid JSON in request body',
         },
       },
       400,

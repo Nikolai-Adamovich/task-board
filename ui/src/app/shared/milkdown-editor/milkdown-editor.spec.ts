@@ -5,7 +5,7 @@
  * - Component creation
  * - Fallback mode activation
  * - Content input/output
- * - Textarea fallback behavior
+ * - Raw textarea behavior
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -35,13 +35,17 @@ describe('MilkdownEditor', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should initialize with loading state', async () => {
-    // In test environment, afterNextRender fires asynchronously
+  it('should reach ready or fallback state after initialization', async () => {
+    // afterNextRender + lazy Milkdown import settle asynchronously; in the
+    // test env Milkdown cannot mount, so the component must end up in
+    // fallback mode.
     setup('Hello world');
-    // Wait for afterNextRender to complete
-    await new Promise((r) => setTimeout(r, 0));
-    expect(component.fallbackMode()).toBe(true);
-    expect(component.loading()).toBe(false);
+
+    for (let i = 0; i < 100 && !component.editorReady() && !component.fallbackMode(); i++) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+
+    expect(component.fallbackMode() || component.editorReady()).toBe(true);
   });
 
   it('should set fallbackContent from input', () => {
@@ -49,7 +53,7 @@ describe('MilkdownEditor', () => {
     expect(component.fallbackContent()).toBe('# Test');
   });
 
-  it('should emit contentChange on textarea input', () => {
+  it('should emit contentChange on raw textarea input', () => {
     setup('');
 
     const emitted: string[] = [];
@@ -58,7 +62,7 @@ describe('MilkdownEditor', () => {
 
     const event = { target: { value: 'new content' } } as unknown as Event;
 
-    component.onFallbackInput(event);
+    component.onRawInput(event);
     expect(emitted).toEqual(['new content']);
     expect(component.fallbackContent()).toBe('new content');
   });

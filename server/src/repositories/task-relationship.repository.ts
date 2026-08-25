@@ -1,5 +1,5 @@
+import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
 import type { TaskRelationship, TaskRelationshipType } from '@task-board/shared';
 
 export interface TaskRelationshipDocument {
@@ -25,13 +25,9 @@ function toDomain(doc: TaskRelationshipDocument): TaskRelationship {
   };
 }
 
-export class TaskRelationshipRepository {
-  constructor(private readonly collection: Collection<TaskRelationshipDocument>) {}
-
-  async findById(id: string): Promise<TaskRelationship | null> {
-    const doc = await this.collection.findOne({ id });
-
-    return doc ? toDomain(doc) : null;
+export class TaskRelationshipRepository extends BaseRepository<TaskRelationshipDocument, TaskRelationship> {
+  protected toDomain(doc: TaskRelationshipDocument): TaskRelationship {
+    return toDomain(doc);
   }
 
   async findByTask(taskId: string): Promise<TaskRelationship[]> {
@@ -61,12 +57,6 @@ export class TaskRelationshipRepository {
 
     await this.collection.insertOne(doc);
     return toDomain(doc);
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
-
-    return result.deletedCount > 0;
   }
 
   async deleteByTask(taskId: string): Promise<void> {

@@ -5,6 +5,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { createInvitationRoutes } from './invitations.js';
 import { errorHandler } from '../middleware/error-handler.js';
+import { TenantService } from '../services/tenant.service.js';
+import { TenantMemberService } from '../services/tenant-member.service.js';
+import { AuthService } from '../services/auth.service.js';
 import type { AppEnv } from '../types/context.js';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -34,11 +37,23 @@ const mockGetMyInvitations = vi.fn().mockResolvedValue([
 const mockAcceptInvitation = vi.fn().mockResolvedValue(undefined);
 const mockDeclineInvitation = vi.fn().mockResolvedValue(undefined);
 
-vi.mock('../services/tenant.service.js', () => ({
-  TenantService: vi.fn().mockImplementation(() => ({
+vi.mock('../services/tenant-member.service.js', () => ({
+  TenantMemberService: vi.fn().mockImplementation(() => ({
     getMyInvitations: mockGetMyInvitations,
     acceptInvitation: mockAcceptInvitation,
     declineInvitation: mockDeclineInvitation,
+  })),
+}));
+
+vi.mock('../services/auth.service.js', () => ({
+  AuthService: vi.fn().mockImplementation(() => ({
+    me: vi.fn().mockResolvedValue({
+      id: 'user-1',
+      email: 'test@example.com',
+      displayName: 'Test User',
+      avatarUrl: null,
+      deletedAt: null,
+    }),
   })),
 }));
 
@@ -81,6 +96,15 @@ function createTestApp() {
   app.onError(errorHandler);
 
   app.use('/api/invitations/*', async (c, next) => {
+    const MockTenants = TenantService as unknown as new () => InstanceType<typeof TenantService>;
+    const MockMembers = TenantMemberService as unknown as new () => InstanceType<typeof TenantMemberService>;
+    const MockAuth = AuthService as unknown as new () => InstanceType<typeof AuthService>;
+
+    c.set('svc', {
+      tenants: new MockTenants(),
+      tenantMembers: new MockMembers(),
+      auth: new MockAuth(),
+    } as never);
     c.set('userId', 'user-1');
     c.set('user', {
       id: 'user-1',

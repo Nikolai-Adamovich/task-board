@@ -1,5 +1,5 @@
 import type { BooleanInput } from '@angular/cdk/coercion';
-import { booleanAttribute, ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { booleanAttribute, Component, computed, input } from '@angular/core';
 import type { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronLeft } from '@ng-icons/lucide';
@@ -12,7 +12,6 @@ import { HlmPaginationLink } from './hlm-pagination-link';
   selector: 'hlm-pagination-previous',
   imports: [HlmPaginationLink, NgIcon],
   providers: [provideIcons({ lucideChevronLeft })],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <a
       hlmPaginationLink

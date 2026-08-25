@@ -1,4 +1,5 @@
 import { TenantRole, ProjectRole } from '@task-board/shared';
+import { ForbiddenError } from '../errors/app-error.js';
 
 // ─── Permission Actions ──────────────────────────────────────────────────────
 
@@ -179,6 +180,24 @@ export class RbacService {
     }
 
     return allowedRoles.includes(projectRole as ProjectRole);
+  }
+}
+
+// ─── Imperative Guard (for domain services) ──────────────────────────────────
+
+/**
+ * Require the given action or throw {@link ForbiddenError}.
+ *
+ * Single source of truth for fine-grained checks inside domain services —
+ * use this instead of hand-rolled role comparisons.
+ */
+export function ensurePermission(
+  action: PermissionAction,
+  tenantRole: TenantRole | string,
+  projectRole?: ProjectRole | string | null,
+): void {
+  if (!new RbacService().can(tenantRole, projectRole, action)) {
+    throw new ForbiddenError(`Insufficient permissions. Requires '${action}'.`);
   }
 }
 

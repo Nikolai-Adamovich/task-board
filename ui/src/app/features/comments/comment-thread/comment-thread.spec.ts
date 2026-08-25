@@ -115,7 +115,6 @@ describe('CommentThread', () => {
     setup();
     expect(commentClientMock.list).toHaveBeenCalledWith('tk1');
     expect(component.comments()).toHaveLength(2);
-    expect(component.loading()).toBe(false);
   });
 
   it('should handle load error', () => {

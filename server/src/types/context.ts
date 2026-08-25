@@ -4,6 +4,7 @@
  */
 
 import type { User, TenantRole, ProjectRole } from '@task-board/shared';
+import type { Services } from '../container.js';
 
 /** Hono environment type for the Task Board API */
 export interface AppEnv {
@@ -25,5 +26,7 @@ export interface AppEnv {
     tenantRole: TenantRole;
     /** User's role within the active project (set per-route when applicable) */
     projectRole?: ProjectRole;
+    /** Request-scoped service graph (set by provideServices middleware) */
+    svc: Services;
   };
 }

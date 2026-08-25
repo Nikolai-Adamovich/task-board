@@ -1,5 +1,8 @@
-import { Component, inject, input, signal, computed, OnInit, OnDestroy, viewChild } from '@angular/core';
+import { Component, inject, input, computed, effect, viewChild, signal } from '@angular/core';
+import { numberAttribute } from '@angular/core';
 import { ProjectStore } from '@stores/project-store';
+import { PreferencesStore } from '@stores/preferences-store';
+import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
 import { getTenantId } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -16,17 +19,10 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { TaskClient } from '@services/task-client';
-import { StatusClient } from '@services/status-client';
-import { TaskTypeClient } from '@services/task-type-client';
-import { SprintClient } from '@services/sprint-client';
-import { LabelClient } from '@services/label-client';
-import { ProjectClient } from '@services/project-client';
-import { PreferencesStore } from '@stores/preferences-store';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { FilterPanel } from '@features/filters/filter-panel/filter-panel';
-import { CreateTaskDialog, SelectOption } from '@features/tasks/create-task-dialog/create-task-dialog';
+import { CreateTaskDialog } from '@features/tasks/create-task-dialog/create-task-dialog';
 import { AppliedFilterState } from '@features/filters/filter-panel/filter-panel';
-import { Subscription } from 'rxjs';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import type { Task, TaskPriority, FilterCriteria, FilterSort } from '@task-board/shared';
 import { taskTypeBadgeVariant, priorityBadgeVariant } from '@app/constants/priority';
@@ -47,6 +43,18 @@ interface TaskColumnDef {
 }
 
 const COLUMN_COUNT = 11;
+
+/** Case-insensitive name → id resolution against a loaded option list */
+function resolveNameToId(name: string, options: SelectOption[]): string {
+  if (!name) return '';
+  // Already an id?
+  if (options.some((o) => o.id === name)) return name;
+
+  const lower = name.toLowerCase();
+  const match = options.find((o) => o.name.toLowerCase() === lower);
+
+  return match?.id ?? '';
+}
 
 @Component({
   selector: 'ui-task-table',
@@ -70,51 +78,75 @@ const COLUMN_COUNT = 11;
   providers: [provideIcons({ lucideArrowUp, lucideArrowDown, lucideFilter })],
   templateUrl: './task-table.html',
 })
-export class TaskTable implements OnInit, OnDestroy {
+export class TaskTable {
   private readonly taskClient = inject(TaskClient);
-  private readonly statusClient = inject(StatusClient);
-  private readonly taskTypeClient = inject(TaskTypeClient);
-  private readonly sprintClient = inject(SprintClient);
-  private readonly labelClient = inject(LabelClient);
-  private readonly projectClient = inject(ProjectClient);
   private readonly projectStore = inject(ProjectStore);
   private readonly preferencesStore = inject(PreferencesStore);
+  private readonly refStore = inject(ProjectRefStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private queryParamsSub?: Subscription;
+  // ─── Route & query params (bound automatically by withComponentInputBinding) ──
   readonly projectKey = input.required<string>();
+  /** Raw URL values — human-readable names or ids */
+  readonly search = input('');
+  readonly page = input(1, { transform: numberAttribute });
+  readonly limit = input(this.preferencesStore.pageSize(), { transform: numberAttribute });
+  readonly priority = input('');
+  readonly status = input('');
+  readonly type = input('');
+  readonly assignee = input('');
+  readonly reporter = input('');
+  readonly sprint = input('');
+  readonly label = input('');
+  /** `${field}:${direction}` */
+  readonly sort = input('');
+  // ─── Derived state ─────────────────────────────────────────────────────────
   /** Resolved project UUID from the store (available after guard loads project) */
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
-  protected readonly tasks = signal<Task[]>([]);
-  protected readonly search = signal('');
-  protected readonly page = signal(1);
-  protected readonly pageSize = signal(this.preferencesStore.pageSize());
-  protected readonly total = signal(0);
-  protected readonly totalPages = signal(0);
-  protected readonly statusMap = signal<Record<string, string>>({});
-  protected readonly typeMap = signal<Record<string, string>>({});
-  /** Task-type id → type key (task/bug/story), used for badge coloring */
-  protected readonly typeKeyMap = signal<Record<string, string>>({});
+  /** Template alias — the URL param is `limit`, the pagination component says `pageSize` */
+  protected readonly pageSize = computed(() => this.limit() || this.preferencesStore.pageSize());
+  /** Safe page number — falls back to 1 when the query param is absent */
+  protected readonly safePage = computed(() => this.page() || 1);
+  protected readonly sortField = computed(() => (this.sort() ?? '').split(':')[0] ?? '');
+  protected readonly sortDirection = computed<'asc' | 'desc'>(() =>
+    (this.sort() ?? '').split(':')[1] === 'asc' ? 'asc' : 'desc',
+  );
+  // Reference data (reactive — empty until loaded)
+  protected readonly statusOptions = computed(() => this.refStore.options(this.projectId(), 'statuses'));
+  protected readonly typeOptions = computed(() => this.refStore.options(this.projectId(), 'types'));
+  protected readonly sprintOptions = computed(() => this.refStore.options(this.projectId(), 'sprints'));
+  protected readonly labelOptions = computed(() => this.refStore.options(this.projectId(), 'labels'));
+  protected readonly memberOptions = computed(() => this.refStore.options(this.projectId(), 'members'));
+  protected readonly statusMap = computed(() => this.refStore.nameMap(this.projectId(), 'statuses'));
+  protected readonly typeMap = computed(() => this.refStore.nameMap(this.projectId(), 'types'));
+  protected readonly sprintMap = computed(() => this.refStore.nameMap(this.projectId(), 'sprints'));
+  protected readonly labelMap = computed(() => this.refStore.nameMap(this.projectId(), 'labels'));
+  protected readonly typeKeyMap = computed<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+
+    for (const option of this.typeOptions()) {
+      if (option.key) map[option.id] = option.key;
+    }
+    return map;
+  });
+  /**
+   * URL name/id → resolved id. Pure computeds: when reference data finishes
+   * loading they recompute automatically — no polling needed.
+   */
+  private readonly filterStatus = computed(() => resolveNameToId(this.status(), this.statusOptions()));
+  private readonly filterType = computed(() => resolveNameToId(this.type(), this.typeOptions()));
+  private readonly filterAssignee = computed(() => resolveNameToId(this.assignee(), this.memberOptions()));
+  private readonly filterReporter = computed(() => resolveNameToId(this.reporter(), this.memberOptions()));
+  private readonly filterSprint = computed(() => resolveNameToId(this.sprint(), this.sprintOptions()));
+  private readonly filterLabel = computed(() => resolveNameToId(this.label(), this.labelOptions()));
   /** Shared badge-variant helpers (see constants/priority.ts) */
   protected readonly taskTypeBadgeVariant = taskTypeBadgeVariant;
   protected readonly priorityBadgeVariant = priorityBadgeVariant;
-  protected readonly sprintMap = signal<Record<string, string>>({});
-  protected readonly labelMap = signal<Record<string, string>>({});
-  /** Column-level filter signals synced with URL query params */
-  protected readonly filterStatus = signal('');
-  protected readonly filterPriority = signal('');
-  protected readonly filterType = signal('');
-  protected readonly filterAssignee = signal('');
-  protected readonly filterReporter = signal('');
-  protected readonly filterSprint = signal('');
-  protected readonly filterLabel = signal('');
-  /** Options for filter selects */
-  protected readonly statusOptions = signal<SelectOption[]>([]);
-  protected readonly typeOptions = signal<SelectOption[]>([]);
-  protected readonly sprintOptions = signal<SelectOption[]>([]);
-  protected readonly labelOptions = signal<SelectOption[]>([]);
-  protected readonly memberOptions = signal<SelectOption[]>([]);
-  /** Column definitions for @for header rendering */
+  // ─── Data ──────────────────────────────────────────────────────────────────
+  protected readonly tasks = signal<Task[]>([]);
+  protected readonly total = signal(0);
+  protected readonly totalPages = signal(0);
+  // ─── Column definitions for @for header rendering ──────────────────────────
   protected readonly taskColumns: TaskColumnDef[] = [
     {
       field: 'number',
@@ -129,11 +161,7 @@ export class TaskTable implements OnInit, OnDestroy {
       filterType: 'text',
       popoverWidth: 'w-56',
       getFilterValue: () => this.search(),
-      setFilterValue: (v) => {
-        this.search.set(v);
-        this.page.set(1);
-        this.syncToUrl();
-      },
+      setFilterValue: (v) => this.patchParams({ search: v || null }),
       placeholder: 'taskTable.searchPlaceholder',
     },
     {
@@ -144,7 +172,7 @@ export class TaskTable implements OnInit, OnDestroy {
       setFilterValue: (v) => this.onColumnFilterChange('type', v),
       getOptions: () => this.typeOptions(),
       allLabelKey: 'taskTable.allTypes',
-      itemToString: (id: string) => this.typeOptions().find((o) => o.id === id)?.name ?? id,
+      itemToString: (id: string) => this.refStore.nameOf(this.projectId(), 'types', id),
     },
     {
       field: 'statusId',
@@ -154,13 +182,13 @@ export class TaskTable implements OnInit, OnDestroy {
       setFilterValue: (v) => this.onColumnFilterChange('status', v),
       getOptions: () => this.statusOptions(),
       allLabelKey: 'taskTable.allStatuses',
-      itemToString: (id: string) => this.statusOptions().find((o) => o.id === id)?.name ?? id,
+      itemToString: (id: string) => this.refStore.nameOf(this.projectId(), 'statuses', id),
     },
     {
       field: 'priority',
       labelKey: 'taskTable.priority',
       filterType: 'select',
-      getFilterValue: () => this.filterPriority(),
+      getFilterValue: () => this.priority(),
       setFilterValue: (v) => this.onColumnFilterChange('priority', v),
       allLabelKey: 'taskTable.allPriorities',
       staticOptions: [
@@ -178,7 +206,7 @@ export class TaskTable implements OnInit, OnDestroy {
       setFilterValue: (v) => this.onColumnFilterChange('assignee', v),
       getOptions: () => this.memberOptions(),
       allLabelKey: 'taskTable.allAssignees',
-      itemToString: (id: string) => this.memberOptions().find((o) => o.id === id)?.name ?? id,
+      itemToString: (id: string) => this.refStore.nameOf(this.projectId(), 'members', id),
     },
     {
       field: 'reporterId',
@@ -188,7 +216,7 @@ export class TaskTable implements OnInit, OnDestroy {
       setFilterValue: (v) => this.onColumnFilterChange('reporter', v),
       getOptions: () => this.memberOptions(),
       allLabelKey: 'taskTable.allReporters',
-      itemToString: (id: string) => this.memberOptions().find((o) => o.id === id)?.name ?? id,
+      itemToString: (id: string) => this.refStore.nameOf(this.projectId(), 'members', id),
     },
     {
       field: 'sprintId',
@@ -198,7 +226,7 @@ export class TaskTable implements OnInit, OnDestroy {
       setFilterValue: (v) => this.onColumnFilterChange('sprint', v),
       getOptions: () => this.sprintOptions(),
       allLabelKey: 'taskTable.allSprints',
-      itemToString: (id: string) => this.sprintOptions().find((o) => o.id === id)?.name ?? id,
+      itemToString: (id: string) => this.refStore.nameOf(this.projectId(), 'sprints', id),
     },
     {
       field: 'labelIds',
@@ -220,19 +248,15 @@ export class TaskTable implements OnInit, OnDestroy {
     },
   ];
   protected readonly COLUMN_COUNT = COLUMN_COUNT;
-  /** Column sorting */
-  protected readonly sortField = signal('');
-  protected readonly sortDirection = signal<'asc' | 'desc'>('desc');
-  // ─── Create Task Dialog ────────────────────────────────────────────────────
+  // ─── Dialogs ───────────────────────────────────────────────────────────────
   protected readonly showCreateDialog = signal(false);
   private readonly createTaskDialog = viewChild(CreateTaskDialog);
-  // ─── Filter Panel Dialog ──────────────────────────────────────────────────
   protected readonly showFilterDialog = signal(false);
   protected readonly currentFilters = computed<FilterCriteria>(() => {
     const filters: FilterCriteria = {};
 
     if (this.filterStatus()) filters.statusIds = [this.filterStatus()];
-    if (this.filterPriority()) filters.priority = [this.filterPriority() as TaskPriority];
+    if (this.priority()) filters.priority = [this.priority() as TaskPriority];
     if (this.filterType()) filters.typeIds = [this.filterType()];
     if (this.filterAssignee()) filters.assigneeIds = [this.filterAssignee()];
     if (this.search()) filters.search = this.search();
@@ -243,166 +267,118 @@ export class TaskTable implements OnInit, OnDestroy {
     field: this.sortField() || 'createdAt',
     direction: this.sortDirection(),
   }));
+  /** Query sent to the API — recomputed whenever any URL param changes */
+  private readonly taskQuery = computed(() => ({
+    search: this.search() || undefined,
+    statusId: this.filterStatus() || undefined,
+    priority: this.priority() || undefined,
+    typeId: this.filterType() || undefined,
+    assigneeId: this.filterAssignee() || undefined,
+    reporterId: this.filterReporter() || undefined,
+    sprintId: this.filterSprint() || undefined,
+    labelId: this.filterLabel() || undefined,
+    sort: this.sortField() ? `${this.sortField()}:${this.sortDirection()}` : undefined,
+    page: this.safePage(),
+    limit: this.pageSize(),
+  }));
 
-  protected onFilterDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
-      this.showFilterDialog.set(false);
-    }
-  }
+  constructor() {
+    // Load reference data whenever the project context becomes available
+    effect(() => {
+      this.refStore.ensure(this.projectId(), ['statuses', 'types', 'sprints', 'labels', 'members']);
+    });
 
-  protected onFilterApplied(state: AppliedFilterState): void {
-    this.showFilterDialog.set(false);
+    // Reload tasks whenever the query changes (initial load included)
+    effect(() => {
+      const query = this.taskQuery();
+      const pid = this.projectId();
 
-    const criteria = state.filters;
+      if (!pid) return;
 
-    if (criteria.statusIds?.length) {
-      this.filterStatus.set(criteria.statusIds[0]);
-    } else {
-      this.filterStatus.set('');
-    }
+      this.taskClient.list(pid, query).subscribe({
+        next: (res) => {
+          this.tasks.set(res.data);
+          this.total.set(res.pagination.total);
+          this.totalPages.set(res.pagination.totalPages);
 
-    if (criteria.priority?.length) {
-      this.filterPriority.set(criteria.priority[0]);
-    } else {
-      this.filterPriority.set('');
-    }
-
-    if (criteria.typeIds?.length) {
-      this.filterType.set(criteria.typeIds[0]);
-    } else {
-      this.filterType.set('');
-    }
-
-    if (criteria.assigneeIds?.length) {
-      this.filterAssignee.set(criteria.assigneeIds[0]);
-    } else {
-      this.filterAssignee.set('');
-    }
-
-    if (criteria.search) {
-      this.search.set(criteria.search);
-    } else {
-      this.search.set('');
-    }
-
-    // Apply sort from saved filter
-    if (state.sort?.field) {
-      this.sortField.set(state.sort.field);
-      this.sortDirection.set(state.sort.direction);
-    }
-
-    this.page.set(1);
-    this.syncToUrl();
-  }
-
-  ngOnInit(): void {
-    this.loadStatuses();
-    this.loadTypes();
-    this.loadSprints();
-    this.loadLabels();
-    this.loadMembers();
-
-    // Sync URL query params → component state
-    this.queryParamsSub = this.route.queryParams.subscribe((params) => {
-      this.search.set(params['search'] ?? '');
-      this.page.set(params['page'] ? +params['page'] : 1);
-      this.pageSize.set(params['limit'] ? +params['limit'] : this.preferencesStore.pageSize());
-      this.filterPriority.set(params['priority'] ?? '');
-
-      const sortParam = params['sort'] ?? '';
-
-      if (sortParam) {
-        const [field, direction] = sortParam.split(':');
-
-        this.sortField.set(field ?? '');
-        this.sortDirection.set((direction === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc');
-      } else {
-        this.sortField.set('');
-        this.sortDirection.set('desc');
-      }
-
-      // Resolve human-readable names → IDs after options are loaded
-      this.resolveUrlFilters(params);
-
-      this.loadTasks();
+          // Handle invalid page — move to nearest valid page
+          if (res.pagination.totalPages > 0 && this.page() > res.pagination.totalPages) {
+            this.patchParams({ page: res.pagination.totalPages });
+          }
+        },
+        error: (err) => console.error('Failed to load tasks:', err),
+      });
     });
   }
 
-  ngOnDestroy(): void {
-    this.queryParamsSub?.unsubscribe();
+  // ─── URL sync ──────────────────────────────────────────────────────────────
+
+  /** Merge params into the URL; null removes a param. Inputs update reactively. */
+  private patchParams(params: Record<string, string | number | null>): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: params,
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
+
+  /** Convert an id to its human-readable name for URL storage */
+  private idToName(kind: Parameters<ProjectRefStore['nameOf']>[1], id: string): string | null {
+    return id ? this.refStore.nameOf(this.projectId(), kind, id) : null;
+  }
+
+  /** Sync all filter/sort/pagination state to URL query params */
+  private syncToUrl(): void {
+    this.patchParams({
+      search: this.search() || null,
+      page: this.page() > 1 ? this.page() : null,
+      limit: this.limit(),
+      priority: this.priority() || null,
+      status: this.idToName('statuses', this.filterStatus()),
+      type: this.idToName('types', this.filterType()),
+      assignee: this.idToName('members', this.filterAssignee()),
+      reporter: this.idToName('members', this.filterReporter()),
+      sprint: this.idToName('sprints', this.filterSprint()),
+      label: this.idToName('labels', this.filterLabel()),
+      sort: this.sortField() ? `${this.sortField()}:${this.sortDirection()}` : null,
+    });
+  }
+
+  // ─── Handlers ──────────────────────────────────────────────────────────────
 
   protected onSearch(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
 
-    this.search.set(value);
-    this.page.set(1);
-    this.syncToUrl();
+    this.patchParams({ search: value || null, page: null });
   }
 
   /** Toggle sort direction for a column. 3-state cycle: asc → desc → none. */
   protected toggleSort(field: string): void {
-    if (this.sortField() === field) {
-      if (this.sortDirection() === 'asc') {
-        this.sortDirection.set('desc');
-      } else {
-        // Was desc → clear sort entirely
-        this.sortField.set('');
-        this.sortDirection.set('desc');
-      }
+    let nextSort: string | null;
+
+    if (this.sortField() === field && this.sortDirection() === 'asc') {
+      nextSort = `${field}:desc`;
+    } else if (this.sortField() === field) {
+      nextSort = null; // was desc → clear sort entirely
     } else {
-      this.sortField.set(field);
-      this.sortDirection.set('asc');
+      nextSort = `${field}:asc`;
     }
-    this.page.set(1);
-    this.syncToUrl();
+    this.patchParams({ sort: nextSort, page: null });
   }
 
   /** Handle column filter changes from popover dropdowns/inputs */
   protected onColumnFilterChange(filterName: string, value: string): void {
-    switch (filterName) {
-      case 'status':
-        this.filterStatus.set(value);
-        break;
-
-      case 'priority':
-        this.filterPriority.set(value);
-        break;
-
-      case 'type':
-        this.filterType.set(value);
-        break;
-
-      case 'assignee':
-        this.filterAssignee.set(value);
-        break;
-
-      case 'reporter':
-        this.filterReporter.set(value);
-        break;
-
-      case 'sprint':
-        this.filterSprint.set(value);
-        break;
-
-      case 'label':
-        this.filterLabel.set(value);
-        break;
-    }
-    this.page.set(1);
-    this.syncToUrl();
+    this.patchParams({ [filterName]: value || null, page: null });
   }
 
   protected onPageChange(newPage: number): void {
-    this.page.set(newPage);
-    this.syncToUrl();
+    this.patchParams({ page: newPage > 1 ? newPage : null });
   }
 
   protected onPageSizeChange(newSize: number): void {
-    this.pageSize.set(newSize);
     this.preferencesStore.setPageSize(newSize);
-    this.page.set(1);
-    this.syncToUrl();
+    this.patchParams({ limit: newSize, page: null });
   }
 
   protected goToTask(task: Task): void {
@@ -416,12 +392,40 @@ export class TaskTable implements OnInit, OnDestroy {
     this.router.navigate(['/tenants', tenantId, 'projects', projectKey, 'tasks', `${projectKey}-${task.number}`]);
   }
 
+  // ─── Filter Panel Dialog ──────────────────────────────────────────────────
+
+  protected onFilterDialogStateChange(state: BrnDialogState): void {
+    if (state === 'closed') {
+      this.showFilterDialog.set(false);
+    }
+  }
+
+  protected onFilterApplied(state: AppliedFilterState): void {
+    this.showFilterDialog.set(false);
+
+    const criteria = state.filters;
+    const params: Record<string, string | number | null> = {
+      search: criteria.search ?? null,
+      priority: criteria.priority?.[0] ?? null,
+      status: this.idToName('statuses', criteria.statusIds?.[0] ?? ''),
+      type: this.idToName('types', criteria.typeIds?.[0] ?? ''),
+      assignee: this.idToName('members', criteria.assigneeIds?.[0] ?? ''),
+      page: null,
+    };
+
+    // Apply sort from saved filter
+    if (state.sort?.field) {
+      params['sort'] = `${state.sort.field}:${state.sort.direction}`;
+    }
+
+    this.patchParams(params);
+  }
+
   // ─── Create Task Dialog Handlers ──────────────────────────────────────────
 
   protected openCreateDialog(): void {
     this.showCreateDialog.set(true);
-    // Reset form after view updates so the dialog child is available
-    setTimeout(() => this.createTaskDialog()?.resetForm());
+    this.createTaskDialog()?.resetForm();
   }
 
   protected onCreateDialogClosed(): void {
@@ -430,254 +434,6 @@ export class TaskTable implements OnInit, OnDestroy {
 
   protected onTaskCreated(): void {
     this.showCreateDialog.set(false);
-    this.loadTasks();
-  }
-
-  /** Resolve human-readable filter names from URL back to IDs */
-  private resolveUrlFilters(params: Record<string, string>): void {
-    // These will be resolved once options are loaded (via separate subscriptions)
-    // Store raw URL values first, then resolve when options arrive
-    const urlStatus = params['status'] ?? '';
-    const urlType = params['type'] ?? '';
-    const urlAssignee = params['assignee'] ?? '';
-    const urlReporter = params['reporter'] ?? '';
-    const urlSprint = params['sprint'] ?? '';
-    const urlLabel = params['label'] ?? '';
-
-    // Try to resolve immediately (options may already be loaded from prior navigation)
-    this.filterStatus.set(this.resolveNameToId(urlStatus, this.statusOptions()));
-    this.filterType.set(this.resolveNameToId(urlType, this.typeOptions()));
-    this.filterAssignee.set(this.resolveNameToId(urlAssignee, this.memberOptions()));
-    this.filterReporter.set(this.resolveNameToId(urlReporter, this.memberOptions()));
-    this.filterSprint.set(this.resolveNameToId(urlSprint, this.sprintOptions()));
-    this.filterLabel.set(this.resolveNameToId(urlLabel, this.labelOptions()));
-
-    // Also try to resolve after options load (for initial page load)
-    if (urlStatus && !this.filterStatus()) {
-      this.deferResolve('status', urlStatus);
-    }
-    if (urlType && !this.filterType()) {
-      this.deferResolve('type', urlType);
-    }
-    if (urlAssignee && !this.filterAssignee()) {
-      this.deferResolve('assignee', urlAssignee);
-    }
-    if (urlReporter && !this.filterReporter()) {
-      this.deferResolve('reporter', urlReporter);
-    }
-    if (urlSprint && !this.filterSprint()) {
-      this.deferResolve('sprint', urlSprint);
-    }
-    if (urlLabel && !this.filterLabel()) {
-      this.deferResolve('label', urlLabel);
-    }
-  }
-
-  /** Defer resolution of a URL filter name to ID until options are loaded */
-  private deferResolve(filterName: string, urlValue: string): void {
-    const checkAndResolve = (): boolean => {
-      let options: SelectOption[] = [];
-      let setter: ((id: string) => void) | null = null;
-
-      switch (filterName) {
-        case 'status':
-          options = this.statusOptions();
-          setter = (v) => this.filterStatus.set(v);
-          break;
-
-        case 'type':
-          options = this.typeOptions();
-          setter = (v) => this.filterType.set(v);
-          break;
-
-        case 'assignee':
-          options = this.memberOptions();
-          setter = (v) => this.filterAssignee.set(v);
-          break;
-
-        case 'reporter':
-          options = this.memberOptions();
-          setter = (v) => this.filterReporter.set(v);
-          break;
-
-        case 'sprint':
-          options = this.sprintOptions();
-          setter = (v) => this.filterSprint.set(v);
-          break;
-
-        case 'label':
-          options = this.labelOptions();
-          setter = (v) => this.filterLabel.set(v);
-          break;
-      }
-
-      if (options.length > 0) {
-        const resolved = this.resolveNameToId(urlValue, options);
-
-        if (resolved && setter) {
-          setter(resolved);
-          return true;
-        }
-      }
-      return false;
-    };
-    // Poll until options are loaded (max 5 seconds)
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts++;
-      if (checkAndResolve() || attempts > 50) {
-        clearInterval(interval);
-      }
-    }, 100);
-  }
-
-  /** Resolve a human-readable name to an ID using options map */
-  private resolveNameToId(name: string, options: SelectOption[]): string {
-    if (!name) return '';
-    // First check if it's already an ID (UUID format)
-    if (options.some((o) => o.id === name)) return name;
-
-    // Try case-insensitive name match
-    const lower = name.toLowerCase();
-    const match = options.find((o) => o.name.toLowerCase() === lower);
-
-    return match?.id ?? '';
-  }
-
-  /** Get human-readable name for an ID using options */
-  private idToName(id: string, options: SelectOption[]): string {
-    if (!id) return '';
-
-    const match = options.find((o) => o.id === id);
-
-    return match?.name ?? id;
-  }
-
-  /** Sync all filter/sort/pagination state to URL query params (using human-readable names) */
-  private syncToUrl(): void {
-    const queryParams: Record<string, string | number | null> = {
-      search: this.search() || null,
-      page: this.page() > 1 ? this.page() : null,
-      limit: this.pageSize(),
-      priority: this.filterPriority() || null,
-      // Store human-readable names instead of IDs
-      status: this.filterStatus() ? this.idToName(this.filterStatus(), this.statusOptions()) : null,
-      type: this.filterType() ? this.idToName(this.filterType(), this.typeOptions()) : null,
-      assignee: this.filterAssignee() ? this.idToName(this.filterAssignee(), this.memberOptions()) : null,
-      reporter: this.filterReporter() ? this.idToName(this.filterReporter(), this.memberOptions()) : null,
-      sprint: this.filterSprint() ? this.idToName(this.filterSprint(), this.sprintOptions()) : null,
-      label: this.filterLabel() ? this.idToName(this.filterLabel(), this.labelOptions()) : null,
-      sort: this.sortField() ? `${this.sortField()}:${this.sortDirection()}` : null,
-    };
-
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams,
-      replaceUrl: true,
-    });
-  }
-
-  private loadTasks(): void {
-    this.taskClient
-      .list(this.projectId(), {
-        search: this.search() || undefined,
-        statusId: this.filterStatus() || undefined,
-        priority: this.filterPriority() || undefined,
-        typeId: this.filterType() || undefined,
-        assigneeId: this.filterAssignee() || undefined,
-        reporterId: this.filterReporter() || undefined,
-        sprintId: this.filterSprint() || undefined,
-        labelId: this.filterLabel() || undefined,
-        sort: this.sortField() ? `${this.sortField()}:${this.sortDirection()}` : undefined,
-        page: this.page(),
-        limit: this.pageSize(),
-      })
-      .subscribe({
-        next: (res) => {
-          this.tasks.set(res.data);
-          this.total.set(res.pagination.total);
-          this.totalPages.set(res.pagination.totalPages);
-
-          // Handle invalid page — move to nearest valid page
-          if (res.pagination.totalPages > 0 && this.page() > res.pagination.totalPages) {
-            this.page.set(res.pagination.totalPages);
-            this.syncToUrl();
-          }
-        },
-      });
-  }
-
-  private loadStatuses(): void {
-    this.statusClient.list(this.projectId()).subscribe({
-      next: (statuses) => {
-        const map: Record<string, string> = {};
-        const opts: SelectOption[] = [];
-
-        for (const s of statuses) {
-          map[s.id] = s.name;
-          opts.push({ id: s.id, name: s.name });
-        }
-        this.statusMap.set(map);
-        this.statusOptions.set(opts);
-      },
-    });
-  }
-
-  private loadTypes(): void {
-    this.taskTypeClient.list(this.projectId()).subscribe({
-      next: (types) => {
-        const map: Record<string, string> = {};
-        const keyMap: Record<string, string> = {};
-        const opts: SelectOption[] = [];
-
-        for (const t of types) {
-          map[t.id] = t.name;
-          keyMap[t.id] = t.key;
-          opts.push({ id: t.id, name: t.name });
-        }
-        this.typeMap.set(map);
-        this.typeKeyMap.set(keyMap);
-        this.typeOptions.set(opts);
-      },
-    });
-  }
-
-  private loadSprints(): void {
-    this.sprintClient.list(this.projectId()).subscribe({
-      next: (sprints) => {
-        const map: Record<string, string> = {};
-        const opts: SelectOption[] = [];
-
-        for (const s of sprints) {
-          map[s.id] = s.name;
-          opts.push({ id: s.id, name: s.name });
-        }
-        this.sprintMap.set(map);
-        this.sprintOptions.set(opts);
-      },
-    });
-  }
-
-  private loadLabels(): void {
-    this.labelClient.list(this.projectId()).subscribe({
-      next: (labels) => {
-        const map: Record<string, string> = {};
-        const opts: SelectOption[] = [];
-
-        for (const l of labels) {
-          map[l.id] = l.name;
-          opts.push({ id: l.id, name: l.name });
-        }
-        this.labelMap.set(map);
-        this.labelOptions.set(opts);
-      },
-    });
-  }
-
-  private loadMembers(): void {
-    this.projectClient.listMembers(this.projectId()).subscribe({
-      next: (members) =>
-        this.memberOptions.set(members.map((m) => ({ id: m.userId, name: m.displayName ?? m.userId }))),
-    });
+    this.syncToUrl(); // re-navigates with identical params → effect reloads tasks
   }
 }

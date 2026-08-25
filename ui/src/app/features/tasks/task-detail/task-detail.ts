@@ -1,4 +1,4 @@
-import { Component, inject, input, signal, OnInit } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, OnInit } from '@angular/core';
 import { getTenantId } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -12,8 +12,8 @@ import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { priorityBadgeVariant } from '@app/constants/priority';
-import { TaskPriority, ProjectRole } from '@task-board/shared';
-import { hasMinProjectRole, hasMinTenantRole } from '@app/shared/utils/role-utils';
+import { TaskPriority } from '@task-board/shared';
+import { canManageProject, canWrite } from '@app/shared/utils/role-utils';
 import { HttpErrorResponse } from '@angular/common/http';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
@@ -25,7 +25,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
-import { finalize } from 'rxjs';
+import { rxResource } from '@angular/core/rxjs-interop';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Task } from '@task-board/shared';
@@ -89,9 +89,15 @@ export class TaskDetail implements OnInit {
   private readonly route = inject(ActivatedRoute);
   /** Bound via withComponentInputBinding() */
   readonly taskId = input.required<string>();
-  protected readonly task = signal<Task | null>(null);
-  protected readonly loading = signal(true);
+  private readonly taskResource = rxResource<Task | null, { taskId: string }>({
+    params: () => ({ taskId: this.taskId() }),
+    stream: ({ params }) => this.taskClient.getById(params.taskId),
+    defaultValue: null,
+  });
+  protected readonly task = computed(() => (this.taskResource.hasValue() ? this.taskResource.value() : null));
   protected readonly isEditing = signal(false);
+  /** Whether the edit editor has finished initializing (swap views only when ready) */
+  protected readonly editReady = signal(false);
   protected readonly error = signal('');
   protected readonly currentUserId = signal('');
   /** Resolved entity names for display */
@@ -142,7 +148,7 @@ export class TaskDetail implements OnInit {
             })
             .subscribe({
               next: (updated) => {
-                this.task.set(updated);
+                this.taskResource.value.set(updated);
                 this.isEditing.set(false);
                 this.notify.success('toasts.updated');
               },
@@ -162,29 +168,26 @@ export class TaskDetail implements OnInit {
     },
   );
 
+  constructor() {
+    effect(() => {
+      // hasValue() guards against reading `.value` in the error state
+      if (!this.taskResource.hasValue()) return;
+
+      const t = this.taskResource.value();
+
+      if (!t) return;
+
+      this.resolveRelatedEntities(t);
+      this.loadEditOptions(t.projectId);
+    });
+  }
+
   ngOnInit(): void {
     const user = this.authStore.currentUser();
 
     if (user) {
       this.currentUserId.set(user.id);
     }
-
-    this.loadTask();
-  }
-
-  private loadTask(): void {
-    this.loading.set(true);
-    this.taskClient
-      .getById(this.taskId())
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (task) => {
-          this.task.set(task);
-          this.resolveRelatedEntities(task);
-          this.loadEditOptions(task.projectId);
-        },
-        error: (err) => this.error.set(getErrorMessage(err)),
-      });
   }
 
   /** Resolve statusId/typeId/labelIds/sprintId to human-readable names */
@@ -260,28 +263,16 @@ export class TaskDetail implements OnInit {
   }
 
   protected canDelete(): boolean {
-    const tenantRole = this.authStore.tenantRole();
-
-    if (hasMinTenantRole(tenantRole, 'ADMIN')) return true;
-
-    return hasMinProjectRole(this.projectStore.projectRole(), ProjectRole.PROJECT_ADMIN);
+    return canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole());
   }
 
   protected canEdit(): boolean {
-    const tenantRole = this.authStore.tenantRole();
-
-    if (hasMinTenantRole(tenantRole, 'ADMIN')) return true;
-
-    return hasMinProjectRole(this.projectStore.projectRole(), ProjectRole.EDITOR);
+    return this.canEditComments();
   }
 
   /** Whether the current user can edit comments (Editor+ or tenant ADMIN+) */
   protected canEditComments(): boolean {
-    const tenantRole = this.authStore.tenantRole();
-
-    if (hasMinTenantRole(tenantRole, 'ADMIN')) return true;
-
-    return hasMinProjectRole(this.projectStore.projectRole(), ProjectRole.EDITOR);
+    return canWrite(this.projectStore.projectRole(), this.authStore.tenantRole());
   }
 
   protected startEdit(): void {
@@ -293,6 +284,8 @@ export class TaskDetail implements OnInit {
         description: t.description ?? '',
         priority: t.priority as TaskPriority,
       });
+      // Keep the display view visible until the edit editor signals readiness
+      this.editReady.set(false);
       this.isEditing.set(true);
     }
   }
@@ -304,6 +297,11 @@ export class TaskDetail implements OnInit {
       priority: TaskPriority.MEDIUM,
     });
     this.isEditing.set(false);
+    this.editReady.set(false);
+  }
+
+  protected onEditReady(): void {
+    this.editReady.set(true);
   }
 
   /** Handle Milkdown editor content change */
@@ -321,7 +319,7 @@ export class TaskDetail implements OnInit {
 
     this.taskClient.update(t.id, update as never).subscribe({
       next: (updated) => {
-        this.task.set(updated);
+        this.taskResource.value.set(updated);
         // Re-resolve names if status/type/sprint changed
         if (field === 'statusId') {
           this.statusName.set(this.statusOptions().find((o) => o.id === value)?.name ?? (value as string));
@@ -370,7 +368,7 @@ export class TaskDetail implements OnInit {
   protected reloadAfterConflict(): void {
     this.showConflictDialog.set(false);
     this.isEditing.set(false);
-    this.loadTask();
+    this.taskResource.reload();
   }
 
   protected deleteTask(): void {

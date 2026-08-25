@@ -1,20 +1,12 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
-import { TaskTypeService } from '../services/task-type.service.js';
-import { TaskTypeRepository } from '../repositories/task-type.repository.js';
-import { TaskRepository } from '../repositories/task.repository.js';
-import { ProjectRepository } from '../repositories/project.repository.js';
-import { AuditEventRepository } from '../repositories/audit-event.repository.js';
-import { UserRepository } from '../repositories/user.repository.js';
-import { AuditService } from '../services/audit.service.js';
-import { getCollection } from '../db/mongo.js';
-import type { TaskTypeDocument } from '../repositories/task-type.repository.js';
-import type { TaskDocument } from '../repositories/task.repository.js';
-import type { ProjectDocument } from '../repositories/project.repository.js';
-import type { AuditEventDocument } from '../repositories/audit-event.repository.js';
-import type { UserDocument } from '../repositories/user.repository.js';
-import { CreateTaskTypeSchema, UpdateTaskTypeSchema, DeleteTaskTypeSchema } from '../schemas/task-type.js';
+import {
+  CreateTaskTypeSchema,
+  UpdateTaskTypeSchema,
+  DeleteTaskTypeSchema,
+  ReorderTaskTypeSchema,
+} from '../schemas/task-type.js';
 
 // ─── TaskType Routes ─────────────────────────────────────────────────────────
 
@@ -26,8 +18,7 @@ export function createTaskTypeRoutes(): Hono<AppEnv> {
    */
   router.get('/projects/:projectId/task-types', async (c) => {
     const projectId = c.req.param('projectId');
-    const service = createTaskTypeService();
-    const taskTypes = await service.getTaskTypesByProject(projectId);
+    const taskTypes = await c.get('svc').taskTypes.getTaskTypesByProject(projectId);
 
     return c.json({ data: taskTypes });
   });
@@ -38,11 +29,21 @@ export function createTaskTypeRoutes(): Hono<AppEnv> {
   router.post('/projects/:projectId/task-types', validateBody(CreateTaskTypeSchema), async (c) => {
     const projectId = c.req.param('projectId');
     const userId = c.get('userId');
-    const body = c.get('validatedBody' as never) as { key: string; name: string; icon?: string; position: number };
-    const service = createTaskTypeService();
-    const taskType = await service.createTaskType(projectId, body, userId);
+    const body = c.req.valid('json');
+    const taskType = await c.get('svc').taskTypes.createTaskType(projectId, body, userId);
 
     return c.json({ data: taskType }, 201);
+  });
+
+  /**
+   * PATCH /projects/:projectId/task-types/reorder — Reorder task types in one bulk pass.
+   */
+  router.patch('/projects/:projectId/task-types/reorder', validateBody(ReorderTaskTypeSchema), async (c) => {
+    const projectId = c.req.param('projectId');
+    const body = c.req.valid('json');
+    const taskTypes = await c.get('svc').taskTypes.reorder(projectId, body.items);
+
+    return c.json({ data: taskTypes });
   });
 
   /**
@@ -51,9 +52,8 @@ export function createTaskTypeRoutes(): Hono<AppEnv> {
   router.patch('/task-types/:taskTypeId', validateBody(UpdateTaskTypeSchema), async (c) => {
     const taskTypeId = c.req.param('taskTypeId');
     const userId = c.get('userId');
-    const body = c.get('validatedBody' as never) as { name?: string; icon?: string; position?: number };
-    const service = createTaskTypeService();
-    const taskType = await service.updateTaskType(taskTypeId, body, userId);
+    const body = c.req.valid('json');
+    const taskType = await c.get('svc').taskTypes.updateTaskType(taskTypeId, body, userId);
 
     return c.json({ data: taskType });
   });
@@ -64,26 +64,12 @@ export function createTaskTypeRoutes(): Hono<AppEnv> {
   router.delete('/task-types/:taskTypeId', validateBody(DeleteTaskTypeSchema), async (c) => {
     const taskTypeId = c.req.param('taskTypeId');
     const userId = c.get('userId');
-    const body = c.get('validatedBody' as never) as { replacementTypeId?: string };
-    const service = createTaskTypeService();
+    const body = c.req.valid('json');
 
-    await service.deleteTaskType(taskTypeId, body.replacementTypeId, userId);
+    await c.get('svc').taskTypes.deleteTaskType(taskTypeId, body.replacementTypeId, userId);
 
     return c.json({ data: { success: true } });
   });
 
   return router;
-}
-
-// ─── Factory Helper ──────────────────────────────────────────────────────────
-
-function createTaskTypeService(): TaskTypeService {
-  const taskTypeRepo = new TaskTypeRepository(getCollection<TaskTypeDocument>('task_types'));
-  const taskRepo = new TaskRepository(getCollection<TaskDocument>('tasks')) as never;
-  const projectRepo = new ProjectRepository(getCollection<ProjectDocument>('projects')) as never;
-  const auditRepo = new AuditEventRepository(getCollection<AuditEventDocument>('audit_events'));
-  const userRepo = new UserRepository(getCollection<UserDocument>('users')) as never;
-  const auditService = new AuditService(auditRepo, userRepo);
-
-  return new TaskTypeService(taskTypeRepo, taskRepo, projectRepo, auditService);
 }

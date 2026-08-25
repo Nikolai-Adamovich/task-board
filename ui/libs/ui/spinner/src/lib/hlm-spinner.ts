@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideLoader2 } from '@ng-icons/lucide';
 import { classes } from '@spartan-ng/helm/utils';
@@ -7,7 +7,6 @@ import { classes } from '@spartan-ng/helm/utils';
   selector: 'hlm-spinner',
   imports: [NgIcon],
   providers: [provideIcons({ lucideLoader2 })],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'data-slot': 'spinner',
     role: 'status',

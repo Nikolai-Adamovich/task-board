@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal, OnInit } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { getTenantId } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -6,11 +6,13 @@ import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
 import { CdkDragDrop, CdkDrag, CdkDropList } from '@angular/cdk/drag-drop';
 import { TaskPriority } from '@task-board/shared';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
-import { StatusClient } from '@services/status-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
+import { ProjectRefStore } from '@stores/project-ref-store';
 import { canWrite } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -20,7 +22,6 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { NgIcon } from '@ng-icons/core';
-import { finalize } from 'rxjs';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Board, BoardColumn, Task } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
@@ -60,32 +61,66 @@ interface CreateTaskForm {
   providers: [provideIcons({ lucidePlus })],
   templateUrl: './board-view.html',
 })
-export class BoardView implements OnInit {
+export class BoardView {
   private readonly notify = injectToasts();
   private readonly boardClient = inject(BoardClient);
   private readonly taskClient = inject(TaskClient);
-  private readonly statusClient = inject(StatusClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
+  private readonly refStore = inject(ProjectRefStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  protected readonly canCreateTask = computed(() =>
-    canWrite(this.projectStore.projectRole(), this.authStore.tenantRole()),
-  );
   /** Bound via withComponentInputBinding() */
   readonly boardId = input.required<string>();
   readonly projectKey = input<string>('');
-  /** Resolved project UUID from the store */
+  /** Optional sprint filter from query params (`?sprintId=…`) */
+  readonly sprintId = input<string | null>(null);
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
-  protected readonly board = signal<Board | null>(null);
-  protected readonly tasks = signal<Task[]>([]);
-  protected readonly statusMap = signal<Record<string, string>>({});
+  /** Tasks live under the board's project — fall back to the active project */
+  private readonly effectiveProjectId = computed(() => this.board()?.projectId ?? this.projectId());
+  // ─── Reads (rxResource — auto refetch/cancel when params change) ──────────
+  private readonly boardResource = rxResource<Board | null, { boardId: string }>({
+    params: () => ({ boardId: this.boardId() }),
+    stream: ({ params }) => this.boardClient.getById(params.boardId),
+    defaultValue: null,
+  });
+  protected readonly board = computed(() => (this.boardResource.hasValue() ? this.boardResource.value() : null));
+  private readonly tasksResource = rxResource({
+    params: () => ({ pid: this.effectiveProjectId(), sprintId: this.sprintId() }),
+    stream: ({ params }) => {
+      const query: TaskQuery = { limit: 200 };
+
+      if (params.sprintId) {
+        query.sprintId = params.sprintId;
+      }
+      return this.taskClient.list(params.pid, query).pipe(map((res) => res.data));
+    },
+    defaultValue: [],
+  });
+  protected readonly tasks = computed(() => (this.tasksResource.hasValue() ? this.tasksResource.value() : []));
+  protected readonly loading = computed(() => this.boardResource.isLoading());
+  /** Load errors from the resource + create-task form errors */
+  protected readonly error = computed(() => {
+    if (this.formError()) return this.formError();
+
+    const err = this.boardResource.error();
+
+    return err ? getErrorMessage(err) : '';
+  });
+  // Reference data (statuses) via the shared store
+  protected readonly statusMap = computed(() => this.refStore.nameMap(this.effectiveProjectId(), 'statuses'));
+
+  constructor() {
+    effect(() => {
+      this.refStore.ensure(this.effectiveProjectId(), ['statuses']);
+    });
+  }
+
+  protected readonly canCreateTask = computed(() =>
+    canWrite(this.projectStore.projectRole(), this.authStore.tenantRole()),
+  );
   /** itemToString helper for hlm-select to display human-readable status labels */
   protected readonly statusItemToString = (id: string) => this.statusMap()[id] ?? id;
-  /** Optional sprint filter from query params */
-  protected readonly sprintId = signal<string | null>(null);
-  protected readonly loading = signal(true);
-  protected readonly error = signal('');
   protected readonly showCreateTask = signal(false);
   protected readonly showStatusSelect = signal(false);
   protected readonly pendingDrop = signal<{ task: Task; targetColumn: BoardColumn } | null>(null);
@@ -106,7 +141,7 @@ export class BoardView implements OnInit {
     {
       submission: {
         action: async (f) => {
-          this.error.set('');
+          this.errorSet('');
 
           const m = this.model();
           const pid = this.board()?.projectId ?? this.projectId();
@@ -123,7 +158,11 @@ export class BoardView implements OnInit {
             })
             .subscribe({
               next: (task) => {
-                this.tasks.update((list) => [...list, task]);
+                if (this.tasksResource.hasValue()) {
+                  this.tasksResource.value.update((list) => [...list, task]);
+                } else {
+                  this.tasksResource.reload();
+                }
                 this.showCreateTask.set(false);
                 this.notify.success('toasts.created');
                 f().reset({
@@ -135,13 +174,20 @@ export class BoardView implements OnInit {
                 });
               },
               error: (err) => {
-                this.error.set(getErrorMessage(err));
+                this.errorSet(getErrorMessage(err));
               },
             });
         },
       },
     },
   );
+  /** Local (non-resource) error message for the create-task form */
+  private readonly formError = signal('');
+  protected readonly formErrorValue = computed(() => this.formError());
+
+  private errorSet(message: string): void {
+    this.formError.set(message);
+  }
 
   /** Get display name for a board column */
   protected getColumnName(column: BoardColumn): string {
@@ -219,9 +265,17 @@ export class BoardView implements OnInit {
   private moveTaskToStatus(task: Task, statusId: string): void {
     this.taskClient.update(task.id, { statusId, version: task.version }).subscribe({
       next: (updated) => {
-        this.tasks.update((list) => list.map((t) => (t.id === task.id ? updated : t)));
+        if (this.tasksResource.hasValue()) {
+          this.tasksResource.value.update((list) => list.map((t) => (t.id === task.id ? updated : t)));
+        } else {
+          this.tasksResource.reload();
+        }
       },
-      error: (err) => console.error('Failed to move task:', err),
+      error: (err) => {
+        // Surface failures (incl. version conflicts) — silent drops confuse users
+        this.notify.error(getErrorMessage(err));
+        this.tasksResource.reload();
+      },
     });
   }
 
@@ -230,72 +284,18 @@ export class BoardView implements OnInit {
     return `column-${column.id}`;
   }
 
-  ngOnInit(): void {
-    // Read sprintId from query params
-    this.route.queryParams.subscribe((params) => {
-      this.sprintId.set(params['sprintId'] ?? null);
-      // Reload tasks if board is already loaded
-      if (this.board()) {
-        this.loadTasks();
-      }
-    });
-    this.loadBoard();
-  }
-
-  private loadBoard(): void {
-    this.loading.set(true);
-    this.boardClient
-      .getById(this.boardId())
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (board) => {
-          this.board.set(board);
-          this.loadStatuses();
-          this.loadTasks();
-        },
-        error: (err) => console.error(err),
-      });
-  }
-
-  private loadTasks(): void {
-    const pid = this.board()?.projectId ?? this.projectId();
-
-    if (!pid) return;
-
-    const query: TaskQuery = { limit: 200 };
-    // Apply sprint filter if present
-    const sid = this.sprintId();
-
-    if (sid) {
-      query.sprintId = sid;
-    }
-
-    this.taskClient.list(pid, query).subscribe({
-      next: (res) => this.tasks.set(res.data),
-    });
-  }
-
-  private loadStatuses(): void {
-    const pid = this.board()?.projectId ?? this.projectId();
-
-    if (!pid) return;
-
-    this.statusClient.list(pid).subscribe({
-      next: (statuses) => {
-        const map: Record<string, string> = {};
-
-        for (const s of statuses) {
-          map[s.id] = s.name;
-        }
-        this.statusMap.set(map);
-      },
-    });
-  }
-
   protected goToTask(task: Task): void {
-    const projectKey = this.projectStore.activeProject()?.key ?? task.projectId;
+    const projectKey =
+      this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? task.projectId;
 
-    // Navigate using route params (tenantId, projectKey from URL)
-    this.router.navigate(['/tenants', getTenantId(this.route), 'projects', projectKey, 'tasks', task.id]);
+    // Backend accepts KEY-NUMBER format for GET /tasks/:taskId
+    this.router.navigate([
+      '/tenants',
+      getTenantId(this.route),
+      'projects',
+      projectKey,
+      'tasks',
+      `${projectKey}-${task.number}`,
+    ]);
   }
 }

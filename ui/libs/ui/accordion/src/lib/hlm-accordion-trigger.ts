@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideChevronUp } from '@ng-icons/lucide';
 import { BrnAccordionImports } from '@spartan-ng/brain/accordion';
@@ -9,7 +9,6 @@ import type { ClassValue } from 'clsx';
   selector: 'hlm-accordion-trigger',
   imports: [BrnAccordionImports, NgIcon],
   providers: [provideIcons({ lucideChevronDown, lucideChevronUp })],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h3 brnAccordionHeader class="flex">
       <button brnAccordionTrigger data-slot="accordion-trigger" [class]="_computedTriggerClass()">

@@ -1,15 +1,5 @@
 import type { BooleanInput } from '@angular/cdk/coercion';
-import {
-  booleanAttribute,
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  ElementRef,
-  inject,
-  input,
-  Renderer2,
-  signal,
-} from '@angular/core';
+import { booleanAttribute, Component, effect, ElementRef, inject, input, Renderer2, signal } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX } from '@ng-icons/lucide';
 import { injectExposedSideProvider, injectExposesStateProvider } from '@spartan-ng/brain/core';
@@ -22,7 +12,6 @@ import { HlmSheetClose } from './hlm-sheet-close';
   selector: 'hlm-sheet-content',
   imports: [HlmButton, HlmSheetClose, NgIcon],
   providers: [provideIcons({ lucideX })],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'data-slot': 'sheet-content',
     '[attr.data-side]': '_sideProvider.side()',

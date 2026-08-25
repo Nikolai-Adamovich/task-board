@@ -1,5 +1,6 @@
+import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Collection, Document } from 'mongodb';
+import type { Document } from 'mongodb';
 import type { Task, IdentitySnapshot } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -96,13 +97,16 @@ function toDomain(doc: TaskDocument): Task {
 
 // ─── Task Repository ─────────────────────────────────────────────────────────
 
-export class TaskRepository {
-  constructor(private readonly collection: Collection<TaskDocument>) {}
+export class TaskRepository extends BaseRepository<TaskDocument, Task> {
+  protected toDomain(doc: TaskDocument): Task {
+    return toDomain(doc);
+  }
 
-  async findById(id: string): Promise<Task | null> {
-    const doc = await this.collection.findOne({ id });
+  /** Tasks assigned to a user across all projects, newest update first. */
+  async findAssignedTo(userId: string, limit = 50): Promise<Task[]> {
+    const docs = await this.collection.find({ assigneeId: userId }).sort({ updatedAt: -1 }).limit(limit).toArray();
 
-    return doc ? toDomain(doc) : null;
+    return docs.map(toDomain);
   }
 
   async findByProjectAndNumber(projectId: string, number: number): Promise<Task | null> {
@@ -353,12 +357,6 @@ export class TaskRepository {
     );
 
     return result ? toDomain(result) : null;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
-
-    return result.deletedCount > 0;
   }
 
   /**

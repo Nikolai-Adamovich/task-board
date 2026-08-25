@@ -1,5 +1,5 @@
+import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
 import type { Board } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -45,13 +45,9 @@ function toDomain(doc: BoardDocument): Board {
 
 // ─── Board Repository ────────────────────────────────────────────────────────
 
-export class BoardRepository {
-  constructor(private readonly collection: Collection<BoardDocument>) {}
-
-  async findById(id: string): Promise<Board | null> {
-    const doc = await this.collection.findOne({ id });
-
-    return doc ? toDomain(doc) : null;
+export class BoardRepository extends BaseRepository<BoardDocument, Board> {
+  protected toDomain(doc: BoardDocument): Board {
+    return toDomain(doc);
   }
 
   async findByProject(projectId: string): Promise<Board[]> {
@@ -91,12 +87,6 @@ export class BoardRepository {
     );
 
     return result ? toDomain(result) : null;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
-
-    return result.deletedCount > 0;
   }
 
   /**

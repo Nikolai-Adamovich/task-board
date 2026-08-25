@@ -1,14 +1,5 @@
 import type { BooleanInput } from '@angular/cdk/coercion';
-import {
-  booleanAttribute,
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  forwardRef,
-  input,
-  linkedSignal,
-  output,
-} from '@angular/core';
+import { booleanAttribute, Component, computed, forwardRef, input, linkedSignal, output } from '@angular/core';
 import { type ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import type { ChangeFn, TouchFn } from '@spartan-ng/brain/forms';
 import { BrnSwitch, type BrnSwitchSize, BrnSwitchThumb } from '@spartan-ng/brain/switch';
@@ -26,7 +17,6 @@ export const HLM_SWITCH_VALUE_ACCESSOR = {
   selector: 'hlm-switch',
   imports: [BrnSwitchThumb, BrnSwitch, HlmSwitchThumb],
   providers: [HLM_SWITCH_VALUE_ACCESSOR],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'data-slot': 'switch',
     class: 'contents',

@@ -1,8 +1,4 @@
-@if (loading()) {
-  <div class="flex items-center justify-center py-12">
-    <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'taskDetail.loading' | transloco }}</span>
-  </div>
-} @else if (error()) {
+@if (error()) {
   <div class="mx-auto max-w-3xl px-4 py-8">
     <hlm-alert variant="destructive" class="mb-4">
       <div hlmAlertDescription>{{ error() | transloco }}</div>
@@ -62,8 +58,23 @@
         <!-- Title & Description -->
         <hlm-card>
           <div hlmCardContent>
+            <!-- Display mode: stays mounted so Cancel never re-initializes the editor -->
+            <div [class.hidden]="isEditing() && editReady()">
+              <h3 class="text-sm font-medium text-foreground">{{ 'taskDetail.description' | transloco }}</h3>
+              @if (t.description) {
+                <ui-milkdown-editor
+                  class="mt-2 text-sm text-muted-foreground"
+                  [content]="t.description"
+                  [readOnly]="true"
+                />
+              } @else {
+                <p class="mt-2 text-sm italic text-muted-foreground">{{ 'taskDetail.noDescription' | transloco }}</p>
+              }
+            </div>
+
+            <!-- Edit mode: mounted while editing, revealed only once the editor is ready -->
             @if (isEditing()) {
-              <form id="edit-task-form" [formRoot]="editForm" class="flex flex-col gap-4">
+              <form id="edit-task-form" [formRoot]="editForm" class="flex flex-col gap-4" [class.hidden]="!editReady()">
                 <hlm-field>
                   <label hlmFieldLabel for="edit-title">{{ 'taskDetail.title' | transloco }}</label>
                   <input hlmInput id="edit-title" type="text" [formField]="editForm.title" />
@@ -75,16 +86,10 @@
                   <ui-milkdown-editor
                     [content]="editForm.description().value()"
                     (contentChange)="onDescriptionChange($event)"
+                    (readyChange)="onEditReady()"
                   />
                 </hlm-field>
               </form>
-            } @else {
-              <h3 class="text-sm font-medium text-foreground">{{ 'taskDetail.description' | transloco }}</h3>
-              @if (t.description) {
-                <p class="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{{ t.description }}</p>
-              } @else {
-                <p class="mt-2 text-sm italic text-muted-foreground">{{ 'taskDetail.noDescription' | transloco }}</p>
-              }
             }
           </div>
         </hlm-card>

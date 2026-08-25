@@ -1,12 +1,6 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
-import { ProjectService } from '../services/project.service.js';
-import { ProjectRepository } from '../repositories/project.repository.js';
-import { ProjectMemberRepository } from '../repositories/project-member.repository.js';
-import { getCollection } from '../db/mongo.js';
-import type { ProjectDocument } from '../repositories/project.repository.js';
-import type { ProjectMemberDocument } from '../repositories/project-member.repository.js';
 import {
   CreateProjectSchema,
   UpdateProjectSchema,
@@ -24,8 +18,7 @@ export function createProjectRoutes(): Hono<AppEnv> {
    */
   router.get('/', async (c) => {
     const tenantId = c.get('tenantId');
-    const service = createProjectService();
-    const projects = await service.listProjects(tenantId);
+    const projects = await c.get('svc').projects.listProjects(tenantId);
 
     return c.json({ data: projects });
   });
@@ -37,13 +30,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
     const tenantId = c.get('tenantId');
     const userId = c.get('userId');
     const userRole = c.get('tenantRole');
-    const body = c.get('validatedBody' as never) as {
-      key: string;
-      name: string;
-      description?: string;
-    };
-    const service = createProjectService();
-    const project = await service.createProject(tenantId, userId, userRole, body);
+    const body = c.req.valid('json');
+    const project = await c.get('svc').projects.createProject(tenantId, userId, userRole, body);
 
     return c.json({ data: project }, 201);
   });
@@ -54,8 +42,7 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.get('/by-key/:key', async (c) => {
     const key = c.req.param('key');
     const tenantId = c.get('tenantId');
-    const service = createProjectService();
-    const project = await service.getProjectByKey(tenantId, key);
+    const project = await c.get('svc').projects.getProjectByKey(tenantId, key);
 
     return c.json({ data: project });
   });
@@ -65,8 +52,7 @@ export function createProjectRoutes(): Hono<AppEnv> {
    */
   router.get('/:projectId', async (c) => {
     const projectId = c.req.param('projectId');
-    const service = createProjectService();
-    const project = await service.getProject(projectId);
+    const project = await c.get('svc').projects.getProject(projectId);
 
     return c.json({ data: project });
   });
@@ -77,9 +63,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.patch('/:projectId', validateBody(UpdateProjectSchema), async (c) => {
     const userRole = c.get('tenantRole');
     const projectId = c.req.param('projectId');
-    const body = c.get('validatedBody' as never) as { name?: string; description?: string };
-    const service = createProjectService();
-    const project = await service.updateProject(projectId, userRole, body);
+    const body = c.req.valid('json');
+    const project = await c.get('svc').projects.updateProject(projectId, userRole, body);
 
     return c.json({ data: project });
   });
@@ -90,9 +75,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.delete('/:projectId', async (c) => {
     const userRole = c.get('tenantRole');
     const projectId = c.req.param('projectId');
-    const service = createProjectService();
 
-    await service.deleteProject(projectId, userRole);
+    await c.get('svc').projects.deleteProject(projectId, userRole);
 
     return c.json({ data: { success: true } });
   });
@@ -103,9 +87,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.post('/:projectId/archive', async (c) => {
     const userRole = c.get('tenantRole');
     const projectId = c.req.param('projectId');
-    const service = createProjectService();
 
-    await service.archiveProject(projectId, userRole);
+    await c.get('svc').projects.archiveProject(projectId, userRole);
 
     return c.json({ data: { success: true } });
   });
@@ -116,9 +99,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.post('/:projectId/restore', async (c) => {
     const userRole = c.get('tenantRole');
     const projectId = c.req.param('projectId');
-    const service = createProjectService();
 
-    await service.restoreProject(projectId, userRole);
+    await c.get('svc').projects.restoreProject(projectId, userRole);
 
     return c.json({ data: { success: true } });
   });
@@ -129,9 +111,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.post('/:projectId/cancel-deletion', async (c) => {
     const userRole = c.get('tenantRole');
     const projectId = c.req.param('projectId');
-    const service = createProjectService();
 
-    await service.cancelDeletion(projectId, userRole);
+    await c.get('svc').projects.cancelDeletion(projectId, userRole);
 
     return c.json({ data: { success: true } });
   });
@@ -140,8 +121,7 @@ export function createProjectRoutes(): Hono<AppEnv> {
 
   router.get('/:projectId/members', async (c) => {
     const projectId = c.req.param('projectId');
-    const service = createProjectService();
-    const members = await service.getProjectMembers(projectId);
+    const members = await c.get('svc').projects.getProjectMembers(projectId);
 
     return c.json({ data: members });
   });
@@ -149,9 +129,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
   router.post('/:projectId/members', validateBody(AddProjectMemberSchema), async (c) => {
     const userRole = c.get('tenantRole');
     const projectId = c.req.param('projectId');
-    const body = c.get('validatedBody' as never) as { userId: string; role: string };
-    const service = createProjectService();
-    const member = await service.addMember(projectId, body.userId, body.role, userRole);
+    const body = c.req.valid('json');
+    const member = await c.get('svc').projects.addMember(projectId, body.userId, body.role, userRole);
 
     return c.json({ data: member }, 201);
   });
@@ -160,9 +139,8 @@ export function createProjectRoutes(): Hono<AppEnv> {
     const userRole = c.get('tenantRole');
     const projectId = c.req.param('projectId');
     const memberUserId = c.req.param('memberUserId');
-    const body = c.get('validatedBody' as never) as { role: string };
-    const service = createProjectService();
-    const member = await service.updateMemberRole(projectId, memberUserId, body.role, userRole);
+    const body = c.req.valid('json');
+    const member = await c.get('svc').projects.updateMemberRole(projectId, memberUserId, body.role, userRole);
 
     return c.json({ data: member });
   });
@@ -171,26 +149,11 @@ export function createProjectRoutes(): Hono<AppEnv> {
     const userRole = c.get('tenantRole');
     const projectId = c.req.param('projectId');
     const memberUserId = c.req.param('memberUserId');
-    const service = createProjectService();
 
-    await service.removeMember(projectId, memberUserId, userRole);
+    await c.get('svc').projects.removeMember(projectId, memberUserId, userRole);
 
     return c.json({ data: { success: true } });
   });
 
   return router;
-}
-
-// ─── Factory Helper ──────────────────────────────────────────────────────────
-
-function createProjectService(): ProjectService {
-  const projectRepo = new ProjectRepository(getCollection<ProjectDocument>('projects'));
-  const projectMemberRepo = new ProjectMemberRepository(getCollection<ProjectMemberDocument>('project_members'));
-  const collections = {
-    taskTypes: getCollection('task_types'),
-    statuses: getCollection('statuses'),
-    boards: getCollection('boards'),
-  };
-
-  return new ProjectService(projectRepo, projectMemberRepo, collections);
 }

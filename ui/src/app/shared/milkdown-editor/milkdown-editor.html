@@ -1,25 +1,215 @@
-@if (loading()) {
-  <div class="flex items-center justify-center py-4">
-    <hlm-spinner />
-    <span class="ml-2 text-sm text-muted-foreground">{{ 'milkdownEditor.loading' | transloco }}</span>
+<!-- Toolbar (hidden in fallback mode and in read-only mode) -->
+@if (!fallbackMode() && !readOnly()) {
+  <div
+    class="flex flex-wrap items-center gap-0.5 rounded-t-md border border-b-0 border-border bg-muted/40 px-2 py-1"
+    role="toolbar"
+    [attr.aria-label]="'milkdownEditor.toolbar' | transloco"
+  >
+    <!-- Text formatting -->
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('strong')"
+      [hlmTooltip]="'milkdownEditor.bold' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideBold" />
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('emphasis')"
+      [hlmTooltip]="'milkdownEditor.italic' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideItalic" />
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('strikethrough')"
+      [hlmTooltip]="'milkdownEditor.strikethrough' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideStrikethrough" />
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('inlineCode')"
+      [hlmTooltip]="'milkdownEditor.inlineCode' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideCode" />
+    </button>
+
+    <span class="mx-1 h-4 w-px bg-border"></span>
+
+    <!-- Headings -->
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0 text-xs font-semibold"
+      type="button"
+      (click)="runHeading(1)"
+      [hlmTooltip]="'Heading 1'"
+      [disabled]="mode() === 'raw'"
+    >
+      H1
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0 text-xs font-semibold"
+      type="button"
+      (click)="runHeading(2)"
+      [hlmTooltip]="'Heading 2'"
+      [disabled]="mode() === 'raw'"
+    >
+      H2
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0 text-xs font-semibold"
+      type="button"
+      (click)="runHeading(3)"
+      [hlmTooltip]="'Heading 3'"
+      [disabled]="mode() === 'raw'"
+    >
+      H3
+    </button>
+
+    <span class="mx-1 h-4 w-px bg-border"></span>
+
+    <!-- Lists & blocks -->
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('bulletList')"
+      [hlmTooltip]="'milkdownEditor.bulletList' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideList" />
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('orderedList')"
+      [hlmTooltip]="'milkdownEditor.orderedList' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideListOrdered" />
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('blockquote')"
+      [hlmTooltip]="'milkdownEditor.blockquote' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideQuote" />
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('codeBlock')"
+      [hlmTooltip]="'milkdownEditor.codeBlock' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideFileText" />
+    </button>
+
+    <span class="mx-1 h-4 w-px bg-border"></span>
+
+    <!-- Insert -->
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="insertLink()"
+      [hlmTooltip]="'milkdownEditor.link' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideLink" />
+    </button>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      class="h-7 w-7 p-0"
+      type="button"
+      (click)="runCommand('hr')"
+      [hlmTooltip]="'milkdownEditor.horizontalRule' | transloco"
+      [disabled]="mode() === 'raw'"
+    >
+      <ng-icon name="lucideMinus" />
+    </button>
+
+    <!-- WYSIWYG ⇄ raw markdown toggle -->
+    <span class="mx-1 h-4 w-px bg-border"></span>
+    <button
+      hlmBtn
+      variant="outline"
+      size="sm"
+      class="h-7 gap-1 px-2 text-xs"
+      type="button"
+      (click)="toggleMode()"
+      [hlmTooltip]="
+        mode() === 'wysiwyg' ? ('milkdownEditor.showRaw' | transloco) : ('milkdownEditor.showWysiwyg' | transloco)
+      "
+    >
+      @if (mode() === 'wysiwyg') {
+        <ng-icon name="lucideEye" /> {{ 'milkdownEditor.raw' | transloco }}
+      } @else {
+        <ng-icon name="lucideFileText" /> {{ 'milkdownEditor.wysiwyg' | transloco }}
+      }
+    </button>
   </div>
 }
 
-@if (fallbackMode()) {
-  <!-- Fallback: plain textarea with markdown support -->
-  <!-- TODO: Replace with full Milkdown WYSIWYG editor once build pipeline is verified -->
-  <div class="milkdown-fallback">
-    <textarea
-      hlmTextarea
-      class="min-h-50 w-full font-mono text-sm"
-      [value]="fallbackContent()"
-      (input)="onFallbackInput($event)"
-      placeholder="Write markdown here..."
-    ></textarea>
-  </div>
-} @else if (editorReady()) {
-  <!-- Milkdown WYSIWYG editor mounts here -->
-  <div
-    class="milkdown-host rounded-md border border-border bg-card p-4 prose prose-sm dark:prose-invert max-w-none"
-  ></div>
+<!-- Raw markdown textarea (also the automatic fallback) -->
+@if (fallbackMode() || mode() === 'raw') {
+  <textarea
+    hlmTextarea
+    class="min-h-50 w-full rounded-t-none font-mono text-sm"
+    [value]="fallbackContent()"
+    (input)="onRawInput($event)"
+    [placeholder]="'milkdownEditor.rawPlaceholder' | transloco"
+  ></textarea>
 }
+
+<!-- Milkdown WYSIWYG host — always rendered so initMilkdown() can find it -->
+<div
+  class="milkdown-host min-h-50 w-full max-w-none rounded-t-none border border-border bg-card p-4 prose prose-sm dark:prose-invert"
+  [class.hidden]="fallbackMode() || mode() === 'raw'"
+></div>

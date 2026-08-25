@@ -1,5 +1,5 @@
+import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
 import type { Filter, FilterCriteria, FilterSort } from '@task-board/shared';
 
 export interface FilterDocument {
@@ -27,13 +27,9 @@ function toDomain(doc: FilterDocument): Filter {
   };
 }
 
-export class FilterRepository {
-  constructor(private readonly collection: Collection<FilterDocument>) {}
-
-  async findById(id: string): Promise<Filter | null> {
-    const doc = await this.collection.findOne({ id });
-
-    return doc ? toDomain(doc) : null;
+export class FilterRepository extends BaseRepository<FilterDocument, Filter> {
+  protected toDomain(doc: FilterDocument): Filter {
+    return toDomain(doc);
   }
 
   async findByUserAndProject(userId: string, projectId: string): Promise<Filter[]> {
@@ -75,12 +71,6 @@ export class FilterRepository {
     );
 
     return result ? toDomain(result) : null;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ id });
-
-    return result.deletedCount > 0;
   }
 
   /**

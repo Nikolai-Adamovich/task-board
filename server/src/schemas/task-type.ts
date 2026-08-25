@@ -34,3 +34,10 @@ export const UpdateTaskTypeSchema = z.object({
 export const DeleteTaskTypeSchema = z.object({
   replacementTypeId: uuid().optional(),
 });
+
+/**
+ * Schema for reordering task types in bulk.
+ */
+export const ReorderTaskTypeSchema = z.object({
+  items: z.array(z.object({ id: uuid(), position: z.number().int().nonnegative() })).min(1),
+});

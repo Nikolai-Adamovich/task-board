@@ -7,7 +7,7 @@
         type="text"
         class="w-64"
         [placeholder]="'taskTable.searchPlaceholder' | transloco"
-        [value]="search()"
+        [value]="search() || ''"
         (input)="onSearch($event)"
       />
       <button
@@ -183,7 +183,7 @@
   </div>
 
   <ui-pagination
-    [page]="page()"
+    [page]="safePage()"
     [totalPages]="totalPages()"
     [pageSize]="pageSize()"
     [total]="total()"

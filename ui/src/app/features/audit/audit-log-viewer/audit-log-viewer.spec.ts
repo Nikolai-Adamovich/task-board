@@ -67,9 +67,19 @@ const mockPaginatedPage2: PaginatedResponse<AuditEvent> = {
 describe('AuditLogViewer', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fixture: any;
   let auditClientMock: {
     listByProject: ReturnType<typeof vi.fn>;
   };
+
+  async function settle() {
+    for (let i = 0; i < 50 && component.loading(); i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      fixture.detectChanges();
+    }
+    fixture.detectChanges();
+  }
 
   function setup(listFn?: ReturnType<typeof vi.fn>) {
     auditClientMock = {
@@ -88,7 +98,7 @@ describe('AuditLogViewer', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(AuditLogViewer);
+    fixture = TestBed.createComponent(AuditLogViewer);
 
     fixture.componentRef.setInput('projectKey', 'proj-key');
     component = fixture.componentInstance;
@@ -100,20 +110,20 @@ describe('AuditLogViewer', () => {
   describe('ngOnInit', () => {
     beforeEach(() => setup());
 
-    it('should call auditClient.listByProject with projectId', () => {
+    it('should call auditClient.listByProject with projectId', async () => {
       expect(auditClientMock.listByProject).toHaveBeenCalledWith('p1', 1, 20, undefined);
     });
 
-    it('should populate events signal', () => {
+    it('should populate events signal', async () => {
       expect(component.events()).toHaveLength(3);
       expect(component.events()[0].actor.displayName).toBe('Alice');
     });
 
-    it('should set loading to false', () => {
+    it('should set loading to false', async () => {
       expect(component.loading()).toBe(false);
     });
 
-    it('should set pagination info', () => {
+    it('should set pagination info', async () => {
       expect(component.totalPages()).toBe(1);
       expect(component.total()).toBe(3);
     });
@@ -122,8 +132,9 @@ describe('AuditLogViewer', () => {
   // ── Error handling ─────────────────────────────────────
 
   describe('error handling', () => {
-    it('should set error on load failure', () => {
-      setup(vi.fn().mockReturnValue(throwError(() => ({ error: { message: 'Forbidden' } }))));
+    it('should set error on load failure', async () => {
+      await setup(vi.fn().mockReturnValue(throwError(() => ({ error: { message: 'Forbidden' } }))));
+      await settle();
       expect(component.error()).toBe('Forbidden');
       expect(component.loading()).toBe(false);
     });
@@ -134,19 +145,21 @@ describe('AuditLogViewer', () => {
   describe('onFilterChange', () => {
     beforeEach(() => setup());
 
-    it('should update filter and reload with entity type', () => {
+    it('should update filter and reload with entity type', async () => {
       auditClientMock.listByProject.mockClear();
       component.onFilterChange('TASK');
+      await settle();
 
       expect(component.entityTypeFilter()).toBe('TASK');
       expect(component.page()).toBe(1);
       expect(auditClientMock.listByProject).toHaveBeenCalledWith('p1', 1, 20, 'TASK');
     });
 
-    it('should clear filter when empty string selected', () => {
+    it('should clear filter when empty string selected', async () => {
       component.onFilterChange('TASK');
       auditClientMock.listByProject.mockClear();
       component.onFilterChange('');
+      await settle();
 
       expect(component.entityTypeFilter()).toBe('');
       expect(auditClientMock.listByProject).toHaveBeenCalledWith('p1', 1, 20, undefined);
@@ -156,24 +169,25 @@ describe('AuditLogViewer', () => {
   // ── Pagination ──────────────────────────────────────────
 
   describe('goToPage', () => {
-    it('should navigate to next page', () => {
-      setup(vi.fn().mockReturnValue(of(mockPaginatedPage2)));
+    it('should navigate to next page', async () => {
+      await setup(vi.fn().mockReturnValue(of(mockPaginatedPage2)));
       auditClientMock.listByProject.mockClear();
 
       component.goToPage(2);
+      await settle();
 
       expect(component.page()).toBe(2);
       expect(auditClientMock.listByProject).toHaveBeenCalledWith('p1', 2, 20, undefined);
     });
 
-    it('should not go below page 1', () => {
-      setup();
+    it('should not go below page 1', async () => {
+      await setup();
       component.goToPage(0);
       expect(component.page()).toBe(1);
     });
 
-    it('should not exceed total pages', () => {
-      setup();
+    it('should not exceed total pages', async () => {
+      await setup();
       component.goToPage(999);
       expect(component.page()).toBe(1);
     });
@@ -184,34 +198,34 @@ describe('AuditLogViewer', () => {
   describe('utility methods', () => {
     beforeEach(() => setup());
 
-    it('should format date', () => {
+    it('should format date', async () => {
       const result = component.formatDate(NOW);
 
       expect(typeof result).toBe('string');
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it('should return green variant for CREATED', () => {
+    it('should return green variant for CREATED', async () => {
       expect(component.getActionVariant('CREATED')).toContain('green');
     });
 
-    it('should return blue variant for UPDATED', () => {
+    it('should return blue variant for UPDATED', async () => {
       expect(component.getActionVariant('UPDATED')).toContain('blue');
     });
 
-    it('should return red variant for DELETED', () => {
+    it('should return red variant for DELETED', async () => {
       expect(component.getActionVariant('DELETED')).toContain('red');
     });
 
-    it('should return empty string for unknown action', () => {
+    it('should return empty string for unknown action', async () => {
       expect(component.getActionVariant('UNKNOWN')).toBe('');
     });
 
-    it('should truncate long IDs', () => {
+    it('should truncate long IDs', async () => {
       expect(component.truncateId('1234567890')).toBe('12345678\u2026');
     });
 
-    it('should not truncate short IDs', () => {
+    it('should not truncate short IDs', async () => {
       expect(component.truncateId('abc')).toBe('abc');
     });
   });

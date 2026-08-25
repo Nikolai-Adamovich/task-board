@@ -1,10 +1,10 @@
-import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown } from '@ng-icons/lucide';
-import { finalize } from 'rxjs';
+import { rxResource } from '@angular/core/rxjs-interop';
 import { SprintClient } from '@services/sprint-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
@@ -63,7 +63,7 @@ interface SprintGroup {
   providers: [provideIcons({ lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown })],
   templateUrl: './sprint-list.html',
 })
-export class SprintList implements OnInit {
+export class SprintList {
   /** Shared badge-class helper (see constants/priority.ts) */
   protected readonly statusBadgeVariant = statusBadgeVariant;
   private readonly notify = injectToasts();
@@ -76,9 +76,21 @@ export class SprintList implements OnInit {
   readonly projectKey = input<string>('');
   /** Resolved project UUID from the store */
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
-  protected readonly sprints = signal<Sprint[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal('');
+  private readonly sprintsResource = rxResource({
+    params: () => ({ projectId: this.projectId() ?? '' }),
+    stream: ({ params }) => this.sprintClient.list(params.projectId),
+    defaultValue: [],
+  });
+  protected readonly sprints = computed(() => (this.sprintsResource.hasValue() ? this.sprintsResource.value() : []));
+  protected readonly loading = computed(() => this.sprintsResource.isLoading());
+  private readonly actionError = signal('');
+  protected readonly error = computed(() => {
+    if (this.actionError()) return this.actionError();
+
+    const err = this.sprintsResource.error();
+
+    return err ? getErrorMessage(err) : '';
+  });
   protected readonly showCreateModal = signal(false);
   protected readonly expandedGroups = signal<Record<string, boolean>>({});
   private readonly model = signal<CreateSprintForm>({
@@ -94,7 +106,7 @@ export class SprintList implements OnInit {
     {
       submission: {
         action: async (f) => {
-          this.error.set('');
+          this.actionError.set('');
 
           const m = this.model();
 
@@ -106,13 +118,17 @@ export class SprintList implements OnInit {
             })
             .subscribe({
               next: (sprint) => {
-                this.sprints.update((list) => [...list, sprint]);
+                if (this.sprintsResource.hasValue()) {
+                  this.sprintsResource.value.update((list) => [...list, sprint]);
+                } else {
+                  this.sprintsResource.reload();
+                }
                 this.showCreateModal.set(false);
                 f().reset({ name: '', startDate: '', endDate: '' });
                 this.notify.success('toasts.created');
               },
               error: (err) => {
-                this.error.set(getErrorMessage(err));
+                this.actionError.set(getErrorMessage(err));
               },
             });
         },
@@ -158,24 +174,5 @@ export class SprintList implements OnInit {
     if (state === 'closed') {
       this.showCreateModal.set(false);
     }
-  }
-
-  ngOnInit(): void {
-    this.loadSprints();
-  }
-
-  private loadSprints(): void {
-    this.loading.set(true);
-    this.sprintClient
-      .list(this.projectId() ?? '')
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (sprints) => {
-          this.sprints.set(sprints);
-        },
-        error: (err) => {
-          this.error.set(getErrorMessage(err));
-        },
-      });
   }
 }

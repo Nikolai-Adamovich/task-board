@@ -1,9 +1,8 @@
-import { createMiddleware } from 'hono/factory';
-import { ValidationError } from './error-handler.js';
-import type { AppEnv } from '../types/context.js';
+import { zValidator } from '@hono/zod-validator';
 import type { ZodType } from 'zod';
+import { ValidationError } from './error-handler.js';
 
-// ─── Validation Middleware Factory ────────────────────────────────────────────
+// ─── Validation Middleware (built on @hono/zod-validator) ────────────────────
 
 /** Zod v4 issue shape — path uses PropertyKey[] (includes symbol). */
 interface ZodIssueLike {
@@ -24,87 +23,46 @@ function formatZodIssues(issues: ZodIssueLike[]) {
   }));
 }
 
+const TARGET_MESSAGES = {
+  json: 'Request body validation failed',
+  query: 'Query parameter validation failed',
+  param: 'Path parameter validation failed',
+} as const;
+
 /**
- * Factory function that creates a Hono middleware validating the request body
- * against a Zod v4 schema.
+ * Typed request validation built on the official `@hono/zod-validator`.
  *
- * Uses `schema.safeParse()` for validation.
- * On failure, returns 400 with structured VALIDATION_ERROR.
- * On success, the parsed data is set as `c.get('validatedBody')`.
- *
- * @param schema - A Zod schema to validate the request body against
- * @returns Hono middleware that validates and parses the request body
+ * On success the parsed data is available in the handler via
+ * `c.req.valid(target)` — fully typed from the schema, no casts needed.
+ * On failure throws {@link ValidationError} → 400 VALIDATION_ERROR
+ * (same response contract as the previous hand-rolled middleware).
  *
  * @example
  * ```ts
- * import { RegisterRequestSchema } from '../schemas/auth.js';
- *
- * app.post('/auth/register', validateBody(RegisterRequestSchema), handler);
+ * router.post('/projects/:projectId/tasks', validateBody(CreateTaskSchema), async (c) => {
+ *   const body = c.req.valid('json'); // typed as z.infer<typeof CreateTaskSchema>
+ * });
  * ```
  */
+function validated<T extends ZodType>(target: keyof typeof TARGET_MESSAGES, schema: T) {
+  return zValidator(target, schema, (result) => {
+    if (!result.success) {
+      throw new ValidationError(TARGET_MESSAGES[target], formatZodIssues(result.error.issues));
+    }
+  });
+}
+
+/** Validate and type the JSON request body against a Zod v4 schema. */
 export function validateBody<T extends ZodType>(schema: T) {
-  return createMiddleware<AppEnv>(async (c, next) => {
-    let body: unknown;
-
-    try {
-      body = await c.req.json();
-    } catch {
-      throw new ValidationError('Invalid JSON in request body');
-    }
-
-    const result = schema.safeParse(body);
-
-    if (!result.success) {
-      throw new ValidationError('Request body validation failed', formatZodIssues(result.error.issues));
-    }
-
-    // Store parsed data for the route handler to use
-    c.set('validatedBody' as never, result.data as never);
-
-    await next();
-  });
+  return validated('json', schema);
 }
 
-/**
- * Factory function that creates a Hono middleware validating query parameters
- * against a Zod v4 schema.
- *
- * @param schema - A Zod schema to validate query params against
- * @returns Hono middleware that validates and parses query parameters
- */
+/** Validate and type the query parameters against a Zod v4 schema. */
 export function validateQuery<T extends ZodType>(schema: T) {
-  return createMiddleware<AppEnv>(async (c, next) => {
-    const query = c.req.query();
-    const result = schema.safeParse(query);
-
-    if (!result.success) {
-      throw new ValidationError('Query parameter validation failed', formatZodIssues(result.error.issues));
-    }
-
-    c.set('validatedQuery' as never, result.data as never);
-
-    await next();
-  });
+  return validated('query', schema);
 }
 
-/**
- * Factory function that creates a Hono middleware validating path parameters
- * against a Zod v4 schema.
- *
- * @param schema - A Zod schema to validate path params against
- * @returns Hono middleware that validates and parses path parameters
- */
+/** Validate and type the path parameters against a Zod v4 schema. */
 export function validateParams<T extends ZodType>(schema: T) {
-  return createMiddleware<AppEnv>(async (c, next) => {
-    const params = c.req.param();
-    const result = schema.safeParse(params);
-
-    if (!result.success) {
-      throw new ValidationError('Path parameter validation failed', formatZodIssues(result.error.issues));
-    }
-
-    c.set('validatedParams' as never, result.data as never);
-
-    await next();
-  });
+  return validated('param', schema);
 }

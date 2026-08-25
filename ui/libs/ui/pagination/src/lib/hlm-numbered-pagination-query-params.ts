@@ -1,14 +1,5 @@
 import type { BooleanInput, NumberInput } from '@angular/cdk/coercion';
-import {
-  booleanAttribute,
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  model,
-  numberAttribute,
-  untracked,
-} from '@angular/core';
+import { booleanAttribute, Component, computed, input, model, numberAttribute, untracked } from '@angular/core';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { classes } from '@spartan-ng/helm/utils';
 import { createPageArray, outOfBoundCorrection } from './hlm-numbered-pagination';
@@ -32,7 +23,6 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
     HlmPaginationEllipsis,
     HlmSelectImports,
   ],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex items-center gap-1 text-sm text-nowrap text-gray-600">
       <b>{{ totalItems() }}</b>
