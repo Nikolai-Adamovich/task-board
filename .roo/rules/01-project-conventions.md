@@ -41,4 +41,4 @@ Read `AGENTS.md` first for the full mental model; read `docs/architecture.md` se
 npm run typecheck && npm test && npm run lint
 ```
 
-Server: 400 tests · UI: 435 tests. Both must stay green.
+Both suites must stay green.

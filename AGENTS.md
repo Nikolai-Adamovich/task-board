@@ -31,7 +31,7 @@ server and UI.
 ```bash
 npm run build            # shared → server → ui
 npm run typecheck        # shared + server tsc
-npm test                 # server (400 tests) + ui (435 tests) vitest
+npm test                 # vitest: run both server and ui suites
 npm run lint             # eslint across repo
 npm run dev --workspace=server   # wrangler dev (needs MONGODB_URI/JWT_SECRET in wrangler.toml [vars])
 npm start --workspace=ui         # ng serve
@@ -39,6 +39,16 @@ npm run test:e2e                 # playwright
 ```
 
 Always verify with `typecheck` + `test` + `lint` before finishing a task.
+
+## Boundaries (agent safety)
+
+- Allowed by default: read/search files, run tests, typecheck, lint, build, local dev servers.
+- Ask first: installing dependencies, changing `package.json`/lockfiles, schema or RBAC-matrix changes, destructive
+  database operations (drop/delete of collections or data).
+- Only when explicitly asked: `git commit`, `git push`. Never force-push or rewrite history.
+- Never run automatically: `npm run deploy:server` / `deploy:ui` (production deploys) — prefer that a human runs them.
+- Secrets (`wrangler.toml [vars]`: `MONGODB_URI`, `JWT_SECRET`; any `.env`): read only when genuinely necessary, never
+  print, copy into reports, logs, or commits.
 
 ## Layout
 
@@ -100,7 +110,3 @@ Full rationale in [`docs/architecture.md`](docs/architecture.md) §Decisions.
 
 - [`docs/architecture.md`](docs/architecture.md) — layers, request lifecycle, DI, RBAC matrix, data model summary,
   design decisions (must/must-not with rationale).
-- [`docs/project-management-requirements.md`](docs/project-management-requirements.md) — domain source of truth: MongoDB
-  schemas, API contracts, authorization, concurrency rules.
-- [`docs/project-management-user-flows.md`](docs/project-management-user-flows.md) — user journeys, screens, empty/error
-  states. Gap-fill rule: when silent, default to classic Jira behavior.

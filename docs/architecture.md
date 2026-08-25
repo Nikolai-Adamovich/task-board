@@ -1,7 +1,6 @@
 # Architecture — Task Board
 
-> Consolidated architecture reference (post-refactoring state). Entry point: [`AGENTS.md`](../AGENTS.md). Domain source
-> of truth: `project-management-requirements.md` / `project-management-user-flows.md` in this folder.
+> Consolidated architecture reference (post-refactoring state). Entry point: [`AGENTS.md`](../AGENTS.md).
 
 ## 1. Monorepo layout
 
@@ -126,9 +125,9 @@ boards/tasks/sprints/members/settings/audit.
 ## 6. Testing
 
 - **Server:** Vitest. Service tests mock repos via constructor; route tests mock service classes with `vi.mock` and
-  inject a fake `svc` through middleware in `createTestApp()` (see any `routes/*.test.ts`). 400 tests.
+  inject a fake `svc` through middleware in `createTestApp()` (see any `routes/*.test.ts`).
 - **UI:** Vitest via `ng test`. Resource-based components resolve asynchronously — poll signal state
-  (`for (i < N && !component.task()) await setTimeout(10)`) instead of fixed timeouts. 435 tests.
+  (`for (i < N && !component.task()) await setTimeout(10)`) instead of fixed timeouts.
 - **E2E:** Playwright specs in `ui/e2e/`.
 
 ## 7. Design decisions (must / must-not, with rationale)
