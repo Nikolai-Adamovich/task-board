@@ -27,7 +27,8 @@
     "taskTypes": "タスクタイプ",
     "labels": "ラベル",
     "audit": "監査",
-    "filters": "フィルター"
+    "filters": "フィルター",
+    "projectSettings": "Project settings"
   },
   "tenantSwitcher": {
     "selectWorkspace": "ワークスペースを選択",
@@ -95,6 +96,26 @@
       "invalidOrExpired": "無効または期限切れの招待です。",
       "passwordsNotMatch": "パスワードが一致しません。",
       "failedAccept": "招待の受け入れに失敗しました。"
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "description": "Enter your email address and we will send you a reset link.",
+      "sentTitle": "Check your inbox",
+      "sentMessage": "If an account exists for that address, we have sent a password reset link.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "description": "Choose a new password for your account.",
+      "missingToken": "This reset link is missing or invalid. Please request a new one.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Reset password",
+      "submitting": "Resetting…",
+      "backToLogin": "Back to sign in"
     }
   },
   "landing": {
@@ -182,15 +203,51 @@
     "title": "ワークスペースを作成",
     "description": "ワークスペースを設定してプロジェクトの管理を開始します。",
     "name": "ワークスペース名",
-    "slug": "スラッグ",
+    "slug": {
+      "label": "Workspace URL",
+      "checking": "Checking availability…",
+      "taken": "This URL is already taken",
+      "available": "This URL is available",
+      "hint": "Lowercase letters, numbers and hyphens only."
+    },
     "slugHint": "URLで使用されます。小文字、数字、ハイフンのみ。",
-    "plan": "サブスクリプションプラン",
+    "plan": {
+      "title": "Choose a plan",
+      "subtitle": "Every workspace starts on the Free plan.",
+      "cardTitle": "Free",
+      "price": "$0",
+      "perMonth": "per month",
+      "workspace": "1 workspace",
+      "projects": "Unlimited projects",
+      "users": "Unlimited users"
+    },
     "planFree": "無料 — 最大3プロジェクト、5ユーザー",
     "submit": "ワークスペースを作成",
     "submitting": "ワークスペース作成中…",
     "failed": "ワークスペースの作成に失敗しました。もう一度お試しください。",
     "descriptionLabel": "説明（任意）",
-    "descriptionPlaceholder": "ワークスペースの簡単な説明…"
+    "descriptionPlaceholder": "ワークスペースの簡単な説明…",
+    "back": "Back",
+    "continue": "Continue",
+    "checkout": {
+      "title": "Checkout",
+      "subtitle": "Review your order before confirming.",
+      "summary": "Summary",
+      "planLabel": "Plan",
+      "planValue": "Free",
+      "workspaceLabel": "Workspace",
+      "urlLabel": "URL",
+      "totalLabel": "Total due today",
+      "totalValue": "$0",
+      "confirm": "Confirm & create workspace",
+      "confirming": "Confirming…",
+      "demoNote": "This is a demo — no payment is required."
+    },
+    "confirmation": {
+      "title": "Workspace created!",
+      "message": "Your workspace is ready. Invite your team and start planning.",
+      "success": "Everything went smoothly."
+    }
   },
   "settings": {
     "title": "設定",
@@ -200,7 +257,14 @@
     "zoomDescription": "インターフェースのフォントサイズを調整します。",
     "resetZoom": "リセット",
     "language": "言語",
-    "languageDescription": "表示言語を選択します。"
+    "languageDescription": "表示言語を選択します。",
+    "dateFormat": "日付形式",
+    "dateFormatDescription": "アプリ全体の日付の表示形式を選択します。",
+    "timeFormat": "時刻形式",
+    "timeFormatDescription": "アプリ全体の時刻の表示形式を選択します。",
+    "timeFormat24h": "24時間制",
+    "timeFormat12h": "12時間制（午前/午後）",
+    "systemDefault": "System default"
   },
   "tenantSettings": {
     "title": "テナント設定",
@@ -276,7 +340,12 @@
     "status": "ステータス",
     "actions": "アクション",
     "restoreAccess": "アクセスを復元",
-    "reinvite": "再招待"
+    "reinvite": "再招待",
+    "contextError": "Members could not be loaded because the project context is unavailable.",
+    "editRole": "Edit role",
+    "editRoleTitle": "Edit member role",
+    "editRoleDesc": "Choose the role this member has in the project.",
+    "invitationPending": "Invitation pending"
   },
   "projects": {
     "title": "プロジェクト",
@@ -336,7 +405,22 @@
     "deleteProjectWarning": "この操作でプロジェクトの削除が予定されます。30日後に完全に削除されます。",
     "deleteProjectConsequence": "すべてのタスク、ボード、スプリント、プロジェクトデータが完全に削除されます。この操作は元に戻せません。",
     "deleteProjectConfirmLabel": "削除を確認するにはプロジェクトキー（{{key}}）を入力してください：",
-    "confirmDeleteButton": "プロジェクトを削除"
+    "confirmDeleteButton": "プロジェクトを削除",
+    "activeSprint": "Active sprint",
+    "deletionScheduledFor": "Deletion scheduled for {{date}}",
+    "goToSprints": "Go to sprints",
+    "goToTasks": "Go to tasks",
+    "manageBoards": "Manage boards",
+    "moreMembers": "+{{count}} more",
+    "noActiveSprint": "No active sprint",
+    "noTasks": "No tasks yet",
+    "openSprint": "Open sprint",
+    "recentTasks": "Recent tasks",
+    "settings": "Settings",
+    "taskSummary": "Task summary",
+    "totalTasks": "Total tasks",
+    "viewAllMembers": "View all members",
+    "viewAllTasks": "View all tasks"
   },
   "boardView": {
     "loading": "ボードを読み込み中…",
@@ -357,8 +441,10 @@
     "selectStatus": "ステータスを選択…",
     "type": "タイプ",
     "typePlaceholder": "タスクタイプを入力…",
-    "noTasks": "このカラムにはタスクがありません",
-    "multiStatusHint": "このカラムには複数のステータスがあります。このタスクの対象ステータスを選択してください。"
+    "multiStatusHint": "このカラムには複数のステータスがあります。このタスクの対象ステータスを選択してください。",
+    "allTasks": "All tasks",
+    "clearSprint": "Clear sprint filter",
+    "sprintChip": "Sprint: {{name}}"
   },
   "priority": {
     "low": "低",
@@ -400,7 +486,9 @@
     "conflictTitle": "バージョン競合",
     "conflictHint": "このタスクは別のユーザーによって変更されました。最新バージョンを取得するには再読み込みしてください。",
     "reloadTask": "タスクを再読み込み",
-    "unknown": "不明"
+    "unknown": "不明",
+    "editTitle": "Edit title",
+    "editDescription": "Edit description"
   },
   "sprints": {
     "title": "スプリント",
@@ -423,9 +511,15 @@
     "createDesc": "このプロジェクトに新しいスプリントを作成します。",
     "future": "上計",
     "active": "アクティブ",
-    "completed": "完了"
+    "completed": "完了",
+    "backlog": "Backlog",
+    "overdue": "Overdue",
+    "overdueTooltip": "This sprint is past its end date"
   },
   "sprintDetail": {
+    "dispositionTitle": "スプリントを完了",
+    "dispositionDesc": "未完了のタスク {{ count }} 件は、以下で選択したスプリントに移動されます。",
+    "dispositionTarget": "スプリントへ移動",
     "loading": "スプリントを読み込み中…",
     "tasks": "タスク",
     "backToProject": "プロジェクトに戻る",
@@ -439,13 +533,18 @@
     "deleteConfirm": "このスプリントを削除してもよろしいですか？",
     "deleteWarning": "このスプリントのタスクは削除されませんが、スプリントから削除されます。",
     "cancelDelete": "キャンセル",
-    "confirmDelete": "削除"
+    "confirmDelete": "削除",
+    "moveToBacklog": "Move to backlog",
+    "moveToSprint": "Move to sprint",
+    "completeAndMove": "Complete sprint & move tasks"
   },
   "sprintBacklog": {
     "backlog": "バックログ",
     "loading": "バックログを読み込み中…",
     "allAssigned": "すべてのタスクがスプリントに割り当てられています。",
-    "addToSprint": "スプリントに追加"
+    "addToSprint": "スプリントに追加",
+    "title": "Backlog",
+    "description": "Tasks without a sprint live here. Move them into an active sprint to start work."
   },
   "docs": {
     "title": "ドキュメント",
@@ -535,7 +634,8 @@
     "labelNameRequired": "ラベル名は必須です",
     "typeRequired": "タスクタイプは必須です",
     "statusRequired": "ステータスは必須です",
-    "priorityRequired": "優先度は必須です"
+    "priorityRequired": "優先度は必須です",
+    "titleMaxLength": "Title must be at most 200 characters"
   },
   "errors": {
     "unexpected": "予期しないエラーが発生しました。もう一度お試しください。",
@@ -672,6 +772,9 @@
     "deleting": "削除中…"
   },
   "taskTable": {
+    "columns": "列",
+    "selectColumns": "列を選択…",
+    "hideColumn": "この列を非表示",
     "filtersDesc": "ステータス・優先度・担当者などでタスクを絞り込みます。",
     "title": "タスク",
     "searchPlaceholder": "タスクを検索…",
@@ -713,7 +816,19 @@
     "noAssignee": "担当者なし",
     "allAssignees": "すべての担当者",
     "allReporters": "すべての報告者",
-    "allSprints": "すべてのスプリント"
+    "allSprints": "すべてのスプリント",
+    "activeFilters": "Active filters",
+    "clearFilters": "Clear all filters",
+    "filterSearch": "Search",
+    "filterStatus": "Status",
+    "filterType": "Type",
+    "filterPriority": "Priority",
+    "filterAssignee": "Assignee",
+    "filterReporter": "Reporter",
+    "filterSprint": "Sprint",
+    "filterLabel": "Label",
+    "noMatchingTasks": "No tasks match the current filters.",
+    "removeFilterAria": "Remove filter {{value}}"
   },
   "comments": {
     "title": "コメント",
@@ -774,9 +889,17 @@
     "deleteConfirm": "この保存済みフィルターを削除してもよろしいですか？",
     "cancelDelete": "キャンセル",
     "confirmDelete": "削除",
-    "deleteError": "フィルターの削除に失敗しました。"
+    "deleteError": "フィルターの削除に失敗しました。",
+    "apply": "Apply"
   },
   "auditLog": {
+    "time": "日時",
+    "actor": "実行者",
+    "actionCol": "操作",
+    "entity": "エンティティ",
+    "changes": "変更内容",
+    "allActions": "すべての操作",
+    "allActors": "すべての実行者",
     "title": "監査ログ",
     "loading": "監査イベントを読み込み中…",
     "noEvents": "監査イベントが見つかりませんでした。",
@@ -810,7 +933,8 @@
     "results": "{{total}}件の結果",
     "perPage": "ページ当たり",
     "totalItems": "件",
-    "pages": "ページ"
+    "pages": "ページ",
+    "auto": "Auto"
   },
   "states": {
     "archived": "このプロジェクトはアーカイブされています。",
@@ -828,5 +952,79 @@
     "forbiddenDescription": "このページを表示する権限がありません。",
     "goHome": "ホームへ",
     "goBack": "戻る"
+  },
+  "projectSettings": {
+    "title": "Project settings",
+    "subtitle": "Configure boards, members and project details.",
+    "general": "General",
+    "generalDesc": "Basic information about this project.",
+    "adminOnly": "Only workspace admins can change these settings.",
+    "name": "Name",
+    "key": "Key",
+    "keyLockedHint": "The project key is permanent and cannot be changed.",
+    "description": "Description",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "creating": "Creating…",
+    "backToHub": "Back to settings hub",
+    "members": "Members",
+    "membersDesc": "Manage who has access to this project.",
+    "boards": "Boards",
+    "boardsDesc": "Create, rename and delete boards for this project.",
+    "newBoard": "New board",
+    "defaultBoard": "Default board",
+    "defaultBoardDeleteHint": "The default board cannot be deleted.",
+    "invalidStatusRefs": "Some columns reference statuses that no longer exist.",
+    "columnsCount": "{{count}} columns",
+    "rename": "Rename",
+    "renameBoardTitle": "Rename board",
+    "delete": "Delete",
+    "deleteBoardTitle": "Delete board",
+    "deleteBoardWarning": "This board will be permanently removed. Tasks are not deleted.",
+    "dangerZone": "Danger zone",
+    "dangerZoneDesc": "Irreversible actions for this project.",
+    "dangerDescription": "Archive or schedule this project for deletion.",
+    "taskTypes": "タスクタイプ",
+    "taskTypesDesc": "このプロジェクトで利用可能なタスクタイプを定義します。",
+    "statuses": "ステータス",
+    "statusesDesc": "このプロジェクトのワークフローステータスをカスタマイズします。",
+    "labels": "ラベル",
+    "labelsDesc": "タスクを分類するためのラベルを作成・管理します。"
+  },
+  "taskCreate": {
+    "title": "Create task",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Short, descriptive summary",
+    "descriptionLabel": "Description",
+    "status": "Status",
+    "selectStatus": "Select status",
+    "priority": "Priority",
+    "type": "Type",
+    "selectType": "Select type",
+    "assignee": "Assignee",
+    "unassigned": "Unassigned",
+    "sprint": "Sprint",
+    "backlog": "Backlog",
+    "labels": "Labels",
+    "labelsPlaceholder": "Search or create label…",
+    "labelsHint": "Pick an existing label or type a new name to create one.",
+    "noLabelsFound": "No labels found",
+    "createLabel": "Create \"{{name}}\"",
+    "removeLabelAria": "Remove label {{name}}",
+    "cancel": "Cancel",
+    "create": "Create task",
+    "creating": "Creating…"
+  },
+  "tenantHome": {
+    "createProject": "Create project",
+    "manageMembers": "Manage members",
+    "myTasks": "My tasks",
+    "noTasks": "No tasks assigned to you",
+    "noTasksHint": "Tasks assigned to you across all your projects will show up here.",
+    "pendingInvitations": "Pending invitations",
+    "pendingInvitationsCount": "{{count}} pending",
+    "noPendingInvitations": "No pending invitations"
   }
 }

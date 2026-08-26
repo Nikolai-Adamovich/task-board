@@ -1,0 +1,43 @@
+# Local development MongoDB (DEC-025).
+#
+# MongoDB must run as a **single-node replica set** so multi-document
+# transactions work identically in dev and production (Atlas Free is always a
+# replica set). A plain standalone `mongod` cannot run transactions; the
+# project seed then falls back to compensating cleanup (see
+# server/src/services/project.service.ts).
+#
+# Usage:
+#   docker compose up -d        # first start runs rs.initiate() via healthcheck
+#   docker compose down         # stop (data persists in the named volume)
+#
+# MONGODB_URI for server/.dev.vars:
+#   mongodb://localhost:27017/task-board?replicaSet=rs0&directConnection=true
+
+services:
+  mongo:
+    image: mongo:8
+    container_name: task-board-mongo
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Idempotent replica-set bootstrap: once initiated, `rs.status()` returns
+      # ok=1 and the initiate branch is skipped. Marks healthy only when the
+      # node is PRIMARY, i.e. transactions are actually available.
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '--eval',
+          'try { if (rs.status().ok !== 1) { quit(2) } } catch (e) { rs.initiate(); quit(2) }',
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  mongo-data:

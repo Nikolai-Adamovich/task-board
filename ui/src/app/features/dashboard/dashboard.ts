@@ -1,44 +1,46 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { TenantRole } from '@task-board/shared';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
 import { TenantClient } from '@services/tenant-client';
-import { TaskClient } from '@services/task-client';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import type { TenantWithRole, MyInvitation, MyTask } from '@app/types/frontend';
+import type { MyInvitation } from '@app/types/frontend';
 
 // Sub-views
 import { LandingPage } from './landing-page/landing-page';
 import { WelcomeView } from './welcome-view/welcome-view';
 import { InvitationView } from './invitation-view/invitation-view';
-import { MemberDashboard } from './member-dashboard/member-dashboard';
-import { OwnerDashboard } from './owner-dashboard/owner-dashboard';
 
-type DashboardState =
-  'visitor' | 'new-user' | 'pending-invitations' | typeof TenantRole.MEMBER | typeof TenantRole.OWNER;
+type DashboardState = 'visitor' | 'new-user' | 'pending-invitations' | 'redirecting';
 
+/**
+ * Root entry (`/`, DEC-033).
+ *
+ * - Visitor → landing page.
+ * - Authenticated with accessible tenants → redirect to the last-selected
+ *   (or first) tenant home `/t/:tenantSlug` (last-selection preference is
+ *   persisted by the TenantStore in localStorage).
+ * - Authenticated without tenants → welcome view; with only pending
+ *   invitations → invitation view. Both behaviors are preserved.
+ */
 @Component({
   selector: 'ui-dashboard',
-  imports: [HlmSpinnerImports, LandingPage, WelcomeView, InvitationView, MemberDashboard, OwnerDashboard],
+  imports: [HlmSpinnerImports, LandingPage, WelcomeView, InvitationView],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
-  protected readonly TenantRole = TenantRole;
   private readonly authStore = inject(AuthStore);
   private readonly tenantStore = inject(TenantStore);
   private readonly tenantClient = inject(TenantClient);
-  private readonly taskClient = inject(TaskClient);
-  protected readonly tenants = signal<TenantWithRole[]>([]);
+  private readonly router = inject(Router);
   protected readonly invitations = signal<MyInvitation[]>([]);
-  protected readonly tasks = signal<MyTask[]>([]);
   protected readonly loading = signal(true);
   protected readonly dashboardState = computed<DashboardState>(() => {
     if (!this.authStore.isAuthenticated()) return 'visitor';
-    if (this.invitations().length > 0 && this.tenants().length === 0) return 'pending-invitations';
-    if (this.tenants().length === 0) return 'new-user';
-    if (this.tenants().some((t) => t.role === TenantRole.OWNER)) return TenantRole.OWNER;
-    return TenantRole.MEMBER;
+    if (this.tenantStore.tenants().length > 0) return 'redirecting';
+    if (this.invitations().length > 0) return 'pending-invitations';
+    return 'new-user';
   });
 
   async ngOnInit(): Promise<void> {
@@ -59,30 +61,26 @@ export class Dashboard implements OnInit {
       return;
     }
 
-    // Load tenants (with roles)
-    this.tenantStore.loadTenants().then(
-      () => {
-        this.tenants.set(this.tenantStore.tenants() as TenantWithRole[]);
-        this.loadData();
-      },
-      () => this.loading.set(false),
-    );
-  }
-
-  private async loadData(): Promise<void> {
-    this.loading.set(true);
+    // Load tenants (with roles); TenantStore restores the last selection
     try {
-      const [invitationsRes, tasksRes] = await Promise.all([
-        firstValueFrom(this.tenantClient.getMyInvitations()),
-        firstValueFrom(this.taskClient.getMyTasks()),
-      ]);
+      const tenants = await this.tenantStore.loadTenants();
+      const active = this.tenantStore.activeTenant();
+
+      if (tenants.length > 0 && active) {
+        await this.router.navigate(['/t', active.slug], { replaceUrl: true });
+        return;
+      }
+    } catch {
+      this.loading.set(false);
+      return;
+    }
+
+    // No tenants — load pending invitations for the welcome/invitation views
+    try {
+      const invitationsRes = await firstValueFrom(this.tenantClient.getMyInvitations());
 
       if (invitationsRes) {
         this.invitations.set(invitationsRes);
-      }
-
-      if (tasksRes) {
-        this.tasks.set(tasksRes);
       }
     } catch {
       // Silently handle errors
@@ -91,14 +89,26 @@ export class Dashboard implements OnInit {
     }
   }
 
-  protected onInvitationHandled(): void {
+  /** Reload tenants after an invitation was accepted/declined */
+  protected async onInvitationHandled(): Promise<void> {
     this.loading.set(true);
-    this.tenantStore.loadTenants().then(
-      () => {
-        this.tenants.set(this.tenantStore.tenants() as TenantWithRole[]);
-        this.loadData();
-      },
-      () => this.loading.set(false),
-    );
+
+    try {
+      const tenants = await this.tenantStore.loadTenants();
+      const active = this.tenantStore.activeTenant();
+
+      if (tenants.length > 0 && active) {
+        await this.router.navigate(['/t', active.slug], { replaceUrl: true });
+        return;
+      }
+
+      const invitationsRes = await firstValueFrom(this.tenantClient.getMyInvitations());
+
+      this.invitations.set(invitationsRes ?? []);
+    } catch {
+      // keep current state
+    } finally {
+      this.loading.set(false);
+    }
   }
 }

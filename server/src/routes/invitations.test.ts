@@ -22,13 +22,14 @@ vi.mock('../middleware/auth.js', () => ({
   }),
 }));
 
+// DEC-018: an unaccepted membership is ACCESS_REVOKED while its invitation is PENDING
 const mockGetMyInvitations = vi.fn().mockResolvedValue([
   {
     id: 'member-1',
     tenantId: 'tenant-1',
     userId: 'user-1',
     role: 'MEMBER',
-    status: 'ACTIVE',
+    status: 'ACCESS_REVOKED',
     invitation: { status: 'PENDING', tokenHash: 'hash', invitedBy: 'owner', invitedOn: '2025-01-01T00:00:00.000Z' },
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:00:00.000Z',
@@ -183,6 +184,29 @@ describe('Invitation Routes', () => {
       const app = createTestApp();
 
       await app.request('/api/invitations/inv-123/decline', { method: 'POST' }, TEST_ENV);
+
+      expect(mockDeclineInvitation).toHaveBeenCalledWith('inv-123', 'user-1');
+    });
+  });
+
+  // V2-3: the UI's Decline action fires DELETE /api/invitations/:id — the same
+  // operation must be reachable under that method.
+  describe('DELETE /api/invitations/:invitationId (UI decline alias)', () => {
+    it('returns 200 with success', async () => {
+      const app = createTestApp();
+      const res = await app.request('/api/invitations/inv-123', { method: 'DELETE' }, TEST_ENV);
+
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as { data: { success: boolean } };
+
+      expect(body.data.success).toBe(true);
+    });
+
+    it('routes to TenantService.declineInvitation like POST …/decline', async () => {
+      const app = createTestApp();
+
+      await app.request('/api/invitations/inv-123', { method: 'DELETE' }, TEST_ENV);
 
       expect(mockDeclineInvitation).toHaveBeenCalledWith('inv-123', 'user-1');
     });

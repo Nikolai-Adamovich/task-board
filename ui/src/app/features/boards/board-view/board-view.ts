@@ -1,29 +1,26 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
-import { getTenantId } from '@app/shared/utils/route-utils';
+import { getTenantSlug } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
-import { lucidePlus } from '@ng-icons/lucide';
+import { lucidePlus, lucideX } from '@ng-icons/lucide';
 import { CdkDragDrop, CdkDrag, CdkDropList } from '@angular/cdk/drag-drop';
-import { TaskPriority } from '@task-board/shared';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
+import { SprintClient } from '@services/sprint-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { ProjectRefStore } from '@stores/project-ref-store';
 import { canWrite } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import { HlmFieldImports } from '@spartan-ng/helm/field';
-import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { NgIcon } from '@ng-icons/core';
-import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
-import type { Board, BoardColumn, Task } from '@task-board/shared';
+import type { Board, BoardColumn, Sprint, Task } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { TaskCard } from '../task-card/task-card';
@@ -31,40 +28,29 @@ import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
-interface CreateTaskForm {
-  title: string;
-  description: string;
-  priority: TaskPriority;
-  statusId: string;
-  typeId: string;
-}
-
 @Component({
   selector: 'ui-board-view',
   imports: [
     HlmAlertImports,
     TranslocoPipe,
-    FormField,
     TaskCard,
     NgIcon,
     CdkDrag,
     CdkDropList,
     HlmButtonImports,
+    HlmBadgeImports,
     HlmDialogImports,
     HlmSpinnerImports,
-    HlmFieldImports,
-    HlmInputImports,
-    HlmTextareaImports,
     HlmSelectImports,
-    FormRoot,
   ],
-  providers: [provideIcons({ lucidePlus })],
+  providers: [provideIcons({ lucidePlus, lucideX })],
   templateUrl: './board-view.html',
 })
 export class BoardView {
   private readonly notify = injectToasts();
   private readonly boardClient = inject(BoardClient);
   private readonly taskClient = inject(TaskClient);
+  private readonly sprintClient = inject(SprintClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
   private readonly refStore = inject(ProjectRefStore);
@@ -98,11 +84,23 @@ export class BoardView {
     defaultValue: [],
   });
   protected readonly tasks = computed(() => (this.tasksResource.hasValue() ? this.tasksResource.value() : []));
-  protected readonly loading = computed(() => this.boardResource.isLoading());
-  /** Load errors from the resource + create-task form errors */
-  protected readonly error = computed(() => {
-    if (this.formError()) return this.formError();
+  /** Sprints of the board's project — powers the sprint selector (DEC-038) */
+  private readonly sprintsResource = rxResource<Sprint[], { projectId: string }>({
+    params: () => ({ projectId: this.effectiveProjectId() }),
+    stream: ({ params }) => this.sprintClient.list(params.projectId),
+    defaultValue: [],
+  });
+  protected readonly sprints = computed(() => (this.sprintsResource.hasValue() ? this.sprintsResource.value() : []));
+  /** Display name of the currently scoped sprint (falls back to the raw id) */
+  protected readonly selectedSprintName = computed(() => {
+    const id = this.sprintId();
 
+    if (!id) return '';
+
+    return this.sprints().find((s) => s.id === id)?.name ?? id;
+  });
+  protected readonly loading = computed(() => this.boardResource.isLoading());
+  protected readonly error = computed(() => {
     const err = this.boardResource.error();
 
     return err ? getErrorMessage(err) : '';
@@ -121,73 +119,27 @@ export class BoardView {
   );
   /** itemToString helper for hlm-select to display human-readable status labels */
   protected readonly statusItemToString = (id: string) => this.statusMap()[id] ?? id;
-  protected readonly showCreateTask = signal(false);
+  /** itemToString helper for the sprint selector — name + status badge text */
+  protected readonly sprintItemToString = (id: string) => {
+    const sprint = this.sprints().find((s) => s.id === id);
+
+    return sprint ? `${sprint.name} (${sprint.status})` : id;
+  };
+
+  /**
+   * Sprint selector change → write `?sprintId=` to the URL (replaceUrl).
+   * Empty value clears the scope; the tasks resource refetches automatically.
+   */
+  protected onSprintSelect(value: string): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { sprintId: value || null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
   protected readonly showStatusSelect = signal(false);
   protected readonly pendingDrop = signal<{ task: Task; targetColumn: BoardColumn } | null>(null);
-  protected readonly model = signal<CreateTaskForm>({
-    title: '',
-    description: '',
-    priority: TaskPriority.MEDIUM,
-    statusId: '',
-    typeId: '',
-  });
-  protected readonly newTaskForm = form(
-    this.model,
-    schema<CreateTaskForm>((field) => {
-      required(field.title, { message: 'validation.titleRequired' });
-      required(field.statusId, { message: 'validation.statusRequired' });
-      required(field.typeId, { message: 'validation.typeRequired' });
-    }),
-    {
-      submission: {
-        action: async (f) => {
-          this.errorSet('');
-
-          const m = this.model();
-          const pid = this.board()?.projectId ?? this.projectId();
-
-          if (!m.title || !pid) return;
-
-          this.taskClient
-            .create(pid, {
-              title: m.title,
-              description: m.description || undefined,
-              statusId: m.statusId,
-              typeId: m.typeId,
-              priority: m.priority,
-            })
-            .subscribe({
-              next: (task) => {
-                if (this.tasksResource.hasValue()) {
-                  this.tasksResource.value.update((list) => [...list, task]);
-                } else {
-                  this.tasksResource.reload();
-                }
-                this.showCreateTask.set(false);
-                this.notify.success('toasts.created');
-                f().reset({
-                  title: '',
-                  description: '',
-                  priority: TaskPriority.MEDIUM,
-                  statusId: '',
-                  typeId: '',
-                });
-              },
-              error: (err) => {
-                this.errorSet(getErrorMessage(err));
-              },
-            });
-        },
-      },
-    },
-  );
-  /** Local (non-resource) error message for the create-task form */
-  private readonly formError = signal('');
-  protected readonly formErrorValue = computed(() => this.formError());
-
-  private errorSet(message: string): void {
-    this.formError.set(message);
-  }
 
   /** Get display name for a board column */
   protected getColumnName(column: BoardColumn): string {
@@ -197,10 +149,38 @@ export class BoardView {
     return names.length > 0 ? names.join(' / ') : `Column ${column.position + 1}`;
   }
 
-  /** Get tasks for a specific column based on its statusIds */
+  /**
+   * V4-12: statusId → the single column that owns it. Board documents may contain
+   * overlapping statusIds across columns (e.g. an "In Progress / Reopened" column
+   * next to a pure "In Progress" column); assigning each status to exactly one
+   * owner column guarantees every task renders in exactly ONE column — its actual
+   * status. Ownership prefers the MOST SPECIFIC column (fewest statusIds), then
+   * the lowest position — so an IN_PROGRESS task lands in the dedicated
+   * "In Progress" column, while REOPENED stays in the combined column.
+   */
+  private readonly columnOwnerByStatusId = computed(() => {
+    const owner = new Map<string, BoardColumn>();
+    const b = this.board();
+
+    if (!b) return owner;
+
+    for (const col of [...b.columns].sort(
+      (a, z) => a.statusIds.length - z.statusIds.length || a.position - z.position,
+    )) {
+      for (const statusId of col.statusIds) {
+        if (!owner.has(statusId)) owner.set(statusId, col);
+      }
+    }
+
+    return owner;
+  });
+
+  /** Get tasks for a specific column — only tasks whose status this column owns (V4-12) */
   protected getTasksForColumn(column: BoardColumn): Task[] {
+    const owner = this.columnOwnerByStatusId();
+
     return this.tasks()
-      .filter((t) => column.statusIds.includes(t.statusId))
+      .filter((t) => owner.get(t.statusId) === column)
       .sort((a, b) => a.number - b.number);
   }
 
@@ -213,10 +193,11 @@ export class BoardView {
     return b.columns.flatMap((c) => c.statusIds);
   }
 
-  protected onDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
-      this.showCreateTask.set(false);
-    }
+  /** Navigate to the unified create-task page (U1 — replaces the board dialog) */
+  goToNewTask(): void {
+    const projectKey = this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? '';
+
+    this.router.navigate(['/t', getTenantSlug(this.route), 'projects', projectKey, 'tasks', 'new']);
   }
 
   /** Handle CDK drag-drop event */
@@ -288,10 +269,10 @@ export class BoardView {
     const projectKey =
       this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? task.projectId;
 
-    // Backend accepts KEY-NUMBER format for GET /tasks/:taskId
+    // Canonical task URL uses the project key + task number (DEC-032)
     this.router.navigate([
-      '/tenants',
-      getTenantId(this.route),
+      '/t',
+      getTenantSlug(this.route),
       'projects',
       projectKey,
       'tasks',

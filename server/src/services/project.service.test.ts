@@ -1,5 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProjectService } from './project.service.js';
+import { withTransaction, TransactionsUnsupportedError } from '../db/mongo.js';
+
+// ─── Transaction API Mock (DEC-025) ──────────────────────────────────────────
+
+/**
+ * Session token handed to the callback — asserted on repository/collection
+ * calls to prove every seed write is bound to the transaction's session.
+ */
+const txSession = { id: 'mock-session' };
+
+vi.mock('../db/mongo.js', () => {
+  class TransactionsUnsupportedError extends Error {
+    constructor(message = 'This MongoDB deployment does not support transactions') {
+      super(message);
+      this.name = 'TransactionsUnsupportedError';
+    }
+  }
+
+  return {
+    TransactionsUnsupportedError,
+    // Default: execute the callback against the mock session (commit semantics)
+    withTransaction: vi.fn(async (fn: (session: unknown) => Promise<unknown>) => fn(txSession)),
+  };
+});
 
 // ─── Mock Factories ──────────────────────────────────────────────────────────
 
@@ -75,6 +99,8 @@ describe('ProjectService', () => {
   let service: ProjectService;
 
   beforeEach(() => {
+    vi.mocked(withTransaction).mockClear();
+    vi.mocked(withTransaction).mockImplementation(async (fn) => fn(txSession as never));
     projectRepo = createMockProjectRepo();
     memberRepo = createMockProjectMemberRepo();
     collections = createMockCollections();
@@ -108,16 +134,114 @@ describe('ProjectService', () => {
         name: 'Test Project',
       });
 
-      expect(projectRepo.create).toHaveBeenCalledWith('tenant-1', { key: 'TEST', name: 'Test Project' });
+      expect(projectRepo.create).toHaveBeenCalledWith(
+        'tenant-1',
+        { key: 'TEST', name: 'Test Project' },
+        { session: txSession },
+      );
       expect(collections.statuses.insertOne).toHaveBeenCalledTimes(5); // 5 seed statuses
       expect(collections.taskTypes.insertOne).toHaveBeenCalledTimes(3); // 3 seed task types
+
+      // DR-1: seed statuses carry human-readable display names, not raw keys
+      const seededNames = collections.statuses.insertOne.mock.calls.map(
+        (call: unknown[]) => (call[0] as { name: string }).name,
+      );
+
+      expect(seededNames).toEqual(['To Do', 'In Progress', 'In Review', 'Reopened', 'Done']);
       expect(collections.boards.insertOne).toHaveBeenCalledTimes(1); // 1 default board
-      expect(memberRepo.create).toHaveBeenCalledWith({
-        userId: 'user-1',
-        projectId: 'proj-1',
-        role: 'PROJECT_ADMIN',
-      });
+      expect(memberRepo.create).toHaveBeenCalledWith(
+        { userId: 'user-1', projectId: 'proj-1', role: 'PROJECT_ADMIN' },
+        { session: txSession },
+      );
       expect(result.key).toBe('TEST');
+    });
+
+    it('runs the whole seed inside one transaction bound to its session', async () => {
+      projectRepo.findByTenantAndKey.mockResolvedValue(null);
+      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '', defaultBoardId: '' }));
+      projectRepo.findById.mockResolvedValue(makeProject());
+      memberRepo.create.mockResolvedValue(makeProjectMember());
+
+      await service.createProject('tenant-1', 'user-1', 'ADMIN', { key: 'TEST', name: 'Test Project' });
+
+      expect(withTransaction).toHaveBeenCalledTimes(1);
+
+      // Every write (statuses, task types, board, defaults update, membership)
+      // carries the transaction session
+      for (const call of collections.statuses.insertOne.mock.calls) {
+        expect(call[1]).toEqual({ session: txSession });
+      }
+      for (const call of collections.taskTypes.insertOne.mock.calls) {
+        expect(call[1]).toEqual({ session: txSession });
+      }
+      expect(collections.boards.insertOne.mock.calls[0][1]).toEqual({ session: txSession });
+      expect(projectRepo.update).toHaveBeenCalledWith(
+        'proj-1',
+        { defaultStatusId: expect.any(String), defaultBoardId: expect.any(String) },
+        { session: txSession },
+      );
+    });
+
+    it('aborted transaction leaves nothing visible and skips compensating delete', async () => {
+      projectRepo.findByTenantAndKey.mockResolvedValue(null);
+      vi.mocked(withTransaction).mockImplementation(async () => {
+        throw new Error('AbortTransaction'); // driver aborts ⇒ nothing committed
+      });
+
+      await expect(service.createProject('tenant-1', 'user-1', 'ADMIN', { key: 'TEST', name: 'X' })).rejects.toThrow(
+        'AbortTransaction',
+      );
+
+      // Transaction rollback replaces app-level cleanup — no compensating delete
+      expect(projectRepo.delete).not.toHaveBeenCalled();
+      expect(projectRepo.findById).not.toHaveBeenCalled(); // no post-commit read either
+    });
+
+    it('falls back to compensating-cleanup seed when transactions are unsupported', async () => {
+      projectRepo.findByTenantAndKey.mockResolvedValue(null);
+      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '', defaultBoardId: '' }));
+      projectRepo.findById.mockResolvedValue(makeProject());
+      memberRepo.create.mockResolvedValue(makeProjectMember());
+      vi.mocked(withTransaction).mockRejectedValue(new TransactionsUnsupportedError());
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(vi.fn());
+
+      try {
+        const result = await service.createProject('tenant-1', 'user-1', 'ADMIN', {
+          key: 'TEST',
+          name: 'Test Project',
+        });
+
+        // All docs written through the legacy path (no session binding)
+        expect(collections.statuses.insertOne).toHaveBeenCalledTimes(5);
+        expect(collections.taskTypes.insertOne).toHaveBeenCalledTimes(3);
+        expect(collections.boards.insertOne).toHaveBeenCalledTimes(1);
+        expect(memberRepo.create).toHaveBeenCalled();
+        expect(projectRepo.delete).not.toHaveBeenCalled(); // success ⇒ no cleanup
+        expect(result.key).toBe('TEST');
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('does not support transactions'));
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('fallback path deletes the project when seeding fails midway', async () => {
+      projectRepo.findByTenantAndKey.mockResolvedValue(null);
+      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '', defaultBoardId: '' }));
+      collections.statuses.insertOne.mockRejectedValue(new Error('write failed'));
+      vi.mocked(withTransaction).mockRejectedValue(new TransactionsUnsupportedError());
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(vi.fn());
+
+      try {
+        await expect(service.createProject('tenant-1', 'user-1', 'ADMIN', { key: 'TEST', name: 'X' })).rejects.toThrow(
+          'write failed',
+        );
+
+        expect(projectRepo.delete).toHaveBeenCalledWith('proj-1');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
 
     it('throws ConflictError for duplicate key', async () => {

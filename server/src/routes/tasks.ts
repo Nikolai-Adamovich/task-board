@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
+import { requirePermission } from '../middleware/rbac.js';
 import type { TaskQueryOptions } from '../repositories/task.repository.js';
 import { CreateTaskSchema, UpdateTaskSchema } from '../schemas/task.js';
 
@@ -45,17 +46,24 @@ export function createTaskRoutes(): Hono<AppEnv> {
 
   /**
    * POST /projects/:projectId/tasks — Create a task.
+   * Coarse gate at the route (projectRole resolved by tenantContextMiddleware),
+   * fine-grained re-check inside the service.
    */
-  router.post('/projects/:projectId/tasks', validateBody(CreateTaskSchema), async (c) => {
-    const projectId = c.req.param('projectId');
-    const userId = c.get('userId');
-    const tenantRole = c.get('tenantRole');
-    const projectRole = c.get('projectRole');
-    const body = c.req.valid('json');
-    const task = await c.get('svc').tasks.createTask(projectId, userId, tenantRole, projectRole, body);
+  router.post(
+    '/projects/:projectId/tasks',
+    requirePermission('create_task', true),
+    validateBody(CreateTaskSchema),
+    async (c) => {
+      const projectId = c.req.param('projectId');
+      const userId = c.get('userId');
+      const tenantRole = c.get('tenantRole');
+      const projectRole = c.get('projectRole');
+      const body = c.req.valid('json');
+      const task = await c.get('svc').tasks.createTask(projectId, userId, tenantRole, projectRole, body);
 
-    return c.json({ data: task }, 201);
-  });
+      return c.json({ data: task }, 201);
+    },
+  );
 
   /**
    * GET /tasks/:taskId — Get a single task by UUID or KEY-NUMBER (e.g. PRO-1).
@@ -82,8 +90,11 @@ export function createTaskRoutes(): Hono<AppEnv> {
   router.patch('/tasks/:taskId', validateBody(UpdateTaskSchema), async (c) => {
     const taskId = c.req.param('taskId');
     const userId = c.get('userId');
+    const tenantRole = c.get('tenantRole');
     const body = c.req.valid('json');
-    const task = await c.get('svc').tasks.updateTask(taskId, body, userId);
+    // Authorization (edit_task) is enforced inside the service after the task's
+    // project is resolved — the route path carries no projectId.
+    const task = await c.get('svc').tasks.updateTask(taskId, body, userId, tenantRole);
 
     return c.json({ data: task });
   });
@@ -94,8 +105,9 @@ export function createTaskRoutes(): Hono<AppEnv> {
   router.delete('/tasks/:taskId', async (c) => {
     const taskId = c.req.param('taskId');
     const userId = c.get('userId');
+    const tenantRole = c.get('tenantRole');
 
-    await c.get('svc').tasks.deleteTask(taskId, userId);
+    await c.get('svc').tasks.deleteTask(taskId, userId, tenantRole);
 
     return c.json({ data: { success: true } });
   });

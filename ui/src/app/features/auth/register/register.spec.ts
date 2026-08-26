@@ -6,7 +6,7 @@
  * - email: required, valid email format
  * - password: required, min 8 characters, max 128 characters
  */
-import { TestBed } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
@@ -17,6 +17,7 @@ import { API_BASE_URL } from '@app/api-url.token';
 describe('Register form validation', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  let fixture: ComponentFixture<Register>;
 
   function setup() {
     TestBed.configureTestingModule({
@@ -29,7 +30,7 @@ describe('Register form validation', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(Register);
+    fixture = TestBed.createComponent(Register);
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -178,6 +179,19 @@ describe('Register form validation', () => {
       }));
 
       expect(component.registerForm().invalid()).toBe(true);
+    });
+  });
+
+  // ── Layout (R3-P6) ───────────────────────────────────────────────────────
+
+  describe('layout', () => {
+    beforeEach(() => setup());
+
+    it('sizes the page container to the viewport minus the app header (no scrollbar)', () => {
+      const container = fixture.nativeElement.querySelector('div');
+
+      expect(container.classList.contains('min-h-[calc(100dvh-var(--header-height))]')).toBe(true);
+      expect(container.classList.contains('min-h-screen')).toBe(false);
     });
   });
 });

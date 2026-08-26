@@ -1,7 +1,7 @@
 import { Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import type { Task } from '@task-board/shared';
-import { priorityBadgeVariant, type BadgeVariant } from '@app/constants/priority';
+import { priorityBadgeVariant, priorityLabel, type BadgeVariant } from '@app/constants/priority';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 
@@ -20,6 +20,8 @@ export class TaskCard {
   readonly projectKey = input<string>('');
   readonly taskClick = output<Task>();
   readonly dragStart = output<{ task: Task; dragEvent: DragEvent }>();
+  /** V7-4b: title-case display label instead of the raw enum value */
+  protected readonly priorityLabel = priorityLabel;
 
   protected priorityVariant(): BadgeVariant {
     return priorityBadgeVariant(this.task().priority);

@@ -25,6 +25,7 @@ function makeDoc(overrides: Partial<TenantDocument> = {}): TenantDocument {
   return {
     id: 'tenant-123',
     name: 'Test Tenant',
+    slug: 'test-tenant',
     description: null,
     status: 'ACTIVE',
     deletionScheduledAt: null,
@@ -53,6 +54,7 @@ describe('TenantRepository', () => {
       expect(result).toEqual({
         id: 'tenant-123',
         name: 'Test Tenant',
+        slug: 'test-tenant',
         description: null,
         status: 'ACTIVE',
         deletionScheduledAt: null,
@@ -88,7 +90,7 @@ describe('TenantRepository', () => {
     it('inserts a document with ACTIVE status and returns the domain tenant', async () => {
       collection.insertOne.mockResolvedValue({ acknowledged: true } as InsertOneResult);
 
-      const result = await repo.create({ name: 'New Tenant' });
+      const result = await repo.create({ name: 'New Tenant', slug: 'new-tenant' });
 
       expect(collection.insertOne).toHaveBeenCalledTimes(1);
 
@@ -146,6 +148,41 @@ describe('TenantRepository', () => {
       const result = await repo.update('missing', { name: 'X' });
 
       expect(result).toBeNull();
+    });
+  });
+
+  // ── DEC-032 slug lookups ─────────────────────────────────────────────────
+
+  describe('findBySlug', () => {
+    it('returns the tenant matching the slug', async () => {
+      collection.findOne.mockResolvedValue(makeDoc());
+
+      const result = await repo.findBySlug('test-tenant');
+
+      expect(collection.findOne).toHaveBeenCalledWith({ slug: 'test-tenant' });
+      expect(result?.id).toBe('tenant-123');
+    });
+
+    it('returns null when no tenant has the slug', async () => {
+      collection.findOne.mockResolvedValue(null);
+
+      const result = await repo.findBySlug('missing');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('slugExists', () => {
+    it('returns true when a tenant claims the slug', async () => {
+      collection.findOne.mockResolvedValue(makeDoc());
+
+      await expect(repo.slugExists('test-tenant')).resolves.toBe(true);
+    });
+
+    it('returns false when the slug is free', async () => {
+      collection.findOne.mockResolvedValue(null);
+
+      await expect(repo.slugExists('free-slug')).resolves.toBe(false);
     });
   });
 

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
-import { UpdateUserProjectBoardPreferenceSchema } from '../schemas/user-preferences.js';
+import { UpdateUserGlobalSettingsSchema, UpdateUserProjectBoardPreferenceSchema } from '../schemas/user-preferences.js';
 
 // ─── User Preferences Routes ─────────────────────────────────────────────────
 
@@ -23,9 +23,9 @@ export function createUserPreferencesRoutes(): Hono<AppEnv> {
   /**
    * PUT /preferences — Update current user's global preferences.
    */
-  router.put('/preferences', async (c) => {
+  router.put('/preferences', validateBody(UpdateUserGlobalSettingsSchema), async (c) => {
     const userId = c.get('userId');
-    const body = await c.req.json<{ zoom?: number; theme?: string; language?: string; pageSize?: number }>();
+    const body = c.req.valid('json');
     const prefs = await c.get('svc').preferences.updateGlobalSettings(userId, body);
 
     return c.json({ data: prefs });

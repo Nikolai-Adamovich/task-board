@@ -1,34 +1,33 @@
 import { Component, computed, effect, inject, input, signal, OnInit } from '@angular/core';
-import { getTenantId } from '@app/shared/utils/route-utils';
+import { getTenantSlug } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideCheck, lucidePencil, lucideX } from '@ng-icons/lucide';
+import { firstValueFrom } from 'rxjs';
 import { TaskClient } from '@services/task-client';
-import { StatusClient } from '@services/status-client';
-import { TaskTypeClient } from '@services/task-type-client';
 import { LabelClient } from '@services/label-client';
-import { SprintClient } from '@services/sprint-client';
-import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
-import { priorityBadgeVariant } from '@app/constants/priority';
-import { TaskPriority } from '@task-board/shared';
+import { PreferencesStore } from '@stores/preferences-store';
+import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
+import { priorityBadgeVariant, priorityLabel } from '@app/constants/priority';
+import { TaskPriorityValues } from '@task-board/shared';
+import type { Task } from '@task-board/shared';
 import { canManageProject, canWrite } from '@app/shared/utils/role-utils';
 import { HttpErrorResponse } from '@angular/common/http';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmCardImports } from '@spartan-ng/helm/card';
-import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
+import { HlmAutocompleteImports } from '@spartan-ng/helm/autocomplete';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { rxResource } from '@angular/core/rxjs-interop';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
-import type { Task } from '@task-board/shared';
 import { CommentThread } from '@features/comments/comment-thread/comment-thread';
 import { TaskRelationships } from '@features/tasks/task-relationships/task-relationships';
 import { MilkdownEditor } from '@app/shared/milkdown-editor/milkdown-editor';
@@ -37,17 +36,11 @@ import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
-export interface EditTaskForm {
-  title: string;
-  description: string;
-  priority: TaskPriority;
-}
-
-interface SelectOption {
-  id: string;
-  name: string;
-}
-
+/**
+ * Single-view task page (R3-P5): title and description are Atlassian-style
+ * click-to-edit inline fields; side-panel selects stay immediate-apply.
+ * There is no separate edit mode / Edit button.
+ */
 @Component({
   selector: 'ui-task-detail',
   imports: [
@@ -55,130 +48,123 @@ interface SelectOption {
     HlmAlertImports,
     DatePipe,
     TranslocoPipe,
-    FormField,
-    FormRoot,
+    NgIcon,
     HlmButtonImports,
     HlmSpinnerImports,
     HlmCardImports,
-    HlmFieldImports,
     HlmInputImports,
-    HlmTextareaImports,
     HlmBadgeImports,
     HlmAvatarImports,
     HlmSelectImports,
+    HlmAutocompleteImports,
     HlmDialogImports,
     CommentThread,
     TaskRelationships,
     MilkdownEditor,
   ],
+  providers: [provideIcons({ lucidePencil, lucideCheck, lucideX })],
   templateUrl: './task-detail.html',
 })
 export class TaskDetail implements OnInit {
-  /** Shared badge-class helpers (see constants/priority.ts) */
+  /** Shared badge/label helpers (see constants/priority.ts) */
   protected readonly priorityBadgeVariant = priorityBadgeVariant;
+  protected readonly priorityLabel = priorityLabel;
+  protected readonly TaskPriorityValues = TaskPriorityValues;
   private readonly notify = injectToasts();
   private readonly taskClient = inject(TaskClient);
-  private readonly statusClient = inject(StatusClient);
-  private readonly taskTypeClient = inject(TaskTypeClient);
   private readonly labelClient = inject(LabelClient);
-  private readonly sprintClient = inject(SprintClient);
-  private readonly projectClient = inject(ProjectClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
+  private readonly preferencesStore = inject(PreferencesStore);
+  /** R3-P8: DatePipe token derived from the user's date/time format preference */
+  protected readonly dateTimeFmt = this.preferencesStore.dateTimePipeFormat;
+  private readonly refStore = inject(ProjectRefStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  /** Bound via withComponentInputBinding() */
-  readonly taskId = input.required<string>();
-  private readonly taskResource = rxResource<Task | null, { taskId: string }>({
-    params: () => ({ taskId: this.taskId() }),
-    stream: ({ params }) => this.taskClient.getById(params.taskId),
+  /**
+   * Canonical task URL segment (KEY-NUMBER, e.g. `ABC-123`) bound via
+   * withComponentInputBinding() — the server resolves it to the task.
+   */
+  readonly taskNumber = input.required<string>();
+  private readonly taskResource = rxResource<Task | null, { taskNumber: string }>({
+    params: () => ({ taskNumber: this.taskNumber() }),
+    stream: ({ params }) => this.taskClient.getById(params.taskNumber),
     defaultValue: null,
   });
   protected readonly task = computed(() => (this.taskResource.hasValue() ? this.taskResource.value() : null));
-  protected readonly isEditing = signal(false);
-  /** Whether the edit editor has finished initializing (swap views only when ready) */
-  protected readonly editReady = signal(false);
+  protected readonly projectId = computed(() => this.task()?.projectId ?? '');
+  // ─── Inline edit state (Atlassian inline-edit pattern) ──────────────────────
+  protected readonly editingTitle = signal(false);
+  protected readonly titleDraft = signal('');
+  protected readonly editingDescription = signal(false);
+  protected readonly descriptionDraft = signal('');
   protected readonly error = signal('');
   protected readonly currentUserId = signal('');
-  /** Resolved entity names for display */
-  protected readonly statusName = signal<string>('');
-  protected readonly typeName = signal<string>('');
-  protected readonly labelNames = signal<string[]>([]);
-  protected readonly sprintName = signal<string>('');
   protected readonly showDeleteConfirm = signal(false);
   protected readonly showConflictDialog = signal(false);
   protected readonly conflictMessage = signal('');
   private readonly taskToDelete = signal<Task | null>(null);
-  /** Options for inline editing */
-  protected readonly statusOptions = signal<SelectOption[]>([]);
-  protected readonly typeOptions = signal<SelectOption[]>([]);
-  protected readonly sprintOptions = signal<SelectOption[]>([]);
-  protected readonly labelOptions = signal<SelectOption[]>([]);
-  protected readonly memberOptions = signal<SelectOption[]>([]);
+  // ─── Reference data via the shared per-project store ───────────────────────
+  protected readonly statusOptions = computed(() => this.refStore.options(this.projectId(), 'statuses'));
+  protected readonly typeOptions = computed(() => this.refStore.options(this.projectId(), 'types'));
+  protected readonly sprintOptions = computed(() => this.refStore.options(this.projectId(), 'sprints'));
+  protected readonly labelOptions = computed(() => this.refStore.options(this.projectId(), 'labels'));
+  protected readonly memberOptions = computed(() => this.refStore.options(this.projectId(), 'members'));
+  /** Resolved entity names for display */
+  protected readonly statusName = computed(() => {
+    const t = this.task();
+
+    return t ? this.refStore.nameOf(this.projectId(), 'statuses', t.statusId) : '';
+  });
+  protected readonly typeName = computed(() => {
+    const t = this.task();
+
+    return t ? this.refStore.nameOf(this.projectId(), 'types', t.typeId) : '';
+  });
+  protected readonly sprintName = computed(() => {
+    const t = this.task();
+
+    return t?.sprintId ? this.refStore.nameOf(this.projectId(), 'sprints', t.sprintId) : '';
+  });
+  /** Current labels of the task resolved to id/name options */
+  protected readonly selectedLabels = computed<SelectOption[]>(() => {
+    const t = this.task();
+
+    if (!t) return [];
+
+    return t.labelIds.map((id) => ({ id, name: this.refStore.nameOf(this.projectId(), 'labels', id) }));
+  });
   /** itemToString helpers for hlm-select to display human-readable labels */
   protected readonly statusItemToString = (id: string) => this.statusOptions().find((o) => o.id === id)?.name ?? id;
   protected readonly typeItemToString = (id: string) => this.typeOptions().find((o) => o.id === id)?.name ?? id;
   protected readonly assigneeItemToString = (id: string) => this.memberOptions().find((o) => o.id === id)?.name ?? id;
   protected readonly sprintItemToString = (id: string) => this.sprintOptions().find((o) => o.id === id)?.name ?? id;
-  protected readonly model = signal<EditTaskForm>({
-    title: '',
-    description: '',
-    priority: TaskPriority.MEDIUM,
+  protected readonly priorityItemToString = (value: string) => priorityLabel(value);
+  // ─── Labels: case-insensitive autocomplete + create-new (BR-019, R3-P5) ─────
+  /** Free-text search buffer for the label autocomplete */
+  protected readonly labelSearch = signal('');
+  /** Existing labels matching the search, excluding already-applied ones */
+  protected readonly filteredLabelOptions = computed(() => {
+    const search = this.labelSearch().toLowerCase();
+    const applied = new Set(this.task()?.labelIds ?? []);
+
+    return this.labelOptions().filter((o) => !applied.has(o.id) && o.name.toLowerCase().includes(search));
   });
-  protected readonly editForm = form(
-    this.model,
-    schema<EditTaskForm>((field) => {
-      required(field.title, { message: 'validation.titleRequired' });
-    }),
-    {
-      submission: {
-        action: async () => {
-          this.error.set('');
+  /** A new label can be created when the search is non-empty and matches no existing label case-insensitively */
+  protected readonly canCreateLabel = computed(() => {
+    const name = this.labelSearch().trim().toLowerCase();
 
-          const t = this.task();
+    if (!name) return false;
 
-          if (!t) return;
-
-          this.taskClient
-            .update(t.id, {
-              title: this.model().title,
-              description: this.model().description,
-              priority: this.model().priority,
-              version: t.version,
-            })
-            .subscribe({
-              next: (updated) => {
-                this.taskResource.value.set(updated);
-                this.isEditing.set(false);
-                this.notify.success('toasts.updated');
-              },
-              error: (err) => {
-                if (err instanceof HttpErrorResponse && err.status === 409) {
-                  this.conflictMessage.set(
-                    (err as HttpErrorResponse & { userMessage?: string }).userMessage ?? 'taskDetail.conflictHint',
-                  );
-                  this.showConflictDialog.set(true);
-                } else {
-                  this.error.set(getErrorMessage(err));
-                }
-              },
-            });
-        },
-      },
-    },
-  );
+    return !this.labelOptions().some((o) => o.name.toLowerCase() === name);
+  });
+  /** Synthetic option representing "create a new label with the typed name" */
+  protected readonly newLabelOption = computed<SelectOption>(() => ({ id: '', name: this.labelSearch().trim() }));
 
   constructor() {
+    // Load per-project reference data once (deduped by the store)
     effect(() => {
-      // hasValue() guards against reading `.value` in the error state
-      if (!this.taskResource.hasValue()) return;
-
-      const t = this.taskResource.value();
-
-      if (!t) return;
-
-      this.resolveRelatedEntities(t);
-      this.loadEditOptions(t.projectId);
+      this.refStore.ensure(this.projectId(), ['statuses', 'types', 'sprints', 'labels', 'members']);
     });
   }
 
@@ -188,68 +174,6 @@ export class TaskDetail implements OnInit {
     if (user) {
       this.currentUserId.set(user.id);
     }
-  }
-
-  /** Resolve statusId/typeId/labelIds/sprintId to human-readable names */
-  private resolveRelatedEntities(t: Task): void {
-    // Resolve status name
-    this.statusClient.list(t.projectId).subscribe({
-      next: (statuses) => {
-        const status = statuses.find((s) => s.id === t.statusId);
-
-        this.statusName.set(status?.name ?? t.statusId);
-      },
-    });
-
-    // Resolve type name
-    this.taskTypeClient.list(t.projectId).subscribe({
-      next: (types) => {
-        const type = types.find((tp) => tp.id === t.typeId);
-
-        this.typeName.set(type?.name ?? t.typeId);
-      },
-    });
-
-    // Resolve label names
-    this.labelClient.list(t.projectId).subscribe({
-      next: (labels) => {
-        const names = t.labelIds.map((id) => labels.find((l) => l.id === id)?.name ?? id);
-
-        this.labelNames.set(names);
-      },
-    });
-
-    // Resolve sprint name
-    if (t.sprintId) {
-      this.sprintClient.getById(t.sprintId).subscribe({
-        next: (sprint) => this.sprintName.set(sprint.name),
-        error: () => this.sprintName.set(t.sprintId ?? ''),
-      });
-    }
-  }
-
-  /** Load options for inline editing dropdowns */
-  private loadEditOptions(projectId: string): void {
-    this.statusClient.list(projectId).subscribe({
-      next: (statuses) => this.statusOptions.set(statuses.map((s) => ({ id: s.id, name: s.name }))),
-    });
-
-    this.taskTypeClient.list(projectId).subscribe({
-      next: (types) => this.typeOptions.set(types.map((t) => ({ id: t.id, name: t.name }))),
-    });
-
-    this.sprintClient.list(projectId).subscribe({
-      next: (sprints) => this.sprintOptions.set(sprints.map((s) => ({ id: s.id, name: s.name }))),
-    });
-
-    this.labelClient.list(projectId).subscribe({
-      next: (labels) => this.labelOptions.set(labels.map((l) => ({ id: l.id, name: l.name }))),
-    });
-
-    this.projectClient.listMembers(projectId).subscribe({
-      next: (members) =>
-        this.memberOptions.set(members.map((m) => ({ id: m.userId, name: m.displayName ?? m.userId }))),
-    });
   }
 
   protected taskLabel(): string {
@@ -266,50 +190,131 @@ export class TaskDetail implements OnInit {
     return canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole());
   }
 
+  /** Whether the current user may edit task fields (Editor+ or tenant ADMIN+) */
   protected canEdit(): boolean {
-    return this.canEditComments();
-  }
-
-  /** Whether the current user can edit comments (Editor+ or tenant ADMIN+) */
-  protected canEditComments(): boolean {
     return canWrite(this.projectStore.projectRole(), this.authStore.tenantRole());
   }
 
-  protected startEdit(): void {
+  /** Whether the current user can edit comments (same permission as field editing) */
+  protected canEditComments(): boolean {
+    return this.canEdit();
+  }
+
+  // ─── Inline title edit ──────────────────────────────────────────────────────
+
+  protected startTitleEdit(): void {
     const t = this.task();
 
-    if (t) {
-      this.model.set({
-        title: t.title,
-        description: t.description ?? '',
-        priority: t.priority as TaskPriority,
-      });
-      // Keep the display view visible until the edit editor signals readiness
-      this.editReady.set(false);
-      this.isEditing.set(true);
+    if (!t || !this.canEdit()) return;
+
+    this.titleDraft.set(t.title);
+    this.editingTitle.set(true);
+  }
+
+  protected confirmTitleEdit(): void {
+    if (!this.editingTitle()) return;
+
+    const t = this.task();
+    const title = this.titleDraft().trim();
+
+    if (!t || !title) return;
+
+    this.editingTitle.set(false);
+    this.titleDraft.set('');
+
+    if (title === t.title) return;
+
+    this.updateField('title', title);
+  }
+
+  protected cancelTitleEdit(): void {
+    this.editingTitle.set(false);
+    this.titleDraft.set('');
+  }
+
+  // ─── Inline description edit (keepEditViewOpenOnBlur semantics) ─────────────
+
+  protected startDescriptionEdit(): void {
+    const t = this.task();
+
+    if (!t || !this.canEdit()) return;
+
+    this.descriptionDraft.set(t.description ?? '');
+    this.editingDescription.set(true);
+  }
+
+  protected confirmDescriptionEdit(): void {
+    if (!this.editingDescription()) return;
+
+    const t = this.task();
+    const description = this.descriptionDraft().trim();
+
+    if (!t) return;
+
+    this.editingDescription.set(false);
+    this.descriptionDraft.set('');
+
+    if (description === (t.description ?? '')) return;
+
+    this.updateField('description', description);
+  }
+
+  protected cancelDescriptionEdit(): void {
+    this.editingDescription.set(false);
+    this.descriptionDraft.set('');
+  }
+
+  // ─── Labels ─────────────────────────────────────────────────────────────────
+
+  /** Add a picked label (existing or to-be-created); PATCHes labelIds immediately */
+  protected async onLabelPicked(option: SelectOption): Promise<void> {
+    const t = this.task();
+
+    if (!t || !option?.name) return;
+
+    this.labelSearch.set('');
+
+    let id = option.id;
+
+    if (!id) {
+      const name = option.name.trim().toLowerCase();
+      // Case-insensitive reuse of an existing project label (BR-019)
+      const existing = this.labelOptions().find((o) => o.name.toLowerCase() === name);
+
+      if (existing) {
+        id = existing.id;
+      } else {
+        try {
+          const created = await firstValueFrom(this.labelClient.create(t.projectId, { name: option.name.trim() }));
+
+          id = created.id;
+          this.refStore.invalidate(t.projectId, 'labels');
+        } catch (err) {
+          this.notify.error(getErrorMessage(err));
+
+          return;
+        }
+      }
     }
+
+    if (t.labelIds.includes(id)) return;
+
+    this.updateField('labelIds', [...t.labelIds, id]);
   }
 
-  protected cancelEdit(): void {
-    this.model.set({
-      title: '',
-      description: '',
-      priority: TaskPriority.MEDIUM,
-    });
-    this.isEditing.set(false);
-    this.editReady.set(false);
+  protected removeLabel(labelId: string): void {
+    const t = this.task();
+
+    if (!t) return;
+
+    this.updateField(
+      'labelIds',
+      t.labelIds.filter((id) => id !== labelId),
+    );
   }
 
-  protected onEditReady(): void {
-    this.editReady.set(true);
-  }
+  // ─── Generic single-field update (Jira-style immediate apply) ───────────────
 
-  /** Handle Milkdown editor content change */
-  protected onDescriptionChange(markdown: string): void {
-    this.model.update((m) => ({ ...m, description: markdown }));
-  }
-
-  /** Inline update for a single field (Jira-style) */
   protected updateField(field: string, value: unknown): void {
     const t = this.task();
 
@@ -318,32 +323,20 @@ export class TaskDetail implements OnInit {
     const update = { [field]: value, version: t.version } as Record<string, unknown>;
 
     this.taskClient.update(t.id, update as never).subscribe({
-      next: (updated) => {
-        this.taskResource.value.set(updated);
-        // Re-resolve names if status/type/sprint changed
-        if (field === 'statusId') {
-          this.statusName.set(this.statusOptions().find((o) => o.id === value)?.name ?? (value as string));
-        } else if (field === 'typeId') {
-          this.typeName.set(this.typeOptions().find((o) => o.id === value)?.name ?? (value as string));
-        } else if (field === 'sprintId') {
-          if (value) {
-            this.sprintName.set(this.sprintOptions().find((o) => o.id === value)?.name ?? (value as string));
-          } else {
-            this.sprintName.set('');
-          }
-        }
-      },
-      error: (err) => {
-        if (err instanceof HttpErrorResponse && err.status === 409) {
-          this.conflictMessage.set(
-            (err as HttpErrorResponse & { userMessage?: string }).userMessage ?? 'taskDetail.conflictHint',
-          );
-          this.showConflictDialog.set(true);
-        } else {
-          this.error.set(getErrorMessage(err));
-        }
-      },
+      next: (updated) => this.taskResource.value.set(updated),
+      error: (err) => this.handleUpdateError(err),
     });
+  }
+
+  private handleUpdateError(err: unknown): void {
+    if (err instanceof HttpErrorResponse && err.status === 409) {
+      this.conflictMessage.set(
+        (err as HttpErrorResponse & { userMessage?: string }).userMessage ?? 'taskDetail.conflictHint',
+      );
+      this.showConflictDialog.set(true);
+    } else {
+      this.error.set(getErrorMessage(err));
+    }
   }
 
   protected confirmDeleteTask(task: Task): void {
@@ -367,7 +360,6 @@ export class TaskDetail implements OnInit {
   /** Reload task from server to resolve conflict */
   protected reloadAfterConflict(): void {
     this.showConflictDialog.set(false);
-    this.isEditing.set(false);
     this.taskResource.reload();
   }
 
@@ -381,7 +373,7 @@ export class TaskDetail implements OnInit {
         // Navigate using project key from store
         const projectKey = this.projectStore.activeProject()?.key ?? task.projectId;
 
-        this.router.navigate(['/tenants', getTenantId(this.route), 'projects', projectKey]);
+        this.router.navigate(['/t', getTenantSlug(this.route), 'projects', projectKey]);
       },
     });
   }

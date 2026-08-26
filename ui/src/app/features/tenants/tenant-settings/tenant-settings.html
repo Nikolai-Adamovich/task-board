@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-3xl">
+<div class="mx-auto max-w-2xl">
   <!-- Page header -->
   <div class="mb-6 flex items-center gap-3">
     <ng-icon name="lucideSettings" class="size-6 text-foreground" />
@@ -92,7 +92,7 @@
 
   <!-- Delete Confirmation Dialog -->
   <hlm-dialog [state]="showDeleteDialog() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
+    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'tenantSettings.deleteTitle' | transloco }}</h3>
         <p hlmDialogDescription>{{ 'tenantSettings.deleteDesc' | transloco }}</p>

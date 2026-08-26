@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   NeutralDotColor,
   priorityBadgeVariant,
+  priorityLabel,
   statusBadgeVariant,
   roleBadgeVariant,
   memberStatusBadgeVariant,
@@ -18,6 +19,19 @@ describe('priorityBadgeVariant', () => {
 
   it('should return the neutral fallback for unknown priorities', () => {
     expect(priorityBadgeVariant('unknown')).toBe('outline');
+  });
+});
+
+describe('priorityLabel', () => {
+  it('should return title-case labels for every priority value', () => {
+    expect(priorityLabel('LOW')).toBe('Low');
+    expect(priorityLabel('MEDIUM')).toBe('Medium');
+    expect(priorityLabel('HIGH')).toBe('High');
+    expect(priorityLabel('CRITICAL')).toBe('Critical');
+  });
+
+  it('should fall back to the raw value for unknown priorities', () => {
+    expect(priorityLabel('unknown')).toBe('unknown');
   });
 });
 

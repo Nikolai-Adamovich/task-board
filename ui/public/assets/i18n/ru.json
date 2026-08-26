@@ -27,7 +27,8 @@
     "taskTypes": "Типы задач",
     "labels": "Метки",
     "audit": "Аудит",
-    "filters": "Фильтры"
+    "filters": "Фильтры",
+    "projectSettings": "Project settings"
   },
   "tenantSwitcher": {
     "selectWorkspace": "Выберите рабочее пространство",
@@ -95,6 +96,26 @@
       "invalidOrExpired": "Недействительное или просроченное приглашение.",
       "passwordsNotMatch": "Пароли не совпадают.",
       "failedAccept": "Не удалось принять приглашение."
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "description": "Enter your email address and we will send you a reset link.",
+      "sentTitle": "Check your inbox",
+      "sentMessage": "If an account exists for that address, we have sent a password reset link.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "description": "Choose a new password for your account.",
+      "missingToken": "This reset link is missing or invalid. Please request a new one.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Reset password",
+      "submitting": "Resetting…",
+      "backToLogin": "Back to sign in"
     }
   },
   "landing": {
@@ -182,15 +203,51 @@
     "title": "Создайте рабочее пространство",
     "description": "Настройте рабочее пространство, чтобы начать управлять проектами.",
     "name": "Название рабочего пространства",
-    "slug": "Slug",
+    "slug": {
+      "label": "Workspace URL",
+      "checking": "Checking availability…",
+      "taken": "This URL is already taken",
+      "available": "This URL is available",
+      "hint": "Lowercase letters, numbers and hyphens only."
+    },
     "slugHint": "Используется в URL. Только строчные буквы, цифры и дефисы.",
-    "plan": "Подписка",
+    "plan": {
+      "title": "Choose a plan",
+      "subtitle": "Every workspace starts on the Free plan.",
+      "cardTitle": "Free",
+      "price": "$0",
+      "perMonth": "per month",
+      "workspace": "1 workspace",
+      "projects": "Unlimited projects",
+      "users": "Unlimited users"
+    },
     "planFree": "Бесплатный — До 3 проектов и 5 пользователей",
     "submit": "Создать рабочее пространство",
     "submitting": "Создание рабочего пространства…",
     "failed": "Не удалось создать рабочее пространство. Пожалуйста, попробуйте снова.",
     "descriptionLabel": "Описание (необязательно)",
-    "descriptionPlaceholder": "Краткое описание рабочего пространства…"
+    "descriptionPlaceholder": "Краткое описание рабочего пространства…",
+    "back": "Back",
+    "continue": "Continue",
+    "checkout": {
+      "title": "Checkout",
+      "subtitle": "Review your order before confirming.",
+      "summary": "Summary",
+      "planLabel": "Plan",
+      "planValue": "Free",
+      "workspaceLabel": "Workspace",
+      "urlLabel": "URL",
+      "totalLabel": "Total due today",
+      "totalValue": "$0",
+      "confirm": "Confirm & create workspace",
+      "confirming": "Confirming…",
+      "demoNote": "This is a demo — no payment is required."
+    },
+    "confirmation": {
+      "title": "Workspace created!",
+      "message": "Your workspace is ready. Invite your team and start planning.",
+      "success": "Everything went smoothly."
+    }
   },
   "settings": {
     "title": "Настройки",
@@ -200,7 +257,14 @@
     "zoomDescription": "Настройте размер шрифта интерфейса.",
     "resetZoom": "Сбросить",
     "language": "Язык",
-    "languageDescription": "Выберите язык отображения."
+    "languageDescription": "Выберите язык отображения.",
+    "dateFormat": "Формат даты",
+    "dateFormatDescription": "Выберите, как отображаются даты в приложении.",
+    "timeFormat": "Формат времени",
+    "timeFormatDescription": "Выберите, как отображается время в приложении.",
+    "timeFormat24h": "24-часовой",
+    "timeFormat12h": "12-часовой (AM/PM)",
+    "systemDefault": "System default"
   },
   "tenantSettings": {
     "title": "Настройки тенанта",
@@ -276,7 +340,12 @@
     "status": "Статус",
     "actions": "Действия",
     "restoreAccess": "Восстановить доступ",
-    "reinvite": "Пригласить повторно"
+    "reinvite": "Пригласить повторно",
+    "contextError": "Members could not be loaded because the project context is unavailable.",
+    "editRole": "Edit role",
+    "editRoleTitle": "Edit member role",
+    "editRoleDesc": "Choose the role this member has in the project.",
+    "invitationPending": "Invitation pending"
   },
   "projects": {
     "title": "Проекты",
@@ -336,7 +405,22 @@
     "deleteProjectWarning": "Это действие запланирует удаление проекта. Проект будет безвозвратно удалён через 30 дней.",
     "deleteProjectConsequence": "Все задачи, доски, спринты и данные проекта будут безвозвратно удалены. Это действие нельзя отменить.",
     "deleteProjectConfirmLabel": "Введите ключ проекта ({{key}}) для подтверждения удаления:",
-    "confirmDeleteButton": "Удалить проект"
+    "confirmDeleteButton": "Удалить проект",
+    "activeSprint": "Active sprint",
+    "deletionScheduledFor": "Deletion scheduled for {{date}}",
+    "goToSprints": "Go to sprints",
+    "goToTasks": "Go to tasks",
+    "manageBoards": "Manage boards",
+    "moreMembers": "+{{count}} more",
+    "noActiveSprint": "No active sprint",
+    "noTasks": "No tasks yet",
+    "openSprint": "Open sprint",
+    "recentTasks": "Recent tasks",
+    "settings": "Settings",
+    "taskSummary": "Task summary",
+    "totalTasks": "Total tasks",
+    "viewAllMembers": "View all members",
+    "viewAllTasks": "View all tasks"
   },
   "boardView": {
     "loading": "Загрузка доски…",
@@ -357,8 +441,10 @@
     "selectStatus": "Выберите статус…",
     "type": "Тип",
     "typePlaceholder": "Введите тип задачи…",
-    "noTasks": "Нет задач в этой колонке",
-    "multiStatusHint": "Эта колонка содержит несколько статусов. Выберите целевой статус для этой задачи."
+    "multiStatusHint": "Эта колонка содержит несколько статусов. Выберите целевой статус для этой задачи.",
+    "allTasks": "All tasks",
+    "clearSprint": "Clear sprint filter",
+    "sprintChip": "Sprint: {{name}}"
   },
   "priority": {
     "low": "Низкий",
@@ -400,7 +486,9 @@
     "conflictTitle": "Конфликт версий",
     "conflictHint": "Эта задача была изменена другим пользователем. Перезагрузите, чтобы получить последнюю версию.",
     "reloadTask": "Перезагрузить задачу",
-    "unknown": "Неизвестно"
+    "unknown": "Неизвестно",
+    "editTitle": "Edit title",
+    "editDescription": "Edit description"
   },
   "sprints": {
     "title": "Спринты",
@@ -423,9 +511,15 @@
     "createDesc": "Создайте новый спринт для этого проекта.",
     "future": "Будущие",
     "active": "Активные",
-    "completed": "Завершённые"
+    "completed": "Завершённые",
+    "backlog": "Backlog",
+    "overdue": "Overdue",
+    "overdueTooltip": "This sprint is past its end date"
   },
   "sprintDetail": {
+    "dispositionTitle": "Завершить спринт",
+    "dispositionDesc": "{{ count }} незавершённых задач будут перемещены в выбранный ниже спринт.",
+    "dispositionTarget": "Переместить в спринт",
     "loading": "Загрузка спринта…",
     "tasks": "Задачи",
     "backToProject": "Вернуться к проекту",
@@ -439,13 +533,18 @@
     "deleteConfirm": "Вы уверены, что хотите удалить этот спринт?",
     "deleteWarning": "Задачи в этом спринте не будут удалены, но будут удалены из спринта.",
     "cancelDelete": "Отмена",
-    "confirmDelete": "Удалить"
+    "confirmDelete": "Удалить",
+    "moveToBacklog": "Move to backlog",
+    "moveToSprint": "Move to sprint",
+    "completeAndMove": "Complete sprint & move tasks"
   },
   "sprintBacklog": {
     "backlog": "Бэклог",
     "loading": "Загрузка бэклога…",
     "allAssigned": "Все задачи назначены в спринты.",
-    "addToSprint": "Добавить в спринт"
+    "addToSprint": "Добавить в спринт",
+    "title": "Backlog",
+    "description": "Tasks without a sprint live here. Move them into an active sprint to start work."
   },
   "docs": {
     "title": "Документация",
@@ -535,7 +634,8 @@
     "labelNameRequired": "Название метки обязательно",
     "typeRequired": "Тип задачи обязателен",
     "statusRequired": "Статус обязателен",
-    "priorityRequired": "Приоритет обязателен"
+    "priorityRequired": "Приоритет обязателен",
+    "titleMaxLength": "Title must be at most 200 characters"
   },
   "errors": {
     "unexpected": "Произошла непредвиденная ошибка. Пожалуйста, попробуйте снова.",
@@ -672,6 +772,9 @@
     "deleting": "Удаление…"
   },
   "taskTable": {
+    "columns": "Колонки",
+    "selectColumns": "Выбрать колонки…",
+    "hideColumn": "Скрыть этот столбец",
     "filtersDesc": "Фильтруйте задачи по статусу, приоритету, исполнителю и др.",
     "title": "Задачи",
     "searchPlaceholder": "Поиск задач…",
@@ -713,7 +816,19 @@
     "noAssignee": "Нет исполнителя",
     "allAssignees": "Все исполнители",
     "allReporters": "Все авторы",
-    "allSprints": "Все спринты"
+    "allSprints": "Все спринты",
+    "activeFilters": "Active filters",
+    "clearFilters": "Clear all filters",
+    "filterSearch": "Search",
+    "filterStatus": "Status",
+    "filterType": "Type",
+    "filterPriority": "Priority",
+    "filterAssignee": "Assignee",
+    "filterReporter": "Reporter",
+    "filterSprint": "Sprint",
+    "filterLabel": "Label",
+    "noMatchingTasks": "No tasks match the current filters.",
+    "removeFilterAria": "Remove filter {{value}}"
   },
   "comments": {
     "title": "Комментарии",
@@ -774,9 +889,17 @@
     "deleteConfirm": "Вы уверены, что хотите удалить этот сохранённый фильтр?",
     "cancelDelete": "Отмена",
     "confirmDelete": "Удалить",
-    "deleteError": "Не удалось удалить фильтр."
+    "deleteError": "Не удалось удалить фильтр.",
+    "apply": "Apply"
   },
   "auditLog": {
+    "time": "Время",
+    "actor": "Инициатор",
+    "actionCol": "Действие",
+    "entity": "Сущность",
+    "changes": "Изменения",
+    "allActions": "Все действия",
+    "allActors": "Все инициаторы",
     "title": "Журнал аудита",
     "loading": "Загрузка событий аудита…",
     "noEvents": "События аудита не найдены.",
@@ -810,7 +933,8 @@
     "results": "{{total}} результатов",
     "perPage": "на страницу",
     "totalItems": "всего",
-    "pages": "страниц"
+    "pages": "страниц",
+    "auto": "Auto"
   },
   "states": {
     "archived": "Этот проект заархивирован.",
@@ -828,5 +952,79 @@
     "forbiddenDescription": "У вас нет прав для просмотра этой страницы.",
     "goHome": "На главную",
     "goBack": "Назад"
+  },
+  "projectSettings": {
+    "title": "Project settings",
+    "subtitle": "Configure boards, members and project details.",
+    "general": "General",
+    "generalDesc": "Basic information about this project.",
+    "adminOnly": "Only workspace admins can change these settings.",
+    "name": "Name",
+    "key": "Key",
+    "keyLockedHint": "The project key is permanent and cannot be changed.",
+    "description": "Description",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "creating": "Creating…",
+    "backToHub": "Back to settings hub",
+    "members": "Members",
+    "membersDesc": "Manage who has access to this project.",
+    "boards": "Boards",
+    "boardsDesc": "Create, rename and delete boards for this project.",
+    "newBoard": "New board",
+    "defaultBoard": "Default board",
+    "defaultBoardDeleteHint": "The default board cannot be deleted.",
+    "invalidStatusRefs": "Some columns reference statuses that no longer exist.",
+    "columnsCount": "{{count}} columns",
+    "rename": "Rename",
+    "renameBoardTitle": "Rename board",
+    "delete": "Delete",
+    "deleteBoardTitle": "Delete board",
+    "deleteBoardWarning": "This board will be permanently removed. Tasks are not deleted.",
+    "dangerZone": "Danger zone",
+    "dangerZoneDesc": "Irreversible actions for this project.",
+    "dangerDescription": "Archive or schedule this project for deletion.",
+    "taskTypes": "Типы задач",
+    "taskTypesDesc": "Определите типы задач, доступные в этом проекте.",
+    "statuses": "Статусы",
+    "statusesDesc": "Настройте статусы рабочего процесса этого проекта.",
+    "labels": "Метки",
+    "labelsDesc": "Создавайте метки и управляйте ими для категоризации задач."
+  },
+  "taskCreate": {
+    "title": "Create task",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Short, descriptive summary",
+    "descriptionLabel": "Description",
+    "status": "Status",
+    "selectStatus": "Select status",
+    "priority": "Priority",
+    "type": "Type",
+    "selectType": "Select type",
+    "assignee": "Assignee",
+    "unassigned": "Unassigned",
+    "sprint": "Sprint",
+    "backlog": "Backlog",
+    "labels": "Labels",
+    "labelsPlaceholder": "Search or create label…",
+    "labelsHint": "Pick an existing label or type a new name to create one.",
+    "noLabelsFound": "No labels found",
+    "createLabel": "Create \"{{name}}\"",
+    "removeLabelAria": "Remove label {{name}}",
+    "cancel": "Cancel",
+    "create": "Create task",
+    "creating": "Creating…"
+  },
+  "tenantHome": {
+    "createProject": "Create project",
+    "manageMembers": "Manage members",
+    "myTasks": "My tasks",
+    "noTasks": "No tasks assigned to you",
+    "noTasksHint": "Tasks assigned to you across all your projects will show up here.",
+    "pendingInvitations": "Pending invitations",
+    "pendingInvitationsCount": "{{count}} pending",
+    "noPendingInvitations": "No pending invitations"
   }
 }

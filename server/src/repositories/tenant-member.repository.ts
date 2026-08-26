@@ -15,6 +15,8 @@ export interface InvitationDocument {
   tokenHash: string;
   invitedBy: string;
   invitedOn: Date;
+  /** Email the invitation was sent to (lookup key for findPendingByEmail / findByInvitedEmail) */
+  invitedEmail?: string | null;
 }
 
 export interface TenantMemberDocument {
@@ -78,6 +80,18 @@ export class TenantMemberRepository {
 
   async findById(id: string): Promise<TenantMemberDocument | null> {
     return this.collection.findOne({ id });
+  }
+
+  /**
+   * Bulk lookup by ids — single `$in` query. Used by batch enrichment paths
+   * (e.g. audit-log label resolution) to avoid N+1 per-event lookups.
+   */
+  async findByIds(ids: string[]): Promise<TenantMember[]> {
+    if (ids.length === 0) return [];
+
+    const docs = await this.collection.find({ id: { $in: ids } }).toArray();
+
+    return docs.map(toDomain);
   }
 
   async countActiveByTenant(tenantId: string): Promise<number> {
@@ -158,6 +172,11 @@ export class TenantMemberRepository {
     const result = await this.collection.deleteOne({ userId, tenantId });
 
     return result.deletedCount > 0;
+  }
+
+  /** Delete all tenant memberships for a user (used on user deletion) */
+  async deleteByUserId(userId: string): Promise<void> {
+    await this.collection.deleteMany({ userId });
   }
 
   async deleteById(id: string): Promise<boolean> {

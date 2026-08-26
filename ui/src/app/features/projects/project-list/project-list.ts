@@ -72,7 +72,8 @@ export class ProjectList {
     return err ? getErrorMessage(err) : '';
   });
   protected readonly showCreateModal = signal(false);
-  protected readonly tenantId = computed(() => this.tenantStore.activeTenant()?.id ?? '');
+  /** Tenant slug for building project links (DEC-032) */
+  protected readonly tenantSlug = computed(() => this.tenantStore.activeTenant()?.slug ?? '');
   private readonly model = signal<CreateProjectForm>({
     name: '',
     key: '',

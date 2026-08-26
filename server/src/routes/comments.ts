@@ -16,8 +16,11 @@ export function createCommentRoutes(): Hono<AppEnv> {
   router.post('/tasks/:taskId/comments', validateBody(CreateCommentSchema), async (c) => {
     const taskId = c.req.param('taskId');
     const userId = c.get('userId');
+    const tenantRole = c.get('tenantRole');
     const body = c.req.valid('json');
-    const comment = await c.get('svc').comments.createComment(taskId, userId, body);
+    // Authorization (create_comment) is enforced inside the service after the
+    // task's project is resolved — the route path carries no projectId.
+    const comment = await c.get('svc').comments.createComment(taskId, userId, body, undefined, tenantRole);
 
     return c.json({ data: comment }, 201);
   });

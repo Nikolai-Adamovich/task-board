@@ -9,6 +9,14 @@
 /** Subset of `hlmBadge` variants used across the app. */
 export type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
+/** Title-case display labels for task priorities (internal enum values unchanged). */
+const PriorityLabelMap: Record<string, string> = {
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  CRITICAL: 'Critical',
+};
+
 /** Task priority levels mapped to badge variants (ascending severity). */
 export const PriorityVariantMap = {
   LOW: 'outline',
@@ -86,6 +94,14 @@ const StatusBadgeVariantMap: Record<string, BadgeVariant> = { ...StatusVariantMa
 /** Resolve the badge variant for a task priority. Unknown values fall back to {@link NeutralVariant}. */
 export function priorityBadgeVariant(priority: string): BadgeVariant {
   return (PriorityVariantMap as Record<string, BadgeVariant>)[priority] ?? NeutralVariant;
+}
+
+/**
+ * Resolve the title-case display label for a task priority (R3-P5).
+ * Unknown values fall back to the raw value so nothing renders blank.
+ */
+export function priorityLabel(priority: string): string {
+  return PriorityLabelMap[priority] ?? priority;
 }
 
 /** Resolve the badge variant for a sprint/tenant/project status. Unknown values fall back to {@link NeutralVariant}. */

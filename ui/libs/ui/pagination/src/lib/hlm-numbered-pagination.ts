@@ -1,5 +1,5 @@
 import type { BooleanInput, NumberInput } from '@angular/cdk/coercion';
-import { Component, booleanAttribute, computed, input, model, numberAttribute, untracked } from '@angular/core';
+import { Component, booleanAttribute, computed, input, model, numberAttribute, output, untracked } from '@angular/core';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmPagination } from './hlm-pagination';
 import { HlmPaginationContent } from './hlm-pagination-content';
@@ -58,13 +58,24 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
         </ul>
       </nav>
 
-      <!-- Show Page Size selector -->
-      <hlm-select [(value)]="itemsPerPage" class="ml-auto">
+      <!-- Show Page Size selector.
+           V4-9: itemToString maps the sentinel value 'auto' to its human label,
+           so the closed trigger shows "Auto" instead of the raw lowercase value
+           (the option list lives in a portal and cannot resolve it otherwise). -->
+      <hlm-select
+        [value]="_selectedValue()"
+        [itemToString]="_pageSizeItemToString"
+        (valueChange)="onItemsPerPageSelect($any($event))"
+        class="ml-auto"
+      >
         <hlm-select-trigger class="w-fit">
           <hlm-select-value />
         </hlm-select-trigger>
         <hlm-select-content *hlmSelectPortal>
           <hlm-select-group>
+            @if (autoOptionLabel()) {
+              <hlm-select-item value="auto">{{ autoOptionLabel() }}</hlm-select-item>
+            }
             @for (pageSize of _pageSizesWithCurrent(); track pageSize) {
               <hlm-select-item [value]="pageSize">{{ pageSize }}</hlm-select-item>
             }
@@ -122,9 +133,41 @@ export class HlmNumberedPagination {
   public readonly previousText = input<string>('Previous');
   /** Text for the "Next" button. */
   public readonly nextText = input<string>('Next');
+  /**
+   * Label for an optional "Auto" page-size entry (e.g. computed from the viewport).
+   * When null/undefined the Auto option is not rendered.
+   */
+  public readonly autoOptionLabel = input<string | null>(null);
+  /** Whether the Auto option is currently the active selection. */
+  public readonly autoSelected = input<boolean, BooleanInput>(false, { transform: booleanAttribute });
+  /** Emitted when the user picks the Auto option in the selector. */
+  public readonly autoPageSizeChange = output();
+
+  /** Value shown as selected in the size selector — 'auto' or the numeric size. */
+  protected readonly _selectedValue = computed(() =>
+    this.autoSelected() && this.autoOptionLabel() ? 'auto' : String(this.itemsPerPage()),
+  );
+
+  /** V4-9: display label resolver for the size selector ('auto' → e.g. "Auto"). */
+  protected readonly _pageSizeItemToString = (value: string | number): string =>
+    `${value}` === 'auto' ? (this.autoOptionLabel() ?? 'Auto') : String(value);
+
+  protected onItemsPerPageSelect(value: string | number): void {
+    if (`${value}` === 'auto' && this.autoOptionLabel()) {
+      this.autoPageSizeChange.emit();
+
+      return;
+    }
+    this.itemsPerPage.set(Number(value));
+  }
 
   protected readonly _pageSizesWithCurrent = computed(() => {
     const pageSizes = this.pageSizes();
+    if (this.autoSelected()) {
+      // Auto mode resolves the effective size dynamically — don't inject it
+      // as a one-off option into the fixed list.
+      return pageSizes;
+    }
     return pageSizes.includes(this.itemsPerPage())
       ? pageSizes // if current page size is included, return the same array
       : [...pageSizes, this.itemsPerPage()].sort((a, b) => a - b); // otherwise, add current page size and sort the array

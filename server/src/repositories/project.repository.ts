@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { ClientSession } from 'mongodb';
 import { BaseRepository } from './base.repository.js';
 import { ProjectStatus } from '@task-board/shared';
 import type { Project } from '@task-board/shared';
@@ -69,7 +70,11 @@ export class ProjectRepository extends BaseRepository<ProjectDocument, Project> 
     return doc ? toDomain(doc) : null;
   }
 
-  async create(tenantId: string, input: { key: string; name: string; description?: string }): Promise<Project> {
+  async create(
+    tenantId: string,
+    input: { key: string; name: string; description?: string },
+    options?: { session?: ClientSession },
+  ): Promise<Project> {
     const now = new Date();
     const doc: ProjectDocument = {
       id: randomUUID(),
@@ -86,7 +91,7 @@ export class ProjectRepository extends BaseRepository<ProjectDocument, Project> 
       updatedAt: now,
     };
 
-    await this.collection.insertOne(doc);
+    await this.collection.insertOne(doc, options);
     return toDomain(doc);
   }
 
@@ -104,11 +109,12 @@ export class ProjectRepository extends BaseRepository<ProjectDocument, Project> 
         | 'deletionScheduledAt'
       >
     >,
+    options?: { session?: ClientSession },
   ): Promise<Project | null> {
     const result = await this.collection.findOneAndUpdate(
       { id },
       { $set: { ...input, updatedAt: new Date() } },
-      { returnDocument: 'after' },
+      { returnDocument: 'after', ...options },
     );
 
     return result ? toDomain(result) : null;

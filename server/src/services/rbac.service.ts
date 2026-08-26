@@ -28,6 +28,7 @@ export type PermissionAction =
   | 'view_comment'
   | 'manage_task_relationships'
   | 'manage_filters'
+  | 'view_task_history'
   | 'view_audit_events';
 
 // ─── Permission Matrix ───────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ const tenantPermissions: Record<string, TenantRole[]> = {
  * | view_comment              | Yes | Yes | Yes |
  * | manage_task_relationships | Yes | Yes | No  |
  * | manage_filters            | Yes | Yes | Yes |
+ * | view_task_history         | Yes | Yes | Yes |
  * | view_audit_events         | Yes | No  | No  |
  *
  * *Limited = editors can create labels from task but not bulk-delete (enforced at service level)
@@ -92,6 +94,9 @@ const projectPermissions: Record<string, ProjectRole[]> = {
   view_comment: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR, ProjectRole.VIEWER],
   manage_task_relationships: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR],
   manage_filters: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR, ProjectRole.VIEWER],
+  // DEC-021: task History is daily-use and visible to all project roles;
+  // administrative audit events stay PROJECT_ADMIN-only (+ tenant bypass).
+  view_task_history: [ProjectRole.PROJECT_ADMIN, ProjectRole.EDITOR, ProjectRole.VIEWER],
   view_audit_events: [ProjectRole.PROJECT_ADMIN],
 };
 

@@ -1,6 +1,7 @@
 import type { Status, CreateStatus, UpdateStatus } from '@task-board/shared';
-import { ConflictError, NotFoundError } from '../errors/app-error.js';
+import { ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { StatusRepository } from '../repositories/status.repository.js';
+import { ensurePermission } from './rbac.service.js';
 import type { AuditService } from './audit.service.js';
 
 // ─── Interfaces for cross-repository dependencies ────────────────────────────
@@ -21,6 +22,11 @@ export interface StatusServiceProjectRepo {
   findById(id: string): Promise<{ tenantId: string } | null>;
 }
 
+/** Minimal project-member repository interface to resolve the caller's project role */
+export interface StatusServiceProjectMemberRepo {
+  findByUserAndProject(userId: string, projectId: string): Promise<{ role: string } | null>;
+}
+
 // ─── Status Service ──────────────────────────────────────────────────────────
 
 export class StatusService {
@@ -30,7 +36,28 @@ export class StatusService {
     private readonly boardRepo: StatusServiceBoardRepo,
     private readonly projectRepo?: StatusServiceProjectRepo,
     private readonly auditService?: AuditService,
+    private readonly projectMemberRepo?: StatusServiceProjectMemberRepo,
   ) {}
+
+  /**
+   * V2-4: gate every mutation behind `manage_statuses` (PROJECT_ADMIN only;
+   * tenant Owner/Admin bypass inside the RBAC matrix). Routes with
+   * `:projectId` in the path are additionally gated by requirePermission —
+   * this is the defense-in-depth / id-based-route layer.
+   */
+  private async ensureManageStatuses(projectId: string, userId?: string, userRole?: string): Promise<void> {
+    if (!userId || !userRole) {
+      return; // no caller context → nothing to enforce against (legacy/test callers)
+    }
+
+    if (!this.projectMemberRepo) {
+      throw new ForbiddenError('Project membership lookup is unavailable');
+    }
+
+    const membership = await this.projectMemberRepo.findByUserAndProject(userId, projectId);
+
+    ensurePermission('manage_statuses', userRole, membership?.role ?? null);
+  }
 
   async getStatusesByProject(projectId: string): Promise<Status[]> {
     return this.statusRepo.findByProject(projectId);
@@ -40,7 +67,14 @@ export class StatusService {
    * Reorder statuses in a single bulk pass (transactional alternative to
    * two sequential PATCH calls that could leave positions inconsistent).
    */
-  async reorder(projectId: string, items: { id: string; position: number }[]): Promise<Status[]> {
+  async reorder(
+    projectId: string,
+    items: { id: string; position: number }[],
+    userId?: string,
+    userRole?: string,
+  ): Promise<Status[]> {
+    await this.ensureManageStatuses(projectId, userId, userRole);
+
     const statuses = await this.statusRepo.findByProject(projectId);
     const knownIds = new Set(statuses.map((s) => s.id));
 
@@ -53,7 +87,9 @@ export class StatusService {
     return this.statusRepo.findByProject(projectId);
   }
 
-  async createStatus(projectId: string, input: CreateStatus, userId?: string): Promise<Status> {
+  async createStatus(projectId: string, input: CreateStatus, userId?: string, userRole?: string): Promise<Status> {
+    await this.ensureManageStatuses(projectId, userId, userRole);
+
     const normalizedName = input.name.toLowerCase().trim();
     const existing = await this.statusRepo.findByProjectAndNormalizedName(projectId, normalizedName);
 
@@ -80,12 +116,14 @@ export class StatusService {
     return status;
   }
 
-  async updateStatus(statusId: string, input: UpdateStatus, userId?: string): Promise<Status> {
+  async updateStatus(statusId: string, input: UpdateStatus, userId?: string, userRole?: string): Promise<Status> {
     const status = await this.statusRepo.findById(statusId);
 
     if (!status) {
       throw new NotFoundError('Status not found');
     }
+
+    await this.ensureManageStatuses(status.projectId, userId, userRole);
 
     const updateFields: { name?: string; normalizedName?: string; position?: number } = {};
 
@@ -133,12 +171,19 @@ export class StatusService {
     return updated;
   }
 
-  async deleteStatus(statusId: string, replacementStatusId?: string, userId?: string): Promise<void> {
+  async deleteStatus(
+    statusId: string,
+    replacementStatusId?: string,
+    userId?: string,
+    userRole?: string,
+  ): Promise<void> {
     const status = await this.statusRepo.findById(statusId);
 
     if (!status) {
       throw new NotFoundError('Status not found');
     }
+
+    await this.ensureManageStatuses(status.projectId, userId, userRole);
 
     // Check if any tasks use this status
     const tasksWithStatus = await this.taskRepo.countByStatus(status.projectId, statusId);

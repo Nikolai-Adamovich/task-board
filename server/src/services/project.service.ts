@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
+import type { ClientSession, Collection } from 'mongodb';
 import { TenantRole, ProjectRole, ProjectStatus, ArchiveReason } from '@task-board/shared';
 import type { Project, ProjectMember, CreateProject, UpdateProject } from '@task-board/shared';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
+import { TransactionsUnsupportedError, withTransaction } from '../db/mongo.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
 import { ProjectMemberRepository } from '../repositories/project-member.repository.js';
 import type { AuditService } from './audit.service.js';
@@ -10,12 +11,15 @@ import type { AuditService } from './audit.service.js';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// DR-1: `name` is the human-readable display name shown in boards/tables;
+// `key` is the stable seed identifier used for board-column wiring and
+// defaultStatusId (keys/positions/normalizedNames are unchanged).
 const SEED_STATUSES = [
-  { name: 'TODO', normalizedName: 'todo', position: 0 },
-  { name: 'IN_PROGRESS', normalizedName: 'in_progress', position: 1 },
-  { name: 'IN_REVIEW', normalizedName: 'in_review', position: 2 },
-  { name: 'REOPENED', normalizedName: 'reopened', position: 3 },
-  { name: 'DONE', normalizedName: 'done', position: 4 },
+  { key: 'TODO', name: 'To Do', normalizedName: 'todo', position: 0 },
+  { key: 'IN_PROGRESS', name: 'In Progress', normalizedName: 'in_progress', position: 1 },
+  { key: 'IN_REVIEW', name: 'In Review', normalizedName: 'in_review', position: 2 },
+  { key: 'REOPENED', name: 'Reopened', normalizedName: 'reopened', position: 3 },
+  { key: 'DONE', name: 'Done', normalizedName: 'done', position: 4 },
 ];
 const SEED_TASK_TYPES = [
   { key: 'TASK', name: 'Task', icon: '📋', position: 0 },
@@ -111,9 +115,14 @@ export class ProjectService {
   }
 
   /**
-   * Create a new project with atomic seed data.
+   * Create a new project with atomic seed data (BR-003 / DEC-025).
    * Validates key format and uniqueness within tenant.
    * Seeds TaskTypes, Statuses, default Board, and creates creator membership.
+   *
+   * The whole seed runs inside a MongoDB transaction: an abort leaves no
+   * partially initialized project visible. On deployments without transaction
+   * support (standalone `mongod`), falls back to ordered inserts with a
+   * compensating delete — see {@link createProjectWithCompensatingCleanup}.
    */
   async createProject(tenantId: string, userId: string, userRole: string, input: CreateProject): Promise<Project> {
     this.requireTenantAdmin(userRole);
@@ -128,33 +137,47 @@ export class ProjectService {
       throw new ConflictError('A project with this key already exists in this tenant', 'DUPLICATE_PROJECT_KEY');
     }
 
-    // Create project
-    const project = await this.projectRepo.create(tenantId, input);
+    let project: Project;
 
-    // Seed data (ordered operations — simulates transaction)
     try {
-      const statusMap = await this.seedStatuses(project.id);
-      const todoStatusId = statusMap.get('TODO') ?? '';
-      const boardId = await this.seedBoard(project.id, statusMap);
+      // DEC-025: insert project + statuses + task types + default board +
+      // creator membership atomically; commit ⇒ all visible, abort ⇒ nothing.
+      project = await withTransaction(async (session) => {
+        const created = await this.projectRepo.create(tenantId, input, { session });
+        const statusMap = await this.seedStatuses(created.id, session);
+        const boardId = await this.seedBoard(created.id, statusMap, session);
 
-      await this.seedTaskTypes(project.id);
+        await this.seedTaskTypes(created.id, session);
 
-      // Update project with default references
-      await this.projectRepo.update(project.id, {
-        defaultStatusId: todoStatusId,
-        defaultBoardId: boardId,
-      });
+        // Link default references on the project (still inside the transaction)
+        await this.projectRepo.update(
+          created.id,
+          { defaultStatusId: statusMap.get('TODO') ?? '', defaultBoardId: boardId },
+          { session },
+        );
 
-      // Add creator as PROJECT_ADMIN
-      await this.projectMemberRepo.create({
-        userId,
-        projectId: project.id,
-        role: ProjectRole.PROJECT_ADMIN,
+        // Add creator as PROJECT_ADMIN
+        await this.projectMemberRepo.create(
+          { userId, projectId: created.id, role: ProjectRole.PROJECT_ADMIN },
+          { session },
+        );
+
+        return created;
       });
     } catch (err) {
-      // If seeding fails, clean up the project
-      await this.projectRepo.delete(project.id);
-      throw err;
+      if (err instanceof TransactionsUnsupportedError) {
+        // Fallback policy (DEC-025): standalone MongoDB (no replica set) cannot
+        // run transactions. Log clearly and use the legacy compensating-cleanup
+        // path so local dev does not hard-fail. Production (Atlas Free replica
+        // set) and docker-compose dev both run a replica set and never hit this.
+        console.warn(
+          '[projects] MongoDB topology does not support transactions — falling back to compensating-cleanup seed. ' +
+            'Run local MongoDB as a single-node replica set (see docker-compose.yml) for atomic seeding.',
+        );
+        project = await this.createProjectWithCompensatingCleanup(tenantId, userId, input);
+      } else {
+        throw err;
+      }
     }
 
     // Return the updated project
@@ -392,43 +415,49 @@ export class ProjectService {
     }
   }
 
-  private async seedStatuses(projectId: string): Promise<Map<string, string>> {
+  private async seedStatuses(projectId: string, session?: ClientSession): Promise<Map<string, string>> {
     const statusMap = new Map<string, string>();
 
     for (const status of SEED_STATUSES) {
       const id = randomUUID();
 
-      await this.collections.statuses.insertOne({
-        id,
-        projectId,
-        name: status.name,
-        normalizedName: status.normalizedName,
-        position: status.position,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      statusMap.set(status.name, id);
+      await this.collections.statuses.insertOne(
+        {
+          id,
+          projectId,
+          name: status.name,
+          normalizedName: status.normalizedName,
+          position: status.position,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        { session },
+      );
+      statusMap.set(status.key, id);
     }
 
     return statusMap;
   }
 
-  private async seedTaskTypes(projectId: string): Promise<void> {
+  private async seedTaskTypes(projectId: string, session?: ClientSession): Promise<void> {
     for (const taskType of SEED_TASK_TYPES) {
-      await this.collections.taskTypes.insertOne({
-        id: randomUUID(),
-        projectId,
-        key: taskType.key,
-        name: taskType.name,
-        icon: taskType.icon,
-        position: taskType.position,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      await this.collections.taskTypes.insertOne(
+        {
+          id: randomUUID(),
+          projectId,
+          key: taskType.key,
+          name: taskType.name,
+          icon: taskType.icon,
+          position: taskType.position,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        { session },
+      );
     }
   }
 
-  private async seedBoard(projectId: string, statusMap: Map<string, string>): Promise<string> {
+  private async seedBoard(projectId: string, statusMap: Map<string, string>, session?: ClientSession): Promise<string> {
     const boardId = randomUUID();
     const columns = SEED_BOARD_COLUMNS.map((col) => ({
       id: randomUUID(),
@@ -436,17 +465,60 @@ export class ProjectService {
       position: col.position,
     }));
 
-    await this.collections.boards.insertOne({
-      id: boardId,
-      projectId,
-      name: 'Default Board',
-      type: 'KANBAN',
-      columns,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    await this.collections.boards.insertOne(
+      {
+        id: boardId,
+        projectId,
+        name: 'Default Board',
+        type: 'KANBAN',
+        columns,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      { session },
+    );
 
     return boardId;
+  }
+
+  /**
+   * Legacy non-transactional seed path (DEC-025 fallback): ordered inserts
+   * followed by a compensating delete of the project if any step fails.
+   * Only used when the deployment's MongoDB cannot run transactions — there
+   * is a small window where a partially seeded project is visible before the
+   * cleanup completes.
+   */
+  private async createProjectWithCompensatingCleanup(
+    tenantId: string,
+    userId: string,
+    input: CreateProject,
+  ): Promise<Project> {
+    const project = await this.projectRepo.create(tenantId, input);
+
+    try {
+      const statusMap = await this.seedStatuses(project.id);
+      const todoStatusId = statusMap.get('TODO') ?? '';
+      const boardId = await this.seedBoard(project.id, statusMap);
+
+      await this.seedTaskTypes(project.id);
+
+      await this.projectRepo.update(project.id, {
+        defaultStatusId: todoStatusId,
+        defaultBoardId: boardId,
+      });
+
+      await this.projectMemberRepo.create({
+        userId,
+        projectId: project.id,
+        role: ProjectRole.PROJECT_ADMIN,
+      });
+    } catch (err) {
+      // If seeding fails, clean up the project
+      await this.projectRepo.delete(project.id);
+      throw err;
+    }
+
+    return project;
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────

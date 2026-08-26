@@ -2,16 +2,13 @@
  * Tests for the TenantMemberList component.
  *
  * Covers:
- * - Loading members on init
+ * - Loading members on init (tenant id resolved from the TenantStore context)
+ * - V1-10/V2-1 regression: no request / no invite when the tenant context is missing
  * - inviteMember validation & submission
- * - changeRole
+ * - changeRole (optimistic update with rollback + error toast)
  * - removeMember
- * - revokeAccess / resendInvitation / hardDeleteMember
- * - restoreMembership / reinviteMember
- * - isOwner / getInitials
- * - getRoleColor / getStatusColor
- * - canManage computed
- * - onDialogStateChange
+ * - revokeAccess / restoreMembership / reinviteMember / resendInvitation / hardDeleteMember
+ * - canManage computed (Owner/Admin only)
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -23,6 +20,7 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { TenantMemberList } from './tenant-member-list';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
+import { TenantStore } from '@stores/tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { TenantMember } from '@task-board/shared';
 
@@ -80,6 +78,7 @@ describe('TenantMemberList', () => {
     updateMemberRole: ReturnType<typeof vi.fn>;
     removeMember: ReturnType<typeof vi.fn>;
     revokeAccess: ReturnType<typeof vi.fn>;
+    revokeInvitation: ReturnType<typeof vi.fn>;
     resendInvitation: ReturnType<typeof vi.fn>;
     hardDeleteMember: ReturnType<typeof vi.fn>;
     restoreMembership: ReturnType<typeof vi.fn>;
@@ -91,14 +90,16 @@ describe('TenantMemberList', () => {
     currentUser: () => null;
     token: () => null;
   };
+  let tenantStoreMock: { activeTenant: ReturnType<typeof vi.fn> };
 
-  function setup(role = 'OWNER') {
+  function setup(role = 'OWNER', activeTenant: { id: string } | null = { id: 't1' }) {
     tenantClientMock = {
       listMembers: vi.fn().mockReturnValue(of(mockMembers)),
       inviteMember: vi.fn().mockReturnValue(of(mockMembers[0])),
       updateMemberRole: vi.fn().mockReturnValue(of({ ...mockMembers[1], role: 'ADMIN' })),
       removeMember: vi.fn().mockReturnValue(of(undefined)),
       revokeAccess: vi.fn().mockReturnValue(of({ success: true })),
+      revokeInvitation: vi.fn().mockReturnValue(of({ success: true })),
       resendInvitation: vi.fn().mockReturnValue(of({ success: true })),
       hardDeleteMember: vi.fn().mockReturnValue(of({ success: true })),
       restoreMembership: vi.fn().mockReturnValue(of({ success: true })),
@@ -110,6 +111,7 @@ describe('TenantMemberList', () => {
       currentUser: () => null,
       token: () => null,
     };
+    tenantStoreMock = { activeTenant: vi.fn().mockReturnValue(activeTenant) };
 
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
@@ -120,12 +122,11 @@ describe('TenantMemberList', () => {
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: TenantClient, useValue: tenantClientMock },
         { provide: AuthStore, useValue: authStoreMock },
+        { provide: TenantStore, useValue: tenantStoreMock },
       ],
     });
 
     const fixture = TestBed.createComponent(TenantMemberList);
-
-    fixture.componentRef.setInput('tenantId', 't1');
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -136,7 +137,7 @@ describe('TenantMemberList', () => {
   describe('ngOnInit', () => {
     beforeEach(() => setup());
 
-    it('should call tenantClient.listMembers', () => {
+    it('should call tenantClient.listMembers with the store-resolved tenant id', () => {
       expect(tenantClientMock.listMembers).toHaveBeenCalledWith('t1');
     });
 
@@ -146,6 +147,35 @@ describe('TenantMemberList', () => {
 
     it('should set loading to false', () => {
       expect(component.loading()).toBe(false);
+    });
+  });
+
+  // ── V1-10/V2-1 regression: missing tenant context ──────────────
+
+  describe('missing tenant context guard', () => {
+    it('should not fetch members when no active tenant is resolved', () => {
+      setup('OWNER', null);
+
+      expect(component.hasContext()).toBe(false);
+      expect(tenantClientMock.listMembers).not.toHaveBeenCalled();
+      expect(component.members()).toEqual([]);
+    });
+
+    it('should not POST an invite when no active tenant is resolved', () => {
+      setup('OWNER', null);
+
+      component.model.update((m: { email: string; role: string }) => ({ ...m, email: 'new@example.com' }));
+      submit(component.inviteForm);
+
+      expect(tenantClientMock.inviteMember).not.toHaveBeenCalled();
+    });
+
+    it('should not call updateMemberRole when no active tenant is resolved', () => {
+      setup('OWNER', null);
+
+      component.changeRole({ userId: 'u2', role: 'MEMBER' }, 'ADMIN');
+
+      expect(tenantClientMock.updateMemberRole).not.toHaveBeenCalled();
     });
   });
 
@@ -176,34 +206,32 @@ describe('TenantMemberList', () => {
       expect(component.model().email).toBe('');
       expect(component.model().role).toBe('MEMBER');
     });
-
-    it('should set actioningUserId to null on error', () => {
-      tenantClientMock.inviteMember.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.model.update((m: { email: string; role: string }) => ({ ...m, email: 'fail@example.com' }));
-      submit(component.inviteForm);
-
-      expect(component.actioningUserId()).toBe(null);
-    });
   });
 
-  // ── changeRole ─────────────────────────────────────────────────
+  // ── changeRole (optimistic + rollback) ─────────────────────────
 
   describe('changeRole', () => {
     beforeEach(() => setup());
 
     it('should not call API when role is unchanged', () => {
-      component.changeRole(mockMembers[0], 'OWNER');
+      component.changeRole({ userId: 'u1', role: 'OWNER' }, 'OWNER');
       expect(tenantClientMock.updateMemberRole).not.toHaveBeenCalled();
     });
 
-    it('should not call API when newRole is null', () => {
-      component.changeRole(mockMembers[1], null);
-      expect(tenantClientMock.updateMemberRole).not.toHaveBeenCalled();
-    });
+    it('should apply the change optimistically and call updateMemberRole', () => {
+      component.changeRole({ userId: 'u2', role: 'MEMBER' }, 'ADMIN');
 
-    it('should call updateMemberRole when role changes', () => {
-      component.changeRole(mockMembers[1], 'ADMIN');
+      // Optimistic: applied before the response arrives
+      expect(component.members().find((m: TenantMember) => m.userId === 'u2')?.role).toBe('ADMIN');
       expect(tenantClientMock.updateMemberRole).toHaveBeenCalledWith('t1', 'u2', 'ADMIN');
+    });
+
+    it('should roll back the optimistic change on error', () => {
+      tenantClientMock.updateMemberRole.mockReturnValueOnce(throwError(() => new Error('forbidden')));
+
+      component.changeRole({ userId: 'u2', role: 'MEMBER' }, 'ADMIN');
+
+      expect(component.members().find((m: TenantMember) => m.userId === 'u2')?.role).toBe('MEMBER');
     });
   });
 
@@ -213,7 +241,7 @@ describe('TenantMemberList', () => {
     beforeEach(() => setup());
 
     it('should remove member from list', () => {
-      component.removeMember(mockMembers[1]);
+      component.removeMember({ userId: 'u2', role: 'MEMBER' });
       expect(tenantClientMock.removeMember).toHaveBeenCalledWith('t1', 'u2');
       expect(component.members().find((m: TenantMember) => m.userId === 'u2')).toBeUndefined();
     });
@@ -221,16 +249,24 @@ describe('TenantMemberList', () => {
 
   // ── revokeAccess ───────────────────────────────────────────────
 
-  describe('revokeAccess', () => {
+  describe('revokeAccess (V2-7 dispatch)', () => {
     beforeEach(() => setup());
 
-    it('should call tenantClient.revokeAccess and update status', () => {
-      component.revokeAccess(mockMembers[1]);
+    it('should call tenantClient.revokeAccess for an ACTIVE member and reload the list', () => {
+      const callsBefore = tenantClientMock.listMembers.mock.calls.length;
+
+      component.revokeAccess({ userId: 'u2', role: 'MEMBER', status: 'ACTIVE' });
+
       expect(tenantClientMock.revokeAccess).toHaveBeenCalledWith('t1', 'u2');
+      expect(tenantClientMock.revokeInvitation).not.toHaveBeenCalled();
+      expect(tenantClientMock.listMembers.mock.calls.length).toBe(callsBefore + 1);
+    });
 
-      const updated = component.members().find((m: TenantMember) => m.userId === 'u2');
+    it('should route a PENDING invitation to the dedicated invitation-revoke endpoint', () => {
+      component.revokeAccess({ userId: 'u4', role: 'MEMBER', invitationStatus: 'PENDING' });
 
-      expect(updated.status).toBe('ACCESS_REVOKED');
+      expect(tenantClientMock.revokeInvitation).toHaveBeenCalledWith('t1', 'u4');
+      expect(tenantClientMock.revokeAccess).not.toHaveBeenCalled();
     });
   });
 
@@ -240,13 +276,10 @@ describe('TenantMemberList', () => {
     beforeEach(() => setup());
 
     it('should call tenantClient.restoreMembership and update status', () => {
-      // First revoke
-      component.revokeAccess(mockMembers[1]);
-      expect(component.members().find((m: TenantMember) => m.userId === 'u2')?.status).toBe('ACCESS_REVOKED');
+      component.restoreMembership({ userId: 'u2', role: 'MEMBER', status: 'ACCESS_REVOKED' });
 
-      // Then restore
-      component.restoreMembership({ ...mockMembers[1], status: 'ACCESS_REVOKED' });
       expect(tenantClientMock.restoreMembership).toHaveBeenCalledWith('t1', 'u2');
+      expect(component.members().find((m: TenantMember) => m.userId === 'u2')?.status).toBe('ACTIVE');
     });
   });
 
@@ -256,57 +289,20 @@ describe('TenantMemberList', () => {
     beforeEach(() => setup());
 
     it('should call tenantClient.reinviteMember', () => {
-      component.reinviteMember(mockMembers[2]);
+      component.reinviteMember({ userId: 'u3', role: 'MEMBER' });
       expect(tenantClientMock.reinviteMember).toHaveBeenCalledWith('t1', 'u3');
     });
   });
 
-  // ── hardDeleteMember ──────────────────────────────────────────────────
+  // ── hardDeleteMember ───────────────────────────────────────────
 
   describe('hardDeleteMember', () => {
     beforeEach(() => setup());
 
     it('should remove member from list', () => {
-      component.hardDeleteMember(mockMembers[1]);
+      component.hardDeleteMember({ userId: 'u2', role: 'MEMBER' });
       expect(tenantClientMock.hardDeleteMember).toHaveBeenCalledWith('t1', 'u2');
       expect(component.members().find((m: TenantMember) => m.userId === 'u2')).toBeUndefined();
-    });
-  });
-
-  // ── Helper methods ─────────────────────────────────────────────
-
-  describe('helpers', () => {
-    beforeEach(() => setup());
-
-    it('isOwner should return true for owner', () => {
-      expect(component.isOwner(mockMembers[0])).toBe(true);
-    });
-
-    it('isOwner should return false for non-owner', () => {
-      expect(component.isOwner(mockMembers[1])).toBe(false);
-    });
-
-    it('getInitials should return first 2 chars uppercased', () => {
-      expect(component.initials('abcdef')).toBe('AB');
-    });
-
-    it('getInitials should return ?? for null', () => {
-      expect(component.initials(null)).toBe('??');
-    });
-
-    it('getRoleColor should return correct colors', () => {
-      expect(component.roleBadgeVariant('OWNER')).toBe('default');
-      expect(component.roleBadgeVariant('ADMIN')).toBe('secondary');
-      expect(component.roleBadgeVariant('MEMBER')).toBe('outline');
-      expect(component.roleBadgeVariant('unknown')).toBe('outline');
-    });
-
-    it('getStatusColor should return correct colors', () => {
-      expect(component.memberStatusBadgeVariant('ACTIVE')).toBe('default');
-      expect(component.memberStatusBadgeVariant('PENDING')).toBe('secondary');
-      expect(component.memberStatusBadgeVariant('DECLINED')).toBe('destructive');
-      expect(component.memberStatusBadgeVariant('ACCESS_REVOKED')).toBe('destructive');
-      expect(component.memberStatusBadgeVariant('unknown')).toBe('outline');
     });
   });
 
@@ -326,19 +322,6 @@ describe('TenantMemberList', () => {
     it('should be false for MEMBER', () => {
       setup('MEMBER');
       expect(component.canManage()).toBe(false);
-    });
-  });
-
-  // ── onDialogStateChange ───────────────────────────────────────
-
-  describe('onDialogStateChange', () => {
-    beforeEach(() => setup());
-
-    it('should close dialog on closed state', () => {
-      component.showInviteDialog.set(true);
-      component.onDialogStateChange('closed');
-
-      expect(component.showInviteDialog()).toBe(false);
     });
   });
 });

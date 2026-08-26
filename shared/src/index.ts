@@ -4,6 +4,7 @@
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 export { valuesOf } from './utils/values-of.js';
+export { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN, generateSlugFromName, isValidTenantSlug } from './utils/slug.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 export {
@@ -35,6 +36,14 @@ export {
   AuditEntityTypeValues,
 } from './constants/roles.js';
 export { ExpandState } from './constants/expand-state.js';
+export {
+  TASK_TABLE_COLUMN_KEYS,
+  TASK_TABLE_PINNED_COLUMNS,
+  DEFAULT_TASK_TABLE_COLUMNS,
+} from './constants/task-table.js';
+export type { TaskTableColumnKey } from './constants/task-table.js';
+export { DATE_FORMAT_PREFERENCES, TIME_FORMAT_PREFERENCES } from './constants/date-format.js';
+export type { DateFormatPreference, TimeFormatPreference } from './constants/date-format.js';
 export { HttpMethod, HttpMethodValues } from './constants/http.js';
 export { API_BASE_PATH, ApiPaths } from './constants/paths.js';
 export { DEFAULT_THEME_ID } from './constants/theme.js';
@@ -42,7 +51,16 @@ export { DEFAULT_THEME_ID } from './constants/theme.js';
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type { User, CreateUser } from './types/user.js';
 
-export type { LoginRequest, RegisterRequest, AuthResponse, AcceptInvitation, InvitationDetails } from './types/auth.js';
+export type {
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+  AcceptInvitation,
+  InvitationDetails,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  ForgotPasswordResponse,
+} from './types/auth.js';
 
 export type {
   IdentitySnapshot,

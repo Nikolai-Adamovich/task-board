@@ -5,7 +5,7 @@
  * - email: required, valid email format
  * - password: required (no length restriction at login)
  */
-import { TestBed } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
@@ -16,6 +16,7 @@ import { API_BASE_URL } from '@app/api-url.token';
 describe('Login form validation', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  let fixture: ComponentFixture<Login>;
 
   function setup() {
     TestBed.configureTestingModule({
@@ -28,7 +29,7 @@ describe('Login form validation', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(Login);
+    fixture = TestBed.createComponent(Login);
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -116,6 +117,19 @@ describe('Login form validation', () => {
       component.model.update(() => ({ email: '', password: 'secret' }));
 
       expect(component.loginForm().invalid()).toBe(true);
+    });
+  });
+
+  // ── Layout (R3-P6) ───────────────────────────────────────────────────────
+
+  describe('layout', () => {
+    beforeEach(() => setup());
+
+    it('sizes the page container to the viewport minus the app header (no scrollbar)', () => {
+      const container = fixture.nativeElement.querySelector('div');
+
+      expect(container.classList.contains('min-h-[calc(100dvh-var(--header-height))]')).toBe(true);
+      expect(container.classList.contains('min-h-screen')).toBe(false);
     });
   });
 });

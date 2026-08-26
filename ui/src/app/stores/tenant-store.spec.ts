@@ -22,6 +22,7 @@ const mockTenants: TenantWithRole[] = [
   {
     id: 't1',
     name: 'Acme',
+    slug: 'acme',
     description: null,
     status: 'ACTIVE',
     deletionScheduledAt: null,
@@ -32,6 +33,7 @@ const mockTenants: TenantWithRole[] = [
   {
     id: 't2',
     name: 'Globex',
+    slug: 'globex',
     description: null,
     status: 'ACTIVE',
     deletionScheduledAt: null,

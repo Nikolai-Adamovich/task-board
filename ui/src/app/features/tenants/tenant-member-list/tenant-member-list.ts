@@ -1,121 +1,74 @@
-import { Component, inject, input, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, computed, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
-import {
-  lucideUserPlus,
-  lucideTrash2,
-  lucideShield,
-  lucideBan,
-  lucideRefreshCw,
-  lucideSkull,
-  lucideRotateCcw,
-  lucideMail,
-  lucideArrowUp,
-  lucideArrowDown,
-  lucideFilter,
-} from '@ng-icons/lucide';
+import { lucideShield, lucideUserPlus } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
 import { form, FormRoot, FormField, schema, required } from '@angular/forms/signals';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
+import { TenantStore } from '@stores/tenant-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
-import { HlmSelectImports } from '@spartan-ng/helm/select';
-import { HlmBadgeImports } from '@spartan-ng/helm/badge';
-import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
-import { HlmTableImports } from '@spartan-ng/helm/table';
-import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { Pagination } from '@app/shared/pagination/pagination';
-import { roleBadgeVariant, memberStatusBadgeVariant } from '@app/constants/priority';
-import type { TenantMember } from '@task-board/shared';
-import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { MemberStatus, TenantRole, InvitationStatus } from '@task-board/shared';
-import { injectToasts } from '@app/shared/utils/toast-utils';
-import { getErrorMessage, initials } from '@app/shared/utils/error-utils';
+import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { MemberTable } from '@app/shared/member-table/member-table';
+import type { MemberRow } from '@app/shared/member-table/member-table';
 import { useMemberTable } from '@app/shared/member-list/member-table';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { InvitationStatus, MemberStatus, TenantRole } from '@task-board/shared';
+import type { TenantMember } from '@task-board/shared';
 
 interface InviteFormModel {
   email: string;
   role: string;
 }
 
-interface ColumnDef {
-  field: string;
-  labelKey: string;
-  filterType: 'text' | 'select';
-  popoverWidth: string;
-  placeholderKey?: string;
-  selectAllLabelKey?: string;
-  selectOptions?: { value: string; labelKey: string }[];
-}
-
 @Component({
   selector: 'ui-tenant-member-list',
   imports: [
-    HlmAlertImports,
+    MemberTable,
     FormRoot,
     FormField,
     TranslocoPipe,
     NgIcon,
+    HlmAlertImports,
     HlmButtonImports,
-    HlmCardImports,
+    HlmDialogImports,
     HlmFieldImports,
     HlmInputImports,
-    HlmSpinnerImports,
-    HlmDialogImports,
     HlmNativeSelectImports,
-    HlmSelectImports,
-    HlmBadgeImports,
-    HlmAvatarImports,
-    HlmTableImports,
-    HlmPopoverImports,
-    Pagination,
+    HlmSpinnerImports,
   ],
-  providers: [
-    provideIcons({
-      lucideUserPlus,
-      lucideTrash2,
-      lucideShield,
-      lucideBan,
-      lucideRefreshCw,
-      lucideSkull,
-      lucideRotateCcw,
-      lucideMail,
-      lucideArrowUp,
-      lucideArrowDown,
-      lucideFilter,
-    }),
-  ],
+  providers: [provideIcons({ lucideUserPlus, lucideShield })],
   templateUrl: './tenant-member-list.html',
 })
 export class TenantMemberList implements OnInit, OnDestroy {
-  /** Shared badge-class + initials helpers (see constants/priority.ts / shared/utils) */
-  protected readonly roleBadgeVariant = roleBadgeVariant;
-  protected readonly memberStatusBadgeVariant = memberStatusBadgeVariant;
-  protected readonly initials = initials;
   private readonly notify = injectToasts();
   private readonly tenantClient = inject(TenantClient);
   private readonly authStore = inject(AuthStore);
+  private readonly tenantStore = inject(TenantStore);
   private readonly route = inject(ActivatedRoute);
   private queryParamsSub?: Subscription;
-  /** Bound via withComponentInputBinding() */
-  readonly tenantId = input.required<string>();
+  /**
+   * Resolved tenant id — always derived from the tenant context (slug → tenant via the
+   * `tenantGuard` + {@link TenantStore}), never from a raw route param (V1-10/V2-1).
+   */
+  protected readonly tenantId = computed(() => this.tenantStore.activeTenant()?.id ?? '');
+  /** Guard: until the context resolves, no requests fire and actions stay disabled. */
+  protected readonly hasContext = computed(() => this.tenantId() !== '');
   protected readonly members = signal<TenantMember[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
   protected readonly showInviteDialog = signal(false);
   protected readonly TenantRole = TenantRole;
-  protected readonly MemberStatus = MemberStatus;
-  protected readonly InvitationStatus = InvitationStatus;
-  protected readonly roles = Object.values(TenantRole);
+  protected readonly roles = Object.values(TenantRole).filter((role) => role !== TenantRole.OWNER);
   protected readonly model = signal<InviteFormModel>({ email: '', role: TenantRole.MEMBER });
   protected readonly inviteForm = form(
     this.model,
@@ -126,6 +79,8 @@ export class TenantMemberList implements OnInit, OnDestroy {
     {
       submission: {
         action: async (f) => {
+          if (!this.hasContext()) return;
+
           this.error.set('');
 
           const modelValue = this.model();
@@ -147,6 +102,7 @@ export class TenantMemberList implements OnInit, OnDestroy {
   );
   protected readonly removingUserId = signal<string | null>(null);
   protected readonly actioningUserId = signal<string | null>(null);
+  /** Only Owner/Tenant Admin may manage members (mirrors server RBAC). */
   protected readonly canManage = computed(() => {
     const role = this.authStore.tenantRole();
 
@@ -156,7 +112,7 @@ export class TenantMemberList implements OnInit, OnDestroy {
    * Shared sort / column-filter / pagination machinery (see shared/member-list).
    * Filter and sort state is synced to URL query params.
    */
-  private readonly table = useMemberTable<TenantMember>({
+  protected readonly table = useMemberTable<TenantMember>({
     source: this.members,
     filters: {
       name: { matches: (m, q) => (m.displayName ?? m.email ?? m.userId ?? '').toLowerCase().includes(q) },
@@ -176,68 +132,26 @@ export class TenantMemberList implements OnInit, OnDestroy {
   protected readonly pageSize = this.table.pageSize;
   protected readonly total = this.table.total;
   protected readonly totalPages = this.table.totalPages;
-  protected readonly paginatedMembers = this.table.paginated;
   protected readonly sortField = this.table.sortField;
   protected readonly sortDirection = this.table.sortDirection;
-
-  protected toggleSort(field: string): void {
-    this.table.toggleSort(field);
-  }
-
-  protected getFilterValue(field: string): string {
-    return this.table.getFilterValue(field);
-  }
-
-  protected onColumnFilterChange(field: string, value: string): void {
-    this.table.onColumnFilterChange(field, value);
-  }
-
-  protected onPageChange(newPage: number): void {
-    this.table.onPageChange(newPage);
-  }
-
-  protected onPageSizeChange(newSize: number): void {
-    this.table.onPageSizeChange(newSize);
-  }
-  /** Column definitions for table headers */
-  protected readonly columns: ColumnDef[] = [
-    {
-      field: 'name',
-      labelKey: 'members.name',
-      filterType: 'text',
-      popoverWidth: 'w-56',
-      placeholderKey: 'members.filterByName',
-    },
-    {
-      field: 'email',
-      labelKey: 'members.email',
-      filterType: 'text',
-      popoverWidth: 'w-56',
-      placeholderKey: 'members.filterByEmail',
-    },
-    {
-      field: 'role',
-      labelKey: 'members.role',
-      filterType: 'select',
-      popoverWidth: 'w-48',
-      selectAllLabelKey: 'members.allRoles',
-      selectOptions: Object.values(TenantRole).map((r) => ({
-        value: r,
-        labelKey: 'members.role' + r.charAt(0) + r.slice(1).toLowerCase(),
-      })),
-    },
-    {
-      field: 'status',
-      labelKey: 'members.status',
-      filterType: 'select',
-      popoverWidth: 'w-48',
-      selectAllLabelKey: 'members.allStatuses',
-      selectOptions: [
-        { value: 'ACTIVE', labelKey: 'members.statusActive' },
-        { value: 'ACCESS_REVOKED', labelKey: 'members.statusAccessRevoked' },
-      ],
-    },
-  ];
+  /** Rows for the shared table (already sorted/filtered/paginated). */
+  protected readonly tableRows = computed<MemberRow[]>(() =>
+    this.table.paginated().map((m) => ({
+      userId: m.userId,
+      displayName: m.displayName,
+      email: m.email,
+      role: m.role,
+      status: m.status,
+      invitationStatus: m.invitation?.status ?? null,
+    })),
+  );
+  /** Current column-filter snapshot passed down to the shared table. */
+  protected readonly filterValues = computed<Record<string, string>>(() => ({
+    name: this.table.getFilterValue('name'),
+    email: this.table.getFilterValue('email'),
+    role: this.table.getFilterValue('role'),
+    status: this.table.getFilterValue('status'),
+  }));
 
   protected onDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
@@ -257,6 +171,14 @@ export class TenantMemberList implements OnInit, OnDestroy {
   }
 
   private loadMembers(): void {
+    // V1-10/V2-1 guard: never fetch without a resolved tenant id (`tenants/undefined`)
+    if (!this.hasContext()) {
+      this.members.set([]);
+      this.loading.set(false);
+
+      return;
+    }
+
     this.loading.set(true);
     this.tenantClient
       .listMembers(this.tenantId())
@@ -268,111 +190,135 @@ export class TenantMemberList implements OnInit, OnDestroy {
       });
   }
 
-  protected changeRole(member: TenantMember, newRole: string | null | undefined): void {
-    if (!newRole || newRole === member.role || !member.userId) return;
+  /** Optimistic role update with rollback + error toast on failure. */
+  protected changeRole(row: MemberRow, newRole: string): void {
+    if (!row.userId || !newRole || newRole === row.role || !this.hasContext()) return;
 
-    this.tenantClient.updateMemberRole(this.tenantId(), member.userId, newRole as TenantRole).subscribe({
-      next: (updated) => {
-        this.members.update((list) => list.map((m) => (m.userId === updated.userId ? updated : m)));
+    const previous = this.members();
+
+    this.members.update((list) =>
+      list.map((m) => (m.userId === row.userId ? { ...m, role: newRole as TenantRole } : m)),
+    );
+
+    this.tenantClient.updateMemberRole(this.tenantId(), row.userId, newRole as TenantRole).subscribe({
+      next: () => {
         this.notify.success('toasts.updated');
+      },
+      error: (err) => {
+        this.members.set(previous); // rollback
+        this.notify.error(getErrorMessage(err));
       },
     });
   }
 
-  protected removeMember(member: TenantMember): void {
-    if (!member.userId) return;
+  protected removeMember(row: MemberRow): void {
+    if (!row.userId || !this.hasContext()) return;
 
-    this.removingUserId.set(member.userId);
+    this.removingUserId.set(row.userId);
 
     this.tenantClient
-      .removeMember(this.tenantId(), member.userId)
+      .removeMember(this.tenantId(), row.userId)
       .pipe(finalize(() => this.removingUserId.set(null)))
       .subscribe({
         next: () => {
-          this.members.update((list) => list.filter((m) => m.userId !== member.userId));
+          this.members.update((list) => list.filter((m) => m.userId !== row.userId));
           this.notify.success('toasts.deleted');
         },
-      });
-  }
-
-  protected revokeAccess(member: TenantMember): void {
-    if (!member.userId) return;
-
-    this.actioningUserId.set(member.userId);
-    this.tenantClient
-      .revokeAccess(this.tenantId(), member.userId)
-      .pipe(finalize(() => this.actioningUserId.set(null)))
-      .subscribe({
-        next: () => {
-          this.members.update((list) =>
-            list.map((m) => (m.userId === member.userId ? { ...m, status: MemberStatus.ACCESS_REVOKED } : m)),
-          );
+        error: (err) => {
+          this.notify.error(getErrorMessage(err));
         },
       });
   }
 
-  protected restoreMembership(member: TenantMember): void {
-    if (!member.userId) return;
+  /**
+   * Revoke dispatch (V2-7): a PENDING invitation is revoked via the dedicated
+   * invitation route; an ACTIVE membership via revoke-access.
+   */
+  protected revokeAccess(row: MemberRow): void {
+    if (!row.userId || !this.hasContext()) return;
 
-    this.actioningUserId.set(member.userId);
+    const isPendingInvitation = row.invitationStatus === InvitationStatus.PENDING;
+
+    this.actioningUserId.set(row.userId);
+
+    const request$ = isPendingInvitation
+      ? this.tenantClient.revokeInvitation(this.tenantId(), row.userId)
+      : this.tenantClient.revokeAccess(this.tenantId(), row.userId);
+
+    request$.pipe(finalize(() => this.actioningUserId.set(null))).subscribe({
+      next: () => {
+        this.loadMembers();
+      },
+      error: (err) => {
+        this.notify.error(getErrorMessage(err));
+      },
+    });
+  }
+
+  protected restoreMembership(row: MemberRow): void {
+    if (!row.userId || !this.hasContext()) return;
+
+    this.actioningUserId.set(row.userId);
     this.tenantClient
-      .restoreMembership(this.tenantId(), member.userId)
+      .restoreMembership(this.tenantId(), row.userId)
       .pipe(finalize(() => this.actioningUserId.set(null)))
       .subscribe({
         next: () => {
           this.members.update((list) =>
-            list.map((m) => (m.userId === member.userId ? { ...m, status: MemberStatus.ACTIVE } : m)),
+            list.map((m) => (m.userId === row.userId ? { ...m, status: MemberStatus.ACTIVE } : m)),
           );
+        },
+        error: (err) => {
+          this.notify.error(getErrorMessage(err));
         },
       });
   }
 
-  protected reinviteMember(member: TenantMember): void {
-    if (!member.userId) return;
+  protected reinviteMember(row: MemberRow): void {
+    if (!row.userId || !this.hasContext()) return;
 
-    this.actioningUserId.set(member.userId);
+    this.actioningUserId.set(row.userId);
     this.tenantClient
-      .reinviteMember(this.tenantId(), member.userId)
+      .reinviteMember(this.tenantId(), row.userId)
       .pipe(finalize(() => this.actioningUserId.set(null)))
       .subscribe({
         next: () => {
           this.loadMembers();
         },
-      });
-  }
-
-  protected resendInvitation(member: TenantMember): void {
-    if (!member.userId) return;
-
-    this.actioningUserId.set(member.userId);
-    this.tenantClient
-      .resendInvitation(this.tenantId(), member.userId)
-      .pipe(finalize(() => this.actioningUserId.set(null)))
-      .subscribe();
-  }
-
-  protected hardDeleteMember(member: TenantMember): void {
-    if (!member.userId) return;
-
-    this.actioningUserId.set(member.userId);
-    this.tenantClient
-      .hardDeleteMember(this.tenantId(), member.userId)
-      .pipe(finalize(() => this.actioningUserId.set(null)))
-      .subscribe({
-        next: () => {
-          this.members.update((list) => list.filter((m) => m.userId !== member.userId));
+        error: (err) => {
+          this.notify.error(getErrorMessage(err));
         },
       });
   }
 
-  protected isOwner(member: TenantMember): boolean {
-    return member.role === TenantRole.OWNER;
+  protected resendInvitation(row: MemberRow): void {
+    if (!row.userId || !this.hasContext()) return;
+
+    this.actioningUserId.set(row.userId);
+    this.tenantClient
+      .resendInvitation(this.tenantId(), row.userId)
+      .pipe(finalize(() => this.actioningUserId.set(null)))
+      .subscribe({
+        error: (err) => {
+          this.notify.error(getErrorMessage(err));
+        },
+      });
   }
 
-  /** Check if a member has an expired or revoked invitation */
-  protected hasExpiredOrRevokedInvitation(member: TenantMember): boolean {
-    return (
-      member.invitation?.status === InvitationStatus.EXPIRED || member.invitation?.status === InvitationStatus.REVOKED
-    );
+  protected hardDeleteMember(row: MemberRow): void {
+    if (!row.userId || !this.hasContext()) return;
+
+    this.actioningUserId.set(row.userId);
+    this.tenantClient
+      .hardDeleteMember(this.tenantId(), row.userId)
+      .pipe(finalize(() => this.actioningUserId.set(null)))
+      .subscribe({
+        next: () => {
+          this.members.update((list) => list.filter((m) => m.userId !== row.userId));
+        },
+        error: (err) => {
+          this.notify.error(getErrorMessage(err));
+        },
+      });
   }
 }

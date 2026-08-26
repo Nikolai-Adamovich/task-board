@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
-import { validateBody } from '../middleware/validation.js';
+import { validateBody, validateQuery } from '../middleware/validation.js';
 import {
   CreateTenantSchema,
   UpdateTenantSchema,
   InviteMemberSchema,
   UpdateMemberRoleSchema,
+  SlugAvailableQuerySchema,
 } from '../schemas/tenant.js';
 
 // ─── Tenant Routes ───────────────────────────────────────────────────────────
@@ -28,6 +29,16 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const tenant = await c.get('svc').tenants.createTenant(userId, body);
 
     return c.json({ data: tenant }, 201);
+  });
+
+  // Slug availability check (DEC-032) — enumeration-safe: only a boolean,
+  // no distinction between invalid format and taken.
+  // Must be registered before /:tenantId.
+  router.get('/slug-available', validateQuery(SlugAvailableQuerySchema), async (c) => {
+    const { slug } = c.req.valid('query');
+    const available = await c.get('svc').tenants.isSlugAvailable(slug);
+
+    return c.json({ data: { available } });
   });
 
   router.get('/:tenantId', async (c) => {
@@ -122,6 +133,21 @@ export function createTenantRoutes(): Hono<AppEnv> {
     return c.json({ data: { success: true } });
   });
 
+  // ── V2-7: full membership lifecycle. All member-scoped routes address the
+  // target by userId (:memberUserId); services resolve the membership document.
+
+  /** Revoke ACTIVE access (member keeps their membership record, status → ACCESS_REVOKED). */
+  router.patch('/:tenantId/members/:memberUserId/revoke', async (c) => {
+    const userId = c.get('userId');
+    const tenantId = c.req.param('tenantId');
+    const memberUserId = c.req.param('memberUserId');
+
+    await c.get('svc').tenantMembers.revokeAccess(userId, tenantId, memberUserId);
+
+    return c.json({ data: { success: true } });
+  });
+
+  /** Restore a revoked membership (rejects PENDING invitations per BR-036). */
   router.post('/:tenantId/members/:memberUserId/restore', async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
@@ -132,12 +158,46 @@ export function createTenantRoutes(): Hono<AppEnv> {
     return c.json({ data: { success: true } });
   });
 
+  /** Reinvite (rotate token + resend email; membership stays ACCESS_REVOKED until accepted). */
   router.post('/:tenantId/members/:memberUserId/reinvite', async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     const memberUserId = c.req.param('memberUserId');
 
     await c.get('svc').tenantMembers.reinviteUser(userId, tenantId, memberUserId);
+
+    return c.json({ data: { success: true } });
+  });
+
+  /** Resend — alias of reinvite for pending invitations (what the UI calls). */
+  router.patch('/:tenantId/members/:memberUserId/resend', async (c) => {
+    const userId = c.get('userId');
+    const tenantId = c.req.param('tenantId');
+    const memberUserId = c.req.param('memberUserId');
+
+    await c.get('svc').tenantMembers.reinviteUser(userId, tenantId, memberUserId);
+
+    return c.json({ data: { success: true } });
+  });
+
+  /** Revoke a PENDING invitation without deleting the membership record. */
+  router.post('/:tenantId/members/:memberUserId/invitation/revoke', async (c) => {
+    const userId = c.get('userId');
+    const tenantId = c.req.param('tenantId');
+    const memberUserId = c.req.param('memberUserId');
+
+    await c.get('svc').tenantMembers.revokeInvitation(userId, tenantId, memberUserId);
+
+    return c.json({ data: { success: true } });
+  });
+
+  /** Permanently remove the membership record. */
+  router.delete('/:tenantId/members/:memberUserId/hard', async (c) => {
+    const userId = c.get('userId');
+    const tenantId = c.req.param('tenantId');
+    const memberUserId = c.req.param('memberUserId');
+
+    await c.get('svc').tenantMembers.hardDeleteMember(userId, tenantId, memberUserId);
 
     return c.json({ data: { success: true } });
   });

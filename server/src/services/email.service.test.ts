@@ -71,6 +71,28 @@ describe('EmailService', () => {
     });
   });
 
+  describe('sendPasswordResetEmail', () => {
+    it('sends an email with the reset URL and expiry', async () => {
+      await service.sendPasswordResetEmail({
+        to: 'user@example.com',
+        resetUrl: 'https://app.example.com/auth/reset-password?token=abc123',
+        expiresInMinutes: 60,
+      });
+
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      expect(mockSend).toHaveBeenCalledWith({
+        from: 'noreply@taskboard.app',
+        to: 'user@example.com',
+        subject: 'Reset your password',
+        html: expect.stringContaining('https://app.example.com/auth/reset-password?token=abc123'),
+      });
+
+      const html = mockSend.mock.calls[0]?.[0]?.html as string;
+
+      expect(html).toContain('60 minutes');
+    });
+  });
+
   describe('sendEmail', () => {
     it('sends a generic email', async () => {
       await service.sendEmail({
@@ -124,6 +146,26 @@ describe('ConsoleEmailService', () => {
       expect(tenantLog).toContain('Acme');
       expect(roleLog).toContain('member');
       expect(urlLog).toContain('accept-invitation?token=tok-123');
+    });
+  });
+
+  describe('sendPasswordResetEmail', () => {
+    it('logs the reset details without leaking the token separately', async () => {
+      await service.sendPasswordResetEmail({
+        to: 'user@example.com',
+        resetUrl: 'http://localhost:4200/auth/reset-password?token=tok-123',
+        expiresInMinutes: 60,
+      });
+
+      expect(consoleSpy).toHaveBeenCalledTimes(3);
+
+      const toLog = consoleSpy.mock.calls[0]?.[0] as string;
+      const urlLog = consoleSpy.mock.calls[1]?.[0] as string;
+      const expiryLog = consoleSpy.mock.calls[2]?.[0] as string;
+
+      expect(toLog).toContain('user@example.com');
+      expect(urlLog).toContain('/auth/reset-password?token=tok-123');
+      expect(expiryLog).toContain('60 minutes');
     });
   });
 

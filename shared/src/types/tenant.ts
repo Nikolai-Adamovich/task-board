@@ -11,6 +11,8 @@ export interface Tenant {
   id: string;
   /** Tenant display name */
   name: string;
+  /** Globally unique URL slug, auto-generated from the name (DEC-032) */
+  slug: string;
   /** Optional description of the tenant */
   description: string | null;
   /** Tenant lifecycle status */
@@ -26,6 +28,8 @@ export interface Tenant {
 /** Create tenant request body type */
 export interface CreateTenant {
   name: string;
+  /** Optional URL slug; auto-generated from the name when omitted (DEC-032) */
+  slug?: string;
   description?: string;
 }
 

@@ -16,6 +16,21 @@ export interface AuditChange {
   oldValue: unknown;
   /** New value (null for deletes) */
   newValue: unknown;
+  /**
+   * R3-P7 (additive): human-readable label for `oldValue` when it references
+   * another entity (status name, member display name, sprint name, …).
+   * Absent when the raw value is already human-readable or could not be resolved.
+   */
+  oldLabel?: string | null;
+  /** R3-P7 (additive): human-readable label for `newValue` — see {@link oldLabel} */
+  newLabel?: string | null;
+  /**
+   * R3-P7 (additive): original raw value preserved when the UI prefers to render
+   * labels. Only set when at least one label was resolved for this change.
+   */
+  rawOldValue?: unknown;
+  /** R3-P7 (additive): see {@link rawOldValue} */
+  rawNewValue?: unknown;
 }
 
 /** Audit event entity type */
@@ -38,4 +53,9 @@ export interface AuditEvent {
   changes: AuditChange[];
   /** Creation timestamp (ISO 8601) */
   createdAt: string;
+  /**
+   * R3-P7 (additive): human-readable entity reference resolved server-side per page
+   * (e.g. `PROJ-123` for tasks, sprint/status/label names). Null when unresolvable.
+   */
+  entityLabel?: string | null;
 }

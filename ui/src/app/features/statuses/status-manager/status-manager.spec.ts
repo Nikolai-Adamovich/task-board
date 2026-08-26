@@ -281,6 +281,21 @@ describe('StatusManager', () => {
       expect(component.otherStatuses()).toHaveLength(2);
       expect(component.otherStatuses().find((s: Status) => s.id === 's1')).toBeUndefined();
     });
+
+    it('should dismiss a stale error alert once a later mutation succeeds (V2-8)', () => {
+      statusClientMock.delete.mockReturnValueOnce(throwError(() => new Error('STATUS_IN_USE')));
+
+      component.confirmDelete(mockStatuses[0]);
+      component.deleteStatus();
+
+      expect(component.error()).not.toBe('');
+
+      // Next attempt succeeds — the old alert must not survive the state change
+      component.confirmDelete(mockStatuses[0]);
+      component.deleteStatus();
+
+      expect(component.error()).toBe('');
+    });
   });
 
   // ── Dialog State Changes ─────────────────────────────────

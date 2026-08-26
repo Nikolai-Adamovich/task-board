@@ -107,6 +107,8 @@ describe('PreferencesStore', () => {
       theme: 'dark',
       language: 'pl',
       pageSize: 20,
+      dateFormat: 'DD/MM/YYYY',
+      timeFormat: '12h',
       updatedAt: new Date().toISOString(),
     };
 
@@ -116,6 +118,11 @@ describe('PreferencesStore', () => {
     expect(store.zoom()).toBe(125);
     expect(store.theme()).toBe('dark');
     expect(store.language()).toBe('pl');
+    // R3-P8: formats are applied and translated into DatePipe tokens
+    expect(store.dateFormat()).toBe('DD/MM/YYYY');
+    expect(store.timeFormat()).toBe('12h');
+    expect(store.datePipeFormat()).toBe('dd/MM/yyyy');
+    expect(store.dateTimePipeFormat()).toBe('dd/MM/yyyy h:mm a');
     expect((themeLoader as { loadTheme: ReturnType<typeof vi.fn> }).loadTheme).toHaveBeenCalledWith('dark');
     expect(document.documentElement.style.getPropertyValue('font-size')).toBe('125%');
     expect(localStorage.getItem('taskboard_theme')).toBe('dark');

@@ -157,6 +157,24 @@ describe('TaskService', () => {
     });
   });
 
+  // DEC-032: canonical task URLs resolve by project + human-readable number
+  describe('getTaskByNumber', () => {
+    it('resolves a task by projectId and number', async () => {
+      taskRepo.findByProjectAndNumber = vi.fn().mockResolvedValue(makeTask({ number: 42 }));
+
+      const result = await service.getTaskByNumber('project-1', 42);
+
+      expect(taskRepo.findByProjectAndNumber).toHaveBeenCalledWith('project-1', 42);
+      expect(result.number).toBe(42);
+    });
+
+    it('throws NOT_FOUND when no task matches the number', async () => {
+      taskRepo.findByProjectAndNumber = vi.fn().mockResolvedValue(null);
+
+      await expect(service.getTaskByNumber('project-1', 999)).rejects.toThrow('Task not found');
+    });
+  });
+
   describe('createTask', () => {
     it('creates a task with sequential number and snapshots', async () => {
       taskRepo.create = vi.fn().mockResolvedValue(makeTask());
@@ -261,6 +279,58 @@ describe('TaskService', () => {
       const deleteCallOrder = (taskRepo.delete as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
 
       expect(auditCallOrder).toBeLessThan(deleteCallOrder);
+    });
+  });
+
+  // ── V2-4: project RBAC enforcement on id-based mutations ─────────────────
+
+  describe('project RBAC enforcement (V2-4)', () => {
+    it('denies updateTask for a project VIEWER even with a valid version', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      projectMemberRepo.findByUserAndProject = vi.fn().mockResolvedValue({ role: 'VIEWER' });
+
+      await expect(service.updateTask('task-1', { version: 1, title: 'hacked' }, 'user-1', 'MEMBER')).rejects.toThrow(
+        'edit_task',
+      );
+      expect(taskRepo.updateWithVersion).not.toHaveBeenCalled();
+    });
+
+    it('allows updateTask for a project EDITOR', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      taskRepo.updateWithVersion = vi.fn().mockResolvedValue(makeTask({ title: 'Updated' }));
+      projectMemberRepo.findByUserAndProject = vi.fn().mockResolvedValue({ role: 'EDITOR' });
+
+      const result = await service.updateTask('task-1', { version: 1, title: 'Updated' }, 'user-1', 'MEMBER');
+
+      expect(result.title).toBe('Updated');
+    });
+
+    it('bypasses the project role for a tenant OWNER (no membership needed)', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      taskRepo.updateWithVersion = vi.fn().mockResolvedValue(makeTask({ title: 'Admin edit' }));
+      projectMemberRepo.findByUserAndProject = vi.fn().mockResolvedValue(null);
+
+      const result = await service.updateTask('task-1', { version: 1, title: 'Admin edit' }, 'user-1', 'OWNER');
+
+      expect(result.title).toBe('Admin edit');
+    });
+
+    it('denies deleteTask for a project EDITOR', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      projectMemberRepo.findByUserAndProject = vi.fn().mockResolvedValue({ role: 'EDITOR' });
+
+      await expect(service.deleteTask('task-1', 'user-1', 'MEMBER')).rejects.toThrow('delete_task');
+      expect(taskRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('allows deleteTask for a project PROJECT_ADMIN', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      taskRepo.delete = vi.fn().mockResolvedValue(true);
+      projectMemberRepo.findByUserAndProject = vi.fn().mockResolvedValue({ role: 'PROJECT_ADMIN' });
+
+      await service.deleteTask('task-1', 'user-1', 'MEMBER');
+
+      expect(taskRepo.delete).toHaveBeenCalledWith('task-1');
     });
   });
 });

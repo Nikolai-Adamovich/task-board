@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { TenantRole } from '@task-board/shared';
-import { requireRole, requirePermission } from '../middleware/rbac.js';
+import { requireRole } from '../middleware/rbac.js';
 import { createAuthRoutes } from './auth.js';
 import { createTenantRoutes } from './tenants.js';
 import { createProjectRoutes } from './projects.js';
@@ -34,12 +34,16 @@ export const routeRegistry = {
    */
   tenants: createTenantRoutes(),
 
-  /** Project routes — requires any tenant member role; handles admin checks internally */
+  /**
+   * Project routes — requires any tenant member role.
+   * Per-action authorization is enforced inside the project service:
+   * reads are allowed for all roles; writes/mutations require tenant admin+
+   * (DEC-017 — no router-level `create_project` gate).
+   */
   projects: (() => {
     const router = new Hono<AppEnv>();
 
     router.use('/*', requireRole(TenantRole.OWNER, TenantRole.ADMIN, TenantRole.MEMBER));
-    router.use('/*', requirePermission('create_project'));
     router.route('/', createProjectRoutes());
     return router;
   })(),

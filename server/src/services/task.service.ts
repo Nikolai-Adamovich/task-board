@@ -80,6 +80,20 @@ export class TaskService {
     return task;
   }
 
+  /**
+   * Resolve a task by project + human-readable number (DEC-032 canonical
+   * task URLs `/tasks/ABC-123`). The caller is responsible for having
+   * resolved the projectId from the tenant-scoped URL context.
+   */
+  async getTaskByNumber(projectId: string, number: number): Promise<Task> {
+    const task = await this.taskRepo.findByProjectAndNumber(projectId, number);
+
+    if (!task) {
+      throw new NotFoundError('Task not found');
+    }
+    return task;
+  }
+
   async createTask(
     projectId: string,
     userId: string,
@@ -156,11 +170,20 @@ export class TaskService {
     return task;
   }
 
-  async updateTask(taskId: string, input: UpdateTask, userId?: string): Promise<Task> {
+  async updateTask(taskId: string, input: UpdateTask, userId?: string, userRole?: string): Promise<Task> {
     const task = await this.taskRepo.findById(taskId);
 
     if (!task) {
       throw new NotFoundError('Task not found');
+    }
+
+    // V2-4: the route path carries no projectId, so authorization is enforced
+    // here after resolving the caller's project role (tenant Owner/Admin bypass
+    // is handled inside the RBAC matrix).
+    if (userId && userRole) {
+      const membership = await this.projectMemberRepo.findByUserAndProject(userId, task.projectId);
+
+      ensurePermission('edit_task', userRole, membership?.role ?? null);
     }
 
     // Optimistic concurrency check
@@ -235,11 +258,18 @@ export class TaskService {
     return updated;
   }
 
-  async deleteTask(taskId: string, userId?: string): Promise<void> {
+  async deleteTask(taskId: string, userId?: string, userRole?: string): Promise<void> {
     const task = await this.taskRepo.findById(taskId);
 
     if (!task) {
       throw new NotFoundError('Task not found');
+    }
+
+    // V2-4: see updateTask — project role resolved server-side, then gated.
+    if (userId && userRole) {
+      const membership = await this.projectMemberRepo.findByUserAndProject(userId, task.projectId);
+
+      ensurePermission('delete_task', userRole, membership?.role ?? null);
     }
 
     // Cascade delete: comments, relationships, label associations

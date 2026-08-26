@@ -29,6 +29,22 @@ export interface AcceptInvitation {
   displayName?: string;
 }
 
+/** Forgot-password request body type (POST /auth/forgot-password) */
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+/** Reset-password request body type (POST /auth/reset-password) */
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
+/** Neutral response returned by POST /auth/forgot-password regardless of account existence */
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
 /** Invitation details returned by GET /invitations/:token */
 export interface InvitationDetails {
   email: string;

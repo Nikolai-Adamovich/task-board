@@ -89,6 +89,7 @@ export class StatusManager implements OnInit {
               this.statuses.update((list) => [...list, status]);
               this.showCreateDialog.set(false);
               f().reset({ name: '' });
+              this.error.set(''); // V2-8: state changed — dismiss stale alerts
               this.notify.success('toasts.created');
             },
             error: (err) => {
@@ -131,6 +132,7 @@ export class StatusManager implements OnInit {
         next: (updated) => {
           this.statuses.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
           this.cancelEdit();
+          this.error.set(''); // V2-8: state changed — dismiss stale alerts
           this.notify.success('toasts.updated');
         },
         error: (err) => {
@@ -176,6 +178,7 @@ export class StatusManager implements OnInit {
 
           this.statuses.update((list) => list.map((s) => updatedById.get(s.id) ?? s));
           this.saving.set(false);
+          this.error.set(''); // V2-8: state changed — dismiss stale alerts
         },
         error: (err) => {
           this.error.set(getErrorMessage(err));
@@ -196,6 +199,9 @@ export class StatusManager implements OnInit {
     if (!status) return;
 
     this.saving.set(true);
+    // V2-8: dismiss any stale inline alert before a new attempt — it described
+    // the previous failure and must not survive a state change.
+    this.error.set('');
 
     const replacementId = this.replacementStatusId() || undefined;
 
@@ -207,6 +213,7 @@ export class StatusManager implements OnInit {
           this.statuses.update((list) => list.filter((s) => s.id !== status.id));
           this.showDeleteDialog.set(false);
           this.deletingStatus.set(null);
+          this.error.set('');
           this.notify.success('toasts.deleted');
         },
         error: (err) => {

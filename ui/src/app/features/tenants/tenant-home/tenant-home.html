@@ -1,0 +1,227 @@
+<div class="mx-auto max-w-6xl px-6 py-8">
+  <!-- Workspace header: name + role badge + status badge -->
+  <div class="mb-6">
+    <div class="flex items-center gap-3">
+      <h1 class="text-2xl font-bold text-foreground">{{ tenant()?.name ?? ('workspace.defaultName' | transloco) }}</h1>
+      @if (role()) {
+        <span hlmBadge [variant]="roleBadgeVariant(role()!)">{{ role() }}</span>
+      }
+      @if (tenant()?.status && tenant()?.status !== TenantStatus.ACTIVE) {
+        <span hlmBadge [variant]="statusBadgeVariant(tenant()!.status)">{{ tenant()!.status }}</span>
+      }
+    </div>
+    @if (tenant()?.description) {
+      <p class="mt-2 text-muted-foreground">{{ tenant()?.description }}</p>
+    }
+  </div>
+
+  <!-- Primary CTA + secondary actions -->
+  <div class="mb-8 flex flex-wrap items-center gap-3">
+    @if (canCreate()) {
+      <button hlmBtn (click)="showCreateModal.set(true)">
+        <ng-icon name="lucidePlus" class="mr-1 size-4" />
+        {{ 'tenantHome.createProject' | transloco }}
+      </button>
+    }
+    @if (isOwnerOrAdmin()) {
+      <a hlmBtn variant="outline" [routerLink]="['/t', tenant()?.slug, 'settings']">
+        <ng-icon name="lucideSettings" class="mr-2 size-4" />
+        {{ 'workspace.settings' | transloco }}
+      </a>
+      <a hlmBtn variant="outline" [routerLink]="['/t', tenant()?.slug, 'settings', 'members']">
+        <ng-icon name="lucideUsers" class="mr-2 size-4" />
+        {{ 'workspace.members' | transloco }}
+      </a>
+    }
+  </div>
+
+  <!-- Projects grid -->
+  <section class="mb-8">
+    <h2 class="mb-4 text-lg font-semibold text-foreground">{{ 'workspace.projects' | transloco }}</h2>
+    @if (loadingProjects()) {
+      <div class="flex justify-center py-8">
+        <hlm-spinner />
+      </div>
+    } @else if (projects().length === 0) {
+      <hlm-empty>
+        <hlm-empty-header>
+          <div hlmEmptyTitle>{{ 'workspace.noProjects' | transloco }}</div>
+        </hlm-empty-header>
+        @if (canCreate()) {
+          <hlm-empty-content>
+            <button hlmBtn variant="outline" size="sm" (click)="showCreateModal.set(true)">
+              {{ 'workspace.createFirst' | transloco }}
+            </button>
+          </hlm-empty-content>
+        }
+      </hlm-empty>
+    } @else {
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        @for (project of projects(); track project.id) {
+          <a
+            [routerLink]="['/t', tenant()?.slug, 'projects', project.key]"
+            class="block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-md"
+          >
+            <div class="flex items-center gap-2">
+              <ng-icon name="lucideFolder" class="size-4 text-muted-foreground" />
+              <h3 class="text-base font-semibold text-foreground">{{ project.name }}</h3>
+              <span class="text-xs font-mono text-muted-foreground">[{{ project.key }}]</span>
+            </div>
+            @if (project.description) {
+              <p class="mt-1 text-sm text-muted-foreground">{{ project.description }}</p>
+            }
+          </a>
+        }
+      </div>
+    }
+  </section>
+
+  <div class="grid gap-6 lg:grid-cols-3">
+    <!-- My Tasks widget -->
+    <section class="lg:col-span-2">
+      <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+        <ng-icon name="lucideListTodo" class="size-4" />
+        {{ 'tenantHome.myTasks' | transloco }}
+      </h2>
+      @if (myTaskItems().length === 0) {
+        <hlm-empty>
+          <hlm-empty-header>
+            <hlm-empty-media variant="icon"><ng-icon name="lucideListTodo" /></hlm-empty-media>
+            <div hlmEmptyTitle>{{ 'tenantHome.noTasks' | transloco }}</div>
+          </hlm-empty-header>
+          <hlm-empty-content>
+            <p class="text-sm text-muted-foreground">{{ 'tenantHome.noTasksHint' | transloco }}</p>
+          </hlm-empty-content>
+        </hlm-empty>
+      } @else {
+        <div class="flex flex-col gap-3">
+          @for (item of myTaskItems().slice(0, 10); track item.task.id) {
+            <a
+              [routerLink]="[
+                '/t',
+                tenant()?.slug,
+                'projects',
+                item.projectKey,
+                'tasks',
+                item.projectKey + '-' + item.task.number,
+              ]"
+              class="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+            >
+              <div class="flex items-center gap-3">
+                <span class="font-mono text-xs text-muted-foreground"
+                  >{{ item.projectKey }}-{{ item.task.number }}</span
+                >
+                <div>
+                  <p class="text-sm font-medium text-foreground">{{ item.task.title }}</p>
+                  <p class="text-xs text-muted-foreground">{{ item.projectName }}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span hlmBadge [variant]="priorityBadgeVariant(item.task.priority)">{{ item.task.priority }}</span>
+                <ng-icon name="lucideArrowRight" class="size-4 text-muted-foreground" />
+              </div>
+            </a>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Pending invitations summary (admins) -->
+    @if (isOwnerOrAdmin()) {
+      <section>
+        <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+          <ng-icon name="lucideUserPlus" class="size-4" />
+          {{ 'tenantHome.pendingInvitations' | transloco }}
+        </h2>
+        @if (loadingInvites()) {
+          <div class="flex justify-center py-8">
+            <hlm-spinner />
+          </div>
+        } @else if (pendingInvites().length === 0) {
+          <p class="text-sm text-muted-foreground">{{ 'tenantHome.noPendingInvitations' | transloco }}</p>
+        } @else {
+          <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-sm text-foreground">
+              {{ 'tenantHome.pendingInvitationsCount' | transloco: { count: pendingInvites().length } }}
+            </p>
+            <ul class="mt-3 flex flex-col gap-2">
+              @for (invite of pendingInvites().slice(0, 5); track invite.id) {
+                <li class="flex items-center justify-between text-sm">
+                  <span class="text-foreground">{{ invite.email ?? invite.displayName }}</span>
+                  <span hlmBadge variant="outline">{{ invite.role }}</span>
+                </li>
+              }
+            </ul>
+            <a
+              hlmBtn
+              variant="outline"
+              size="sm"
+              class="mt-4"
+              [routerLink]="['/t', tenant()?.slug, 'settings', 'members']"
+            >
+              {{ 'tenantHome.manageMembers' | transloco }}
+            </a>
+          </div>
+        }
+      </section>
+    }
+  </div>
+</div>
+
+<!-- Create Project Modal -->
+<hlm-dialog [state]="showCreateModal() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ 'projects.createTitle' | transloco }}</h3>
+      <p hlmDialogDescription>{{ 'projects.createDesc' | transloco }}</p>
+    </hlm-dialog-header>
+
+    @if (error()) {
+      <hlm-alert variant="destructive" class="mb-4">
+        <div hlmAlertDescription>{{ error() | transloco }}</div>
+      </hlm-alert>
+    }
+
+    <form id="create-project-form" [formRoot]="newProjectForm" class="flex flex-col gap-4">
+      <hlm-field>
+        <label hlmFieldLabel for="project-name">{{ 'projects.name' | transloco }}</label>
+        <input hlmInput id="project-name" type="text" [formField]="newProjectForm.name" placeholder="Project name" />
+        @if (newProjectForm.name().touched() && newProjectForm.name().errors().length) {
+          <p hlm-field-error>{{ newProjectForm.name().errors()[0].message | transloco }}</p>
+        }
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="project-key">{{ 'projects.key' | transloco }}</label>
+        <input hlmInput id="project-key" type="text" [formField]="newProjectForm.key" placeholder="PROJ" />
+        @if (newProjectForm.key().touched() && newProjectForm.key().errors().length) {
+          <p hlm-field-error>{{ newProjectForm.key().errors()[0].message | transloco }}</p>
+        }
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="project-desc">{{ 'projects.description' | transloco }}</label>
+        <textarea
+          hlmTextarea
+          id="project-desc"
+          [formField]="newProjectForm.description"
+          rows="3"
+          [placeholder]="'projects.descriptionPlaceholder' | transloco"
+        ></textarea>
+      </hlm-field>
+    </form>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>{{ 'projects.cancel' | transloco }}</button>
+      <button
+        hlmBtn
+        type="submit"
+        form="create-project-form"
+        [disabled]="newProjectForm().invalid() || newProjectForm().submitting()"
+      >
+        @if (newProjectForm().submitting()) {
+          <hlm-spinner /> {{ 'projects.creating' | transloco }}
+        } @else {
+          {{ 'projects.create' | transloco }}
+        }
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>

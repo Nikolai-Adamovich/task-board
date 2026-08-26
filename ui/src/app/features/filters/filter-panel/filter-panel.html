@@ -13,6 +13,118 @@
       </button>
     </div>
 
+    <!-- V4-10: actual filter fields (spec S11) — bound to the current criteria -->
+    <div class="mb-4 grid gap-3 sm:grid-cols-2">
+      <hlm-field>
+        <label hlmFieldLabel for="filter-field-search">{{ 'taskTable.filterSearch' | transloco }}</label>
+        <input
+          hlmInput
+          id="filter-field-search"
+          type="text"
+          [placeholder]="'taskTable.searchPlaceholder' | transloco"
+          [value]="draft().search ?? ''"
+          (input)="onDraftSearch($event)"
+        />
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="filter-field-status">{{ 'taskTable.filterStatus' | transloco }}</label>
+        <hlm-native-select
+          id="filter-field-status"
+          [value]="firstOf('statusIds')"
+          (valueChange)="setSingle('statusIds', $event ?? '')"
+        >
+          <option value="">{{ 'taskTable.allStatuses' | transloco }}</option>
+          @for (opt of statusOptions(); track opt.id) {
+            <option [value]="opt.id">{{ opt.name }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="filter-field-type">{{ 'taskTable.filterType' | transloco }}</label>
+        <hlm-native-select
+          id="filter-field-type"
+          [value]="firstOf('typeIds')"
+          (valueChange)="setSingle('typeIds', $event ?? '')"
+        >
+          <option value="">{{ 'taskTable.allTypes' | transloco }}</option>
+          @for (opt of typeOptions(); track opt.id) {
+            <option [value]="opt.id">{{ opt.name }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="filter-field-priority">{{ 'taskTable.filterPriority' | transloco }}</label>
+        <hlm-native-select
+          id="filter-field-priority"
+          [value]="draft().priority?.[0] ?? ''"
+          (valueChange)="onDraftPriority($event ?? '')"
+        >
+          <option value="">{{ 'taskTable.allPriorities' | transloco }}</option>
+          @for (opt of priorityOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.labelKey | transloco }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="filter-field-assignee">{{ 'taskTable.filterAssignee' | transloco }}</label>
+        <hlm-native-select
+          id="filter-field-assignee"
+          [value]="firstOf('assigneeIds')"
+          (valueChange)="setSingle('assigneeIds', $event ?? '')"
+        >
+          <option value="">{{ 'taskTable.allAssignees' | transloco }}</option>
+          @for (opt of memberOptions(); track opt.id) {
+            <option [value]="opt.id">{{ opt.name }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="filter-field-reporter">{{ 'taskTable.filterReporter' | transloco }}</label>
+        <hlm-native-select
+          id="filter-field-reporter"
+          [value]="firstOf('reporterIds')"
+          (valueChange)="setSingle('reporterIds', $event ?? '')"
+        >
+          <option value="">{{ 'taskTable.allReporters' | transloco }}</option>
+          @for (opt of memberOptions(); track opt.id) {
+            <option [value]="opt.id">{{ opt.name }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="filter-field-sprint">{{ 'taskTable.filterSprint' | transloco }}</label>
+        <hlm-native-select
+          id="filter-field-sprint"
+          [value]="firstOf('sprintIds')"
+          (valueChange)="setSingle('sprintIds', $event ?? '')"
+        >
+          <option value="">{{ 'taskTable.allSprints' | transloco }}</option>
+          @for (opt of sprintOptions(); track opt.id) {
+            <option [value]="opt.id">{{ opt.name }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="filter-field-label">{{ 'taskTable.filterLabel' | transloco }}</label>
+        <hlm-native-select
+          id="filter-field-label"
+          [value]="firstOf('labelIds')"
+          (valueChange)="setSingle('labelIds', $event ?? '')"
+        >
+          <option value="">{{ 'taskTable.filterLabel' | transloco }}…</option>
+          @for (opt of labelOptions(); track opt.id) {
+            <option [value]="opt.id">{{ opt.name }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+    </div>
+    <div class="mb-4 flex justify-end gap-2">
+      <button hlmBtn variant="outline" size="sm" (click)="clearDraft()">
+        {{ 'taskTable.clearFilters' | transloco }}
+      </button>
+      <button hlmBtn size="sm" (click)="applyDraft()">{{ 'filters.apply' | transloco }}</button>
+    </div>
+
     @if (loading()) {
       <div class="flex items-center justify-center py-6">
         <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'filters.loading' | transloco }}</span>

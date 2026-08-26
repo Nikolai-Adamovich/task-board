@@ -3,11 +3,16 @@ import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
-import { lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown } from '@ng-icons/lucide';
+import { lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown, lucideInbox } from '@ng-icons/lucide';
 import { rxResource } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs';
 import { SprintClient } from '@services/sprint-client';
+import { TaskClient } from '@services/task-client';
+import { isSprintOverdue } from '@app/shared/utils/sprint-utils';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
+import { PreferencesStore } from '@stores/preferences-store';
+import { TenantStore } from '@stores/tenant-store';
 import { statusBadgeVariant } from '@app/constants/priority';
 import { SprintStatus } from '@task-board/shared';
 import { canManageProject } from '@app/shared/utils/role-utils';
@@ -60,18 +65,25 @@ interface SprintGroup {
     HlmCollapsibleImports,
     HlmBadgeImports,
   ],
-  providers: [provideIcons({ lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown })],
+  providers: [provideIcons({ lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown, lucideInbox })],
   templateUrl: './sprint-list.html',
 })
 export class SprintList {
   /** Shared badge-class helper (see constants/priority.ts) */
   protected readonly statusBadgeVariant = statusBadgeVariant;
+  /** Visual-only overdue flag (DEC-029) */
+  protected readonly isSprintOverdue = isSprintOverdue;
   private readonly notify = injectToasts();
+  private readonly preferencesStore = inject(PreferencesStore);
+  /** R3-P8: DatePipe token derived from the user's date format preference */
+  protected readonly dateFmt = this.preferencesStore.datePipeFormat;
   private readonly sprintClient = inject(SprintClient);
+  private readonly taskClient = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
-  /** Current tenant id for building sprint-detail links */
-  protected readonly tenantId = this.authStore.tenantId;
+  private readonly tenantStore = inject(TenantStore);
+  /** Current tenant slug for building sprint-detail links (DEC-032) */
+  protected readonly tenantSlug = computed(() => this.tenantStore.activeTenant()?.slug ?? '');
   /** Bound via withComponentInputBinding() — now receives project key from route */
   readonly projectKey = input<string>('');
   /** Resolved project UUID from the store */
@@ -82,6 +94,16 @@ export class SprintList {
     defaultValue: [],
   });
   protected readonly sprints = computed(() => (this.sprintsResource.hasValue() ? this.sprintsResource.value() : []));
+  /** Number of unassigned (backlog) tasks — powers the Backlog group count (DEC-039) */
+  private readonly backlogCountResource = rxResource<number, { projectId: string }>({
+    params: () => ({ projectId: this.projectId() ?? '' }),
+    stream: ({ params }) =>
+      this.taskClient.list(params.projectId, { sprintId: null, limit: 1 }).pipe(map((res) => res.pagination.total)),
+    defaultValue: 0,
+  });
+  protected readonly backlogCount = computed(() =>
+    this.backlogCountResource.hasValue() ? this.backlogCountResource.value() : 0,
+  );
   protected readonly loading = computed(() => this.sprintsResource.isLoading());
   private readonly actionError = signal('');
   protected readonly error = computed(() => {

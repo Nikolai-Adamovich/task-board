@@ -1,11 +1,18 @@
-import { Service, signal, inject, effect } from '@angular/core';
+import { Service, signal, computed, inject, effect } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { DEFAULT_THEME_ID } from '@task-board/shared';
+import type {
+  DateFormatPreference,
+  TaskTableColumnKey,
+  TimeFormatPreference,
+  UserPreferences,
+  UpdateUserPreferences,
+} from '@task-board/shared';
+import { toDatePipeDateFormat, toDatePipeDateTimeFormat } from '@app/utils/date-format';
 import { UserPreferencesClient } from '@services/user-preferences-client';
 import { AuthStore } from '@stores/auth-store';
 import { ThemeLoader } from '@services/theme-loader';
-import type { UserPreferences, UpdateUserPreferences } from '@task-board/shared';
 
 const THEME_KEY = 'taskboard_theme';
 
@@ -24,8 +31,18 @@ export class PreferencesStore {
   readonly theme = signal<string>(DEFAULT_THEME_ID);
   readonly language = signal<string>('en');
   readonly pageSize = signal<number>(20);
+  /** R3-P8: preferred date display format (null = not set → ISO fallback). */
+  readonly dateFormat = signal<DateFormatPreference | null>(null);
+  /** R3-P8: preferred time display format (null = not set → 24h fallback). */
+  readonly timeFormat = signal<TimeFormatPreference | null>(null);
+  /** DatePipe token for date-only rendering, derived from the preference. */
+  readonly datePipeFormat = computed(() => toDatePipeDateFormat(this.dateFormat()));
+  /** DatePipe token for timestamp rendering, derived from both preferences. */
+  readonly dateTimePipeFormat = computed(() => toDatePipeDateTimeFormat(this.dateFormat(), this.timeFormat()));
   /** Per-project default board ID. Map of projectId → boardId (or null). */
   private readonly projectBoardPreferences = signal<Record<string, string | null>>({});
+  /** R3-P4: per-project visible task-table columns. Map of projectId → column keys (or null = default). */
+  private readonly projectTaskTableColumns = signal<Record<string, TaskTableColumnKey[] | null>>({});
   /** Tracks the last zoom applied locally but not yet persisted to the backend. */
   private pendingZoom: number | null = null;
   /** Tracks the last theme applied locally but not yet persisted to the backend. */
@@ -54,10 +71,44 @@ export class PreferencesStore {
 
       this.projectBoardPreferences.update((map) => ({
         ...map,
-        [projectId]: prefs.defaultBoardId,
+        [projectId]: prefs?.defaultBoardId ?? null,
+      }));
+      // R3-P4: task-table column visibility lives in the same per-project document
+      this.projectTaskTableColumns.update((map) => ({
+        ...map,
+        [projectId]: prefs?.taskTableColumns ?? null,
       }));
     } catch {
       // Silently ignore — preferences are non-critical.
+    }
+  }
+
+  /** Get the persisted visible task-table columns for a project (null = default set) */
+  getTaskTableColumns(projectId: string): TaskTableColumnKey[] | null {
+    return this.projectTaskTableColumns()[projectId] ?? null;
+  }
+
+  /** Set and persist the visible task-table columns for a project (null resets to the default set) */
+  async setTaskTableColumns(projectId: string, columns: TaskTableColumnKey[] | null): Promise<void> {
+    // Optimistic update
+    this.projectTaskTableColumns.update((map) => ({
+      ...map,
+      [projectId]: columns,
+    }));
+
+    try {
+      const prefs = await firstValueFrom(
+        this.client.updateProjectPreferences(projectId, { taskTableColumns: columns }),
+      );
+
+      // Sync with server response
+      this.projectTaskTableColumns.update((map) => ({
+        ...map,
+        [projectId]: prefs.taskTableColumns,
+      }));
+    } catch {
+      // Revert on failure — reload from server
+      this.loadProjectPreferences(projectId);
     }
   }
 
@@ -144,12 +195,26 @@ export class PreferencesStore {
     this.saveToBackend({ pageSize: size });
   }
 
+  /** Set the preferred date display format (R3-P8) and persist to backend. */
+  setDateFormat(format: DateFormatPreference | null): void {
+    this.dateFormat.set(format);
+    this.saveToBackend({ dateFormat: format });
+  }
+
+  /** Set the preferred time display format (R3-P8) and persist to backend. */
+  setTimeFormat(format: TimeFormatPreference | null): void {
+    this.timeFormat.set(format);
+    this.saveToBackend({ timeFormat: format });
+  }
+
   /** Apply all preference values from a backend response. */
   private applyPreferences(prefs: UserPreferences): void {
     this.zoom.set(prefs.zoom);
     this.theme.set(prefs.theme);
     this.language.set(prefs.language);
     this.pageSize.set(prefs.pageSize ?? 20);
+    this.dateFormat.set(prefs.dateFormat ?? null);
+    this.timeFormat.set(prefs.timeFormat ?? null);
     this.transloco.setActiveLang(prefs.language);
 
     document.documentElement.style.setProperty('font-size', `${prefs.zoom}%`);

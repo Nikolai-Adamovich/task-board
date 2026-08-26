@@ -36,6 +36,6 @@ export class HlmDropdownMenuSubTrigger {
       this._cdkTrigger.menuPosition = this._menuPosition();
     });
 
-    classes(() => 'aria-expanded:bg-accent aria-expanded:text-accent-foreground');
+    classes(() => 'cursor-pointer aria-expanded:bg-accent aria-expanded:text-accent-foreground');
   }
 }

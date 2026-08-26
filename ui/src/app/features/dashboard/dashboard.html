@@ -1,4 +1,4 @@
-@if (loading()) {
+@if (loading() || dashboardState() === 'redirecting') {
   <div class="flex items-center justify-center py-20">
     <hlm-spinner />
   </div>
@@ -12,12 +12,6 @@
     }
     @case ('pending-invitations') {
       <ui-invitation-view [invitations]="invitations()" (invitationHandled)="onInvitationHandled()" />
-    }
-    @case (TenantRole.MEMBER) {
-      <ui-member-dashboard [tenants]="tenants()" [tasks]="tasks()" />
-    }
-    @case (TenantRole.OWNER) {
-      <ui-owner-dashboard [tenants]="tenants()" [tasks]="tasks()" />
     }
   }
 }

@@ -7,7 +7,19 @@ function createMockUserRepo() {
   return {
     findById: vi.fn(),
     findByEmail: vi.fn(),
+    findDocumentById: vi.fn(),
+    setPasswordAndDisplayName: vi.fn(),
+    findActiveByEmail: vi.fn(),
+    findByPasswordResetToken: vi.fn(),
+    setPasswordReset: vi.fn(),
+    updatePasswordAndClearReset: vi.fn(),
     create: vi.fn(),
+  };
+}
+
+function createMockMailer() {
+  return {
+    sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -93,6 +105,173 @@ describe('AuthService', () => {
     tenantRepo = createMockTenantRepo();
     memberRepo = createMockTenantMemberRepo();
     service = new AuthService(userRepo as never, tenantRepo as never, memberRepo as never, TEST_SECRET);
+  });
+
+  // ── requestPasswordReset ────────────────────────────────────────────────
+
+  describe('requestPasswordReset', () => {
+    let mailer: ReturnType<typeof createMockMailer>;
+
+    beforeEach(() => {
+      mailer = createMockMailer();
+      service = new AuthService(
+        userRepo as never,
+        tenantRepo as never,
+        memberRepo as never,
+        TEST_SECRET,
+        mailer as never,
+        'https://app.example.com',
+      );
+    });
+
+    it('stores a hashed token and sends the reset email for an existing user', async () => {
+      userRepo.findActiveByEmail.mockResolvedValue(makeUserDoc());
+      userRepo.setPasswordReset.mockResolvedValue(undefined);
+
+      const result = await service.requestPasswordReset({ email: 'user@example.com' }, '1.2.3.4');
+
+      expect(userRepo.findActiveByEmail).toHaveBeenCalledWith('user@example.com');
+      expect(userRepo.setPasswordReset).toHaveBeenCalledTimes(1);
+
+      const [, tokenHash] = userRepo.setPasswordReset.mock.calls[0];
+
+      // SHA-256 hex digest of the raw token — 64 chars, never the raw token itself
+      expect(tokenHash).toMatch(/^[0-9a-f]{64}$/);
+
+      expect(mailer.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+
+      const mailParams = mailer.sendPasswordResetEmail.mock.calls[0][0];
+
+      expect(mailParams.to).toBe('test@example.com');
+      expect(mailParams.resetUrl).toMatch(/^https:\/\/app\.example\.com\/auth\/reset-password\?token=[0-9a-f]{64}$/);
+      expect(mailParams.expiresInMinutes).toBe(60);
+
+      // Neutral response regardless of account existence
+      expect(result.message).toContain('If an account exists');
+    });
+
+    it('normalizes the email before lookup', async () => {
+      userRepo.findActiveByEmail.mockResolvedValue(null);
+
+      await service.requestPasswordReset({ email: '  USER@EXAMPLE.COM  ' });
+
+      expect(userRepo.findActiveByEmail).toHaveBeenCalledWith('user@example.com');
+    });
+
+    it('responds neutrally without storing a token or sending email for unknown emails', async () => {
+      userRepo.findActiveByEmail.mockResolvedValue(null);
+
+      const result = await service.requestPasswordReset({ email: 'ghost@example.com' });
+
+      expect(userRepo.setPasswordReset).not.toHaveBeenCalled();
+      expect(mailer.sendPasswordResetEmail).not.toHaveBeenCalled();
+      expect(result.message).toContain('If an account exists');
+    });
+
+    it('never matches soft-deleted users', async () => {
+      userRepo.findActiveByEmail.mockResolvedValue(null);
+
+      await service.requestPasswordReset({ email: 'deleted@example.com' });
+
+      expect(userRepo.setPasswordReset).not.toHaveBeenCalled();
+      expect(mailer.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('still responds neutrally when rate-limited (no lookup, no email)', async () => {
+      userRepo.findActiveByEmail.mockResolvedValue(makeUserDoc());
+
+      // Exhaust the per-email+IP limit (5 requests / 15 min window)
+      for (let i = 0; i < 5; i++) {
+        await service.requestPasswordReset({ email: 'ratelimit@example.com' }, '9.9.9.9');
+      }
+
+      const callsBefore = userRepo.setPasswordReset.mock.calls.length;
+      const mailsBefore = mailer.sendPasswordResetEmail.mock.calls.length;
+      const result = await service.requestPasswordReset({ email: 'ratelimit@example.com' }, '9.9.9.9');
+
+      expect(result.message).toContain('If an account exists');
+      expect(userRepo.setPasswordReset.mock.calls.length).toBe(callsBefore);
+      expect(mailer.sendPasswordResetEmail.mock.calls.length).toBe(mailsBefore);
+    });
+  });
+
+  // ── resetPassword ───────────────────────────────────────────────────────
+
+  describe('resetPassword', () => {
+    function makeUserWithReset(requestedOnOffsetMs = 0) {
+      return makeUserDoc({
+        passwordReset: { tokenHash: 'a'.repeat(64), requestedOn: new Date(Date.now() + requestedOnOffsetMs) },
+      });
+    }
+
+    it('hashes the new password, clears the token and returns success for a valid token', async () => {
+      userRepo.findByPasswordResetToken.mockResolvedValue(makeUserWithReset());
+      userRepo.updatePasswordAndClearReset.mockResolvedValue(undefined);
+
+      const result = await service.resetPassword({ token: 'valid-token', newPassword: 'newSecurePass123' });
+
+      expect(userRepo.findByPasswordResetToken).toHaveBeenCalledTimes(1);
+
+      const [lookupHash] = userRepo.findByPasswordResetToken.mock.calls[0];
+
+      expect(lookupHash).toMatch(/^[0-9a-f]{64}$/); // token stored/looked up as SHA-256 hash
+
+      expect(userRepo.updatePasswordAndClearReset).toHaveBeenCalledTimes(1);
+
+      const [userId, passwordHash] = userRepo.updatePasswordAndClearReset.mock.calls[0];
+
+      expect(userId).toBe('user-1');
+      expect(passwordHash).not.toBe('newSecurePass123');
+      expect(passwordHash.length).toBeGreaterThan(10);
+
+      expect(result.message).toContain('has been reset');
+    });
+
+    it('throws neutral INVALID_RESET_TOKEN error for unknown tokens', async () => {
+      userRepo.findByPasswordResetToken.mockResolvedValue(null);
+
+      await expect(service.resetPassword({ token: 'unknown', newPassword: 'newSecurePass123' })).rejects.toMatchObject({
+        code: 'INVALID_RESET_TOKEN',
+        statusCode: 400,
+      });
+      expect(userRepo.updatePasswordAndClearReset).not.toHaveBeenCalled();
+    });
+
+    it('throws neutral INVALID_RESET_TOKEN error for expired tokens (> 1 hour)', async () => {
+      userRepo.findByPasswordResetToken.mockResolvedValue(
+        makeUserWithReset(-(61 * 60 * 1000)), // requested 61 minutes ago
+      );
+
+      await expect(service.resetPassword({ token: 'expired', newPassword: 'newSecurePass123' })).rejects.toMatchObject({
+        code: 'INVALID_RESET_TOKEN',
+      });
+      expect(userRepo.updatePasswordAndClearReset).not.toHaveBeenCalled();
+    });
+
+    it('accepts a token at the edge of the TTL window (< 1 hour)', async () => {
+      userRepo.findByPasswordResetToken.mockResolvedValue(makeUserWithReset(-(30 * 60 * 1000)));
+      userRepo.updatePasswordAndClearReset.mockResolvedValue(undefined);
+
+      await expect(service.resetPassword({ token: 'fresh', newPassword: 'newSecurePass123' })).resolves.toMatchObject({
+        message: expect.stringContaining('has been reset'),
+      });
+    });
+
+    it('single-use: a used token no longer matches (token cleared on success)', async () => {
+      userRepo.findByPasswordResetToken.mockResolvedValueOnce(makeUserWithReset());
+      userRepo.updatePasswordAndClearReset.mockResolvedValue(undefined);
+
+      await service.resetPassword({ token: 'used-token', newPassword: 'newSecurePass123' });
+
+      // Second attempt: token was cleared → repository finds nothing
+      userRepo.findByPasswordResetToken.mockResolvedValueOnce(null);
+
+      await expect(service.resetPassword({ token: 'used-token', newPassword: 'anotherPass123' })).rejects.toMatchObject(
+        {
+          code: 'INVALID_RESET_TOKEN',
+        },
+      );
+    });
   });
 
   // ── register ────────────────────────────────────────────────────────────
@@ -204,23 +383,29 @@ describe('AuthService', () => {
       expect(userRepo.findByEmail).toHaveBeenCalledWith('user@example.com');
     });
 
-    it('throws UnauthorizedError for wrong email', async () => {
+    // V1-8: wrong credentials must carry the distinct INVALID_CREDENTIALS code
+    // so the UI can show a neutral message instead of session-expired copy.
+    it('throws INVALID_CREDENTIALS for unknown email', async () => {
       userRepo.findByEmail.mockResolvedValue(null);
 
-      await expect(service.login({ email: 'nope@example.com', password: 'x' })).rejects.toThrow(
-        'Invalid email or password',
-      );
+      await expect(service.login({ email: 'nope@example.com', password: 'x' })).rejects.toMatchObject({
+        message: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS',
+        statusCode: 401,
+      });
     });
 
-    it('throws UnauthorizedError for wrong password', async () => {
+    it('throws INVALID_CREDENTIALS for wrong password', async () => {
       const bcrypt = await import('bcryptjs');
       const hash = await bcrypt.hash('correctpass', 10);
 
       userRepo.findByEmail.mockResolvedValue(makeUserDoc({ passwordHash: hash }));
 
-      await expect(service.login({ email: 'user@example.com', password: 'wrongpass' })).rejects.toThrow(
-        'Invalid email or password',
-      );
+      await expect(service.login({ email: 'user@example.com', password: 'wrongpass' })).rejects.toMatchObject({
+        message: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS',
+        statusCode: 401,
+      });
     });
   });
 
@@ -248,13 +433,17 @@ describe('AuthService', () => {
   // ── acceptInvitation ────────────────────────────────────────────────────
 
   describe('acceptInvitation', () => {
-    it('activates invitation for existing user', async () => {
-      memberRepo.findByInvitationToken.mockResolvedValue(
-        makeMemberDoc({
-          invitation: { status: 'PENDING', tokenHash: 'hash', invitedBy: 'owner', invitedOn: new Date() },
-        }),
+    const pendingMember = () =>
+      makeMemberDoc({
+        status: 'ACCESS_REVOKED',
+        invitation: { status: 'PENDING', tokenHash: 'hash', invitedBy: 'owner', invitedOn: new Date() },
+      });
+
+    it('activates invitation for existing (registered) user', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue(pendingMember());
+      userRepo.findDocumentById.mockResolvedValue(
+        makeUserDoc({ id: 'user-existing', email: 'existing@example.com', passwordHash: 'hashed-pw' }),
       );
-      userRepo.findById.mockResolvedValue(makeUser({ id: 'user-existing', email: 'existing@example.com' }));
       memberRepo.update.mockResolvedValue(makeMemberDoc({ invitation: null }));
 
       const result = await service.acceptInvitation({ token: 'token-abc' });
@@ -263,6 +452,64 @@ describe('AuthService', () => {
       expect(memberRepo.update).toHaveBeenCalled();
       expect(result.user.id).toBe('user-existing');
       expect(result.token).toBeDefined();
+      // Registered users must NOT get their password overwritten via a token
+      expect(userRepo.setPasswordAndDisplayName).not.toHaveBeenCalled();
+    });
+
+    // ── V5-2: invitee without an account must set a password ──────────────
+
+    it('rejects a placeholder invitee without password/displayName (no fake auto-login)', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue(pendingMember());
+      userRepo.findDocumentById.mockResolvedValue(makeUserDoc({ passwordHash: '' }));
+
+      await expect(service.acceptInvitation({ token: 'token-abc' })).rejects.toMatchObject({
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+      });
+      expect(memberRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('creates usable credentials for a placeholder invitee, activates membership, then login works', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue(pendingMember());
+      userRepo.findDocumentById.mockResolvedValue(
+        makeUserDoc({ email: 'v5member@t.local', displayName: 'v5member', passwordHash: '' }),
+      );
+      memberRepo.update.mockResolvedValue(makeMemberDoc({ status: 'ACTIVE', invitation: null }));
+      userRepo.setPasswordAndDisplayName.mockResolvedValue(undefined);
+
+      const result = await service.acceptInvitation({
+        token: 'token-abc',
+        password: 'securepass123',
+        displayName: 'V Five Member',
+      });
+
+      // Account created: real bcrypt hash + chosen display name persisted
+      expect(userRepo.setPasswordAndDisplayName).toHaveBeenCalledTimes(1);
+
+      const [, storedHash, storedName] = userRepo.setPasswordAndDisplayName.mock.calls[0];
+      const bcrypt = await import('bcryptjs');
+
+      await expect(bcrypt.compare('securepass123', storedHash as string)).resolves.toBe(true);
+      expect(storedName).toBe('V Five Member');
+
+      // Membership ACTIVE
+      expect(memberRepo.update).toHaveBeenCalledWith(
+        'member-1',
+        expect.objectContaining({ status: 'ACTIVE', invitation: null }),
+      );
+      expect(result.user.displayName).toBe('V Five Member');
+      expect(result.token).toBeDefined();
+
+      // …and the invitee can log in with that password afterwards
+      userRepo.findByEmail.mockResolvedValue(
+        makeUserDoc({ email: 'v5member@t.local', displayName: 'V Five Member', passwordHash: storedHash }),
+      );
+      memberRepo.findByUser.mockResolvedValue([makeMemberDoc({ status: 'ACTIVE', invitation: null })]);
+
+      const login = await service.login({ email: 'v5member@t.local', password: 'securepass123' });
+
+      expect(login.user.email).toBe('v5member@t.local');
+      expect(login.token).toBeDefined();
     });
 
     it('throws NotFoundError for invalid token', async () => {
@@ -300,7 +547,10 @@ describe('AuthService', () => {
         createdAt: NOW,
         updatedAt: NOW,
       });
-      userRepo.findById.mockResolvedValue(makeUser({ email: 'invited@example.com' }));
+      // Registered account (real password hash) → isRegistered true
+      userRepo.findDocumentById.mockResolvedValue(
+        makeUserDoc({ email: 'invited@example.com', passwordHash: 'hashed-pw' }),
+      );
       userRepo.findByEmail.mockResolvedValue(null);
 
       const result = await service.getInvitationDetails('token-abc');
@@ -309,6 +559,31 @@ describe('AuthService', () => {
       expect(result.tenantName).toBe('Acme Corp');
       expect(result.role).toBe('MEMBER');
       expect(result.status).toBe('PENDING');
+      expect(result.isRegistered).toBe(true);
+    });
+
+    it('reports isRegistered=false for a placeholder invitee without an account (V5-2)', async () => {
+      memberRepo.findByInvitationToken.mockResolvedValue(
+        makeMemberDoc({
+          invitation: { status: 'PENDING', tokenHash: 'hash', invitedBy: 'owner', invitedOn: new Date() },
+        }),
+      );
+      tenantRepo.findById.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Acme Corp',
+        status: 'ACTIVE',
+        description: null,
+        deletionScheduledAt: null,
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+      // Placeholder created at invite time: exists but has no password
+      userRepo.findDocumentById.mockResolvedValue(makeUserDoc({ email: 'v5member@t.local', passwordHash: '' }));
+
+      const result = await service.getInvitationDetails('token-abc');
+
+      expect(result.email).toBe('v5member@t.local');
+      expect(result.isRegistered).toBe(false);
     });
 
     it('throws NotFoundError for invalid token', async () => {

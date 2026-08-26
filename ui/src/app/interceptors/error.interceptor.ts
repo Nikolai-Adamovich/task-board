@@ -10,6 +10,9 @@ import type { ErrorResponse } from '@task-board/shared';
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   VALIDATION_ERROR: 'errors.validation',
   NOT_FOUND: 'errors.notFound',
+  // V1-8: a failed login must show neutral invalid-credentials copy, not the
+  // session-expired message mapped from the bare 401 status below.
+  INVALID_CREDENTIALS: 'errors.invalidCredentials',
   TASK_VERSION_CONFLICT: 'errors.taskVersionConflict',
   UNAUTHORIZED: 'errors.unauthorized',
   FORBIDDEN: 'errors.forbidden',
@@ -28,6 +31,7 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   PROJECT_KEY_IMMUTABLE: 'errors.projectKeyImmutable',
   TASK_TYPE_IN_USE: 'errors.taskTypeInUse',
   STATUS_IN_USE: 'errors.statusInUse',
+  SLUG_TAKEN: 'errors.slugTaken',
 };
 
 /** Extract a user-friendly message from a structured error response */

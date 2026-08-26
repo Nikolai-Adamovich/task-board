@@ -5,6 +5,7 @@ import { ActivatedRouteSnapshot, provideRouter, RouterStateSnapshot, UrlTree } f
 import { tenantGuard } from './tenant.guard';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
+import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { TenantWithRole } from '@app/types/frontend';
 
@@ -13,6 +14,7 @@ const mockTenants: TenantWithRole[] = [
   {
     id: 'tenant-1',
     name: 'Acme',
+    slug: 'acme',
     description: null,
     status: 'ACTIVE',
     deletionScheduledAt: null,
@@ -23,6 +25,7 @@ const mockTenants: TenantWithRole[] = [
   {
     id: 'tenant-2',
     name: 'Beta',
+    slug: 'beta',
     description: null,
     status: 'ACTIVE',
     deletionScheduledAt: null,
@@ -50,11 +53,11 @@ describe('tenantGuard', () => {
     });
   }
 
-  function makeRoute(tenantId: string | null): ActivatedRouteSnapshot {
-    return { paramMap: { get: (key: string) => (key === 'tenantId' ? tenantId : null) } } as ActivatedRouteSnapshot;
+  function makeRoute(tenantSlug: string | null): ActivatedRouteSnapshot {
+    return { paramMap: { get: (key: string) => (key === 'tenantSlug' ? tenantSlug : null) } } as ActivatedRouteSnapshot;
   }
 
-  it('should redirect to / when tenantId is missing', async () => {
+  it('should redirect to / when tenantSlug is missing', async () => {
     setup();
 
     const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute(null), mockState));
@@ -66,7 +69,7 @@ describe('tenantGuard', () => {
   it('should redirect to / when no active tenant and no match', async () => {
     setup();
 
-    const result = TestBed.runInInjectionContext(() => tenantGuard(makeRoute('tenant-1'), mockState));
+    const result = TestBed.runInInjectionContext(() => tenantGuard(makeRoute('acme'), mockState));
     // Guard calls loadTenants() when tenants list is empty — flush the HTTP request
     const http = TestBed.inject(HttpTestingController);
     const req = http.expectOne('http://localhost/api/tenants');
@@ -88,7 +91,7 @@ describe('tenantGuard', () => {
     tenantStore.tenants.set(mockTenants);
     tenantStore.setActiveTenant(mockTenants[0]);
 
-    const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('tenant-1'), mockState));
+    const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('acme'), mockState));
 
     expect(result).toBe(true);
     expect(authStore.tenantRole()).toBe('OWNER');
@@ -103,10 +106,27 @@ describe('tenantGuard', () => {
     tenantStore.tenants.set(mockTenants);
     // No active tenant set — guard should find the match and sync the role
 
-    const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('tenant-2'), mockState));
+    const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('beta'), mockState));
 
     expect(result).toBe(true);
     expect(authStore.tenantRole()).toBe('ADMIN');
     expect(tenantStore.activeTenant()?.id).toBe('tenant-2');
+  });
+
+  it('should clear the project context when switching tenants', async () => {
+    setup();
+
+    const tenantStore = TestBed.inject(TenantStore);
+    const authStore = TestBed.inject(AuthStore);
+    const projectStore = TestBed.inject(ProjectStore);
+
+    tenantStore.tenants.set(mockTenants);
+    tenantStore.setActiveTenant(mockTenants[0]);
+    authStore.setTenantRole('OWNER');
+
+    const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('beta'), mockState));
+
+    expect(result).toBe(true);
+    expect(projectStore.activeProject()).toBeNull();
   });
 });

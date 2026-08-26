@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Task, CreateTask, UpdateTask } from '@task-board/shared';
-import type { MoveTask, MyTask } from '@app/types/frontend';
+import type { MoveTask } from '@app/types/frontend';
 
 /** Query params for filtering tasks */
 export interface TaskQuery {
@@ -91,8 +91,11 @@ export class TaskClient {
 
   // ─── Cross-Tenant "My Tasks" ──────────────────────────────────────────────
 
-  /** Get tasks assigned to the current user across all tenants */
-  getMyTasks(): Observable<MyTask[]> {
-    return this.http.get<{ data: MyTask[] }>(`${this.baseUrl}/tasks/my`).pipe(map((res) => res.data));
+  /**
+   * Get tasks assigned to the current user across all tenants.
+   * Returns plain `Task` objects — the caller resolves tenant/project context.
+   */
+  getMyTasks(): Observable<Task[]> {
+    return this.http.get<{ data: Task[] }>(`${this.baseUrl}/tasks/my`).pipe(map((res) => res.data));
   }
 }

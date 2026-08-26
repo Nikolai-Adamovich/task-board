@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Collection } from 'mongodb';
+import type { ClientSession, Collection } from 'mongodb';
 import type { ProjectMember } from '@task-board/shared';
 
 // Required MongoDB indexes:
@@ -91,7 +91,10 @@ export class ProjectMemberRepository {
     return docs.map(toDomain);
   }
 
-  async create(input: { userId: string; projectId: string; role: string }): Promise<ProjectMember> {
+  async create(
+    input: { userId: string; projectId: string; role: string },
+    options?: { session?: ClientSession },
+  ): Promise<ProjectMember> {
     const now = new Date();
     const doc: ProjectMemberDocument = {
       id: randomUUID(),
@@ -102,7 +105,7 @@ export class ProjectMemberRepository {
       updatedAt: now,
     };
 
-    await this.collection.insertOne(doc);
+    await this.collection.insertOne(doc, options);
     return toDomain(doc);
   }
 
@@ -120,5 +123,10 @@ export class ProjectMemberRepository {
     const result = await this.collection.deleteOne({ userId, projectId });
 
     return result.deletedCount > 0;
+  }
+
+  /** Delete all project memberships for a user (used on user deletion) */
+  async deleteByUserId(userId: string): Promise<void> {
+    await this.collection.deleteMany({ userId });
   }
 }

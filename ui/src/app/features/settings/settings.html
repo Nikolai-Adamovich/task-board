@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-3xl px-4 py-8">
+<div class="mx-auto max-w-6xl px-6 py-8">
   <h1 class="mb-6 text-2xl font-bold">{{ 'settings.title' | transloco }}</h1>
 
   <div class="flex flex-col gap-4">
@@ -9,9 +9,10 @@
         <p hlmCardDescription>{{ 'settings.themeDescription' | transloco }}</p>
       </div>
       <div hlmCardContent>
-        <hlm-select [value]="theme()" (valueChange)="onThemeChange($any($event))">
+        <!-- V5-3: itemToString so the closed trigger shows the human label, not the raw id -->
+        <hlm-select [value]="theme()" (valueChange)="onThemeChange($any($event))" [itemToString]="themeName">
           <hlm-select-trigger class="w-64" size="sm">
-            <hlm-select-value [placeholder]="themeName(theme())" />
+            <hlm-select-value />
           </hlm-select-trigger>
           <hlm-select-content *hlmSelectPortal>
             <hlm-select-group>
@@ -31,7 +32,8 @@
         <p hlmCardDescription>{{ 'settings.zoomDescription' | transloco }}</p>
       </div>
       <div hlmCardContent class="flex items-center gap-3">
-        <hlm-select [value]="$any(zoom())" (valueChange)="onZoomChange($any($event))">
+        <!-- V5-3: show "100%" instead of the raw stored value -->
+        <hlm-select [value]="$any(zoom())" (valueChange)="onZoomChange($any($event))" [itemToString]="zoomLabel">
           <hlm-select-trigger class="w-32" size="sm">
             <hlm-select-value />
           </hlm-select-trigger>
@@ -56,7 +58,8 @@
         <p hlmCardDescription>{{ 'settings.languageDescription' | transloco }}</p>
       </div>
       <div hlmCardContent>
-        <hlm-select [value]="language()" (valueChange)="onLanguageChange($any($event))">
+        <!-- V5-3: show the language name instead of the locale code -->
+        <hlm-select [value]="language()" (valueChange)="onLanguageChange($any($event))" [itemToString]="languageLabel">
           <hlm-select-trigger class="w-64" size="sm">
             <hlm-select-value />
           </hlm-select-trigger>
@@ -64,6 +67,58 @@
             <hlm-select-group>
               @for (lang of availableLangs(); track lang.id) {
                 <hlm-select-item [value]="lang.id">{{ lang.label }}</hlm-select-item>
+              }
+            </hlm-select-group>
+          </hlm-select-content>
+        </hlm-select>
+      </div>
+    </div>
+
+    <!-- R3-P8: Date format -->
+    <div hlmCard>
+      <div hlmCardHeader>
+        <h3 hlmCardTitle>{{ 'settings.dateFormat' | transloco }}</h3>
+        <p hlmCardDescription>{{ 'settings.dateFormatDescription' | transloco }}</p>
+      </div>
+      <div hlmCardContent>
+        <!-- V7-5: placeholder label when no preference is stored -->
+        <hlm-select [value]="$any(dateFormat())" (valueChange)="onDateFormatChange($any($event))">
+          <hlm-select-trigger class="w-64" size="sm">
+            <hlm-select-value [placeholder]="'settings.systemDefault' | transloco" />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-group>
+              @for (format of dateFormatValues; track format) {
+                <hlm-select-item [value]="$any(format)">{{ format }}</hlm-select-item>
+              }
+            </hlm-select-group>
+          </hlm-select-content>
+        </hlm-select>
+      </div>
+    </div>
+
+    <!-- R3-P8: Time format -->
+    <div hlmCard>
+      <div hlmCardHeader>
+        <h3 hlmCardTitle>{{ 'settings.timeFormat' | transloco }}</h3>
+        <p hlmCardDescription>{{ 'settings.timeFormatDescription' | transloco }}</p>
+      </div>
+      <div hlmCardContent>
+        <!-- V7-5: itemToString so the closed trigger shows the option label, not the stored "12h" -->
+        <hlm-select
+          [value]="$any(timeFormat())"
+          (valueChange)="onTimeFormatChange($any($event))"
+          [itemToString]="timeFormatLabel"
+        >
+          <hlm-select-trigger class="w-64" size="sm">
+            <hlm-select-value [placeholder]="'settings.systemDefault' | transloco" />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-group>
+              @for (format of timeFormatValues; track format) {
+                <hlm-select-item [value]="$any(format)">{{
+                  format === '24h' ? ('settings.timeFormat24h' | transloco) : ('settings.timeFormat12h' | transloco)
+                }}</hlm-select-item>
               }
             </hlm-select-group>
           </hlm-select-content>

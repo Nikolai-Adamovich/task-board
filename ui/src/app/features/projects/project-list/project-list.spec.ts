@@ -56,6 +56,7 @@ const mockProjects: Project[] = [
 const mockTenant: TenantWithRole = {
   id: 't1',
   name: 'Acme',
+  slug: 'acme',
   description: null,
   status: 'ACTIVE',
   deletionScheduledAt: null,

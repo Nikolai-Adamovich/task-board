@@ -52,7 +52,8 @@ export function useMemberTable<T>(config: MemberTableConfig<T>): MemberTableStat
   const route = inject(ActivatedRoute);
   const preferencesStore = inject(PreferencesStore);
   const page = signal(1);
-  const pageSize = signal(preferencesStore.pageSize());
+  // `0` is the Auto sentinel persisted by the tasks table — fall back to the default here.
+  const pageSize = signal(preferencesStore.pageSize() || 20);
   const sortField = signal('');
   const sortDirection = signal<'asc' | 'desc'>('asc');
   const filterValues = signal<Record<string, string>>({});

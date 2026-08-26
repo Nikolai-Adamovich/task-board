@@ -1,6 +1,14 @@
-import { MemberStatus, TenantRole, TenantStatus, ProjectStatus, ArchiveReason } from '@task-board/shared';
+import {
+  MemberStatus,
+  TenantRole,
+  TenantStatus,
+  ProjectStatus,
+  ArchiveReason,
+  generateSlugFromName,
+  isValidTenantSlug,
+} from '@task-board/shared';
 import type { Tenant, TenantMember, CreateTenant, UpdateTenant } from '@task-board/shared';
-import { AppError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
+import { AppError, ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../errors/app-error.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
 import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
 import { UserRepository } from '../repositories/user.repository.js';
@@ -10,6 +18,11 @@ import type { AuditService } from './audit.service.js';
 export interface TenantServiceProjectRepo {
   findByTenant(tenantId: string): Promise<{ id: string; status: string; archiveReason: string | null }[]>;
   update(id: string, data: Record<string, unknown>): Promise<unknown>;
+}
+
+/** Minimal project-member repository interface for user-deletion cleanup */
+export interface TenantServiceProjectMemberRepo {
+  deleteByUserId(userId: string): Promise<void>;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -25,12 +38,14 @@ export class TenantService {
     private readonly userRepo: UserRepository,
     private readonly projectRepo?: TenantServiceProjectRepo,
     private readonly auditService?: AuditService,
+    private readonly projectMemberRepo?: TenantServiceProjectMemberRepo,
   ) {}
 
   // ─── Tenant CRUD ──────────────────────────────────────────────────────────
 
   async createTenant(userId: string, input: CreateTenant): Promise<Tenant> {
-    const tenant = await this.tenantRepo.create({ ...input });
+    const slug = await this.resolveSlugForCreate(input);
+    const tenant = await this.tenantRepo.create({ ...input, slug });
 
     await this.tenantMemberRepo.create({
       userId,
@@ -95,6 +110,20 @@ export class TenantService {
       throw new NotFoundError('Tenant not found');
     }
     return tenant;
+  }
+
+  /**
+   * Check slug availability for the create-workspace form (DEC-032).
+   *
+   * Enumeration-safe: invalid slugs simply report as unavailable, without
+   * distinguishing "invalid format" from "already taken".
+   */
+  async isSlugAvailable(slug: string): Promise<boolean> {
+    if (!isValidTenantSlug(slug)) {
+      return false;
+    }
+
+    return !(await this.tenantRepo.slugExists(slug));
   }
 
   async updateTenant(userId: string, id: string, input: UpdateTenant): Promise<Tenant> {
@@ -223,18 +252,14 @@ export class TenantService {
   // ─── User Deletion ─────────────────────────────────────────────────────────
 
   /**
-   * Soft-delete a user. Removes all tenant memberships but preserves
-   * historical snapshots in tasks/comments.
+   * Soft-delete a user (DEC-019).
+   *
+   * The requester must be an ACTIVE OWNER or ADMIN of at least one tenant that
+   * the target user belongs to — cross-tenant deletion is rejected. On success
+   * the user is soft-deleted AND all their live tenant/project memberships are
+   * removed. Identity snapshots on tasks/comments remain untouched.
    */
   async deleteUser(requesterId: string, userId: string): Promise<void> {
-    // Only tenant owners can delete users
-    // The requester must be a tenant owner somewhere
-    const requester = await this.userRepo.findById(requesterId);
-
-    if (!requester) {
-      throw new NotFoundError('Requester not found');
-    }
-
     const targetUser = await this.userRepo.findById(userId);
 
     if (!targetUser) {
@@ -246,11 +271,80 @@ export class TenantService {
       throw new ForbiddenError('Cannot delete your own account');
     }
 
+    // Requester must be OWNER/ADMIN of a tenant shared with the target user
+    const targetMemberships = await this.tenantMemberRepo.findByUser(userId);
+    let isAuthorized = false;
+
+    for (const membership of targetMemberships) {
+      const requesterMembership = await this.tenantMemberRepo.findByUserAndTenant(requesterId, membership.tenantId);
+
+      if (
+        requesterMembership &&
+        requesterMembership.status === MemberStatus.ACTIVE &&
+        (requesterMembership.role === TenantRole.OWNER || requesterMembership.role === TenantRole.ADMIN)
+      ) {
+        isAuthorized = true;
+        break;
+      }
+    }
+
+    if (!isAuthorized) {
+      throw new ForbiddenError('Only an owner or admin of the same tenant can delete a user');
+    }
+
     // Soft-delete the user
     await this.userRepo.softDelete(userId);
+
+    // Remove live memberships (snapshots elsewhere stay untouched)
+    await this.tenantMemberRepo.deleteByUserId(userId);
+
+    if (this.projectMemberRepo) {
+      await this.projectMemberRepo.deleteByUserId(userId);
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  /**
+   * Resolve the slug for a new tenant (DEC-032).
+   *
+   * - User-supplied slug: validated against shape/length rules, then checked
+   *   for global uniqueness.
+   * - Omitted slug: generated from the tenant name, then checked for global
+   *   uniqueness (the create-workspace form offers a live availability check,
+   *   so collisions surface as an explicit SLUG_TAKEN conflict).
+   */
+  private async resolveSlugForCreate(input: CreateTenant): Promise<string> {
+    if (input.slug !== undefined) {
+      if (!isValidTenantSlug(input.slug)) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Slug must be 2-48 characters of lowercase letters, numbers, and hyphens, without leading/trailing hyphens',
+        );
+      }
+
+      if (await this.tenantRepo.slugExists(input.slug)) {
+        throw new ConflictError(`Slug "${input.slug}" is already taken`, 'SLUG_TAKEN');
+      }
+
+      return input.slug;
+    }
+
+    const generated = generateSlugFromName(input.name);
+
+    // V4-6: a name that yields an empty/invalid slug is a validation failure
+    // (400 VALIDATION_ERROR), not a conflict — the UI maps it to a field error.
+    if (!isValidTenantSlug(generated)) {
+      throw new ValidationError('Workspace name must contain letters or numbers');
+    }
+
+    if (await this.tenantRepo.slugExists(generated)) {
+      throw new ConflictError(`Generated slug "${generated}" is already taken`, 'SLUG_TAKEN');
+    }
+
+    return generated;
+  }
 
   private requireNotArchived(tenant: Tenant): void {
     if (tenant.status === TenantStatus.ARCHIVED) {

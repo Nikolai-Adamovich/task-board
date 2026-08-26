@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-5xl">
+<div class="mx-auto max-w-6xl px-6">
   <div class="mb-6 flex items-center justify-between">
     <h2 class="text-2xl font-bold text-foreground">{{ 'projects.title' | transloco }}</h2>
     @if (canCreate()) {
@@ -23,7 +23,7 @@
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       @for (project of projects(); track project.id) {
         <a
-          [routerLink]="['/tenants', project.tenantId, 'projects', project.key]"
+          [routerLink]="['/t', tenantSlug(), 'projects', project.key]"
           class="block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-md"
         >
           <div class="flex items-center gap-2">
@@ -40,7 +40,7 @@
 
   <!-- Create Project Modal -->
   <hlm-dialog [state]="showCreateModal() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
+    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'projects.createTitle' | transloco }}</h3>
         <p hlmDialogDescription>{{ 'projects.createDesc' | transloco }}</p>

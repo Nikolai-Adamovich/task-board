@@ -4,7 +4,7 @@ import { ForbiddenError, ValidationError } from './error-handler.js';
 import { getCollection } from '../db/mongo.js';
 import type { AppEnv } from '../types/context.js';
 
-// ─── TenantMember Document Shape ─────────────────────────────────────────────
+// ─── Document Shapes ─────────────────────────────────────────────────────────
 
 interface TenantMemberDocument {
   userId: string;
@@ -13,12 +13,31 @@ interface TenantMemberDocument {
   status: string;
 }
 
+interface ProjectMemberDocument {
+  userId: string;
+  projectId: string;
+  role: string;
+}
+
+/**
+ * Matches project-scoped request paths and captures the projectId:
+ * `/api/projects/:projectId` and any sub-resource
+ * (`/api/projects/:projectId/tasks`, `/statuses`, `/sprints`, …).
+ * Routes that address a resource by its own id (`/tasks/:taskId`,
+ * `/statuses/:statusId`, …) do NOT match — those enforce permissions at the
+ * service layer after resolving the owning project (see task/status/sprint services).
+ */
+const PROJECT_PATH_PATTERN = /^\/api\/projects\/([^/]+)(?:\/|$)/;
+
 // ─── Tenant Context Middleware ────────────────────────────────────────────────
 
 /**
  * Hono middleware that resolves the active tenant context.
  *
- * 1. Reads the `X-Tenant-Id` header.
+ * 1. Reads the `X-Tenant-Id` header. The value may be a tenant **id** or a
+ *    tenant **slug** (DEC-032): if a membership exists for the raw value it is
+ *    used directly (id path, backward compatible); otherwise the value is
+ *    resolved as a slug to its tenant id.
  * 2. Validates the authenticated user has an ACTIVE membership in that tenant.
  * 3. Rejects ACCESS_REVOKED members with 403.
  * 4. Sets `tenantId` and `tenantRole` on the context.
@@ -31,9 +50,9 @@ interface TenantMemberDocument {
  * so that auth and invitation routes can skip it.
  */
 export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) => {
-  const tenantId = c.req.header('X-Tenant-Id');
+  const tenantRef = c.req.header('X-Tenant-Id');
 
-  if (!tenantId) {
+  if (!tenantRef) {
     throw new ValidationError('Missing X-Tenant-Id header');
   }
 
@@ -43,12 +62,20 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
     throw new ForbiddenError('Authentication required for tenant context');
   }
 
-  // Query the tenant_members collection to verify membership
+  // Query the tenant_members collection to verify membership.
+  // First try the raw value as a tenant id (backward compatible); if no
+  // membership matches, treat the value as a slug and resolve the tenant id.
   const tenantMembers = getCollection<TenantMemberDocument>('tenant_members');
-  const membership = await tenantMembers.findOne({
-    userId,
-    tenantId,
-  });
+  let membership = await tenantMembers.findOne({ userId, tenantId: tenantRef });
+
+  if (!membership) {
+    const tenants = getCollection<{ id: string; slug: string }>('tenants');
+    const tenant = await tenants.findOne({ slug: tenantRef });
+
+    if (tenant) {
+      membership = await tenantMembers.findOne({ userId, tenantId: tenant.id });
+    }
+  }
 
   if (!membership) {
     throw new ForbiddenError('You are not a member of this tenant');
@@ -64,8 +91,28 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
   }
 
   // Set tenant context for downstream handlers
-  c.set('tenantId', tenantId);
+  c.set('tenantId', membership.tenantId);
   c.set('tenantRole', membership.role as TenantRole);
+
+  // V2-4: populate the caller's project role for project-scoped requests so
+  // requirePermission(action, true) / ensurePermission() see the real role.
+  // Tenant Owner/Admin bypass happens inside the RBAC matrix, so no special
+  // casing here — but we can skip the lookup entirely for them.
+  const tenantRole = membership.role as TenantRole;
+
+  if (tenantRole !== TenantRole.OWNER && tenantRole !== TenantRole.ADMIN) {
+    const projectMatch = PROJECT_PATH_PATTERN.exec(c.req.path);
+
+    if (projectMatch) {
+      const projectId = projectMatch[1];
+      const projectMembers = getCollection<ProjectMemberDocument>('project_members');
+      const projectMembership = await projectMembers.findOne({ userId, projectId });
+
+      if (projectMembership) {
+        c.set('projectRole', projectMembership.role as AppEnv['Variables']['projectRole']);
+      }
+    }
+  }
 
   await next();
 });

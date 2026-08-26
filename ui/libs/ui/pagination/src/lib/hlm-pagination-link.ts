@@ -39,13 +39,14 @@ export class HlmPaginationLink {
   public readonly link = input<RouterLink['routerLink']>();
 
   constructor() {
+    // R3-P9: pagination items are always interactive → pointer cursor
     classes(() => [
       'relative',
+      'cursor-pointer',
       buttonVariants({
         variant: this.isActive() ? 'outline' : 'ghost',
         size: this.size(),
       }),
-      this.link() === undefined && 'cursor-pointer',
     ]);
   }
 }

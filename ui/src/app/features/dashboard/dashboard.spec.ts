@@ -1,32 +1,32 @@
 /**
- * Tests for the Dashboard component.
+ * Tests for the root Dashboard entry component (DEC-033).
  *
  * Covers:
- * - dashboardState computed signal
+ * - dashboardState computed signal (visitor / new-user / pending-invitations / redirecting)
+ * - Redirect to the last/first accessible tenant home `/t/:tenantSlug`
  * - Auth flow (fetchCurrentUser when token but no user)
- * - Loading tenants and data
  * - onInvitationHandled reload
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { Dashboard } from './dashboard';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
 import { TenantClient } from '@services/tenant-client';
-import { TaskClient } from '@services/task-client';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { User } from '@task-board/shared';
-import type { TenantWithRole } from '@app/types/frontend';
+import type { MyInvitation, TenantWithRole } from '@app/types/frontend';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockTenants: TenantWithRole[] = [
   {
     id: 't1',
     name: 'Acme',
+    slug: 'acme',
     description: null,
     status: 'ACTIVE',
     deletionScheduledAt: null,
@@ -47,10 +47,11 @@ describe('Dashboard', () => {
   };
   let tenantStoreMock: {
     tenants: ReturnType<typeof vi.fn>;
+    activeTenant: ReturnType<typeof vi.fn>;
     loadTenants: ReturnType<typeof vi.fn>;
   };
   let tenantClientMock: { getMyInvitations: ReturnType<typeof vi.fn> };
-  let taskClientMock: { getMyTasks: ReturnType<typeof vi.fn> };
+  let routerNavigateSpy: ReturnType<typeof vi.fn>;
 
   function setup(
     opts: {
@@ -58,6 +59,7 @@ describe('Dashboard', () => {
       hasUser?: boolean;
       token?: string | null;
       tenants?: TenantWithRole[];
+      invitations?: MyInvitation[];
       fetchCurrentUserMock?: () => Promise<User>;
     } = {},
   ) {
@@ -66,6 +68,7 @@ describe('Dashboard', () => {
       hasUser = true,
       token = 'test-token',
       tenants = mockTenants,
+      invitations = [],
       fetchCurrentUserMock,
     } = opts;
 
@@ -79,15 +82,12 @@ describe('Dashboard', () => {
     };
     tenantStoreMock = {
       tenants: vi.fn().mockReturnValue(tenants),
+      activeTenant: vi.fn().mockReturnValue(tenants[0] ?? null),
       loadTenants: vi.fn().mockResolvedValue(tenants),
     };
     tenantClientMock = {
-      getMyInvitations: vi.fn().mockReturnValue(of([])),
+      getMyInvitations: vi.fn().mockReturnValue(of(invitations)),
     };
-    taskClientMock = {
-      getMyTasks: vi.fn().mockReturnValue(of([])),
-    };
-
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
       providers: [
@@ -98,9 +98,11 @@ describe('Dashboard', () => {
         { provide: AuthStore, useValue: authStoreMock },
         { provide: TenantStore, useValue: tenantStoreMock },
         { provide: TenantClient, useValue: tenantClientMock },
-        { provide: TaskClient, useValue: taskClientMock },
       ],
     });
+
+    // Spy on navigation instead of replacing the Router (RouterLink needs the real one)
+    routerNavigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     const fixture = TestBed.createComponent(Dashboard);
 
@@ -108,121 +110,55 @@ describe('Dashboard', () => {
     fixture.detectChanges();
   }
 
-  describe('authenticated user with tenants', () => {
-    beforeEach(() => setup());
+  it('should redirect an authenticated user with tenants to the tenant home', async () => {
+    setup();
 
-    it('should load tenants via tenantStore', async () => {
-      // loadTenants is called in ngOnInit
-      expect(tenantStoreMock.loadTenants).toHaveBeenCalled();
-    });
+    // Wait for async tenant loading + navigation
+    await new Promise((r) => setTimeout(r, 0));
 
-    it('should load invitations and tasks', () => {
-      expect(tenantClientMock.getMyInvitations).toHaveBeenCalled();
-      expect(taskClientMock.getMyTasks).toHaveBeenCalled();
-    });
-
-    it('should set loading to false after data loads', () => {
-      expect(component.loading()).toBe(false);
-    });
-
-    it('dashboardState should be OWNER for owner role', () => {
-      expect(component.dashboardState()).toBe('OWNER');
-    });
+    expect(tenantStoreMock.loadTenants).toHaveBeenCalled();
+    expect(routerNavigateSpy).toHaveBeenCalledWith(['/t', 'acme'], { replaceUrl: true });
+    expect(component.dashboardState()).toBe('redirecting');
   });
 
-  describe('authenticated user without tenants', () => {
-    it('dashboardState should be new-user', async () => {
-      authStoreMock = {
-        isAuthenticated: vi.fn().mockReturnValue(true),
-        currentUser: vi.fn().mockReturnValue({ id: 'u1' } as User),
-        token: vi.fn().mockReturnValue('tok'),
-        fetchCurrentUser: vi.fn().mockResolvedValue({ id: 'u1' } as User),
-      };
-      tenantStoreMock = {
-        tenants: vi.fn().mockReturnValue([]),
-        loadTenants: vi.fn().mockResolvedValue([]),
-      };
-      tenantClientMock = { getMyInvitations: vi.fn().mockReturnValue(of([])) };
-      taskClientMock = { getMyTasks: vi.fn().mockReturnValue(of([])) };
+  it('should show the welcome view for an authenticated user without tenants', async () => {
+    setup({ tenants: [] });
 
-      TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
-        providers: [
-          provideHttpClient(),
-          provideHttpClientTesting(),
-          provideRouter([]),
-          { provide: API_BASE_URL, useValue: 'http://localhost/api' },
-          { provide: AuthStore, useValue: authStoreMock },
-          { provide: TenantStore, useValue: tenantStoreMock },
-          { provide: TenantClient, useValue: tenantClientMock },
-          { provide: TaskClient, useValue: taskClientMock },
-        ],
-      });
+    await new Promise((r) => setTimeout(r, 0));
 
-      const fixture = TestBed.createComponent(Dashboard);
-
-      component = fixture.componentInstance;
-      fixture.detectChanges();
-
-      // Wait for async tenant loading
-      await new Promise((r) => setTimeout(r, 0));
-
-      expect(component.dashboardState()).toBe('new-user');
-    });
+    expect(component.dashboardState()).toBe('new-user');
+    expect(routerNavigateSpy).not.toHaveBeenCalled();
   });
 
-  describe('unauthenticated user', () => {
-    it('dashboardState should be visitor', () => {
-      authStoreMock = {
-        isAuthenticated: vi.fn().mockReturnValue(false),
-        currentUser: vi.fn().mockReturnValue(null),
-        token: vi.fn().mockReturnValue(null),
-        fetchCurrentUser: vi.fn(),
-      };
-      tenantStoreMock = { tenants: vi.fn().mockReturnValue([]), loadTenants: vi.fn() };
-      tenantClientMock = { getMyInvitations: vi.fn() };
-      taskClientMock = { getMyTasks: vi.fn() };
+  it('should show the invitation view when there are only pending invitations', async () => {
+    setup({ tenants: [], invitations: [{ id: 'inv1' } as MyInvitation] });
 
-      TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
-        providers: [
-          provideHttpClient(),
-          provideHttpClientTesting(),
-          provideRouter([]),
-          { provide: API_BASE_URL, useValue: 'http://localhost/api' },
-          { provide: AuthStore, useValue: authStoreMock },
-          { provide: TenantStore, useValue: tenantStoreMock },
-          { provide: TenantClient, useValue: tenantClientMock },
-          { provide: TaskClient, useValue: taskClientMock },
-        ],
-      });
+    await new Promise((r) => setTimeout(r, 0));
 
-      const fixture = TestBed.createComponent(Dashboard);
+    expect(component.dashboardState()).toBe('pending-invitations');
+  });
 
-      component = fixture.componentInstance;
-      fixture.detectChanges();
+  it('should show the landing page for a visitor', () => {
+    setup({ authenticated: false, hasUser: false, token: null });
 
-      expect(component.dashboardState()).toBe('visitor');
-      expect(component.loading()).toBe(false);
-    });
+    expect(component.dashboardState()).toBe('visitor');
+    expect(component.loading()).toBe(false);
   });
 
   describe('onInvitationHandled', () => {
-    beforeEach(() => setup());
-
-    it('should reload tenants and data', async () => {
-      // Reset the mock call counts
-      tenantStoreMock.loadTenants.mockClear();
-      tenantClientMock.getMyInvitations.mockClear();
-      taskClientMock.getMyTasks.mockClear();
-
-      component.onInvitationHandled();
-
-      expect(component.loading()).toBe(true);
+    it('should reload tenants and navigate once a tenant is available', async () => {
+      setup({ tenants: [] });
 
       await new Promise((r) => setTimeout(r, 0));
 
-      expect(tenantStoreMock.loadTenants).toHaveBeenCalled();
+      // An invitation acceptance produced a tenant
+      tenantStoreMock.loadTenants.mockResolvedValue(mockTenants);
+      tenantStoreMock.activeTenant.mockReturnValue(mockTenants[0]);
+      tenantStoreMock.tenants.mockReturnValue(mockTenants);
+
+      await component.onInvitationHandled();
+
+      expect(routerNavigateSpy).toHaveBeenCalledWith(['/t', 'acme'], { replaceUrl: true });
     });
   });
 });

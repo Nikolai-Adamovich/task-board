@@ -11,7 +11,7 @@
               <li hlmSidebarMenuItem>
                 <a
                   hlmSidebarMenuButton
-                  [routerLink]="['/tenants', tenant.id, 'projects']"
+                  [routerLink]="['/t', tenant.slug, 'projects']"
                   routerLinkActive
                   #rlaProjects="routerLinkActive"
                   [isActive]="rlaProjects.isActive"
@@ -22,34 +22,37 @@
                   <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.projects' | transloco }}</span>
                 </a>
               </li>
-              <li hlmSidebarMenuItem>
-                <a
-                  hlmSidebarMenuButton
-                  [routerLink]="['/tenants', tenant.id, 'settings']"
-                  routerLinkActive
-                  #rlaSettings="routerLinkActive"
-                  [isActive]="rlaSettings.isActive"
-                  [tooltip]="'sidebar.settings' | transloco"
-                  size="lg"
-                >
-                  <ng-icon name="lucideSettings" />
-                  <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.settings' | transloco }}</span>
-                </a>
-              </li>
-              <li hlmSidebarMenuItem>
-                <a
-                  hlmSidebarMenuButton
-                  [routerLink]="['/tenants', tenant.id, 'settings', 'members']"
-                  routerLinkActive
-                  #rlaMembers="routerLinkActive"
-                  [isActive]="rlaMembers.isActive"
-                  [tooltip]="'sidebar.members' | transloco"
-                  size="lg"
-                >
-                  <ng-icon name="lucideUsers" />
-                  <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.members' | transloco }}</span>
-                </a>
-              </li>
+              <!-- V2-10: workspace Settings/Members nav only for OWNER/ADMIN -->
+              @if (isTenantAdmin()) {
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/t', tenant.slug, 'settings']"
+                    routerLinkActive
+                    #rlaSettings="routerLinkActive"
+                    [isActive]="rlaSettings.isActive"
+                    [tooltip]="'sidebar.settings' | transloco"
+                    size="lg"
+                  >
+                    <ng-icon name="lucideSettings" />
+                    <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.settings' | transloco }}</span>
+                  </a>
+                </li>
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/t', tenant.slug, 'settings', 'members']"
+                    routerLinkActive
+                    #rlaMembers="routerLinkActive"
+                    [isActive]="rlaMembers.isActive"
+                    [tooltip]="'sidebar.members' | transloco"
+                    size="lg"
+                  >
+                    <ng-icon name="lucideUsers" />
+                    <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.members' | transloco }}</span>
+                  </a>
+                </li>
+              }
             </ul>
           </div>
         </div>
@@ -64,7 +67,7 @@
                 <li hlmSidebarMenuItem>
                   <a
                     hlmSidebarMenuButton
-                    [routerLink]="['/tenants', tenant.id, 'projects', projectId]"
+                    [routerLink]="['/t', tenant.slug, 'projects', projectId]"
                     routerLinkActive
                     #rlaOverview="routerLinkActive"
                     [routerLinkActiveOptions]="{ exact: true }"
@@ -80,7 +83,7 @@
                   <li hlmSidebarMenuItem>
                     <a
                       hlmSidebarMenuButton
-                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'boards', boardId]"
+                      [routerLink]="['/t', tenant.slug, 'projects', projectId, 'boards', boardId]"
                       routerLinkActive
                       #rlaBoard="routerLinkActive"
                       [isActive]="rlaBoard.isActive"
@@ -95,7 +98,7 @@
                 <li hlmSidebarMenuItem>
                   <a
                     hlmSidebarMenuButton
-                    [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'tasks']"
+                    [routerLink]="['/t', tenant.slug, 'projects', projectId, 'tasks']"
                     routerLinkActive
                     #rlaTasks="routerLinkActive"
                     [isActive]="rlaTasks.isActive"
@@ -109,7 +112,7 @@
                 <li hlmSidebarMenuItem>
                   <a
                     hlmSidebarMenuButton
-                    [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'sprints']"
+                    [routerLink]="['/t', tenant.slug, 'projects', projectId, 'sprints']"
                     routerLinkActive
                     #rlaPSprints="routerLinkActive"
                     [isActive]="rlaPSprints.isActive"
@@ -123,7 +126,7 @@
                 <li hlmSidebarMenuItem>
                   <a
                     hlmSidebarMenuButton
-                    [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'members']"
+                    [routerLink]="['/t', tenant.slug, 'projects', projectId, 'members']"
                     routerLinkActive
                     #rlaPMembers="routerLinkActive"
                     [isActive]="rlaPMembers.isActive"
@@ -138,49 +141,23 @@
                   <li hlmSidebarMenuItem>
                     <a
                       hlmSidebarMenuButton
-                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'settings', 'statuses']"
+                      [routerLink]="['/t', tenant.slug, 'projects', projectId, 'settings']"
                       routerLinkActive
-                      #rlaStatuses="routerLinkActive"
-                      [isActive]="rlaStatuses.isActive"
-                      [tooltip]="'sidebar.statuses' | transloco"
+                      #rlaSettings="routerLinkActive"
+                      [isActive]="rlaSettings.isActive"
+                      [tooltip]="'sidebar.projectSettings' | transloco"
                       size="default"
                     >
-                      <ng-icon name="lucideCircleDot" />
-                      <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.statuses' | transloco }}</span>
+                      <ng-icon name="lucideSettings" />
+                      <span class="group-data-[collapsible=icon]:hidden">{{
+                        'sidebar.projectSettings' | transloco
+                      }}</span>
                     </a>
                   </li>
                   <li hlmSidebarMenuItem>
                     <a
                       hlmSidebarMenuButton
-                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'settings', 'task-types']"
-                      routerLinkActive
-                      #rlaTaskTypes="routerLinkActive"
-                      [isActive]="rlaTaskTypes.isActive"
-                      [tooltip]="'sidebar.taskTypes' | transloco"
-                      size="default"
-                    >
-                      <ng-icon name="lucideLayers" />
-                      <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.taskTypes' | transloco }}</span>
-                    </a>
-                  </li>
-                  <li hlmSidebarMenuItem>
-                    <a
-                      hlmSidebarMenuButton
-                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'settings', 'labels']"
-                      routerLinkActive
-                      #rlaLabels="routerLinkActive"
-                      [isActive]="rlaLabels.isActive"
-                      [tooltip]="'sidebar.labels' | transloco"
-                      size="default"
-                    >
-                      <ng-icon name="lucideTag" />
-                      <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.labels' | transloco }}</span>
-                    </a>
-                  </li>
-                  <li hlmSidebarMenuItem>
-                    <a
-                      hlmSidebarMenuButton
-                      [routerLink]="['/tenants', tenant.id, 'projects', projectId, 'audit']"
+                      [routerLink]="['/t', tenant.slug, 'projects', projectId, 'audit']"
                       routerLinkActive
                       #rlaAudit="routerLinkActive"
                       [isActive]="rlaAudit.isActive"

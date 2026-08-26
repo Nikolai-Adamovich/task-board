@@ -24,6 +24,7 @@ const NOW = '2025-01-01T00:00:00Z';
 const mockTenant: TenantWithRole = {
   id: 'tenant-1',
   name: 'Acme',
+  slug: 'acme',
   description: null,
   status: 'ACTIVE',
   deletionScheduledAt: null,
@@ -32,11 +33,11 @@ const mockTenant: TenantWithRole = {
   updatedAt: NOW,
 };
 
-function createRoute(tenantId: string | null, projectKey: string | null): ActivatedRouteSnapshot {
+function createRoute(tenantSlug: string | null, projectKey: string | null): ActivatedRouteSnapshot {
   return {
     paramMap: {
       get: (key: string) => {
-        if (key === 'tenantId') return tenantId;
+        if (key === 'tenantSlug') return tenantSlug;
         if (key === 'projectKey') return projectKey;
         return null;
       },
@@ -78,13 +79,14 @@ describe('projectGuard', () => {
     authStore.setTenantRole('OWNER');
 
     const result = await TestBed.runInInjectionContext(() =>
-      projectGuard(createRoute('tenant-1', 'proj-1'), {} as RouterStateSnapshot),
+      projectGuard(createRoute('acme', 'proj-1'), {} as RouterStateSnapshot),
     );
 
     expect(result).toBe(true);
+    expect(projectStoreMock.loadProjectByKey).toHaveBeenCalledWith('tenant-1', 'proj-1');
   });
 
-  it('should redirect to / when tenantId is missing', async () => {
+  it('should redirect to / when tenantSlug is missing', async () => {
     setup();
 
     const result = await TestBed.runInInjectionContext(() =>
@@ -98,13 +100,13 @@ describe('projectGuard', () => {
     setup();
 
     const result = await TestBed.runInInjectionContext(() =>
-      projectGuard(createRoute('tenant-1', null), {} as RouterStateSnapshot),
+      projectGuard(createRoute('acme', null), {} as RouterStateSnapshot),
     );
 
     expect(result).not.toBe(true);
   });
 
-  it('should redirect to / when active tenant does not match tenantId', async () => {
+  it('should redirect to / when active tenant does not match tenantSlug', async () => {
     setup();
 
     const tenantStore = TestBed.inject(TenantStore);
@@ -112,7 +114,7 @@ describe('projectGuard', () => {
     tenantStore.setActiveTenant(mockTenant);
 
     const result = await TestBed.runInInjectionContext(() =>
-      projectGuard(createRoute('other-tenant', 'proj-1'), {} as RouterStateSnapshot),
+      projectGuard(createRoute('other-workspace', 'proj-1'), {} as RouterStateSnapshot),
     );
 
     expect(result).not.toBe(true);
@@ -122,7 +124,7 @@ describe('projectGuard', () => {
     setup();
 
     const result = await TestBed.runInInjectionContext(() =>
-      projectGuard(createRoute('tenant-1', 'proj-1'), {} as RouterStateSnapshot),
+      projectGuard(createRoute('acme', 'proj-1'), {} as RouterStateSnapshot),
     );
 
     expect(result).not.toBe(true);
@@ -138,7 +140,7 @@ describe('projectGuard', () => {
     authStore.setTenantRole('ADMIN');
 
     const result = await TestBed.runInInjectionContext(() =>
-      projectGuard(createRoute('tenant-1', 'proj-1'), {} as RouterStateSnapshot),
+      projectGuard(createRoute('acme', 'proj-1'), {} as RouterStateSnapshot),
     );
 
     expect(result).toBe(true);
@@ -154,7 +156,7 @@ describe('projectGuard', () => {
     authStore.setTenantRole('MEMBER');
 
     const result = await TestBed.runInInjectionContext(() =>
-      projectGuard(createRoute('tenant-1', 'proj-1'), {} as RouterStateSnapshot),
+      projectGuard(createRoute('acme', 'proj-1'), {} as RouterStateSnapshot),
     );
 
     expect(result).toBe(true);
@@ -169,7 +171,7 @@ describe('projectGuard', () => {
     // No tenant role set — authStore.tenantRole() is null
 
     const result = await TestBed.runInInjectionContext(() =>
-      projectGuard(createRoute('tenant-1', 'proj-1'), {} as RouterStateSnapshot),
+      projectGuard(createRoute('acme', 'proj-1'), {} as RouterStateSnapshot),
     );
 
     expect(result).not.toBe(true);

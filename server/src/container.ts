@@ -11,6 +11,7 @@
 import type { Document } from 'mongodb';
 import { getCollection } from './db/mongo.js';
 import { AuthService } from './services/auth.service.js';
+import { AuditEnrichmentService } from './services/audit-enrichment.service.js';
 import { AuditService } from './services/audit.service.js';
 import { BoardService } from './services/board.service.js';
 import { CommentService } from './services/comment.service.js';
@@ -99,16 +100,36 @@ export function buildServices(env: ContainerEnv): Services {
   const userRepo = new UserRepository(getCollection<UserDocument>('users'));
   // ── Cross-cutting services ────────────────────────────────────────────────
   const counterService = new CounterService(counterRepo);
-  const auditService = new AuditService(auditRepo, userRepo);
+  const auditEnrichment = new AuditEnrichmentService({
+    tasks: taskRepo,
+    sprints: sprintRepo,
+    statuses: statusRepo,
+    labels: labelRepo,
+    taskTypes: taskTypeRepo,
+    boards: boardRepo,
+    projects: projectRepo,
+    users: userRepo,
+    comments: commentRepo,
+    tenants: tenantRepo,
+    tenantMembers: tenantMemberRepo,
+  });
+  const auditService = new AuditService(auditRepo, userRepo, auditEnrichment);
   const emailService = env.RESEND_API_KEY
     ? new EmailService(env.RESEND_API_KEY, 'noreply@taskboard.app', env.FRONTEND_URL || '')
     : new ConsoleEmailService();
 
   return {
-    auth: new AuthService(userRepo, tenantRepo, tenantMemberRepo, env.JWT_SECRET),
+    auth: new AuthService(
+      userRepo,
+      tenantRepo,
+      tenantMemberRepo,
+      env.JWT_SECRET,
+      emailService,
+      env.FRONTEND_URL || 'http://localhost:4200',
+    ),
     audit: auditService,
     boards: new BoardService(boardRepo, statusRepo),
-    comments: new CommentService(commentRepo, userRepo),
+    comments: new CommentService(commentRepo, userRepo, taskRepo, projectMemberRepo),
     filters: new FilterService(filterRepo),
     labels: new LabelService(labelRepo, taskRepo),
     preferences: new UserPreferencesService(
@@ -122,8 +143,8 @@ export function buildServices(env: ContainerEnv): Services {
       boards: getCollection<Document>('boards'),
     }),
     relationships: new TaskRelationshipService(relationshipRepo, taskRepo),
-    sprints: new SprintService(sprintRepo, projectRepo, taskRepo),
-    statuses: new StatusService(statusRepo, taskRepo, boardRepo, projectRepo, auditService),
+    sprints: new SprintService(sprintRepo, projectRepo, taskRepo, auditService, projectMemberRepo),
+    statuses: new StatusService(statusRepo, taskRepo, boardRepo, projectRepo, auditService, projectMemberRepo),
     tasks: new TaskService(
       taskRepo,
       counterService,
@@ -139,6 +160,6 @@ export function buildServices(env: ContainerEnv): Services {
     ),
     taskTypes: new TaskTypeService(taskTypeRepo, taskRepo, projectRepo, auditService),
     tenantMembers: new TenantMemberService(tenantRepo, tenantMemberRepo, userRepo, emailService),
-    tenants: new TenantService(tenantRepo, tenantMemberRepo, userRepo),
+    tenants: new TenantService(tenantRepo, tenantMemberRepo, userRepo, undefined, undefined, projectMemberRepo),
   };
 }

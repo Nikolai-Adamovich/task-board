@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { createTenantRoutes } from './tenants.js';
 import { TenantService } from '../services/tenant.service.js';
 import { TenantMemberService } from '../services/tenant-member.service.js';
+import { ConflictError } from '../errors/app-error.js';
 import { errorHandler } from '../middleware/error-handler.js';
 import type { AppEnv } from '../types/context.js';
 
@@ -15,6 +16,8 @@ vi.mock('../db/mongo.js', () => ({
   getCollection: vi.fn(() => ({})),
 }));
 
+/** Mutable return value for the mocked isSlugAvailable — controlled per test. */
+let slugAvailabilityResult = true;
 const mockTenant = {
   id: '550e8400-e29b-41d4-a716-446655440000',
   name: 'Test Tenant',
@@ -34,6 +37,20 @@ const mockMember = {
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
 };
+// DEC-018: an invited-but-unaccepted membership is ACCESS_REVOKED + invitation PENDING
+const mockInvitedMember = {
+  ...mockMember,
+  id: '550e8400-e29b-41d4-a716-446655440003',
+  userId: '550e8400-e29b-41d4-a716-446655440004',
+  role: 'MEMBER',
+  status: 'ACCESS_REVOKED',
+  invitation: {
+    status: 'PENDING',
+    tokenHash: 'hash',
+    invitedBy: '550e8400-e29b-41d4-a716-446655440002',
+    invitedOn: '2025-01-01T00:00:00.000Z',
+  },
+};
 
 vi.mock('../services/tenant.service.js', () => ({
   TenantService: vi.fn().mockImplementation(() => ({
@@ -45,17 +62,28 @@ vi.mock('../services/tenant.service.js', () => ({
     archiveTenant: vi.fn().mockResolvedValue(undefined),
     restoreTenant: vi.fn().mockResolvedValue(undefined),
     cancelDeletion: vi.fn().mockResolvedValue(undefined),
+    isSlugAvailable: vi.fn().mockImplementation(() => Promise.resolve(slugAvailabilityResult)),
   })),
 }));
 
+// V2-7: shared spies for the membership lifecycle routes
+const mockRevokeAccess = vi.fn().mockResolvedValue(undefined);
+const mockRestoreMembership = vi.fn().mockResolvedValue(undefined);
+const mockReinviteUser = vi.fn().mockResolvedValue(undefined);
+const mockRevokeInvitation = vi.fn().mockResolvedValue(undefined);
+const mockHardDeleteMember = vi.fn().mockResolvedValue(undefined);
+
 vi.mock('../services/tenant-member.service.js', () => ({
   TenantMemberService: vi.fn().mockImplementation(() => ({
-    getTenantMembers: vi.fn().mockResolvedValue([mockMember]),
-    inviteUser: vi.fn().mockResolvedValue(mockMember),
+    getTenantMembers: vi.fn().mockResolvedValue([mockMember, mockInvitedMember]),
+    inviteUser: vi.fn().mockResolvedValue(mockInvitedMember),
     updateMemberRole: vi.fn().mockResolvedValue(mockMember),
     removeMember: vi.fn().mockResolvedValue(undefined),
-    restoreMembership: vi.fn().mockResolvedValue(undefined),
-    reinviteUser: vi.fn().mockResolvedValue(undefined),
+    revokeAccess: mockRevokeAccess,
+    restoreMembership: mockRestoreMembership,
+    reinviteUser: mockReinviteUser,
+    revokeInvitation: mockRevokeInvitation,
+    hardDeleteMember: mockHardDeleteMember,
   })),
 }));
 
@@ -111,6 +139,52 @@ async function deleteJson(app: Hono<AppEnv>, path: string) {
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
+describe('GET /api/tenants/slug-available (DEC-032)', () => {
+  it('returns { available: true } for a free slug', async () => {
+    const app = createTestApp();
+    const res = await getJson(app, '/api/tenants/slug-available?slug=free-slug');
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { available: boolean } };
+
+    expect(body.data.available).toBe(true);
+  });
+
+  it('returns { available: false } for a taken slug', async () => {
+    slugAvailabilityResult = false;
+
+    const app = createTestApp();
+    const res = await getJson(app, '/api/tenants/slug-available?slug=taken-slug');
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { available: boolean } };
+
+    expect(body.data.available).toBe(false);
+
+    slugAvailabilityResult = true;
+  });
+
+  it('returns 400 when the slug query parameter is missing', async () => {
+    const app = createTestApp();
+    const res = await getJson(app, '/api/tenants/slug-available');
+
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as { error: { code: string } };
+
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('does not leak tenant info beyond the boolean (enumeration-safe)', async () => {
+    const app = createTestApp();
+    const res = await getJson(app, '/api/tenants/slug-available?slug=some-slug');
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.data).toEqual({ available: expect.any(Boolean) });
+  });
+});
 
 describe('GET /api/tenants', () => {
   const app = createTestApp();
@@ -237,5 +311,124 @@ describe('POST /api/tenants/:tenantId/members/invite', () => {
     });
 
     expect(res.status).toBe(201);
+  });
+
+  it('returns the invited membership as ACCESS_REVOKED with a PENDING invitation (DEC-018)', async () => {
+    const res = await postJson(app, '/api/tenants/550e8400-e29b-41d4-a716-446655440000/members/invite', {
+      email: 'new@test.com',
+      role: 'MEMBER',
+    });
+
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as { data: { status: string; invitation: { status: string } | null } };
+
+    expect(body.data.status).toBe('ACCESS_REVOKED');
+    expect(body.data.invitation?.status).toBe('PENDING');
+  });
+});
+
+describe('GET /api/tenants/:tenantId/members includes invited members', () => {
+  const app = createTestApp();
+
+  it('lists invited members alongside active ones', async () => {
+    const res = await getJson(app, '/api/tenants/550e8400-e29b-41d4-a716-446655440000/members');
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { status: string }[] };
+
+    expect(body.data).toHaveLength(2);
+    expect(body.data.some((m) => m.status === 'ACCESS_REVOKED')).toBe(true);
+  });
+});
+
+// ─── V2-7: membership lifecycle routes ───────────────────────────────────────
+
+const T = '550e8400-e29b-41d4-a716-446655440000';
+const UID = '550e8400-e29b-41d4-a716-446655440004';
+
+describe('PATCH /api/tenants/:tenantId/members/:memberUserId/revoke (V2-7)', () => {
+  it('returns 200 and calls revokeAccess with the userId', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/tenants/${T}/members/${UID}/revoke`, {});
+
+    expect(res.status).toBe(200);
+    expect(mockRevokeAccess).toHaveBeenCalledWith(expect.any(String), T, UID);
+  });
+});
+
+describe('POST /api/tenants/:tenantId/members/:memberUserId/restore (V2-7)', () => {
+  it('returns 200 and calls restoreMembership with the userId', async () => {
+    mockRestoreMembership.mockClear();
+
+    const app = createTestApp();
+    const res = await postJson(app, `/api/tenants/${T}/members/${UID}/restore`, {});
+
+    expect(res.status).toBe(200);
+    expect(mockRestoreMembership).toHaveBeenCalledWith(expect.any(String), T, UID);
+  });
+
+  it('propagates BR-036 conflicts from the service', async () => {
+    mockRestoreMembership.mockRejectedValueOnce(
+      new ConflictError('Cannot restore a membership with a pending invitation'),
+    );
+
+    const app = createTestApp();
+    const res = await postJson(app, `/api/tenants/${T}/members/${UID}/restore`, {});
+
+    expect(res.status).toBe(409);
+
+    const body = (await res.json()) as { error: { code: string } };
+
+    expect(body.error.code).toBe('CONFLICT');
+  });
+});
+
+describe('POST /api/tenants/:tenantId/members/:memberUserId/reinvite (V2-7)', () => {
+  it('returns 200 and calls reinviteUser with the userId', async () => {
+    mockReinviteUser.mockClear();
+
+    const app = createTestApp();
+    const res = await postJson(app, `/api/tenants/${T}/members/${UID}/reinvite`, {});
+
+    expect(res.status).toBe(200);
+    expect(mockReinviteUser).toHaveBeenCalledWith(expect.any(String), T, UID);
+  });
+});
+
+describe('PATCH /api/tenants/:tenantId/members/:memberUserId/resend (V2-7)', () => {
+  it('aliases reinvite for pending invitations', async () => {
+    mockReinviteUser.mockClear();
+
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/tenants/${T}/members/${UID}/resend`, {});
+
+    expect(res.status).toBe(200);
+    expect(mockReinviteUser).toHaveBeenCalledWith(expect.any(String), T, UID);
+  });
+});
+
+describe('POST /api/tenants/:tenantId/members/:memberUserId/invitation/revoke (V2-7)', () => {
+  it('returns 200 and calls revokeInvitation with the userId', async () => {
+    mockRevokeInvitation.mockClear();
+
+    const app = createTestApp();
+    const res = await postJson(app, `/api/tenants/${T}/members/${UID}/invitation/revoke`, {});
+
+    expect(res.status).toBe(200);
+    expect(mockRevokeInvitation).toHaveBeenCalledWith(expect.any(String), T, UID);
+  });
+});
+
+describe('DELETE /api/tenants/:tenantId/members/:memberUserId/hard (V2-7)', () => {
+  it('returns 200 and calls hardDeleteMember with the userId', async () => {
+    mockHardDeleteMember.mockClear();
+
+    const app = createTestApp();
+    const res = await deleteJson(app, `/api/tenants/${T}/members/${UID}/hard`);
+
+    expect(res.status).toBe(200);
+    expect(mockHardDeleteMember).toHaveBeenCalledWith(expect.any(String), T, UID);
   });
 });

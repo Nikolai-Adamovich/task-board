@@ -4,21 +4,25 @@
  * Covers:
  * - Loading task on init
  * - Loading/error states
- * - getPriorityColor helper
- * - startEdit / cancelEdit toggle
- * - saveTask submission
+ * - priorityBadgeVariant / priorityLabel helpers
+ * - Inline title edit (click → edit → confirm PATCHes, cancel/escape discards)
+ * - Inline description save/cancel (keepEditViewOpenOnBlur semantics)
+ * - No Edit button / edit-mode state (R3-P5)
+ * - Header layout classes (key nowrap, title clamp)
+ * - Labels add/remove from detail PATCHes labelIds
+ * - Viewer sees no edit affordances
  * - canDelete check
- * - optimistic concurrency conflict handling
+ * - Optimistic concurrency conflict handling
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { submit } from '@angular/forms/signals';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { TaskDetail, EditTaskForm } from './task-detail';
+import { TaskDetail } from './task-detail';
 import { TaskClient } from '@services/task-client';
+import { LabelClient } from '@services/label-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -50,14 +54,23 @@ const mockTask: Task = {
 describe('TaskDetail', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fixture: any;
   let taskClientMock: {
     getById: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
+  let labelClientMock: {
+    list: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+  };
   let authStoreMock: { currentUser: ReturnType<typeof vi.fn>; tenantRole: ReturnType<typeof vi.fn> };
 
-  async function setup(taskOverrides: Partial<Task> = {}) {
+  async function setup(
+    taskOverrides: Partial<Task> = {},
+    authOverrides: { currentUser?: unknown; tenantRole?: string | null } = {},
+  ) {
     const task = { ...mockTask, ...taskOverrides };
 
     taskClientMock = {
@@ -65,9 +78,20 @@ describe('TaskDetail', () => {
       update: vi.fn().mockReturnValue(of({ ...task, title: 'Updated Title', version: 2 })),
       delete: vi.fn().mockReturnValue(of(undefined)),
     };
+    labelClientMock = {
+      list: vi.fn().mockReturnValue(
+        of([
+          { id: 'label1', name: 'backend' },
+          { id: 'label2', name: 'bug' },
+        ]),
+      ),
+      create: vi.fn().mockReturnValue(of({ id: 'label9', name: 'urgent' })),
+    };
     authStoreMock = {
-      currentUser: vi.fn().mockReturnValue({ id: 'u1', email: 'a@b.com', displayName: 'Test' } as User),
-      tenantRole: vi.fn().mockReturnValue('OWNER'),
+      currentUser: vi
+        .fn()
+        .mockReturnValue(authOverrides.currentUser ?? ({ id: 'u1', email: 'a@b.com', displayName: 'Test' } as User)),
+      tenantRole: vi.fn().mockReturnValue('tenantRole' in authOverrides ? authOverrides.tenantRole : 'OWNER'),
     };
 
     TestBed.configureTestingModule({
@@ -81,13 +105,13 @@ describe('TaskDetail', () => {
           provide: AuthStore,
           useValue: {
             isAuthenticated: () => false,
-            currentUser: () => null,
+            currentUser: authStoreMock.currentUser,
             token: () => null,
-            tenantRole: () => null,
+            tenantRole: authStoreMock.tenantRole,
           },
         },
         { provide: TaskClient, useValue: taskClientMock },
-        { provide: AuthStore, useValue: authStoreMock },
+        { provide: LabelClient, useValue: labelClientMock },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -98,9 +122,9 @@ describe('TaskDetail', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(TaskDetail);
+    fixture = TestBed.createComponent(TaskDetail);
 
-    fixture.componentRef.setInput('taskId', 'tk000000-0000-0000-0000-000000000001');
+    fixture.componentRef.setInput('taskNumber', 'TK-1');
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -111,12 +135,20 @@ describe('TaskDetail', () => {
     }
   }
 
+  /** Poll until the given condition holds (reference data resolves asynchronously) */
+  async function pollUntil(condition: () => boolean, tries = 100): Promise<void> {
+    for (let i = 0; i < tries && !condition(); i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      fixture.detectChanges();
+    }
+  }
+
   // ── Loading ─────────────────────────────────────────────────────
 
   describe('loading', () => {
     it('should call taskClient.getById on init', async () => {
       await setup();
-      expect(taskClientMock.getById).toHaveBeenCalledWith('tk000000-0000-0000-0000-000000000001');
+      expect(taskClientMock.getById).toHaveBeenCalledWith('TK-1');
     });
 
     it('should populate task signal after loading', async () => {
@@ -131,7 +163,7 @@ describe('TaskDetail', () => {
       expect(component.error()).toBe('');
     });
 
-    it('should set loading to false on error', async () => {
+    it('should leave the task empty on load error', async () => {
       taskClientMock = {
         getById: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
         update: vi.fn(),
@@ -158,7 +190,7 @@ describe('TaskDetail', () => {
             },
           },
           { provide: TaskClient, useValue: taskClientMock },
-          { provide: AuthStore, useValue: authStoreMock },
+          { provide: LabelClient, useValue: labelClientMock },
           {
             provide: ActivatedRoute,
             useValue: {
@@ -169,9 +201,9 @@ describe('TaskDetail', () => {
         ],
       });
 
-      const fixture = TestBed.createComponent(TaskDetail);
+      fixture = TestBed.createComponent(TaskDetail);
 
-      fixture.componentRef.setInput('taskId', 'tk000000-0000-0000-0000-000000000001');
+      fixture.componentRef.setInput('taskNumber', 'TK-1');
       component = fixture.componentInstance;
       fixture.detectChanges();
 
@@ -185,29 +217,25 @@ describe('TaskDetail', () => {
     });
   });
 
-  // ── getPriorityColor ───────────────────────────────────
+  // ── Priority helpers ───────────────────────────────────
 
-  describe('getPriorityColor', () => {
+  describe('priority helpers', () => {
     beforeEach(() => setup());
 
-    it('should return correct color for LOW', async () => {
+    it('should return correct badge variant per priority', async () => {
       expect(component.priorityBadgeVariant('LOW')).toBe('outline');
-    });
-
-    it('should return correct color for MEDIUM', async () => {
       expect(component.priorityBadgeVariant('MEDIUM')).toBe('secondary');
-    });
-
-    it('should return correct color for HIGH', async () => {
       expect(component.priorityBadgeVariant('HIGH')).toBe('default');
-    });
-
-    it('should return correct color for CRITICAL', async () => {
       expect(component.priorityBadgeVariant('CRITICAL')).toBe('destructive');
+      expect(component.priorityBadgeVariant('unknown')).toBe('outline');
     });
 
-    it('should return fallback color for unknown priority', async () => {
-      expect(component.priorityBadgeVariant('unknown')).toBe('outline');
+    it('should return title-case display labels (R3-P5)', async () => {
+      expect(component.priorityLabel('LOW')).toBe('Low');
+      expect(component.priorityLabel('MEDIUM')).toBe('Medium');
+      expect(component.priorityLabel('HIGH')).toBe('High');
+      expect(component.priorityLabel('CRITICAL')).toBe('Critical');
+      expect(component.priorityLabel('unknown')).toBe('unknown');
     });
   });
 
@@ -221,57 +249,216 @@ describe('TaskDetail', () => {
     });
   });
 
-  // ── Edit flow ──────────────────────────────────────────────────
+  // ── No edit mode (R3-P5) ───────────────────────────────
 
-  describe('edit flow', () => {
+  describe('edit mode removal', () => {
+    it('should not render an Edit button', async () => {
+      await setup();
+      fixture.detectChanges();
+
+      const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLElement[];
+
+      expect(buttons.map((b) => b.textContent?.trim())).not.toContain('taskDetail.edit');
+    });
+
+    it('should have no edit-mode state left', async () => {
+      await setup();
+
+      expect(component.isEditing).toBeUndefined();
+      expect(component.startEdit).toBeUndefined();
+      expect(component.editForm).toBeUndefined();
+    });
+  });
+
+  // ── Inline title edit (R3-P5) ──────────────────────────
+
+  describe('inline title edit', () => {
     beforeEach(() => setup());
 
-    it('should populate edit form when startEdit is called', async () => {
-      component.startEdit();
+    it('should enter edit view with the current title as draft', async () => {
+      component.startTitleEdit();
 
-      expect(component.isEditing()).toBe(true);
-      expect(component.model().title).toBe('Test Task');
-      expect(component.model().description).toBe('Task description');
-      expect(component.model().priority).toBe('HIGH');
+      expect(component.editingTitle()).toBe(true);
+      expect(component.titleDraft()).toBe('Test Task');
     });
 
-    it('should reset form when cancelEdit is called', async () => {
-      component.startEdit();
-      component.cancelEdit();
-
-      expect(component.isEditing()).toBe(false);
-      expect(component.model().title).toBe('');
-      expect(component.model().description).toBe('');
-      expect(component.model().priority).toBe('MEDIUM');
-    });
-
-    it('should call taskClient.update with version on saveTask', async () => {
-      component.startEdit();
-      component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
-      submit(component.editForm);
+    it('should PATCH the title with version on confirm', async () => {
+      component.startTitleEdit();
+      component.titleDraft.set('Renamed Task');
+      component.confirmTitleEdit();
 
       expect(taskClientMock.update).toHaveBeenCalledWith(
         mockTask.id,
-        expect.objectContaining({ title: 'Updated Title', version: 1 }),
+        expect.objectContaining({ title: 'Renamed Task', version: 1 }),
+      );
+      expect(component.editingTitle()).toBe(false);
+    });
+
+    it('should update the task signal after successful confirm', async () => {
+      component.startTitleEdit();
+      component.titleDraft.set('Renamed Task');
+      component.confirmTitleEdit();
+
+      expect(component.task().title).toBe('Updated Title');
+    });
+
+    it('should not PATCH when cancelled (Escape/✕)', async () => {
+      component.startTitleEdit();
+      component.titleDraft.set('Renamed Task');
+      component.cancelTitleEdit();
+
+      expect(component.editingTitle()).toBe(false);
+      expect(component.titleDraft()).toBe('');
+      expect(taskClientMock.update).not.toHaveBeenCalled();
+    });
+
+    it('should not PATCH an unchanged or blank title', async () => {
+      component.startTitleEdit();
+      component.confirmTitleEdit();
+
+      expect(taskClientMock.update).not.toHaveBeenCalled();
+
+      component.startTitleEdit();
+      component.titleDraft.set('   ');
+      component.confirmTitleEdit();
+
+      expect(taskClientMock.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Inline description edit (R3-P5) ────────────────────
+
+  describe('inline description edit', () => {
+    beforeEach(() => setup());
+
+    it('should enter edit view with the current description as draft', async () => {
+      component.startDescriptionEdit();
+
+      expect(component.editingDescription()).toBe(true);
+      expect(component.descriptionDraft()).toBe('Task description');
+    });
+
+    it('should PATCH the description with version on Save', async () => {
+      component.startDescriptionEdit();
+      component.descriptionDraft.set('New **markdown** body');
+      component.confirmDescriptionEdit();
+
+      expect(taskClientMock.update).toHaveBeenCalledWith(
+        mockTask.id,
+        expect.objectContaining({ description: 'New **markdown** body', version: 1 }),
+      );
+      expect(component.editingDescription()).toBe(false);
+    });
+
+    it('should not PATCH when cancelled', async () => {
+      component.startDescriptionEdit();
+      component.descriptionDraft.set('Discarded draft');
+      component.cancelDescriptionEdit();
+
+      expect(component.editingDescription()).toBe(false);
+      expect(taskClientMock.update).not.toHaveBeenCalled();
+    });
+
+    it('should not PATCH an unchanged description', async () => {
+      component.startDescriptionEdit();
+      component.confirmDescriptionEdit();
+
+      expect(taskClientMock.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Header layout (R3-P5) ──────────────────────────────
+
+  describe('header layout', () => {
+    it('should render nowrap key, clamped title and own-row priority badge', async () => {
+      await setup({ title: 'A very long task title that should wrap onto multiple lines without widening layout' });
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const key = el.querySelector('span.font-mono');
+
+      expect(key?.classList.contains('whitespace-nowrap')).toBe(true);
+
+      const title = el.querySelector('h2');
+
+      expect(title?.classList.contains('break-words')).toBe(true);
+      expect(title?.classList.contains('line-clamp-2')).toBe(true);
+    });
+  });
+
+  // ── Labels editing (R3-P5) ─────────────────────────────
+
+  describe('labels editing', () => {
+    beforeEach(() => setup());
+
+    it('should resolve current labels to names', async () => {
+      await pollUntil(() => component.selectedLabels().length > 0 && component.selectedLabels()[0].name === 'backend');
+
+      expect(component.selectedLabels()).toEqual([{ id: 'label1', name: 'backend' }]);
+    });
+
+    it('should PATCH labelIds when adding an existing label', async () => {
+      await component.onLabelPicked({ id: 'label2', name: 'bug' });
+
+      expect(taskClientMock.update).toHaveBeenCalledWith(
+        mockTask.id,
+        expect.objectContaining({ labelIds: ['label1', 'label2'], version: 1 }),
       );
     });
 
-    it('should update task signal after successful save', async () => {
-      component.startEdit();
-      component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
-      submit(component.editForm);
+    it('should reuse an existing label case-insensitively instead of creating one', async () => {
+      await pollUntil(() => component.labelOptions().length > 0);
+      await component.onLabelPicked({ id: '', name: 'BUG' });
 
-      expect(component.task().title).toBe('Updated Title');
-      expect(component.isEditing()).toBe(false);
+      expect(labelClientMock.create).not.toHaveBeenCalled();
+      expect(taskClientMock.update).toHaveBeenCalledWith(
+        mockTask.id,
+        expect.objectContaining({ labelIds: ['label1', 'label2'] }),
+      );
     });
 
-    it('should stay in edit mode when save fails', async () => {
-      taskClientMock.update.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.startEdit();
-      submit(component.editForm);
+    it('should create a new label then PATCH labelIds including it', async () => {
+      await pollUntil(() => component.labelOptions().length > 0);
+      await component.onLabelPicked({ id: '', name: 'urgent' });
 
-      expect(component.isEditing()).toBe(true);
-      expect(component.error()).not.toBe('');
+      expect(labelClientMock.create).toHaveBeenCalledWith(mockTask.projectId, { name: 'urgent' });
+      expect(taskClientMock.update).toHaveBeenCalledWith(
+        mockTask.id,
+        expect.objectContaining({ labelIds: ['label1', 'label9'] }),
+      );
+    });
+
+    it('should PATCH labelIds without the removed label', async () => {
+      component.removeLabel('label1');
+
+      expect(taskClientMock.update).toHaveBeenCalledWith(
+        mockTask.id,
+        expect.objectContaining({ labelIds: [], version: 1 }),
+      );
+    });
+  });
+
+  // ── Viewer permissions (R3-P5) ─────────────────────────
+
+  describe('viewer sees no edit affordances', () => {
+    it('should disable editing and hide affordances for users without write access', async () => {
+      await setup({}, { tenantRole: null });
+      fixture.detectChanges();
+
+      expect(component.canEdit()).toBe(false);
+
+      const el: HTMLElement = fixture.nativeElement;
+
+      // Title is a plain heading — no click-to-edit role
+      expect(el.querySelector('h2')?.closest('[role="button"]')).toBeNull();
+      // Inline editors cannot be started
+      component.startTitleEdit();
+      component.startDescriptionEdit();
+
+      expect(component.editingTitle()).toBe(false);
+      expect(component.editingDescription()).toBe(false);
+      // Priority renders as a plain title-case label
+      expect(el.textContent).toContain('High');
     });
   });
 
@@ -284,48 +471,7 @@ describe('TaskDetail', () => {
     });
 
     it('should return false when user is not authenticated', async () => {
-      authStoreMock = {
-        currentUser: vi.fn().mockReturnValue(null),
-        tenantRole: vi.fn().mockReturnValue(null),
-      };
-      taskClientMock = {
-        getById: vi.fn().mockReturnValue(of(mockTask)),
-        update: vi.fn(),
-        delete: vi.fn(),
-      };
-      TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
-        providers: [
-          provideHttpClient(),
-          provideHttpClientTesting(),
-          provideRouter([]),
-          { provide: API_BASE_URL, useValue: 'http://localhost/api' },
-          {
-            provide: AuthStore,
-            useValue: {
-              isAuthenticated: () => false,
-              currentUser: () => null,
-              token: () => null,
-              tenantRole: () => null,
-            },
-          },
-          { provide: TaskClient, useValue: taskClientMock },
-          { provide: AuthStore, useValue: authStoreMock },
-          {
-            provide: ActivatedRoute,
-            useValue: {
-              snapshot: { paramMap: { get: () => 't1' } },
-              parent: { snapshot: { paramMap: { get: () => 't1' } }, parent: null },
-            },
-          },
-        ],
-      });
-
-      const fixture = TestBed.createComponent(TaskDetail);
-
-      fixture.componentRef.setInput('taskId', 'tk000000-0000-0000-0000-000000000001');
-      component = fixture.componentInstance;
-      fixture.detectChanges();
+      await setup({}, { currentUser: null, tenantRole: null });
 
       expect(component.canDelete()).toBe(false);
     });
@@ -343,9 +489,9 @@ describe('TaskDetail', () => {
       });
 
       taskClientMock.update.mockReturnValueOnce(throwError(() => conflictError));
-      component.startEdit();
-      component.model.update((m: EditTaskForm) => ({ ...m, title: 'Updated Title' }));
-      submit(component.editForm);
+      component.startTitleEdit();
+      component.titleDraft.set('Updated Title');
+      component.confirmTitleEdit();
 
       expect(component.showConflictDialog()).toBe(true);
       expect(component.conflictMessage()).toBe('taskDetail.conflictHint');
@@ -356,7 +502,6 @@ describe('TaskDetail', () => {
       component.reloadAfterConflict();
 
       expect(component.showConflictDialog()).toBe(false);
-      expect(component.isEditing()).toBe(false);
     });
   });
 });

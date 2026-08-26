@@ -3,7 +3,7 @@
     <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'sprintDetail.loading' | transloco }}</span>
   </div>
 } @else if (sprint(); as s) {
-  <div class="mx-auto max-w-5xl">
+  <div class="mx-auto max-w-6xl px-6">
     <!-- Sprint header -->
     <div class="mb-6 flex items-center justify-between">
       <div>
@@ -12,9 +12,14 @@
           <span hlmBadge [variant]="statusBadgeVariant(s.status)">
             {{ s.status }}
           </span>
+          @if (isSprintOverdue(s)) {
+            <span hlmBadge variant="destructive" [title]="'sprints.overdueTooltip' | transloco">
+              {{ 'sprints.overdue' | transloco }}
+            </span>
+          }
         </div>
         <p class="mt-1 text-xs text-muted-foreground">
-          {{ s.startDate | date: 'mediumDate' }} — {{ s.endDate | date: 'mediumDate' }}
+          {{ s.startDate | date: dateFmt() }} — {{ s.endDate | date: dateFmt() }}
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -53,7 +58,7 @@
               <div class="flex items-center gap-3">
                 <span class="size-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
                 <a
-                  [routerLink]="['/tenants', tenantId(), 'projects', task.projectId, 'tasks', task.id]"
+                  [routerLink]="['/t', tenantSlug(), 'projects', projectKey(), 'tasks', taskNumber(task)]"
                   class="text-sm font-medium text-foreground hover:text-primary hover:underline"
                 >
                   {{ task.title }}
@@ -66,7 +71,7 @@
                   class="text-[10px] uppercase"
                   [variant]="getPriorityBadge(task.priority)"
                 >
-                  {{ task.priority }}
+                  {{ getPriorityLabel(task.priority) }}
                 </span>
                 @if (canManage()) {
                   <button
@@ -98,4 +103,45 @@
   >
     <p class="text-sm text-amber-600">{{ 'sprintDetail.deleteWarning' | transloco }}</p>
   </ui-confirm-dialog>
+
+  <!-- V1-7: Completion disposition dialog — shown when unfinished tasks remain -->
+  <hlm-dialog
+    [state]="showDispositionDialog() ? 'open' : 'closed'"
+    (stateChanged)="onDispositionDialogStateChange($event)"
+  >
+    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'sprintDetail.dispositionTitle' | transloco }}</h3>
+        <p hlmDialogDescription>
+          {{ 'sprintDetail.dispositionDesc' | transloco: { count: unfinishedTasks().length } }}
+        </p>
+      </hlm-dialog-header>
+
+      <hlm-field>
+        <label hlmFieldLabel for="disposition-target">{{ 'sprintDetail.dispositionTarget' | transloco }}</label>
+        <hlm-native-select
+          id="disposition-target"
+          [value]="dispositionTarget()"
+          (valueChange)="dispositionTarget.set($event ?? '')"
+        >
+          <option value="">{{ 'sprintDetail.moveToBacklog' | transloco }}</option>
+          @for (future of futureSprints(); track future.id) {
+            <option [value]="future.id">{{ 'sprintDetail.moveToSprint' | transloco }} {{ future.name }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose [disabled]="completing()">
+          {{ 'common.cancel' | transloco }}
+        </button>
+        <button hlmBtn (click)="completeSprint()" [disabled]="completing()">
+          @if (completing()) {
+            <hlm-spinner />
+          }
+          {{ 'sprintDetail.completeAndMove' | transloco }}
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
 }

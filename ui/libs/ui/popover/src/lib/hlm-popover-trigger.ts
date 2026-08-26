@@ -6,6 +6,6 @@ import { BrnPopoverTrigger } from '@spartan-ng/brain/popover';
   hostDirectives: [
     { directive: BrnPopoverTrigger, inputs: ['id', 'brnPopoverTriggerFor: hlmPopoverTriggerFor', 'type'] },
   ],
-  host: { 'data-slot': 'popover-trigger' },
+  host: { 'data-slot': 'popover-trigger', class: 'cursor-pointer' },
 })
 export class HlmPopoverTrigger {}

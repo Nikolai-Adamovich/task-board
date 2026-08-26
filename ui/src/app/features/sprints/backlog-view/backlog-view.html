@@ -1,0 +1,9 @@
+<div class="mx-auto max-w-6xl px-6">
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold text-foreground">{{ 'sprintBacklog.title' | transloco }}</h2>
+    <p class="mt-1 text-sm text-muted-foreground">{{ 'sprintBacklog.description' | transloco }}</p>
+  </div>
+  @if (projectId()) {
+    <ui-sprint-backlog [projectId]="projectId()" [projectKey]="projectKey()" [tenantSlug]="tenantSlug()" />
+  }
+</div>

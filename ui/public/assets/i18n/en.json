@@ -27,7 +27,8 @@
     "taskTypes": "Task Types",
     "labels": "Labels",
     "audit": "Audit",
-    "filters": "Filters"
+    "filters": "Filters",
+    "projectSettings": "Project settings"
   },
   "tenantSwitcher": {
     "selectWorkspace": "Select workspace",
@@ -95,6 +96,26 @@
       "invalidOrExpired": "Invalid or expired invitation.",
       "passwordsNotMatch": "Passwords do not match.",
       "failedAccept": "Failed to accept invitation."
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "description": "Enter your email address and we will send you a reset link.",
+      "sentTitle": "Check your inbox",
+      "sentMessage": "If an account exists for that address, we have sent a password reset link.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "description": "Choose a new password for your account.",
+      "missingToken": "This reset link is missing or invalid. Please request a new one.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Reset password",
+      "submitting": "Resetting…",
+      "backToLogin": "Back to sign in"
     }
   },
   "landing": {
@@ -186,7 +207,45 @@
     "descriptionPlaceholder": "A short description of your workspace…",
     "submit": "Create Workspace",
     "submitting": "Creating workspace…",
-    "failed": "Failed to create workspace. Please try again."
+    "failed": "Failed to create workspace. Please try again.",
+    "back": "Back",
+    "continue": "Continue",
+    "plan": {
+      "title": "Choose a plan",
+      "subtitle": "Every workspace starts on the Free plan.",
+      "cardTitle": "Free",
+      "price": "$0",
+      "perMonth": "per month",
+      "workspace": "1 workspace",
+      "projects": "Unlimited projects",
+      "users": "Unlimited users"
+    },
+    "slug": {
+      "label": "Workspace URL",
+      "checking": "Checking availability…",
+      "taken": "This URL is already taken",
+      "available": "This URL is available",
+      "hint": "Lowercase letters, numbers and hyphens only."
+    },
+    "checkout": {
+      "title": "Checkout",
+      "subtitle": "Review your order before confirming.",
+      "summary": "Summary",
+      "planLabel": "Plan",
+      "planValue": "Free",
+      "workspaceLabel": "Workspace",
+      "urlLabel": "URL",
+      "totalLabel": "Total due today",
+      "totalValue": "$0",
+      "confirm": "Confirm & create workspace",
+      "confirming": "Confirming…",
+      "demoNote": "This is a demo — no payment is required."
+    },
+    "confirmation": {
+      "title": "Workspace created!",
+      "message": "Your workspace is ready. Invite your team and start planning.",
+      "success": "Everything went smoothly."
+    }
   },
   "settings": {
     "title": "Settings",
@@ -196,7 +255,14 @@
     "zoomDescription": "Adjust the interface font size.",
     "resetZoom": "Reset",
     "language": "Language",
-    "languageDescription": "Choose the display language."
+    "languageDescription": "Choose the display language.",
+    "dateFormat": "Date format",
+    "dateFormatDescription": "Choose how dates are displayed across the app.",
+    "timeFormat": "Time format",
+    "timeFormatDescription": "Choose how times are displayed across the app.",
+    "timeFormat24h": "24-hour",
+    "timeFormat12h": "12-hour (AM/PM)",
+    "systemDefault": "System default"
   },
   "tenantSettings": {
     "title": "Tenant Settings",
@@ -271,7 +337,12 @@
     "statusAccessRevoked": "Access Revoked",
     "roleOwner": "Owner",
     "roleAdmin": "Admin",
-    "roleMember": "Member"
+    "roleMember": "Member",
+    "contextError": "Members could not be loaded because the project context is unavailable.",
+    "editRole": "Edit role",
+    "editRoleTitle": "Edit member role",
+    "editRoleDesc": "Choose the role this member has in the project.",
+    "invitationPending": "Invitation pending"
   },
   "projects": {
     "title": "Projects",
@@ -313,7 +384,24 @@
     "deleteProjectConfirmLabel": "Type the project key ({{key}}) to confirm deletion:",
     "confirmDeleteButton": "Delete Project",
     "createBoardDesc": "Create a new board for this project.",
-    "deleteProjectDesc": "The project will be scheduled for permanent deletion."
+    "deleteProjectDesc": "The project will be scheduled for permanent deletion.",
+    "activeSprint": "Active sprint",
+    "deletionScheduledFor": "Deletion scheduled for {{date}}",
+    "goToSprints": "Go to sprints",
+    "goToTasks": "Go to tasks",
+    "manageBoards": "Manage boards",
+    "members": "Members",
+    "moreMembers": "+{{count}} more",
+    "noActiveSprint": "No active sprint",
+    "noMembers": "No members yet",
+    "noTasks": "No tasks yet",
+    "openSprint": "Open sprint",
+    "recentTasks": "Recent tasks",
+    "settings": "Settings",
+    "taskSummary": "Task summary",
+    "totalTasks": "Total tasks",
+    "viewAllMembers": "View all members",
+    "viewAllTasks": "View all tasks"
   },
   "projectMembers": {
     "title": "Project Members",
@@ -353,11 +441,13 @@
     "cancel": "Cancel",
     "create": "Create",
     "creating": "Creating…",
-    "noTasks": "No tasks in this column",
     "column": "Column",
     "multiStatusHint": "This column contains multiple statuses. Select the intended status for this task.",
     "createTaskDesc": "Add a new task to this column.",
-    "selectStatusDesc": "Choose the status for the moved task."
+    "selectStatusDesc": "Choose the status for the moved task.",
+    "allTasks": "All tasks",
+    "clearSprint": "Clear sprint filter",
+    "sprintChip": "Sprint: {{name}}"
   },
   "priority": {
     "low": "Low",
@@ -398,7 +488,9 @@
     "conflictHint": "This task was modified by another user. Please reload to get the latest version.",
     "reloadTask": "Reload Task",
     "unknown": "Unknown",
-    "unassigned": "Unassigned"
+    "unassigned": "Unassigned",
+    "editTitle": "Edit title",
+    "editDescription": "Edit description"
   },
   "sprints": {
     "title": "Sprints",
@@ -421,9 +513,15 @@
     "future": "Future",
     "active": "Active",
     "completed": "Completed",
-    "createDesc": "Create a new sprint for this project."
+    "createDesc": "Create a new sprint for this project.",
+    "backlog": "Backlog",
+    "overdue": "Overdue",
+    "overdueTooltip": "This sprint is past its end date"
   },
   "sprintDetail": {
+    "dispositionTitle": "Complete sprint",
+    "dispositionDesc": "{{ count }} unfinished task(s) will be moved to a sprint you pick below.",
+    "dispositionTarget": "Move to sprint",
     "loading": "Loading sprint…",
     "tasks": "Tasks",
     "backToProject": "Back to Project",
@@ -437,13 +535,18 @@
     "deleteConfirm": "Are you sure you want to delete this sprint?",
     "deleteWarning": "Tasks in this sprint will not be deleted, but will be removed from the sprint.",
     "cancelDelete": "Cancel",
-    "confirmDelete": "Delete"
+    "confirmDelete": "Delete",
+    "moveToBacklog": "Move to backlog",
+    "moveToSprint": "Move to sprint",
+    "completeAndMove": "Complete sprint & move tasks"
   },
   "sprintBacklog": {
     "backlog": "Backlog",
     "loading": "Loading backlog…",
     "allAssigned": "All tasks are assigned to sprints.",
-    "addToSprint": "Add to Sprint"
+    "addToSprint": "Add to Sprint",
+    "title": "Backlog",
+    "description": "Tasks without a sprint live here. Move them into an active sprint to start work."
   },
   "docs": {
     "title": "Documentation",
@@ -533,7 +636,8 @@
     "labelNameRequired": "Label name is required",
     "typeRequired": "Task type is required",
     "statusRequired": "Status is required",
-    "priorityRequired": "Priority is required"
+    "priorityRequired": "Priority is required",
+    "titleMaxLength": "Title must be at most 200 characters"
   },
   "statusManager": {
     "title": "Statuses",
@@ -666,9 +770,17 @@
     "deleteConfirm": "Are you sure you want to delete this saved filter?",
     "cancelDelete": "Cancel",
     "confirmDelete": "Delete",
-    "deleteError": "Failed to delete filter."
+    "deleteError": "Failed to delete filter.",
+    "apply": "Apply"
   },
   "auditLog": {
+    "time": "Time",
+    "actor": "Actor",
+    "actionCol": "Action",
+    "entity": "Entity",
+    "changes": "Changes",
+    "allActions": "All Actions",
+    "allActors": "All Actors",
     "title": "Audit Log",
     "loading": "Loading audit events…",
     "noEvents": "No audit events found.",
@@ -697,6 +809,9 @@
     "strikethrough": "Strikethrough"
   },
   "taskTable": {
+    "columns": "Columns",
+    "selectColumns": "Select columns…",
+    "hideColumn": "Hide this column",
     "title": "Tasks",
     "searchPlaceholder": "Search tasks…",
     "loading": "Loading tasks…",
@@ -738,7 +853,19 @@
     "allAssignees": "All Assignees",
     "allReporters": "All Reporters",
     "allSprints": "All Sprints",
-    "filtersDesc": "Filter tasks by status, priority, assignee and more."
+    "filtersDesc": "Filter tasks by status, priority, assignee and more.",
+    "activeFilters": "Active filters",
+    "clearFilters": "Clear all filters",
+    "filterSearch": "Search",
+    "filterStatus": "Status",
+    "filterType": "Type",
+    "filterPriority": "Priority",
+    "filterAssignee": "Assignee",
+    "filterReporter": "Reporter",
+    "filterSprint": "Sprint",
+    "filterLabel": "Label",
+    "noMatchingTasks": "No tasks match the current filters.",
+    "removeFilterAria": "Remove filter {{value}}"
   },
   "pagination": {
     "previous": "Previous",
@@ -746,7 +873,8 @@
     "results": "{{total}} results",
     "perPage": "per page",
     "totalItems": "total items",
-    "pages": "pages"
+    "pages": "pages",
+    "auto": "Auto"
   },
   "errors": {
     "unexpected": "An unexpected error occurred. Please try again.",
@@ -804,5 +932,79 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "delete": "Delete"
+  },
+  "projectSettings": {
+    "title": "Project settings",
+    "subtitle": "Configure boards, members and project details.",
+    "general": "General",
+    "generalDesc": "Basic information about this project.",
+    "adminOnly": "Only workspace admins can change these settings.",
+    "name": "Name",
+    "key": "Key",
+    "keyLockedHint": "The project key is permanent and cannot be changed.",
+    "description": "Description",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "creating": "Creating…",
+    "backToHub": "Back to settings hub",
+    "members": "Members",
+    "membersDesc": "Manage who has access to this project.",
+    "boards": "Boards",
+    "boardsDesc": "Create, rename and delete boards for this project.",
+    "newBoard": "New board",
+    "defaultBoard": "Default board",
+    "defaultBoardDeleteHint": "The default board cannot be deleted.",
+    "invalidStatusRefs": "Some columns reference statuses that no longer exist.",
+    "columnsCount": "{{count}} columns",
+    "rename": "Rename",
+    "renameBoardTitle": "Rename board",
+    "delete": "Delete",
+    "deleteBoardTitle": "Delete board",
+    "deleteBoardWarning": "This board will be permanently removed. Tasks are not deleted.",
+    "dangerZone": "Danger zone",
+    "dangerZoneDesc": "Irreversible actions for this project.",
+    "dangerDescription": "Archive or schedule this project for deletion.",
+    "taskTypes": "Task Types",
+    "taskTypesDesc": "Define the task types available in this project.",
+    "statuses": "Statuses",
+    "statusesDesc": "Customize the workflow statuses of this project.",
+    "labels": "Labels",
+    "labelsDesc": "Create and manage labels to categorize tasks."
+  },
+  "taskCreate": {
+    "title": "Create task",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Short, descriptive summary",
+    "descriptionLabel": "Description",
+    "status": "Status",
+    "selectStatus": "Select status",
+    "priority": "Priority",
+    "type": "Type",
+    "selectType": "Select type",
+    "assignee": "Assignee",
+    "unassigned": "Unassigned",
+    "sprint": "Sprint",
+    "backlog": "Backlog",
+    "labels": "Labels",
+    "labelsPlaceholder": "Search or create label…",
+    "labelsHint": "Pick an existing label or type a new name to create one.",
+    "noLabelsFound": "No labels found",
+    "createLabel": "Create \"{{name}}\"",
+    "removeLabelAria": "Remove label {{name}}",
+    "cancel": "Cancel",
+    "create": "Create task",
+    "creating": "Creating…"
+  },
+  "tenantHome": {
+    "createProject": "Create project",
+    "manageMembers": "Manage members",
+    "myTasks": "My tasks",
+    "noTasks": "No tasks assigned to you",
+    "noTasksHint": "Tasks assigned to you across all your projects will show up here.",
+    "pendingInvitations": "Pending invitations",
+    "pendingInvitationsCount": "{{count}} pending",
+    "noPendingInvitations": "No pending invitations"
   }
 }

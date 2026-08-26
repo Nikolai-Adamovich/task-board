@@ -21,7 +21,23 @@
           <div class="flex items-center gap-3">
             <span class="size-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
             <div>
-              <p class="text-sm font-medium text-foreground">{{ task.title }}</p>
+              @if (projectKey()) {
+                <a
+                  [routerLink]="[
+                    '/t',
+                    tenantSlug(),
+                    'projects',
+                    projectKey(),
+                    'tasks',
+                    projectKey() + '-' + task.number,
+                  ]"
+                  class="text-sm font-medium text-foreground hover:text-primary hover:underline"
+                >
+                  {{ task.title }}
+                </a>
+              } @else {
+                <p class="text-sm font-medium text-foreground">{{ task.title }}</p>
+              }
               @if (task.description) {
                 <p class="text-xs text-muted-foreground line-clamp-1">{{ task.description }}</p>
               }

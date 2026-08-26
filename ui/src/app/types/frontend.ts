@@ -4,31 +4,12 @@
  * API response shapes or UI-specific compositions.
  */
 import type { Tenant, TenantRole } from '@task-board/shared';
-import type { TaskPriority } from '@task-board/shared';
 
 /** Tenant enriched with the current user's role (returned by GET /api/tenants) */
 export type TenantWithRole = Tenant & { role: TenantRole };
 
 /** Cross-tenant invitation visible to the current user (contract lives in shared) */
 export type { MyInvitation } from '@task-board/shared';
-
-/** Task summary for "My Tasks" cross-tenant dashboard */
-export interface MyTask {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  projectId: string;
-  projectName: string;
-  boardId: string;
-  columnId: string;
-  columnTitle: string;
-  title: string;
-  description: string | null;
-  priority: TaskPriority;
-  sprintId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 /** Request body for moving a task to a different column/status */
 export interface MoveTask {

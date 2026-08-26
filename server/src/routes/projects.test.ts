@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { createProjectRoutes } from './projects.js';
 import { ProjectService } from '../services/project.service.js';
 import { errorHandler } from '../middleware/error-handler.js';
+import { ForbiddenError } from '../errors/app-error.js';
 import type { AppEnv } from '../types/context.js';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -46,7 +47,14 @@ const mockProjectMember = {
 vi.mock('../services/project.service.js', () => ({
   ProjectService: vi.fn().mockImplementation(() => ({
     listProjects: vi.fn().mockResolvedValue([mockProject]),
-    createProject: vi.fn().mockResolvedValue(mockProject),
+    // Simulates the real service-level enforcement (requireTenantAdmin)
+    createProject: vi
+      .fn()
+      .mockImplementation((_tenantId: string, _userId: string, userRole: string) =>
+        userRole === 'OWNER' || userRole === 'ADMIN'
+          ? Promise.resolve(mockProject)
+          : Promise.reject(new ForbiddenError('Only owner or admin can perform this action')),
+      ),
     getProject: vi.fn().mockResolvedValue(mockProject),
     updateProject: vi.fn().mockResolvedValue(mockProject),
     deleteProject: vi.fn().mockResolvedValue(undefined),
@@ -65,7 +73,7 @@ vi.mock('../services/project.service.js', () => ({
 const TEST_ENV = { JWT_SECRET: 'test-secret', MONGODB_URI: '', ALLOWED_ORIGINS: '*' };
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440002';
 
-function createTestApp() {
+function createTestApp(tenantRole = 'OWNER') {
   const app = new Hono<AppEnv>();
 
   app.onError(errorHandler);
@@ -75,7 +83,7 @@ function createTestApp() {
 
     c.set('userId', VALID_UUID);
     c.set('tenantId', '550e8400-e29b-41d4-a716-446655440000');
-    c.set('tenantRole', 'OWNER');
+    c.set('tenantRole', tenantRole as 'OWNER');
     c.set('svc', { projects: new MockProjects() } as never);
     await next();
   });
@@ -295,5 +303,61 @@ describe('DELETE /api/projects/:projectId/members/:memberUserId', () => {
     const res = await deleteJson(app, `/api/projects/550e8400-e29b-41d4-a716-446655440010/members/${VALID_UUID}`);
 
     expect(res.status).toBe(200);
+  });
+});
+
+// ─── DEC-017: per-action authorization on projects routes ─────────────────
+
+describe('DEC-017 per-action authorization', () => {
+  it('allows MEMBER to list projects', async () => {
+    const res = await getJson(createTestApp('MEMBER'), '/api/projects');
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).toHaveProperty('data');
+  });
+
+  it('allows MEMBER to get a single project', async () => {
+    const res = await getJson(createTestApp('MEMBER'), '/api/projects/550e8400-e29b-41d4-a716-446655440010');
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).toHaveProperty('data');
+  });
+
+  it('allows MEMBER to list project members', async () => {
+    const res = await getJson(createTestApp('MEMBER'), '/api/projects/550e8400-e29b-41d4-a716-446655440010/members');
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).toHaveProperty('data');
+  });
+
+  it('denies MEMBER project creation with 403 (service-level check)', async () => {
+    const res = await postJson(createTestApp('MEMBER'), '/api/projects', {
+      key: 'TEST',
+      name: 'New Project',
+    });
+
+    expect(res.status).toBe(403);
+
+    const body = (await res.json()) as { error?: { code?: string } };
+
+    expect(body.error?.code).toBe('FORBIDDEN');
+  });
+
+  it('still allows ADMIN project creation', async () => {
+    const res = await postJson(createTestApp('ADMIN'), '/api/projects', {
+      key: 'TEST',
+      name: 'New Project',
+    });
+
+    expect(res.status).toBe(201);
   });
 });

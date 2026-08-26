@@ -2,6 +2,7 @@ import { type Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 import { tenantGuard } from './guards/tenant.guard';
 import { projectGuard } from './guards/project.guard';
+import { tenantRedirectGuard } from './guards/tenant-redirect.guard';
 
 export const routes: Routes = [
   // Auth routes (unauthenticated)
@@ -17,8 +18,17 @@ export const routes: Routes = [
     path: 'auth/accept-invitation',
     loadComponent: () => import('./features/auth/accept-invitation/accept-invitation').then((m) => m.AcceptInvitation),
   },
+  {
+    path: 'auth/forgot-password',
+    loadComponent: () => import('./features/auth/forgot-password/forgot-password').then((m) => m.ForgotPassword),
+  },
+  {
+    path: 'auth/reset-password',
+    loadComponent: () => import('./features/auth/reset-password/reset-password').then((m) => m.ResetPassword),
+  },
 
-  // Root — dashboard handles all states internally (no authGuard)
+  // Root — entry handles visitor / new-user / pending-invitations states and
+  // redirects authenticated users with an accessible tenant to its home (DEC-033)
   {
     path: '',
     loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
@@ -29,16 +39,15 @@ export const routes: Routes = [
     loadComponent: () => import('./features/tenants/create-workspace/create-workspace').then((m) => m.CreateWorkspace),
   },
 
-  // Tenant-scoped routes (authenticated + tenant guard)
+  // Tenant-scoped routes via slug (DEC-032): /t/:tenantSlug/...
   {
-    path: 'tenants/:tenantId',
+    path: 't/:tenantSlug',
     canActivate: [authGuard, tenantGuard],
     loadComponent: () => import('./shell/app-shell/app-shell').then((m) => m.AppShell),
     children: [
       {
         path: '',
-        loadComponent: () =>
-          import('./features/tenants/workspace-detail/workspace-detail').then((m) => m.WorkspaceDetail),
+        loadComponent: () => import('./features/tenants/tenant-home/tenant-home').then((m) => m.TenantHome),
       },
       {
         path: 'settings',
@@ -71,12 +80,21 @@ export const routes: Routes = [
             loadComponent: () => import('./features/tasks/task-table/task-table').then((m) => m.TaskTable),
           },
           {
-            path: 'tasks/:taskId',
+            // Must be registered BEFORE `tasks/:taskNumber` so "new" is not treated as a task number (U1)
+            path: 'tasks/new',
+            loadComponent: () => import('./features/tasks/create-task/create-task').then((m) => m.TaskCreate),
+          },
+          {
+            path: 'tasks/:taskNumber',
             loadComponent: () => import('./features/tasks/task-detail/task-detail').then((m) => m.TaskDetail),
           },
           {
             path: 'sprints',
             loadComponent: () => import('./features/sprints/sprint-list/sprint-list').then((m) => m.SprintList),
+          },
+          {
+            path: 'sprints/backlog',
+            loadComponent: () => import('./features/sprints/backlog-view/backlog-view').then((m) => m.BacklogView),
           },
           {
             path: 'sprints/:sprintId',
@@ -86,6 +104,27 @@ export const routes: Routes = [
             path: 'members',
             loadComponent: () =>
               import('./features/projects/project-member-list/project-member-list').then((m) => m.ProjectMemberList),
+          },
+          {
+            path: 'settings',
+            loadComponent: () =>
+              import('./features/projects/project-settings-hub/project-settings-hub').then((m) => m.ProjectSettingsHub),
+          },
+          {
+            path: 'settings/general',
+            loadComponent: () =>
+              import('./features/projects/project-settings-general/project-settings-general').then(
+                (m) => m.ProjectSettingsGeneral,
+              ),
+          },
+          {
+            path: 'settings/boards',
+            loadComponent: () => import('./features/projects/board-manager/board-manager').then((m) => m.BoardManager),
+          },
+          {
+            path: 'settings/danger-zone',
+            loadComponent: () =>
+              import('./features/projects/project-danger-zone/project-danger-zone').then((m) => m.ProjectDangerZone),
           },
           {
             path: 'settings/statuses',
@@ -111,6 +150,13 @@ export const routes: Routes = [
     ],
   },
 
+  // Legacy /tenants/:id paths → redirect to the slug URL (DEC-032)
+  {
+    path: 'tenants/:tenantId',
+    canActivate: [authGuard, tenantRedirectGuard],
+    redirectTo: '',
+  },
+
   // Help pages (public)
   {
     path: 'faq',
@@ -125,11 +171,17 @@ export const routes: Routes = [
     loadComponent: () => import('./features/help/support/support').then((m) => m.Support),
   },
 
-  // Settings (authenticated, no tenant context)
+  // User preferences (authenticated, no tenant context) — V3-7: renamed from
+  // `/settings` to `/profile/preferences`; the old URL redirects for bookmarks.
   {
-    path: 'settings',
+    path: 'profile/preferences',
     canActivate: [authGuard],
     loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+  },
+  {
+    path: 'settings',
+    redirectTo: 'profile/preferences',
+    pathMatch: 'full',
   },
 
   // Fallback

@@ -8,7 +8,7 @@
  * - acceptAsNewUser: password mismatch, successful accept
  * - acceptAsExistingUser: successful accept
  */
-import { TestBed } from '@angular/core/testing';
+import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
@@ -36,6 +36,7 @@ const mockAuthResponse: AuthResponse = {
 describe('AcceptInvitation', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  let fixture: ComponentFixture<AcceptInvitation>;
   let tenantClientMock: {
     getInvitationDetails: ReturnType<typeof vi.fn>;
     acceptInvitation: ReturnType<typeof vi.fn>;
@@ -45,9 +46,9 @@ describe('AcceptInvitation', () => {
   };
   let routeMock: { snapshot: { queryParamMap: { get: ReturnType<typeof vi.fn> } } };
 
-  function setup(token: string | null = 'valid-token') {
+  function setup(token: string | null = 'valid-token', details: InvitationDetails = mockInvitationDetails) {
     tenantClientMock = {
-      getInvitationDetails: vi.fn().mockReturnValue(of(mockInvitationDetails)),
+      getInvitationDetails: vi.fn().mockReturnValue(of(details)),
       acceptInvitation: vi.fn().mockReturnValue(of(mockAuthResponse)),
     };
     authStoreMock = {
@@ -74,7 +75,7 @@ describe('AcceptInvitation', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(AcceptInvitation);
+    fixture = TestBed.createComponent(AcceptInvitation);
 
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -230,6 +231,54 @@ describe('AcceptInvitation', () => {
 
       expect(component.error()).toBe('Expired invitation');
       expect(component.loading()).toBe(false);
+    });
+  });
+
+  // ── V5-2: unregistered invitee must set a password (register-with-invite) ──
+
+  describe('acceptAsNewUser (V5-2)', () => {
+    it('should send token + password + displayName so the placeholder account becomes usable', async () => {
+      setup();
+
+      component.model.update(() => ({
+        displayName: 'V Five Member',
+        password: 'securepass123',
+        confirmPassword: 'securepass123',
+      }));
+      await component.acceptAsNewUser();
+
+      expect(tenantClientMock.acceptInvitation).toHaveBeenCalledWith({
+        token: 'valid-token',
+        password: 'securepass123',
+        displayName: 'V Five Member',
+      });
+      expect(authStoreMock.setSession).toHaveBeenCalledWith(mockAuthResponse);
+    });
+
+    it('should not call the client when passwords do not match', async () => {
+      setup();
+
+      component.model.update(() => ({
+        displayName: 'V Five Member',
+        password: 'securepass123',
+        confirmPassword: 'different123',
+      }));
+      await component.acceptAsNewUser();
+
+      expect(tenantClientMock.acceptInvitation).not.toHaveBeenCalled();
+      expect(authStoreMock.setSession).not.toHaveBeenCalled();
+    });
+
+    it('should render the registration form for an unregistered invitee (isRegistered=false)', () => {
+      setup('valid-token', { ...mockInvitationDetails, isRegistered: false });
+
+      expect(fixture.nativeElement.querySelector('#invitation-form')).toBeTruthy();
+    });
+
+    it('should NOT render the registration form for a registered invitee', () => {
+      setup('valid-token', { ...mockInvitationDetails, isRegistered: true });
+
+      expect(fixture.nativeElement.querySelector('#invitation-form')).toBeNull();
     });
   });
 

@@ -33,6 +33,13 @@ export class TenantClient {
     return this.http.post<{ data: Tenant }>(`${this.apiBaseUrl}/tenants`, data).pipe(map((res) => res.data));
   }
 
+  /** Check whether a tenant slug is available (DEC-032). */
+  isSlugAvailable(slug: string): Observable<boolean> {
+    return this.http
+      .get<{ data: { available: boolean } }>(`${this.apiBaseUrl}/tenants/slug-available`, { params: { slug } })
+      .pipe(map((res) => res.data.available));
+  }
+
   /** Update tenant name/description. */
   updateTenant(tenantId: string, data: { name?: string; description?: string }): Observable<Tenant> {
     return this.http
@@ -126,10 +133,10 @@ export class TenantClient {
     return this.http.get<{ data: MyInvitation[] }>(`${this.apiBaseUrl}/invitations/my`).pipe(map((res) => res.data));
   }
 
-  /** Decline an invitation. */
+  /** Decline an invitation (canonical `POST …/decline`; the server also accepts DELETE for compat). */
   declineInvitation(invitationId: string): Observable<{ success: boolean }> {
     return this.http
-      .delete<{ data: { success: boolean } }>(`${this.apiBaseUrl}/invitations/${invitationId}`)
+      .post<{ data: { success: boolean } }>(`${this.apiBaseUrl}/invitations/${invitationId}/decline`, {})
       .pipe(map((res) => res.data));
   }
 
@@ -141,8 +148,20 @@ export class TenantClient {
   }
 
   // ─── Member Actions ───────────────────────────────────────────────────────
+  // V2-7: all lifecycle routes address the target by userId; services resolve
+  // the membership document server-side.
 
-  /** Revoke a member's access. */
+  /** Revoke a PENDING invitation without deleting the membership record. */
+  revokeInvitation(tenantId: string, userId: string): Observable<{ success: boolean }> {
+    return this.http
+      .post<{ data: { success: boolean } }>(
+        `${this.apiBaseUrl}/tenants/${tenantId}/members/${userId}/invitation/revoke`,
+        {},
+      )
+      .pipe(map((res) => res.data));
+  }
+
+  /** Revoke a member's access (ACTIVE membership → ACCESS_REVOKED). */
   revokeAccess(tenantId: string, memberId: string): Observable<{ success: boolean }> {
     return this.http
       .patch<{ data: { success: boolean } }>(`${this.apiBaseUrl}/tenants/${tenantId}/members/${memberId}/revoke`, {})

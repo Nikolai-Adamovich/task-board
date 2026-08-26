@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Collection, Db, MongoClient } from 'mongodb';
+import type { ClientSession, Collection, Db, MongoClient } from 'mongodb';
 
 /**
  * Per-request MongoDB storage.
@@ -74,4 +74,109 @@ export function getDb(): Db {
  */
 export function getCollection<T extends import('mongodb').Document>(name: string): Collection<T> {
   return getDb().collection<T>(name);
+}
+
+// ─── Transactions (DEC-025) ──────────────────────────────────────────────────
+
+/**
+ * Thrown when the connected MongoDB topology does not support multi-document
+ * transactions (e.g. a standalone `mongod` without a replica set).
+ *
+ * Callers may catch this to fall back to a non-transactional code path —
+ * see {@link withTransaction} and `ProjectService.createProject`.
+ */
+export class TransactionsUnsupportedError extends Error {
+  constructor(message = 'This MongoDB deployment does not support transactions', options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'TransactionsUnsupportedError';
+  }
+}
+
+/**
+ * Best-effort topology check using the driver's public-ish surface.
+ *
+ * Transactions require a replica set (`ReplicaSetWithPrimary` /
+ * `ReplicaSetNoPrimary`), sharded cluster (`Sharded`) or load balancer
+ * (`LoadBalanced`). A `Single`/`Standalone`/`Unknown` topology cannot run
+ * them. If the topology description is not reachable we return `true` and
+ * rely on the runtime error detection in {@link isTransactionsUnsupportedError}
+ * instead of blocking a potentially capable deployment.
+ */
+function topologySupportsTransactions(client: MongoClient): boolean {
+  const topologyType = (client as unknown as { topology?: { description?: { type?: string } } }).topology?.description
+    ?.type;
+
+  if (!topologyType) {
+    return true;
+  }
+
+  return /ReplicaSet|Sharded|LoadBalanced/.test(topologyType);
+}
+
+/**
+ * Detect the driver/server errors raised when a transaction is attempted
+ * against a topology that does not support it. Known messages:
+ * - "Transaction numbers are only allowed on a replica set member or mongos"
+ * - "This MongoDB deployment does not support sessions/transactions" variants
+ */
+export function isTransactionsUnsupportedError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+
+  return (
+    /transaction/i.test(message) &&
+    /(not supported|only allowed on a replica set|replica set member|mongos)/i.test(message)
+  );
+}
+
+/**
+ * Run `fn` inside a MongoDB multi-document transaction on the current
+ * request's client (DEC-025). The session is committed automatically by the
+ * driver's `withTransaction` retry wrapper; any error thrown by `fn` aborts
+ * the transaction so **nothing becomes visible** (BR-003 atomic project seed).
+ *
+ * Must be called within a `runWithDb()` context — the underlying
+ * `MongoClient` is taken from the request-scoped `Db`.
+ *
+ * @throws {@link TransactionsUnsupportedError} if the topology cannot run
+ *   transactions (checked up-front via topology description, or detected at
+ *   runtime from driver errors). Callers decide whether to fall back.
+ *
+ * @example
+ * ```ts
+ * await withTransaction(async (session) => {
+ *   await collection.insertOne(doc, { session });
+ * });
+ * ```
+ */
+export async function withTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
+  const db = getDb();
+  const client = db.client;
+
+  if (!topologySupportsTransactions(client)) {
+    throw new TransactionsUnsupportedError();
+  }
+
+  const session = client.startSession();
+
+  try {
+    let result!: T;
+
+    await session.withTransaction(async () => {
+      result = await fn(session);
+    });
+
+    return result;
+  } catch (err) {
+    // Some drivers/servers only surface the unsupported-topology condition
+    // when the first command actually runs — normalize it for callers.
+    if (isTransactionsUnsupportedError(err)) {
+      throw new TransactionsUnsupportedError(undefined, { cause: err });
+    }
+
+    throw err;
+  } finally {
+    await session.endSession().catch(() => {
+      /* swallow — socket may already be dead */
+    });
+  }
 }

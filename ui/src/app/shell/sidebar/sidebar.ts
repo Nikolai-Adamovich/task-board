@@ -8,14 +8,11 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideCalendar,
-  lucideCircleDot,
   lucideFolder,
   lucideHistory,
-  lucideLayers,
   lucideLayoutDashboard,
   lucidePanelLeft,
   lucideSettings,
-  lucideTag,
   lucideUsers,
   lucideHome,
   lucideListTodo,
@@ -39,9 +36,6 @@ import { TenantSwitcher } from '../tenant-switcher/tenant-switcher';
       lucideSettings,
       lucideUsers,
       lucideLayoutDashboard,
-      lucideCircleDot,
-      lucideLayers,
-      lucideTag,
       lucideHistory,
       lucideHome,
       lucideListTodo,
@@ -90,6 +84,12 @@ export class Sidebar {
     const projectRole = this.projectStore.projectRole();
 
     return projectRole === ProjectRole.PROJECT_ADMIN;
+  });
+  /** V2-10: workspace Settings/Members nav is admin-only — hidden from MEMBERs. */
+  protected readonly isTenantAdmin = computed(() => {
+    const tenantRole = this.authStore.tenantRole();
+
+    return tenantRole === TenantRole.OWNER || tenantRole === TenantRole.ADMIN;
   });
 
   constructor() {

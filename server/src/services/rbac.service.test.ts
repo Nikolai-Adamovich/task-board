@@ -173,6 +173,26 @@ describe('RbacService', () => {
       expect(service.can('MEMBER', 'VIEWER', 'manage_filters')).toBe(true);
     });
 
+    it('allows all project roles to view_task_history (DEC-021)', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'view_task_history')).toBe(true);
+      expect(service.can('MEMBER', 'EDITOR', 'view_task_history')).toBe(true);
+      expect(service.can('MEMBER', 'VIEWER', 'view_task_history')).toBe(true);
+    });
+
+    it('denies view_task_history without a project role (tenant MEMBER)', () => {
+      expect(service.can('MEMBER', null, 'view_task_history')).toBe(false);
+    });
+
+    it('allows tenant OWNER/ADMIN to view_task_history via bypass', () => {
+      expect(service.can('OWNER', null, 'view_task_history')).toBe(true);
+      expect(service.can('ADMIN', null, 'view_task_history')).toBe(true);
+    });
+
+    it('keeps view_audit_events restricted to PROJECT_ADMIN (+ tenant bypass)', () => {
+      expect(service.can('MEMBER', 'PROJECT_ADMIN', 'view_audit_events')).toBe(true);
+      expect(service.can('OWNER', null, 'view_audit_events')).toBe(true);
+    });
+
     it('allows PROJECT_ADMIN to view_audit_events', () => {
       expect(service.can('MEMBER', 'PROJECT_ADMIN', 'view_audit_events')).toBe(true);
     });

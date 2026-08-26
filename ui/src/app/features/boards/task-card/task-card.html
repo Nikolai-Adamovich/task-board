@@ -10,7 +10,7 @@
       <h4 class="text-sm font-medium text-foreground line-clamp-2">{{ task().title }}</h4>
     </div>
     <span hlmBadge class="shrink-0 text-[10px] uppercase" [variant]="priorityVariant()">
-      {{ task().priority }}
+      {{ priorityLabel(task().priority) }}
     </span>
   </div>
 

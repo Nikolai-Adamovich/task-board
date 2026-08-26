@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { sign } from 'hono/jwt';
 import { MemberStatus, InvitationStatus } from '@task-board/shared';
 import type {
@@ -7,8 +8,9 @@ import type {
   LoginRequest,
   InvitationDetails,
   TenantRole,
+  ForgotPasswordResponse,
 } from '@task-board/shared';
-import { ConflictError, NotFoundError, UnauthorizedError } from '../errors/app-error.js';
+import { AppError, BadRequestError, ConflictError, NotFoundError, ValidationError } from '../errors/app-error.js';
 import { UserRepository } from '../repositories/user.repository.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
 import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
@@ -32,6 +34,54 @@ export interface JwtPayload {
 const BCRYPT_SALT_ROUNDS = 10;
 const TOKEN_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
 
+/** Password-reset token TTL (1 hour) */
+export const PASSWORD_RESET_TTL_MINUTES = 60;
+
+/** Forgot-password rate limit: max requests per email+IP within the window */
+const FORGOT_PASSWORD_MAX_REQUESTS = 5;
+const FORGOT_PASSWORD_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Minimal mailer contract needed by AuthService for password-reset emails.
+ * Satisfied by both EmailService (Resend) and ConsoleEmailService.
+ */
+export interface PasswordResetMailer {
+  sendPasswordResetEmail(params: { to: string; resetUrl: string; expiresInMinutes: number }): Promise<void>;
+}
+
+/**
+ * Best-effort in-memory rate limiter for forgot-password (per email+IP).
+ *
+ * Intentionally module-level: it must survive across requests to be effective.
+ * On Cloudflare Workers it is per-isolate and resets on eviction — acceptable
+ * for MVP abuse mitigation (DEC-023 / security notes §21).
+ */
+const forgotPasswordAttempts = new Map<string, number[]>();
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const attempts = (forgotPasswordAttempts.get(key) ?? []).filter((ts) => now - ts < FORGOT_PASSWORD_WINDOW_MS);
+
+  if (attempts.length >= FORGOT_PASSWORD_MAX_REQUESTS) {
+    forgotPasswordAttempts.set(key, attempts);
+    return true;
+  }
+
+  attempts.push(now);
+  forgotPasswordAttempts.set(key, attempts);
+
+  // Opportunistic cleanup of stale keys to bound memory growth
+  if (forgotPasswordAttempts.size > 1000) {
+    for (const [k, timestamps] of forgotPasswordAttempts) {
+      if (timestamps.every((ts) => now - ts >= FORGOT_PASSWORD_WINDOW_MS)) {
+        forgotPasswordAttempts.delete(k);
+      }
+    }
+  }
+
+  return false;
+}
+
 /** Create a deterministic SHA-256 hash of a token for storage/lookup (Web Crypto — Workers compatible) */
 async function hashToken(token: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
@@ -49,6 +99,8 @@ export class AuthService {
     private readonly tenantRepo: TenantRepository,
     private readonly tenantMemberRepo: TenantMemberRepository,
     private readonly jwtSecret: string,
+    private readonly mailer?: PasswordResetMailer | null,
+    private readonly frontendUrl = 'http://localhost:4200',
   ) {}
 
   /**
@@ -98,15 +150,18 @@ export class AuthService {
     const normalizedEmail = input.email.toLowerCase().trim();
     const userDoc = await this.userRepo.findByEmail(normalizedEmail);
 
+    // V1-8: wrong credentials must return a distinct INVALID_CREDENTIALS code so
+    // the UI can show a neutral "Invalid email or password" message instead of
+    // mapping every 401 to session-expired copy.
     if (!userDoc) {
-      throw new UnauthorizedError('Invalid email or password');
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     const bcrypt = await import('bcryptjs');
     const passwordValid = await bcrypt.compare(input.password, userDoc.passwordHash);
 
     if (!passwordValid) {
-      throw new UnauthorizedError('Invalid email or password');
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     const memberships = await this.tenantMemberRepo.findByUser(userDoc.id);
@@ -149,14 +204,36 @@ export class AuthService {
       throw new NotFoundError('Invalid or expired invitation');
     }
 
-    const user = await this.userRepo.findById(invitation.userId);
+    // V5-2: inspect the document (not the domain projection) to distinguish a
+    // real account from an invitation placeholder (empty passwordHash).
+    const doc = await this.userRepo.findDocumentById(invitation.userId);
 
-    if (!user) {
+    if (!doc) {
       throw new NotFoundError('Invitation user not found');
     }
 
-    // Note: In v5, the invite flow creates a real user record.
-    // Password handling for placeholder accounts is done at the invite creation time.
+    let user: User = {
+      id: doc.id,
+      email: doc.email,
+      displayName: doc.displayName,
+      avatarUrl: doc.avatarUrl,
+      createdAt: doc.createdAt.toISOString(),
+      updatedAt: doc.updatedAt.toISOString(),
+      deletedAt: doc.deletedAt ? doc.deletedAt.toISOString() : null,
+    };
+
+    if (doc.passwordHash === '') {
+      // Placeholder account — completing the invitation REQUIRES password setup.
+      if (!input.password || !input.displayName) {
+        throw new ValidationError('Password and display name are required to activate this invitation');
+      }
+
+      const bcrypt = await import('bcryptjs');
+      const passwordHash = await bcrypt.hash(input.password, 10);
+
+      await this.userRepo.setPasswordAndDisplayName(doc.id, passwordHash, input.displayName);
+      user = { ...user, displayName: input.displayName };
+    }
 
     // Activate the membership
     await this.tenantMemberRepo.update(invitation.id, {
@@ -186,16 +263,81 @@ export class AuthService {
       throw new NotFoundError('Tenant not found');
     }
 
-    const user = await this.userRepo.findById(invitation.userId);
-    const isRegistered = user !== null;
+    // V5-2: a placeholder account (created at invite time for an email with no
+    // account, passwordHash '') is NOT a registered user — the invitee must go
+    // through password setup, not the "you already have an account" path.
+    const doc = await this.userRepo.findDocumentById(invitation.userId);
+    const isRegistered = doc !== null && doc.passwordHash !== '';
 
     return {
-      email: user?.email ?? '',
+      email: doc?.email ?? '',
       tenantName: tenant.name,
       role: invitation.role as InvitationDetails['role'],
       status: invitation.invitation.status as InvitationDetails['status'],
       isRegistered,
     };
+  }
+
+  // ─── Password reset (DEC-023) ──────────────────────────────────────────────
+
+  /**
+   * Request a password reset.
+   *
+   * Anti-enumeration: always resolves with the same neutral message whether or
+   * not the email belongs to an existing, non-deleted account. Rate-limited
+   * per email+IP; over-limit requests are silently dropped with the same
+   * neutral response. The raw token is never stored — only its SHA-256 hash.
+   */
+  async requestPasswordReset(input: { email: string }, clientIp?: string): Promise<ForgotPasswordResponse> {
+    const normalizedEmail = input.email.toLowerCase().trim();
+
+    if (!isRateLimited(`${normalizedEmail}:${clientIp ?? 'unknown'}`)) {
+      const user = await this.userRepo.findActiveByEmail(normalizedEmail);
+
+      if (user) {
+        const token = randomBytes(32).toString('hex');
+        const tokenHash = await hashToken(token);
+
+        await this.userRepo.setPasswordReset(user.id, tokenHash, new Date());
+
+        if (this.mailer) {
+          await this.mailer.sendPasswordResetEmail({
+            to: user.email,
+            resetUrl: `${this.frontendUrl}/auth/reset-password?token=${token}`,
+            expiresInMinutes: PASSWORD_RESET_TTL_MINUTES,
+          });
+        }
+      }
+    }
+
+    return {
+      message: `If an account exists for that email, a password reset link has been sent. It expires in ${PASSWORD_RESET_TTL_MINUTES} minutes.`,
+    };
+  }
+
+  /**
+   * Reset a password with a single-use, expiring token.
+   * Unknown / expired / already-used tokens all yield the same neutral error.
+   */
+  async resetPassword(input: { token: string; newPassword: string }): Promise<{ message: string }> {
+    const tokenHash = await hashToken(input.token);
+    const user = await this.userRepo.findByPasswordResetToken(tokenHash);
+    const expired =
+      !user ||
+      !user.passwordReset ||
+      Date.now() - user.passwordReset.requestedOn.getTime() > PASSWORD_RESET_TTL_MINUTES * 60 * 1000;
+
+    if (expired) {
+      throw new BadRequestError('Invalid or expired reset token', 'INVALID_RESET_TOKEN');
+    }
+
+    const bcrypt = await import('bcryptjs');
+    const passwordHash = await bcrypt.hash(input.newPassword, BCRYPT_SALT_ROUNDS);
+
+    // Single-use: clears the token as part of the update
+    await this.userRepo.updatePasswordAndClearReset(user.id, passwordHash);
+
+    return { message: 'Password has been reset.' };
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────

@@ -78,6 +78,7 @@ export class ConflictError extends AppError {
       | 'INVITATION_ALREADY_ACCEPTED'
       | 'TASK_TYPE_IN_USE'
       | 'STATUS_IN_USE'
+      | 'SLUG_TAKEN'
     > = 'CONFLICT',
   ) {
     super(409, code, message);
@@ -90,7 +91,11 @@ export class BadRequestError extends AppError {
     message = 'Bad request',
     code: Extract<
       ErrorCode,
-      'INVALID_STATUS_REPLACEMENT' | 'INVALID_SPRINT_DATES' | 'PROJECT_KEY_IMMUTABLE' | 'VALIDATION_ERROR'
+      | 'INVALID_STATUS_REPLACEMENT'
+      | 'INVALID_SPRINT_DATES'
+      | 'PROJECT_KEY_IMMUTABLE'
+      | 'INVALID_RESET_TOKEN'
+      | 'VALIDATION_ERROR'
     > = 'VALIDATION_ERROR',
   ) {
     super(400, code, message);

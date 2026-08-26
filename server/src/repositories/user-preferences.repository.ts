@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
-import type { UserProjectBoardPreference, UpdateUserProjectBoardPreference } from '@task-board/shared';
+import type {
+  TaskTableColumnKey,
+  UpdateUserProjectBoardPreference,
+  UserProjectBoardPreference,
+} from '@task-board/shared';
 
 // Required MongoDB indexes:
 // - { userId: 1, projectId: 1 } (unique)
@@ -13,6 +17,8 @@ export interface UserPreferencesDocument {
   userId: string;
   projectId: string;
   defaultBoardId: string | null;
+  /** R3-P4: visible task-table columns; null/absent = default set. */
+  taskTableColumns?: TaskTableColumnKey[] | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,9 +30,11 @@ function toDomain(doc: UserPreferencesDocument): UserProjectBoardPreference {
     id: doc.id,
     userId: doc.userId,
     projectId: doc.projectId,
-    defaultBoardId: doc.defaultBoardId,
-    createdAt: doc.createdAt.toISOString(),
-    updatedAt: doc.updatedAt.toISOString(),
+    defaultBoardId: doc.defaultBoardId ?? null,
+    taskTableColumns: doc.taskTableColumns ?? null,
+    // Tolerate legacy docs persisted before createdAt/updatedAt were set on insert (V7-3).
+    createdAt: (doc.createdAt ?? new Date(0)).toISOString(),
+    updatedAt: (doc.updatedAt ?? new Date(0)).toISOString(),
   };
 }
 
@@ -47,8 +55,18 @@ export class UserPreferencesRepository {
     data: UpdateUserProjectBoardPreference,
   ): Promise<UserProjectBoardPreference> {
     const now = new Date();
-    const $set: Record<string, unknown> = { updatedAt: now, defaultBoardId: data.defaultBoardId };
-    const $setOnInsert: Record<string, unknown> = { id: randomUUID(), userId, projectId };
+    // Partial update: only $set the fields the request actually carried so a
+    // PATCH of one preference never wipes the other (R3-P4).
+    const $set: Record<string, unknown> = { updatedAt: now };
+
+    if (data.defaultBoardId !== undefined) {
+      $set['defaultBoardId'] = data.defaultBoardId;
+    }
+    if (data.taskTableColumns !== undefined) {
+      $set['taskTableColumns'] = data.taskTableColumns;
+    }
+
+    const $setOnInsert: Record<string, unknown> = { id: randomUUID(), userId, projectId, createdAt: now };
     const result = await this.collection.findOneAndUpdate(
       { userId, projectId },
       { $set, $setOnInsert },

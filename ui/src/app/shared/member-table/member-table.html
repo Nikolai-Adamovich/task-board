@@ -1,0 +1,324 @@
+@if (contextMissing()) {
+  <!-- V1-10/V2-1 guard: tenant/project context not resolved — no requests, no actions -->
+  <hlm-alert variant="destructive" class="mb-4">
+    <div hlmAlertDescription>{{ 'members.contextError' | transloco }}</div>
+  </hlm-alert>
+} @else {
+  <div hlmTableContainer>
+    <table hlmTable>
+      <thead hlmTableHeader>
+        <tr hlmTableRow>
+          @for (col of columns(); track col.field) {
+            <th hlmTableHead>
+              <div class="flex items-center gap-1">
+                <button class="flex items-center gap-1 hover:text-foreground" (click)="sortToggle.emit(col.field)">
+                  <span>{{ col.labelKey | transloco }}</span>
+                  <span class="inline-flex size-3 shrink-0">
+                    @if (sortField() === col.field) {
+                      <ng-icon
+                        [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'"
+                        class="size-3"
+                      />
+                    }
+                  </span>
+                </button>
+                <hlm-popover sideOffset="4">
+                  <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="size-6 shrink-0">
+                    <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="getFilterValue(col.field)" />
+                  </button>
+                  <hlm-popover-content *hlmPopoverPortal [class]="col.popoverWidth">
+                    <div class="flex flex-col gap-2">
+                      @if (col.filterType === 'text') {
+                        <input
+                          hlmInput
+                          type="text"
+                          class="h-8 w-full"
+                          [value]="getFilterValue(col.field)"
+                          (input)="filterChange.emit({ field: col.field, value: $any($event.target).value })"
+                          [placeholder]="col.placeholderKey ? (col.placeholderKey | transloco) : ''"
+                        />
+                      } @else {
+                        <hlm-select
+                          [value]="getFilterValue(col.field)"
+                          (valueChange)="filterChange.emit({ field: col.field, value: $any($event) })"
+                        >
+                          <hlm-select-trigger class="w-full" size="sm">
+                            <hlm-select-value
+                              [placeholder]="col.selectAllLabelKey ? (col.selectAllLabelKey | transloco) : ''"
+                            />
+                          </hlm-select-trigger>
+                          <hlm-select-content *hlmSelectPortal>
+                            <hlm-select-group>
+                              <hlm-select-item value="">{{ col.selectAllLabelKey | transloco }}</hlm-select-item>
+                              @if (col.field === 'role') {
+                                @for (opt of roleOptions(); track opt.value) {
+                                  <hlm-select-item [value]="opt.value">{{ opt.label }}</hlm-select-item>
+                                }
+                              } @else {
+                                @for (opt of statusOptions; track opt.value) {
+                                  <hlm-select-item [value]="opt.value">{{ opt.labelKey | transloco }}</hlm-select-item>
+                                }
+                              }
+                            </hlm-select-group>
+                          </hlm-select-content>
+                        </hlm-select>
+                      }
+                    </div>
+                  </hlm-popover-content>
+                </hlm-popover>
+              </div>
+            </th>
+          }
+          @if (canManage()) {
+            <th hlmTableHead class="text-right">{{ 'members.actions' | transloco }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody hlmTableBody>
+        @for (row of rows(); track row.userId) {
+          <tr hlmTableRow>
+            <!-- User: avatar + display name -->
+            <td hlmTableCell>
+              <div class="flex items-center gap-3">
+                <hlm-avatar class="size-8">
+                  <div hlmAvatarFallback class="text-xs font-medium">
+                    {{ initials(row.displayName ?? row.email ?? '??') }}
+                  </div>
+                </hlm-avatar>
+                <span class="text-sm text-foreground">
+                  {{ row.displayName ?? row.email ?? ('members.unknown' | transloco) }}
+                </span>
+              </div>
+            </td>
+            <!-- Email -->
+            <td hlmTableCell>
+              <span class="text-sm text-muted-foreground">
+                {{ row.email ?? '—' }}
+              </span>
+            </td>
+            <!-- Role -->
+            <td hlmTableCell>
+              <span hlmBadge [variant]="roleBadgeVariant(row.role)">
+                {{ roleLabel(row.role) }}
+              </span>
+            </td>
+            <!-- Access / Invitation status (tenant variant only) -->
+            @if (variant() === 'tenant') {
+              <td hlmTableCell>
+                @if (row.invitationStatus === InvitationStatus.PENDING) {
+                  <span hlmBadge [variant]="memberStatusBadgeVariant('PENDING')">
+                    {{ 'members.invitationPending' | transloco }}
+                  </span>
+                } @else if (row.status === MemberStatus.ACTIVE) {
+                  <span hlmBadge [variant]="memberStatusBadgeVariant(row.status)">
+                    {{ 'members.active' | transloco }}
+                  </span>
+                } @else if (row.status === MemberStatus.ACCESS_REVOKED) {
+                  <span hlmBadge [variant]="memberStatusBadgeVariant(row.status)">
+                    {{ 'members.accessRevoked' | transloco }}
+                  </span>
+                } @else if (row.invitationStatus === InvitationStatus.DECLINED) {
+                  <span hlmBadge [variant]="memberStatusBadgeVariant('DECLINED')">
+                    {{ 'members.declined' | transloco }}
+                  </span>
+                } @else if (hasExpiredOrRevokedInvitation(row)) {
+                  <span hlmBadge [variant]="memberStatusBadgeVariant('DECLINED')">
+                    {{ row.invitationStatus }}
+                  </span>
+                }
+              </td>
+            }
+            <!-- Actions -->
+            @if (canManage()) {
+              <td hlmTableCell class="text-right">
+                @if (!isOwner(row)) {
+                  <div class="flex items-center justify-end gap-2">
+                    <!-- Edit role (small dialog with confirm) -->
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="sm"
+                      (click)="openEdit(row)"
+                      [title]="'members.editRole' | transloco"
+                      [attr.aria-label]="'members.editRole' | transloco"
+                    >
+                      <ng-icon name="lucidePencil" class="size-4" />
+                    </button>
+
+                    @if (variant() === 'tenant') {
+                      <!-- Restore membership (revoked without pending invitation — BR-036) -->
+                      @if (canRestore(row)) {
+                        <button
+                          hlmBtn
+                          variant="ghost"
+                          size="sm"
+                          (click)="restore.emit(row)"
+                          [disabled]="busyUserId() === row.userId"
+                          [title]="'members.restoreAccess' | transloco"
+                        >
+                          @if (busyUserId() === row.userId) {
+                            <hlm-spinner class="size-4" />
+                          } @else {
+                            <ng-icon name="lucideRotateCcw" class="size-4 text-green-600" />
+                          }
+                        </button>
+                      }
+
+                      <!-- Reinvite (expired/revoked invitation) -->
+                      @if (hasExpiredOrRevokedInvitation(row)) {
+                        <button
+                          hlmBtn
+                          variant="ghost"
+                          size="sm"
+                          (click)="reinvite.emit(row)"
+                          [disabled]="busyUserId() === row.userId"
+                          [title]="'members.reinvite' | transloco"
+                        >
+                          @if (busyUserId() === row.userId) {
+                            <hlm-spinner class="size-4" />
+                          } @else {
+                            <ng-icon name="lucideMail" class="size-4 text-blue-600" />
+                          }
+                        </button>
+                      }
+
+                      <!-- Revoke access (active member or pending invitation) -->
+                      @if (canRevoke(row)) {
+                        <button
+                          hlmBtn
+                          variant="ghost"
+                          size="sm"
+                          (click)="revoke.emit(row)"
+                          [disabled]="busyUserId() === row.userId"
+                          [title]="'members.revokeAccess' | transloco"
+                        >
+                          @if (busyUserId() === row.userId) {
+                            <hlm-spinner class="size-4" />
+                          } @else {
+                            <ng-icon name="lucideBan" class="size-4 text-orange-600" />
+                          }
+                        </button>
+                      }
+
+                      <!-- Resend invitation (pending) -->
+                      @if (row.invitationStatus === InvitationStatus.PENDING) {
+                        <button
+                          hlmBtn
+                          variant="ghost"
+                          size="sm"
+                          (click)="resend.emit(row)"
+                          [disabled]="busyUserId() === row.userId"
+                          [title]="'members.resendInvitation' | transloco"
+                        >
+                          @if (busyUserId() === row.userId) {
+                            <hlm-spinner class="size-4" />
+                          } @else {
+                            <ng-icon name="lucideRefreshCw" class="size-4 text-blue-600" />
+                          }
+                        </button>
+                      }
+
+                      <!-- Permanently delete (revoked or declined) -->
+                      @if (canHardDelete(row)) {
+                        <button
+                          hlmBtn
+                          variant="ghost"
+                          size="sm"
+                          (click)="hardDelete.emit(row)"
+                          [disabled]="busyUserId() === row.userId"
+                          [title]="'members.permanentlyDelete' | transloco"
+                        >
+                          @if (busyUserId() === row.userId) {
+                            <hlm-spinner class="size-4" />
+                          } @else {
+                            <ng-icon name="lucideSkull" class="size-4 text-destructive" />
+                          }
+                        </button>
+                      }
+                    }
+
+                    <!-- Remove member (confirm dialog) -->
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="sm"
+                      (click)="confirmRemove(row)"
+                      [disabled]="removingUserId() === row.userId"
+                      [title]="'members.removeMember' | transloco"
+                    >
+                      @if (removingUserId() === row.userId) {
+                        <hlm-spinner class="size-4" />
+                      } @else {
+                        <ng-icon name="lucideTrash2" class="size-4 text-destructive" />
+                      }
+                    </button>
+                  </div>
+                }
+              </td>
+            }
+          </tr>
+        } @empty {
+          @if (!loading()) {
+            <tr hlmTableRow>
+              <td hlmTableCell [attr.colspan]="colspan()" class="py-12 text-center">
+                <p class="text-sm text-muted-foreground">{{ 'members.noMembers' | transloco }}</p>
+              </td>
+            </tr>
+          }
+        }
+        @if (loading()) {
+          <tr hlmTableRow>
+            <td hlmTableCell [attr.colspan]="colspan()" class="py-12 text-center">
+              <div class="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <hlm-spinner class="size-4" />
+                {{ 'members.loading' | transloco }}
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <ui-pagination
+    [page]="page()"
+    [totalPages]="totalPages()"
+    [pageSize]="pageSize()"
+    [total]="total()"
+    (pageChange)="pageChange.emit($event)"
+    (pageSizeChange)="pageSizeChange.emit($event)"
+  />
+
+  <!-- Edit role dialog (dialog-md) -->
+  <hlm-dialog [state]="editingRow() ? 'open' : 'closed'" (stateChanged)="onEditDialogStateChange($event)">
+    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'members.editRoleTitle' | transloco }}</h3>
+        <p hlmDialogDescription>{{ 'members.editRoleDesc' | transloco }}</p>
+      </hlm-dialog-header>
+      <hlm-field>
+        <label hlmFieldLabel for="member-table-edit-role">{{ 'members.role' | transloco }}</label>
+        <hlm-native-select id="member-table-edit-role" [value]="editRole()" (valueChange)="editRole.set($any($event))">
+          @for (role of roles(); track role) {
+            <option hlmNativeSelectOption [value]="role">{{ roleLabel(role) }}</option>
+          }
+        </hlm-native-select>
+      </hlm-field>
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose>{{ 'common.cancel' | transloco }}</button>
+        <button hlmBtn (click)="confirmRoleChange()">{{ 'common.confirm' | transloco }}</button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- Remove member confirmation -->
+  <ui-confirm-dialog
+    [state]="rowToRemove() !== null"
+    titleKey="members.removeMemberTitle"
+    messageKey="members.removeConfirm"
+    confirmLabelKey="common.delete"
+    [loading]="removingUserId() !== null"
+    (confirmed)="onRemoveConfirmed()"
+    (stateChanged)="onRemoveDialogStateChange($event)"
+  />
+}

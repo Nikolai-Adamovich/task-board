@@ -13,6 +13,7 @@ export class AuditService {
   constructor(
     private readonly auditRepo: AuditEventRepository,
     private readonly userRepo: AuditServiceUserRepo,
+    private readonly enrichment?: { enrichEvents(events: AuditEvent[]): Promise<AuditEvent[]> },
   ) {}
 
   /**
@@ -41,11 +42,22 @@ export class AuditService {
   }
 
   async queryByProject(projectId: string, options: AuditQueryOptions = {}): Promise<PaginatedResult<AuditEvent>> {
-    return this.auditRepo.findByProject(projectId, options);
+    const result = await this.auditRepo.findByProject(projectId, options);
+
+    return this.enrich(result);
   }
 
   async queryByTenant(tenantId: string, options: AuditQueryOptions = {}): Promise<PaginatedResult<AuditEvent>> {
-    return this.auditRepo.findByTenant(tenantId, options);
+    const result = await this.auditRepo.findByTenant(tenantId, options);
+
+    return this.enrich(result);
+  }
+
+  /** R3-P7: resolve human-readable labels for one page — batched, never per-event. */
+  private async enrich(result: PaginatedResult<AuditEvent>): Promise<PaginatedResult<AuditEvent>> {
+    if (!this.enrichment) return result;
+
+    return { ...result, data: await this.enrichment.enrichEvents(result.data) };
   }
 
   private async captureActor(userId: string): Promise<AuditActor> {

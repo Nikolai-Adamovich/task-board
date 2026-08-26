@@ -82,6 +82,18 @@ zoom/theme/language/pageSize).
   Cascades handled in services (not DB-level).
 - Indexes are documented at the top of each repository file.
 
+### 3.1 Persistence & transactions (DEC-025)
+
+- **Replica set required:** MongoDB must run as a replica set in every environment — local dev uses the root
+  [`docker-compose.yml`](../docker-compose.yml) (`mongod --replSet rs0` + `rs.initiate()` healthcheck), production uses
+  Atlas Free (replica set out of the box). Multi-document transactions behave identically everywhere.
+- **Atomic project seed (BR-003):** `ProjectService.createProject` wraps project insert + statuses + task types +
+  default board + creator membership + default-reference updates in a transaction via
+  [`withTransaction()`](../server/src/db/mongo.ts) on the request-scoped client. Abort ⇒ nothing visible.
+- **Fallback:** if the topology does not support transactions (standalone `mongod`), the service logs a warning and
+  falls back to ordered inserts with compensating cleanup so local dev without Docker compose still works. The fallback
+  is not the primary mechanism and leaves a small visibility window during cleanup.
+
 ## 4. RBAC
 
 Tenant roles: `OWNER > ADMIN > MEMBER` (+ invited pending). Project roles: `PROJECT_ADMIN > EDITOR > VIEWER`. Tenant

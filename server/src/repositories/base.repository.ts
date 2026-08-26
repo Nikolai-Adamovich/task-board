@@ -18,6 +18,18 @@ export abstract class BaseRepository<TDoc extends { id: string }, TDomain> {
     return doc ? this.toDomain(doc) : null;
   }
 
+  /**
+   * Bulk lookup by ids — single `$in` query. Used by batch enrichment paths
+   * (e.g. audit-log label resolution) to avoid N+1 per-event lookups.
+   */
+  async findByIds(ids: string[]): Promise<TDomain[]> {
+    if (ids.length === 0) return [];
+
+    const docs = (await this.collection.find({ id: { $in: ids } } as Filter<TDoc>).toArray()) as TDoc[];
+
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
   async delete(id: string): Promise<boolean> {
     const result = await this.collection.deleteOne({ id } as Filter<TDoc>);
 

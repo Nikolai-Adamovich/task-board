@@ -27,26 +27,34 @@ cd task-board
 npm install
 ```
 
-### 2. Start MongoDB
+### 2. Start MongoDB (single-node replica set)
 
-First time only — create and start the container:
-
-```bash
-docker run -d --name task-board-mongo -p 27017:27017 mongo:8
-```
-
-On subsequent runs (e.g. after reboot) just restart the existing container:
+MongoDB **must run as a replica set** — project creation seeds statuses, task types and the default board inside a
+MongoDB transaction (DEC-025), which a standalone `mongod` cannot execute. Use the provided compose file; it starts
+`mongod --replSet rs0` and runs `rs.initiate()` automatically via healthcheck:
 
 ```bash
-docker start task-board-mongo
+docker compose up -d        # first start initiates the replica set
 ```
+
+On subsequent runs (e.g. after reboot):
+
+```bash
+docker compose start
+```
+
+> **Production / Atlas:** MongoDB Atlas Free tiers are replica sets out of the box — no extra configuration needed.
+
+> **Fallback:** if the server detects a topology without transaction support (e.g. a plain standalone `mongod`), it logs
+> a warning and falls back to the legacy compensating-cleanup seed so local development does not hard-fail. The atomic
+> transaction path is the primary mechanism everywhere else.
 
 ### 3. Configure environment
 
 Create `server/.dev.vars`:
 
 ```env
-MONGODB_URI=mongodb://localhost:27017/task-board
+MONGODB_URI=mongodb://localhost:27017/task-board?replicaSet=rs0&directConnection=true
 JWT_SECRET=<your-generated-secret>
 ```
 

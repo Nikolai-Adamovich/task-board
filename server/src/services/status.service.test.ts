@@ -76,6 +76,55 @@ describe('StatusService', () => {
     service = new StatusService(statusRepo, taskRepo, boardRepo, projectRepo, auditService);
   });
 
+  // ── V2-4: manage_statuses enforcement ────────────────────────────────────
+
+  describe('manage_statuses enforcement (V2-4)', () => {
+    let projectMemberRepo: { findByUserAndProject: ReturnType<typeof vi.fn> };
+
+    beforeEach(() => {
+      projectMemberRepo = { findByUserAndProject: vi.fn().mockResolvedValue(null) };
+      service = new StatusService(statusRepo, taskRepo, boardRepo, projectRepo, auditService, projectMemberRepo);
+    });
+
+    it('denies createStatus for a VIEWER', async () => {
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'VIEWER' });
+
+      await expect(service.createStatus('project-1', { name: 'New', position: 5 }, 'user-1', 'MEMBER')).rejects.toThrow(
+        'manage_statuses',
+      );
+      expect(statusRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('allows createStatus for a PROJECT_ADMIN', async () => {
+      statusRepo.findByProjectAndNormalizedName = vi.fn().mockResolvedValue(null);
+      statusRepo.create = vi.fn().mockResolvedValue(makeStatus({ id: 'status-new', name: 'New' }));
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'PROJECT_ADMIN' });
+
+      const status = await service.createStatus('project-1', { name: 'New', position: 5 }, 'user-1', 'MEMBER');
+
+      expect(status.id).toBe('status-new');
+    });
+
+    it('denies deleteStatus for an EDITOR (id-based route — service is the only gate)', async () => {
+      statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'EDITOR' });
+
+      await expect(service.deleteStatus('status-1', undefined, 'user-1', 'MEMBER')).rejects.toThrow('manage_statuses');
+      expect(statusRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('bypasses the project role for a tenant ADMIN', async () => {
+      statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
+      statusRepo.delete = vi.fn().mockResolvedValue(true);
+      // no membership record at all
+      projectMemberRepo.findByUserAndProject.mockResolvedValue(null);
+
+      await service.deleteStatus('status-1', undefined, 'user-1', 'ADMIN');
+
+      expect(statusRepo.delete).toHaveBeenCalledWith('status-1');
+    });
+  });
+
   describe('getStatusesByProject', () => {
     it('returns all statuses for a project', async () => {
       statusRepo.findByProject = vi.fn().mockResolvedValue([makeStatus()]);

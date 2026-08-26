@@ -95,6 +95,26 @@ describe('errorInterceptor', () => {
     req.flush(errorBody, { status: 422, statusText: 'Unprocessable Entity' });
   });
 
+  it('should map INVALID_CREDENTIALS to neutral invalid-credentials copy (V1-8)', () => {
+    const errorBody = {
+      error: {
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid email or password',
+      },
+    };
+
+    http.post('/api/auth/login', {}).subscribe({
+      error: (err) => {
+        expect(err.status).toBe(401);
+        expect(err.userMessage).toBe('errors.invalidCredentials');
+      },
+    });
+
+    const req = httpMock.expectOne('/api/auth/login');
+
+    req.flush(errorBody, { status: 401, statusText: 'Unauthorized' });
+  });
+
   it('should handle structured NOT_FOUND response', () => {
     const errorBody = {
       error: {

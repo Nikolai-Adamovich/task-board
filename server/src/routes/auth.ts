@@ -2,7 +2,13 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { RegisterRequestSchema, LoginRequestSchema, AcceptInvitationSchema } from '../schemas/auth.js';
+import {
+  RegisterRequestSchema,
+  LoginRequestSchema,
+  AcceptInvitationSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+} from '../schemas/auth.js';
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────────
 
@@ -57,6 +63,34 @@ export function createAuthRoutes(): Hono<AppEnv> {
   router.get('/invitations/:token', async (c) => {
     const token = c.req.param('token');
     const result = await c.get('svc').auth.getInvitationDetails(token);
+
+    return c.json({ data: result }, 200);
+  });
+
+  /**
+   * POST /forgot-password — Request a password reset link.
+   * Public endpoint — no auth required.
+   * Anti-enumeration (DEC-023): always responds with the same neutral message,
+   * whether or not the email belongs to an existing account.
+   * Returns 200 with { data: { message } }.
+   */
+  router.post('/forgot-password', validateBody(ForgotPasswordSchema), async (c) => {
+    const body = c.req.valid('json');
+    const clientIp = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
+    const result = await c.get('svc').auth.requestPasswordReset(body, clientIp);
+
+    return c.json({ data: result }, 200);
+  });
+
+  /**
+   * POST /reset-password — Set a new password using a single-use reset token.
+   * Public endpoint — no auth required.
+   * Unknown/expired/used tokens yield a neutral 400 INVALID_RESET_TOKEN.
+   * Returns 200 with { data: { message } }.
+   */
+  router.post('/reset-password', validateBody(ResetPasswordSchema), async (c) => {
+    const body = c.req.valid('json');
+    const result = await c.get('svc').auth.resetPassword(body);
 
     return c.json({ data: result }, 200);
   });

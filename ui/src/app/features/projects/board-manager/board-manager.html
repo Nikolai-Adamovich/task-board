@@ -1,0 +1,187 @@
+<div class="mx-auto max-w-6xl px-6">
+  <!-- Page header -->
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h2 class="text-2xl font-bold text-foreground">{{ 'projectSettings.boards' | transloco }}</h2>
+      <p class="mt-1 text-sm text-muted-foreground">{{ 'projectSettings.boardsDesc' | transloco }}</p>
+    </div>
+    @if (isAdmin()) {
+      <button hlmBtn size="sm" (click)="showCreateDialog.set(true)">
+        <ng-icon name="lucidePlus" class="mr-1" />
+        {{ 'projectSettings.newBoard' | transloco }}
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="flex items-center justify-center py-12">
+      <hlm-spinner />
+      <span class="ml-2 text-sm text-muted-foreground">{{ 'projectSettings.loading' | transloco }}</span>
+    </div>
+  } @else if (error()) {
+    <hlm-alert variant="destructive" class="mb-4">
+      <div hlmAlertDescription>{{ error() | transloco }}</div>
+    </hlm-alert>
+  } @else if (boards().length === 0) {
+    <hlm-empty>
+      <hlm-empty-header>
+        <div hlmEmptyTitle>{{ 'projectDetail.noBoards' | transloco }}</div>
+      </hlm-empty-header>
+    </hlm-empty>
+  } @else {
+    <ul class="flex flex-col gap-3">
+      @for (board of boards(); track board.id) {
+        <li
+          class="rounded-lg border p-4 shadow-sm"
+          [class.border-border]="!hasInvalidRefs(board)"
+          [class.bg-card]="true"
+          [class.border-destructive/50]="hasInvalidRefs(board)"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-medium text-foreground">{{ board.name }}</h3>
+                <span hlmBadge variant="secondary" class="text-xs">{{ board.type }}</span>
+                @if (isDefault(board)) {
+                  <span hlmBadge variant="outline" class="text-xs">{{
+                    'projectSettings.defaultBoard' | transloco
+                  }}</span>
+                }
+                @if (hasInvalidRefs(board)) {
+                  <span hlmBadge variant="destructive" class="text-xs">
+                    <ng-icon name="lucideAlertTriangle" class="mr-1" />
+                    {{ 'projectSettings.invalidStatusRefs' | transloco }}
+                  </span>
+                }
+              </div>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {{ board.columns.length }}
+                {{ 'projectSettings.columnsCount' | transloco }}
+              </p>
+            </div>
+            @if (isAdmin()) {
+              <div class="flex items-center gap-2">
+                <button hlmBtn variant="outline" size="sm" (click)="openRenameDialog(board)">
+                  <ng-icon name="lucidePencil" class="mr-1" />
+                  {{ 'projectSettings.rename' | transloco }}
+                </button>
+                <button
+                  hlmBtn
+                  variant="destructive"
+                  size="sm"
+                  [disabled]="isDefault(board)"
+                  [title]="isDefault(board) ? ('projectSettings.defaultBoardDeleteHint' | transloco) : ''"
+                  (click)="requestDelete(board)"
+                >
+                  <ng-icon name="lucideTrash2" class="mr-1" />
+                  {{ 'projectSettings.delete' | transloco }}
+                </button>
+              </div>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  }
+
+  <!-- V1-9/V3-5: one level up lands on the settings hub (`…/settings/settings` was a duplicated segment) -->
+  <a [routerLink]="['..']" class="mt-4 inline-block text-sm text-primary hover:underline">
+    {{ 'projectSettings.backToHub' | transloco }}
+  </a>
+</div>
+
+<!-- Create Board Dialog -->
+<hlm-dialog [state]="showCreateDialog() ? 'open' : 'closed'" (stateChanged)="onCreateDialogStateChange($event)">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ 'projectDetail.createBoardTitle' | transloco }}</h3>
+      <p hlmDialogDescription>{{ 'projectDetail.createBoardDesc' | transloco }}</p>
+    </hlm-dialog-header>
+    @if (error()) {
+      <hlm-alert variant="destructive" class="mb-4">
+        <div hlmAlertDescription>{{ error() | transloco }}</div>
+      </hlm-alert>
+    }
+    <form id="create-board-form" [formRoot]="createBoardForm" class="flex flex-col gap-4">
+      <hlm-field>
+        <label hlmFieldLabel for="board-name">{{ 'projectDetail.boardName' | transloco }}</label>
+        <input hlmInput id="board-name" type="text" [formField]="createBoardForm.name" placeholder="Sprint Board" />
+      </hlm-field>
+      <hlm-field>
+        <label hlmFieldLabel for="board-type">{{ 'projectDetail.boardType' | transloco }}</label>
+        <select hlmNativeSelect id="board-type" [formField]="createBoardForm.type">
+          @for (type of boardTypes; track type) {
+            <option [value]="type">{{ type }}</option>
+          }
+        </select>
+      </hlm-field>
+    </form>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>{{ 'projectSettings.cancel' | transloco }}</button>
+      <button
+        hlmBtn
+        type="submit"
+        form="create-board-form"
+        [disabled]="createBoardForm().invalid() || createBoardForm().submitting()"
+      >
+        @if (createBoardForm().submitting()) {
+          <hlm-spinner /> {{ 'projectSettings.creating' | transloco }}
+        } @else {
+          {{ 'projectDetail.createBoardButton' | transloco }}
+        }
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
+
+<!-- Rename Board Dialog -->
+<hlm-dialog [state]="renamingBoard() ? 'open' : 'closed'" (stateChanged)="onRenameDialogStateChange($event)">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ 'projectSettings.renameBoardTitle' | transloco }}</h3>
+    </hlm-dialog-header>
+    @if (error()) {
+      <hlm-alert variant="destructive" class="mb-4">
+        <div hlmAlertDescription>{{ error() | transloco }}</div>
+      </hlm-alert>
+    }
+    <form id="rename-board-form" [formRoot]="renameBoardForm" class="flex flex-col gap-4">
+      <hlm-field>
+        <label hlmFieldLabel for="rename-board-name">{{ 'projectDetail.boardName' | transloco }}</label>
+        <input hlmInput id="rename-board-name" type="text" [formField]="renameBoardForm.name" />
+      </hlm-field>
+    </form>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>{{ 'projectSettings.cancel' | transloco }}</button>
+      <button
+        hlmBtn
+        type="submit"
+        form="rename-board-form"
+        [disabled]="renameBoardForm().invalid() || renameBoardForm().submitting()"
+      >
+        @if (renameBoardForm().submitting()) {
+          <hlm-spinner /> {{ 'projectSettings.saving' | transloco }}
+        } @else {
+          {{ 'projectSettings.save' | transloco }}
+        }
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
+
+<!-- Delete Board Confirmation -->
+<hlm-dialog [state]="deletingBoard() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ 'projectSettings.deleteBoardTitle' | transloco }}</h3>
+      <p hlmDialogDescription>{{ 'projectSettings.deleteBoardWarning' | transloco }}</p>
+    </hlm-dialog-header>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>{{ 'projectSettings.cancel' | transloco }}</button>
+      <button hlmBtn variant="destructive" (click)="confirmDelete()">
+        <ng-icon name="lucideTrash2" class="mr-1" />
+        {{ 'projectSettings.delete' | transloco }}
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>

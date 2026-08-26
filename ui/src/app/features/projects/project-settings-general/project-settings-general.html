@@ -1,0 +1,76 @@
+<div class="mx-auto max-w-2xl">
+  <!-- Page header -->
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold text-foreground">{{ 'projectSettings.general' | transloco }}</h2>
+    <p class="mt-1 text-sm text-muted-foreground">{{ 'projectSettings.generalDesc' | transloco }}</p>
+  </div>
+
+  @if (!isAdmin()) {
+    <hlm-alert class="mb-4">
+      <div hlmAlertDescription>{{ 'projectSettings.adminOnly' | transloco }}</div>
+    </hlm-alert>
+  }
+
+  <hlm-card>
+    <hlm-card-header>
+      <h3 hlmCardTitle>{{ 'projectSettings.general' | transloco }}</h3>
+    </hlm-card-header>
+    <div hlmCardContent>
+      @if (error()) {
+        <hlm-alert variant="destructive" class="mb-4">
+          <div hlmAlertDescription>{{ error() | transloco }}</div>
+        </hlm-alert>
+      }
+
+      <form id="general-form" [formRoot]="generalForm" class="flex flex-col gap-4">
+        <!-- Project key: immutable server-side (BR-022) — locked with hint -->
+        <hlm-field>
+          <label hlmFieldLabel for="project-key">{{ 'projectSettings.key' | transloco }}</label>
+          <div class="relative">
+            <input
+              hlmInput
+              id="project-key"
+              type="text"
+              [value]="projectStore.activeProject()?.key ?? ''"
+              disabled
+              readonly
+              class="pr-9"
+            />
+            <ng-icon name="lucideLock" class="absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
+          <p hlmFieldDescription>{{ 'projectSettings.keyLockedHint' | transloco }}</p>
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="project-name">{{ 'projectSettings.name' | transloco }}</label>
+          <input hlmInput id="project-name" type="text" [formField]="generalForm.name" />
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="project-description">{{ 'projectSettings.description' | transloco }}</label>
+          <textarea hlmInput id="project-description" rows="3" [formField]="generalForm.description"></textarea>
+        </hlm-field>
+      </form>
+    </div>
+    @if (isAdmin()) {
+      <hlm-card-footer>
+        <button
+          hlmBtn
+          type="submit"
+          form="general-form"
+          [disabled]="generalForm().invalid() || generalForm().submitting()"
+        >
+          @if (generalForm().submitting()) {
+            <hlm-spinner /> {{ 'projectSettings.saving' | transloco }}
+          } @else {
+            <ng-icon name="lucideSave" class="mr-1" />
+            {{ 'projectSettings.save' | transloco }}
+          }
+        </button>
+      </hlm-card-footer>
+    }
+  </hlm-card>
+
+  <!-- V1-9/V3-5: one level up lands on the settings hub (`…/settings/settings` was a duplicated segment) -->
+  <a [routerLink]="['..']" class="mt-4 inline-block text-sm text-primary hover:underline">
+    {{ 'projectSettings.backToHub' | transloco }}
+  </a>
+</div>

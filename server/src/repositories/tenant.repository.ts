@@ -5,6 +5,7 @@ import type { Tenant } from '@task-board/shared';
 
 // Required MongoDB indexes:
 // - { id: 1 } (unique)
+// - { slug: 1 } (unique) — DEC-032 tenant slug lookup + global uniqueness
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
@@ -12,6 +13,7 @@ export interface TenantDocument {
   _id?: import('mongodb').ObjectId;
   id: string;
   name: string;
+  slug: string;
   description: string | null;
   status: string;
   deletionScheduledAt: Date | null;
@@ -25,6 +27,7 @@ function toDomain(doc: TenantDocument): Tenant {
   return {
     id: doc.id,
     name: doc.name,
+    slug: doc.slug,
     description: doc.description,
     status: doc.status as Tenant['status'],
     deletionScheduledAt: doc.deletionScheduledAt ? doc.deletionScheduledAt.toISOString() : null,
@@ -46,11 +49,26 @@ export class TenantRepository extends BaseRepository<TenantDocument, Tenant> {
     return docs.map(toDomain);
   }
 
-  async create(input: { name: string; description?: string }): Promise<Tenant> {
+  /** Find a tenant by its globally unique slug (DEC-032). */
+  async findBySlug(slug: string): Promise<Tenant | null> {
+    const doc = await this.collection.findOne({ slug });
+
+    return doc ? toDomain(doc) : null;
+  }
+
+  /** Check whether a slug is already claimed by any tenant (DEC-032). */
+  async slugExists(slug: string): Promise<boolean> {
+    const doc = await this.collection.findOne({ slug }, { projection: { _id: 1 } });
+
+    return doc !== null;
+  }
+
+  async create(input: { name: string; slug: string; description?: string }): Promise<Tenant> {
     const now = new Date();
     const doc: TenantDocument = {
       id: randomUUID(),
       name: input.name,
+      slug: input.slug,
       description: input.description ?? null,
       status: TenantStatus.ACTIVE,
       deletionScheduledAt: null,

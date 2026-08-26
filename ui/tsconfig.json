@@ -38,7 +38,9 @@
       "@spartan-ng/helm/empty": ["./libs/ui/empty/src/index.ts"],
       "@spartan-ng/helm/alert": ["./libs/ui/alert/src/index.ts"],
       "@spartan-ng/helm/checkbox": ["./libs/ui/checkbox/src/index.ts"],
-      "@spartan-ng/helm/switch": ["./libs/ui/switch/src/index.ts"]
+      "@spartan-ng/helm/switch": ["./libs/ui/switch/src/index.ts"],
+      "@spartan-ng/helm/autocomplete": ["./libs/ui/autocomplete/src/index.ts"],
+      "@spartan-ng/helm/input-group": ["./libs/ui/input-group/src/index.ts"]
     }
   }
 }

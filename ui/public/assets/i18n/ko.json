@@ -27,7 +27,8 @@
     "taskTypes": "작업 유형",
     "labels": "라벨",
     "audit": "감사",
-    "filters": "필터"
+    "filters": "필터",
+    "projectSettings": "Project settings"
   },
   "tenantSwitcher": {
     "selectWorkspace": "워크스페이스 선택",
@@ -95,6 +96,26 @@
       "invalidOrExpired": "유효하지 않거나 만료된 초대입니다.",
       "passwordsNotMatch": "비밀번호가 일치하지 않습니다.",
       "failedAccept": "초대 수락에 실패했습니다."
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "description": "Enter your email address and we will send you a reset link.",
+      "sentTitle": "Check your inbox",
+      "sentMessage": "If an account exists for that address, we have sent a password reset link.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "description": "Choose a new password for your account.",
+      "missingToken": "This reset link is missing or invalid. Please request a new one.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Reset password",
+      "submitting": "Resetting…",
+      "backToLogin": "Back to sign in"
     }
   },
   "landing": {
@@ -182,15 +203,51 @@
     "title": "워크스페이스 만들기",
     "description": "워크스페이스를 설정하여 프로젝트 관리를 시작하세요.",
     "name": "워크스페이스 이름",
-    "slug": "슬러그",
+    "slug": {
+      "label": "Workspace URL",
+      "checking": "Checking availability…",
+      "taken": "This URL is already taken",
+      "available": "This URL is available",
+      "hint": "Lowercase letters, numbers and hyphens only."
+    },
     "slugHint": "URL에서 사용됩니다. 소문자, 숫자, 하이픈만 허용됩니다.",
-    "plan": "구독 플랜",
+    "plan": {
+      "title": "Choose a plan",
+      "subtitle": "Every workspace starts on the Free plan.",
+      "cardTitle": "Free",
+      "price": "$0",
+      "perMonth": "per month",
+      "workspace": "1 workspace",
+      "projects": "Unlimited projects",
+      "users": "Unlimited users"
+    },
     "planFree": "무료 — 프로젝트 3개, 사용자 5명까지",
     "submit": "워크스페이스 만들기",
     "submitting": "워크스페이스 생성 중…",
     "failed": "워크스페이스 생성에 실패했습니다. 다시 시도해 주세요.",
     "descriptionLabel": "설명 (선택사항)",
-    "descriptionPlaceholder": "워크스페이스에 대한 짧은 설명…"
+    "descriptionPlaceholder": "워크스페이스에 대한 짧은 설명…",
+    "back": "Back",
+    "continue": "Continue",
+    "checkout": {
+      "title": "Checkout",
+      "subtitle": "Review your order before confirming.",
+      "summary": "Summary",
+      "planLabel": "Plan",
+      "planValue": "Free",
+      "workspaceLabel": "Workspace",
+      "urlLabel": "URL",
+      "totalLabel": "Total due today",
+      "totalValue": "$0",
+      "confirm": "Confirm & create workspace",
+      "confirming": "Confirming…",
+      "demoNote": "This is a demo — no payment is required."
+    },
+    "confirmation": {
+      "title": "Workspace created!",
+      "message": "Your workspace is ready. Invite your team and start planning.",
+      "success": "Everything went smoothly."
+    }
   },
   "settings": {
     "title": "설정",
@@ -200,7 +257,14 @@
     "zoomDescription": "인터페이스 글꼴 크기를 조정합니다.",
     "resetZoom": "초기화",
     "language": "언어",
-    "languageDescription": "표시 언어를 선택하세요."
+    "languageDescription": "표시 언어를 선택하세요.",
+    "dateFormat": "날짜 형식",
+    "dateFormatDescription": "앱에서 날짜 표시 방식을 선택하세요.",
+    "timeFormat": "시간 형식",
+    "timeFormatDescription": "앱에서 시간 표시 방식을 선택하세요.",
+    "timeFormat24h": "24시간제",
+    "timeFormat12h": "12시간제 (오전/오후)",
+    "systemDefault": "System default"
   },
   "tenantSettings": {
     "title": "테넌트 설정",
@@ -276,7 +340,12 @@
     "status": "상태",
     "actions": "동작",
     "restoreAccess": "액세스 복원",
-    "reinvite": "다시 초대"
+    "reinvite": "다시 초대",
+    "contextError": "Members could not be loaded because the project context is unavailable.",
+    "editRole": "Edit role",
+    "editRoleTitle": "Edit member role",
+    "editRoleDesc": "Choose the role this member has in the project.",
+    "invitationPending": "Invitation pending"
   },
   "projects": {
     "title": "프로젝트",
@@ -336,7 +405,22 @@
     "deleteProjectWarning": "이 동작으로 프로젝트가 삭제됩니다. 30일 후에 영구적으로 삭제됩니다.",
     "deleteProjectConsequence": "모든 작업, 보드, 스프린트, 프로젝트 데이터가 영구적으로 삭제됩니다. 이 동작은 되돌릴 수 없습니다.",
     "deleteProjectConfirmLabel": "삭제를 확인하려면 프로젝트 키({{key}})를 입력하세요:",
-    "confirmDeleteButton": "프로젝트 삭제"
+    "confirmDeleteButton": "프로젝트 삭제",
+    "activeSprint": "Active sprint",
+    "deletionScheduledFor": "Deletion scheduled for {{date}}",
+    "goToSprints": "Go to sprints",
+    "goToTasks": "Go to tasks",
+    "manageBoards": "Manage boards",
+    "moreMembers": "+{{count}} more",
+    "noActiveSprint": "No active sprint",
+    "noTasks": "No tasks yet",
+    "openSprint": "Open sprint",
+    "recentTasks": "Recent tasks",
+    "settings": "Settings",
+    "taskSummary": "Task summary",
+    "totalTasks": "Total tasks",
+    "viewAllMembers": "View all members",
+    "viewAllTasks": "View all tasks"
   },
   "boardView": {
     "loading": "보드 로딩 중…",
@@ -357,8 +441,10 @@
     "selectStatus": "상태 선택…",
     "type": "유형",
     "typePlaceholder": "작업 유형 입력…",
-    "noTasks": "이 커러륨에 작업이 없습니다",
-    "multiStatusHint": "이 커러륨에는 여러 상태가 포함되얰 있습니다. 이 작업에 대한 목표 상태를 선택하세요."
+    "multiStatusHint": "이 커러륨에는 여러 상태가 포함되얰 있습니다. 이 작업에 대한 목표 상태를 선택하세요.",
+    "allTasks": "All tasks",
+    "clearSprint": "Clear sprint filter",
+    "sprintChip": "Sprint: {{name}}"
   },
   "priority": {
     "low": "낮음",
@@ -400,7 +486,9 @@
     "conflictTitle": "버전 충돌",
     "conflictHint": "이 작업은 다른 사용자에 의해 변경되었습니다. 최신 버전을 가져오려면 다시 로드하세요.",
     "reloadTask": "작업 다시 로드",
-    "unknown": "알 수 없음"
+    "unknown": "알 수 없음",
+    "editTitle": "Edit title",
+    "editDescription": "Edit description"
   },
   "sprints": {
     "title": "스프린트",
@@ -423,9 +511,15 @@
     "createDesc": "이 프로젝트에 새 스프린트를 만듭니다.",
     "future": "미래",
     "active": "활성",
-    "completed": "완료"
+    "completed": "완료",
+    "backlog": "Backlog",
+    "overdue": "Overdue",
+    "overdueTooltip": "This sprint is past its end date"
   },
   "sprintDetail": {
+    "dispositionTitle": "스프린트 완료",
+    "dispositionDesc": "완료되지 않은 작업 {{ count }}개가 아래에서 선택한 스프린트로 이동됩니다.",
+    "dispositionTarget": "스프린트로 이동",
     "loading": "스프린트 로딩 중…",
     "tasks": "작업",
     "backToProject": "프로젝트로 돌아가기",
@@ -439,13 +533,18 @@
     "deleteConfirm": "이 스프린트를 삭제하시겠습니까?",
     "deleteWarning": "이 스프린트의 작업은 삭제되지 않으나, 스프린트에서 제거됩니다.",
     "cancelDelete": "취소",
-    "confirmDelete": "삭제"
+    "confirmDelete": "삭제",
+    "moveToBacklog": "Move to backlog",
+    "moveToSprint": "Move to sprint",
+    "completeAndMove": "Complete sprint & move tasks"
   },
   "sprintBacklog": {
     "backlog": "백로그",
     "loading": "백로그 로딩 중…",
     "allAssigned": "모든 작업이 스프린트에 할당되었습니다.",
-    "addToSprint": "스프린트에 추가"
+    "addToSprint": "스프린트에 추가",
+    "title": "Backlog",
+    "description": "Tasks without a sprint live here. Move them into an active sprint to start work."
   },
   "docs": {
     "title": "문서",
@@ -535,7 +634,8 @@
     "labelNameRequired": "라벨 이름은 필수입니다",
     "typeRequired": "작업 유형은 필수입니다",
     "statusRequired": "상태는 필수입니다",
-    "priorityRequired": "우선순위는 필수입니다"
+    "priorityRequired": "우선순위는 필수입니다",
+    "titleMaxLength": "Title must be at most 200 characters"
   },
   "errors": {
     "unexpected": "예기치 않은 오류가 발생했습니다. 다시 시도해 주세요.",
@@ -672,6 +772,9 @@
     "deleting": "삭제 중…"
   },
   "taskTable": {
+    "columns": "열",
+    "selectColumns": "열 선택…",
+    "hideColumn": "이 열 숨기기",
     "filtersDesc": "상태, 우선순위, 담당자 등으로 작업을 필터링합니다.",
     "title": "작업",
     "searchPlaceholder": "작업 검색…",
@@ -713,7 +816,19 @@
     "noAssignee": "당단자 없음",
     "allAssignees": "모든 당단자",
     "allReporters": "모든 보고자",
-    "allSprints": "모든 스프린트"
+    "allSprints": "모든 스프린트",
+    "activeFilters": "Active filters",
+    "clearFilters": "Clear all filters",
+    "filterSearch": "Search",
+    "filterStatus": "Status",
+    "filterType": "Type",
+    "filterPriority": "Priority",
+    "filterAssignee": "Assignee",
+    "filterReporter": "Reporter",
+    "filterSprint": "Sprint",
+    "filterLabel": "Label",
+    "noMatchingTasks": "No tasks match the current filters.",
+    "removeFilterAria": "Remove filter {{value}}"
   },
   "comments": {
     "title": "콘멘트",
@@ -774,9 +889,17 @@
     "deleteConfirm": "이 저장된 필터를 삭제하시겠습니까?",
     "cancelDelete": "취소",
     "confirmDelete": "삭제",
-    "deleteError": "필터 삭제에 실패했습니다."
+    "deleteError": "필터 삭제에 실패했습니다.",
+    "apply": "Apply"
   },
   "auditLog": {
+    "time": "시간",
+    "actor": "실행자",
+    "actionCol": "작업",
+    "entity": "엔터티",
+    "changes": "변경 사항",
+    "allActions": "모든 작업",
+    "allActors": "모든 실행자",
     "title": "감사 로그",
     "loading": "감사 이벤트 로딩 중…",
     "noEvents": "감사 이벤트가 없습니다.",
@@ -810,7 +933,8 @@
     "results": "결과 {{total}}건",
     "perPage": "페이지당",
     "totalItems": "항목",
-    "pages": "페이지"
+    "pages": "페이지",
+    "auto": "Auto"
   },
   "states": {
     "archived": "이 프로젝트는 아카이브되얰 있습니다.",
@@ -828,5 +952,79 @@
     "forbiddenDescription": "이 페이지를 보는 권한이 없습니다.",
     "goHome": "홈으로",
     "goBack": "뒤로"
+  },
+  "projectSettings": {
+    "title": "Project settings",
+    "subtitle": "Configure boards, members and project details.",
+    "general": "General",
+    "generalDesc": "Basic information about this project.",
+    "adminOnly": "Only workspace admins can change these settings.",
+    "name": "Name",
+    "key": "Key",
+    "keyLockedHint": "The project key is permanent and cannot be changed.",
+    "description": "Description",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "creating": "Creating…",
+    "backToHub": "Back to settings hub",
+    "members": "Members",
+    "membersDesc": "Manage who has access to this project.",
+    "boards": "Boards",
+    "boardsDesc": "Create, rename and delete boards for this project.",
+    "newBoard": "New board",
+    "defaultBoard": "Default board",
+    "defaultBoardDeleteHint": "The default board cannot be deleted.",
+    "invalidStatusRefs": "Some columns reference statuses that no longer exist.",
+    "columnsCount": "{{count}} columns",
+    "rename": "Rename",
+    "renameBoardTitle": "Rename board",
+    "delete": "Delete",
+    "deleteBoardTitle": "Delete board",
+    "deleteBoardWarning": "This board will be permanently removed. Tasks are not deleted.",
+    "dangerZone": "Danger zone",
+    "dangerZoneDesc": "Irreversible actions for this project.",
+    "dangerDescription": "Archive or schedule this project for deletion.",
+    "taskTypes": "작업 유형",
+    "taskTypesDesc": "이 프로젝트에서 사용할 수 있는 작업 유형을 정의합니다.",
+    "statuses": "상태",
+    "statusesDesc": "이 프로젝트의 워크플로 상태를 사용자 지정합니다.",
+    "labels": "레이블",
+    "labelsDesc": "작업을 분류할 레이블을 만들고 관리합니다."
+  },
+  "taskCreate": {
+    "title": "Create task",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Short, descriptive summary",
+    "descriptionLabel": "Description",
+    "status": "Status",
+    "selectStatus": "Select status",
+    "priority": "Priority",
+    "type": "Type",
+    "selectType": "Select type",
+    "assignee": "Assignee",
+    "unassigned": "Unassigned",
+    "sprint": "Sprint",
+    "backlog": "Backlog",
+    "labels": "Labels",
+    "labelsPlaceholder": "Search or create label…",
+    "labelsHint": "Pick an existing label or type a new name to create one.",
+    "noLabelsFound": "No labels found",
+    "createLabel": "Create \"{{name}}\"",
+    "removeLabelAria": "Remove label {{name}}",
+    "cancel": "Cancel",
+    "create": "Create task",
+    "creating": "Creating…"
+  },
+  "tenantHome": {
+    "createProject": "Create project",
+    "manageMembers": "Manage members",
+    "myTasks": "My tasks",
+    "noTasks": "No tasks assigned to you",
+    "noTasksHint": "Tasks assigned to you across all your projects will show up here.",
+    "pendingInvitations": "Pending invitations",
+    "pendingInvitationsCount": "{{count}} pending",
+    "noPendingInvitations": "No pending invitations"
   }
 }

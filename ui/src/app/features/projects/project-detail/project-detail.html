@@ -2,62 +2,243 @@
   <div class="flex items-center justify-center py-12">
     <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'projectDetail.loading' | transloco }}</span>
   </div>
+} @else if (error()) {
+  <!-- V4-4: error() holds a transloco key from getErrorMessage — translate it -->
+  <hlm-alert variant="destructive" class="mx-auto max-w-6xl px-6">
+    <div hlmAlertDescription>{{ error() | transloco }}</div>
+  </hlm-alert>
 } @else if (project(); as p) {
-  <div class="mx-auto max-w-5xl">
-    <!-- Project header -->
-    <div class="mb-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="flex items-center gap-3">
-            <h2 class="text-2xl font-bold text-foreground">{{ p.name }}</h2>
-            <span class="text-sm font-mono text-muted-foreground">[{{ p.key }}]</span>
-            @if (p.status !== ProjectStatus.ACTIVE) {
-              <span hlmBadge [variant]="statusBadgeVariant(p.status)">{{ p.status }}</span>
-            }
+  <div class="mx-auto max-w-6xl px-6">
+    <!-- Read-only banner for archived / deletion-pending projects -->
+    @if (readOnlyBannerKey(); as bannerKey) {
+      <hlm-alert variant="destructive" class="mb-6">
+        <ng-icon name="lucideArchive" hlmAlertIcon />
+        <div hlmAlertTitle>{{ bannerKey | transloco }}</div>
+        @if (p.status === ProjectStatus.DELETION_PENDING && p.deletionScheduledAt) {
+          <div hlmAlertDescription>
+            {{ 'projectDetail.deletionScheduledFor' | transloco: { date: p.deletionScheduledAt | date: 'mediumDate' } }}
           </div>
-          @if (p.description) {
-            <p class="mt-1 text-sm text-muted-foreground">{{ p.description }}</p>
+        }
+      </hlm-alert>
+    }
+
+    <!-- Project header.
+         V4-2: min-w-0 + break-words + line-clamp constrain long unbreakable
+         project names so the action buttons stay on-screen. -->
+    <div class="mb-6 flex items-start justify-between gap-4">
+      <div class="min-w-0 flex-1">
+        <div class="flex min-w-0 flex-wrap items-center gap-3">
+          <h2 class="text-2xl font-bold break-words text-foreground line-clamp-2">{{ p.name }}</h2>
+          <span class="text-sm font-mono text-muted-foreground">[{{ p.key }}]</span>
+          @if (p.status !== ProjectStatus.ACTIVE) {
+            <span hlmBadge [variant]="statusBadgeVariant(p.status)">{{ p.status }}</span>
           }
         </div>
-        <div class="flex items-center gap-2">
-          <button hlmBtn variant="outline" size="sm" [routerLink]="['sprints']">
-            {{ 'projectDetail.sprints' | transloco }}
+        @if (p.description) {
+          <p class="mt-1 text-sm break-words text-muted-foreground">{{ p.description }}</p>
+        }
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <button hlmBtn variant="outline" size="sm" [routerLink]="['sprints']">
+          {{ 'projectDetail.sprints' | transloco }}
+        </button>
+        @if (isAdmin()) {
+          <button hlmBtn variant="outline" size="sm" [routerLink]="['settings']">
+            <ng-icon name="lucideSettings" class="mr-1" />
+            {{ 'projectDetail.settings' | transloco }}
           </button>
-          @if (p.status === ProjectStatus.ACTIVE) {
-            <button hlmBtn size="sm" (click)="showCreateBoard.set(true)">
-              <ng-icon name="lucidePlus" class="mr-1" />
-              {{ 'projectDetail.newBoard' | transloco }}
-            </button>
-          }
-        </div>
+        }
       </div>
     </div>
 
-    <!-- Boards section -->
+    <!-- Widgets grid -->
+    <div class="mb-8 grid gap-4 lg:grid-cols-2">
+      <!-- Task summary by status -->
+      <hlm-card>
+        <hlm-card-header>
+          <h3 hlmCardTitle>{{ 'projectDetail.taskSummary' | transloco }}</h3>
+        </hlm-card-header>
+        <div hlmCardContent>
+          @if (statusCounts().length === 0) {
+            <hlm-empty>
+              <hlm-empty-header>
+                <div hlmEmptyTitle>{{ 'projectDetail.noTasks' | transloco }}</div>
+              </hlm-empty-header>
+              <hlm-empty-content>
+                <button hlmBtn size="sm" [routerLink]="['tasks']">{{ 'projectDetail.goToTasks' | transloco }}</button>
+              </hlm-empty-content>
+            </hlm-empty>
+          } @else {
+            <ul class="flex flex-col gap-2">
+              @for (entry of statusCounts(); track entry.status.id) {
+                <li class="flex items-center justify-between text-sm">
+                  <span class="flex items-center gap-2 text-foreground">
+                    <ng-icon name="lucideCircleDot" class="size-4 text-muted-foreground" />
+                    {{ entry.status.name }}
+                  </span>
+                  <span hlmBadge variant="secondary">{{ entry.total }}</span>
+                </li>
+              }
+              <li class="mt-1 flex items-center justify-between border-t border-border pt-2 text-sm font-medium">
+                <span class="text-foreground">{{ 'projectDetail.totalTasks' | transloco }}</span>
+                <span>{{ totalTasks() }}</span>
+              </li>
+            </ul>
+          }
+        </div>
+      </hlm-card>
+
+      <!-- Active sprint -->
+      <hlm-card>
+        <hlm-card-header>
+          <h3 hlmCardTitle>{{ 'projectDetail.activeSprint' | transloco }}</h3>
+        </hlm-card-header>
+        <div hlmCardContent>
+          @if (activeSprint(); as sprint) {
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center gap-3">
+                <a
+                  [routerLink]="['sprints', sprint.id]"
+                  class="font-medium text-foreground hover:text-primary hover:underline"
+                >
+                  {{ sprint.name }}
+                </a>
+                <span hlmBadge [variant]="statusBadgeVariant(sprint.status)">{{ sprint.status }}</span>
+              </div>
+              @if (sprint.startDate || sprint.endDate) {
+                <p class="text-sm text-muted-foreground">
+                  {{
+                    'projectDetail.sprintDates'
+                      | transloco: { start: sprint.startDate | date: dateFmt(), end: sprint.endDate | date: dateFmt() }
+                  }}
+                </p>
+              }
+              <a
+                [routerLink]="['sprints', sprint.id]"
+                class="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                <ng-icon name="lucideExternalLink" class="size-4" />
+                {{ 'projectDetail.openSprint' | transloco }}
+              </a>
+            </div>
+          } @else {
+            <hlm-empty>
+              <hlm-empty-header>
+                <div hlmEmptyTitle>{{ 'projectDetail.noActiveSprint' | transloco }}</div>
+              </hlm-empty-header>
+              <hlm-empty-content>
+                <button hlmBtn size="sm" variant="outline" [routerLink]="['sprints']">
+                  <ng-icon name="lucideCalendar" class="mr-1" />
+                  {{ 'projectDetail.goToSprints' | transloco }}
+                </button>
+              </hlm-empty-content>
+            </hlm-empty>
+          }
+        </div>
+      </hlm-card>
+
+      <!-- Recent tasks -->
+      <hlm-card>
+        <hlm-card-header>
+          <h3 hlmCardTitle>{{ 'projectDetail.recentTasks' | transloco }}</h3>
+        </hlm-card-header>
+        <div hlmCardContent>
+          @if (recentTasks().length === 0) {
+            <p class="text-sm text-muted-foreground">{{ 'projectDetail.noTasks' | transloco }}</p>
+          } @else {
+            <ul class="flex flex-col divide-y divide-border">
+              @for (task of recentTasks(); track task.id) {
+                <li>
+                  <!-- V2-9: canonical `KEY-NUMBER` URL — bare numbers are rejected by the API -->
+                  <a
+                    [routerLink]="['tasks', p.key + '-' + task.number]"
+                    class="flex items-center justify-between py-2 text-sm hover:text-primary"
+                  >
+                    <span class="truncate">
+                      <span class="mr-2 font-mono text-xs text-muted-foreground">{{ p.key }}-{{ task.number }}</span>
+                      {{ task.title }}
+                    </span>
+                    <span class="ml-2 shrink-0 text-xs text-muted-foreground">
+                      {{ task.updatedAt | date: dateFmt() }}
+                    </span>
+                  </a>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+        <hlm-card-footer>
+          <a [routerLink]="['tasks']" class="text-sm text-primary hover:underline">
+            {{ 'projectDetail.viewAllTasks' | transloco }}
+          </a>
+        </hlm-card-footer>
+      </hlm-card>
+
+      <!-- Members preview -->
+      <hlm-card>
+        <hlm-card-header>
+          <h3 hlmCardTitle>{{ 'projectDetail.members' | transloco }}</h3>
+        </hlm-card-header>
+        <div hlmCardContent>
+          @if (membersPreview().length === 0) {
+            <p class="text-sm text-muted-foreground">{{ 'projectDetail.noMembers' | transloco }}</p>
+          } @else {
+            <ul class="flex flex-col gap-2">
+              @for (member of membersPreview(); track member.userId) {
+                <li class="flex items-center gap-2 text-sm">
+                  <span
+                    class="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary"
+                    aria-hidden="true"
+                  >
+                    {{ memberInitials(member.displayName, member.email) }}
+                  </span>
+                  <span class="truncate text-foreground">{{ member.displayName || member.email }}</span>
+                  <span hlmBadge variant="outline" class="ml-auto text-xs">{{ member.role }}</span>
+                </li>
+              }
+              @if (extraMembersCount() > 0) {
+                <li class="text-xs text-muted-foreground">
+                  {{ 'projectDetail.moreMembers' | transloco: { count: extraMembersCount() } }}
+                </li>
+              }
+            </ul>
+          }
+        </div>
+        <hlm-card-footer>
+          <a [routerLink]="['members']" class="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+            <ng-icon name="lucideUsers" class="size-4" />
+            {{ 'projectDetail.viewAllMembers' | transloco }}
+          </a>
+        </hlm-card-footer>
+      </hlm-card>
+    </div>
+
+    <!-- Board shortcuts -->
     <section class="mb-8">
-      <h3 class="mb-4 text-lg font-semibold text-foreground">{{ 'projectDetail.boards' | transloco }}</h3>
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-foreground">{{ 'projectDetail.boards' | transloco }}</h3>
+        @if (isAdmin()) {
+          <a [routerLink]="['settings', 'boards']" class="text-sm text-primary hover:underline">
+            {{ 'projectDetail.manageBoards' | transloco }}
+          </a>
+        }
+      </div>
       @if (boards().length === 0) {
         <hlm-empty>
           <hlm-empty-header>
             <div hlmEmptyTitle>{{ 'projectDetail.noBoards' | transloco }}</div>
           </hlm-empty-header>
-          @if (p.status === ProjectStatus.ACTIVE) {
-            <hlm-empty-content>
-              <button hlmBtn size="sm" (click)="showCreateBoard.set(true)">
-                {{ 'projectDetail.createBoard' | transloco }}
-              </button>
-            </hlm-empty-content>
-          }
         </hlm-empty>
       } @else {
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           @for (board of boards(); track board.id) {
             <a
               [routerLink]="['boards', board.id]"
-              class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+              class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
             >
               <div class="flex items-center justify-between">
-                <h4 class="font-medium text-foreground group-hover:text-primary">
+                <h4 class="flex items-center gap-2 font-medium text-foreground group-hover:text-primary">
+                  <ng-icon name="lucideLayoutDashboard" class="size-4 text-muted-foreground" />
                   {{ board.name }}
                 </h4>
                 <span hlmBadge variant="secondary" class="text-xs">{{ board.type }}</span>
@@ -67,131 +248,5 @@
         </div>
       }
     </section>
-
-    <!-- Danger Zone (admin only) -->
-    @if (isAdmin()) {
-      <section>
-        <hlm-card class="border-destructive/50">
-          <hlm-card-header>
-            <h3 hlmCardTitle class="text-destructive">{{ 'projectDetail.dangerZone' | transloco }}</h3>
-          </hlm-card-header>
-          <div hlmCardContent>
-            <p class="text-sm text-muted-foreground">
-              {{ 'projectDetail.dangerDescription' | transloco }}
-            </p>
-          </div>
-          <hlm-card-footer class="flex flex-wrap gap-3">
-            @if (p.status === ProjectStatus.ACTIVE) {
-              <button hlmBtn variant="outline" (click)="archiveProject()">
-                <ng-icon name="lucideArchive" class="mr-1" />
-                {{ 'projectDetail.archiveProject' | transloco }}
-              </button>
-              <button hlmBtn variant="destructive" (click)="requestDeleteProject()">
-                <ng-icon name="lucideTrash2" class="mr-1" />
-                {{ 'projectDetail.deleteProject' | transloco }}
-              </button>
-            } @else if (p.status === ProjectStatus.ARCHIVED) {
-              <button hlmBtn variant="outline" (click)="restoreProject()">
-                <ng-icon name="lucideRotateCcw" class="mr-1" />
-                {{ 'projectDetail.restoreProject' | transloco }}
-              </button>
-            } @else if (p.status === ProjectStatus.DELETION_PENDING) {
-              <button hlmBtn variant="outline" (click)="cancelDeletion()">
-                <ng-icon name="lucideXCircle" class="mr-1" />
-                {{ 'projectDetail.cancelDeletion' | transloco }}
-              </button>
-            }
-          </hlm-card-footer>
-        </hlm-card>
-      </section>
-    }
   </div>
-
-  <!-- Create Board Modal -->
-  <hlm-dialog [state]="showCreateBoard() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
-      <hlm-dialog-header>
-        <h3 hlmDialogTitle>{{ 'projectDetail.createBoardTitle' | transloco }}</h3>
-        <p hlmDialogDescription>{{ 'projectDetail.createBoardDesc' | transloco }}</p>
-      </hlm-dialog-header>
-
-      @if (error()) {
-        <hlm-alert variant="destructive" class="mb-4">
-          <div hlmAlertDescription>{{ error() | transloco }}</div>
-        </hlm-alert>
-      }
-
-      <form id="create-board-form" [formRoot]="createBoardForm" class="flex flex-col gap-4">
-        <hlm-field>
-          <label hlmFieldLabel for="board-name">{{ 'projectDetail.boardName' | transloco }}</label>
-          <input hlmInput id="board-name" type="text" [formField]="createBoardForm.name" placeholder="Sprint Board" />
-        </hlm-field>
-        <hlm-field>
-          <label hlmFieldLabel for="board-type">{{ 'projectDetail.boardType' | transloco }}</label>
-          <select hlmNativeSelect id="board-type" [formField]="createBoardForm.type">
-            @for (type of boardTypes; track type) {
-              <option [value]="type">{{ type }}</option>
-            }
-          </select>
-        </hlm-field>
-      </form>
-      <hlm-dialog-footer>
-        <button hlmBtn variant="outline" hlmDialogClose>{{ 'projectDetail.cancel' | transloco }}</button>
-        <button
-          hlmBtn
-          type="submit"
-          form="create-board-form"
-          [disabled]="createBoardForm().invalid() || createBoardForm().submitting()"
-        >
-          @if (createBoardForm().submitting()) {
-            <hlm-spinner /> {{ 'projectDetail.creating' | transloco }}
-          } @else {
-            {{ 'projectDetail.createBoardButton' | transloco }}
-          }
-        </button>
-      </hlm-dialog-footer>
-    </hlm-dialog-content>
-  </hlm-dialog>
-
-  <!-- Delete Project Confirmation Dialog -->
-  <hlm-dialog [state]="showDeleteConfirm() ? 'open' : 'closed'" (stateChanged)="onDeleteDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
-      <hlm-dialog-header>
-        <h3 hlmDialogTitle>{{ 'projectDetail.deleteProjectTitle' | transloco }}</h3>
-        <p hlmDialogDescription>{{ 'projectDetail.deleteProjectDesc' | transloco }}</p>
-      </hlm-dialog-header>
-      <div class="flex flex-col gap-4">
-        <p class="text-sm text-muted-foreground">
-          {{ 'projectDetail.deleteProjectWarning' | transloco }}
-        </p>
-        <p class="text-sm text-amber-600 font-medium">
-          {{ 'projectDetail.deleteProjectConsequence' | transloco }}
-        </p>
-        @if (project(); as p) {
-          <hlm-field>
-            <label hlmFieldLabel for="delete-confirm">
-              {{ 'projectDetail.deleteProjectConfirmLabel' | transloco: { key: p.key } }}
-            </label>
-            <input
-              hlmInput
-              id="delete-confirm"
-              type="text"
-              [value]="deleteConfirmText()"
-              (input)="deleteConfirmText.set($any($event.target).value)"
-              [placeholder]="p.key"
-            />
-          </hlm-field>
-        }
-      </div>
-      <hlm-dialog-footer>
-        <button hlmBtn variant="outline" (click)="showDeleteConfirm.set(false)">
-          {{ 'projectDetail.cancel' | transloco }}
-        </button>
-        <button hlmBtn variant="destructive" [disabled]="!canConfirmDelete" (click)="confirmDeleteProject()">
-          <ng-icon name="lucideTrash2" class="mr-1" />
-          {{ 'projectDetail.confirmDeleteButton' | transloco }}
-        </button>
-      </hlm-dialog-footer>
-    </hlm-dialog-content>
-  </hlm-dialog>
 }

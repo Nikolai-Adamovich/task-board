@@ -8,7 +8,7 @@
  * - isGroupExpanded / toggleGroup
  * - onDialogStateChange
  */
-import { TestBed } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
@@ -17,6 +17,7 @@ import { submit } from '@angular/forms/signals';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { SprintList, CreateSprintForm } from './sprint-list';
 import { SprintClient } from '@services/sprint-client';
+import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
@@ -49,11 +50,13 @@ const mockSprints: Sprint[] = [
 describe('SprintList', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  let fixture: ComponentFixture<SprintList>;
   let sprintClientMock: {
     list: ReturnType<typeof vi.fn>;
     listByTenant: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
   };
+  let taskClientMock: { list: ReturnType<typeof vi.fn> };
   let authStoreMock: {
     currentUser: ReturnType<typeof vi.fn>;
     isAuthenticated: () => boolean;
@@ -67,6 +70,9 @@ describe('SprintList', () => {
       list: vi.fn().mockReturnValue(of(mockSprints)),
       listByTenant: vi.fn().mockReturnValue(of(mockSprints)),
       create: vi.fn().mockReturnValue(of(mockSprints[0])),
+    };
+    taskClientMock = {
+      list: vi.fn().mockReturnValue(of({ data: [], pagination: { total: 5, page: 1, limit: 1, totalPages: 5 } })),
     };
     authStoreMock = {
       currentUser: vi.fn().mockReturnValue({ id: 'u1' } as User),
@@ -84,6 +90,7 @@ describe('SprintList', () => {
         provideRouter([]),
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         { provide: SprintClient, useValue: sprintClientMock },
+        { provide: TaskClient, useValue: taskClientMock },
         { provide: AuthStore, useValue: authStoreMock },
         {
           provide: ProjectStore,
@@ -92,7 +99,7 @@ describe('SprintList', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(SprintList);
+    fixture = TestBed.createComponent(SprintList);
 
     if (projectId) {
       fixture.componentRef.setInput('projectKey', projectId);
@@ -158,6 +165,7 @@ describe('SprintList', () => {
           provideRouter([]),
           { provide: API_BASE_URL, useValue: 'http://localhost/api' },
           { provide: SprintClient, useValue: sprintClientMock },
+          { provide: TaskClient, useValue: taskClientMock },
           { provide: AuthStore, useValue: authStoreMock },
           { provide: ProjectStore, useValue: { activeProject: () => null, projectRole: () => null } },
         ],
@@ -252,6 +260,62 @@ describe('SprintList', () => {
       submit(component.newSprintForm);
 
       expect(component.loading()).toBe(false);
+    });
+  });
+
+  // ── Backlog group & overdue flag (DEC-029 / DEC-039) ──────
+
+  describe('backlog group', () => {
+    beforeEach(() => setup('p1'));
+
+    it('should fetch the backlog task count with sprintId null', () => {
+      expect(taskClientMock.list).toHaveBeenCalledWith('p1', { sprintId: null, limit: 1 });
+    });
+
+    it('should expose the backlog count from the pagination total', () => {
+      expect(component.backlogCount()).toBe(5);
+    });
+
+    it('should make the group header the backlog link with no nested row (DR-6)', async () => {
+      for (let i = 0; i < 20 && component.sprints().length === 0; i++) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const backlogLinks = Array.from(el.querySelectorAll<HTMLAnchorElement>('a')).filter((a) =>
+        (a.getAttribute('href') ?? '').includes('sprints/backlog'),
+      );
+
+      expect(backlogLinks).toHaveLength(1);
+      expect(backlogLinks[0].textContent).toContain('sprints.backlog');
+      expect(el.textContent).not.toContain('sprints.viewBacklog');
+    });
+  });
+
+  describe('overdue indicator', () => {
+    beforeEach(() => setup('p1'));
+
+    it('should flag an ACTIVE sprint whose endDate is in the past', () => {
+      const overdue = component.isSprintOverdue({
+        ...mockSprints[0],
+        status: 'ACTIVE',
+        endDate: '2000-01-01T00:00:00Z',
+      });
+
+      expect(overdue).toBe(true);
+    });
+
+    it('should not flag an ACTIVE sprint with a future endDate', () => {
+      expect(component.isSprintOverdue({ ...mockSprints[0], status: 'ACTIVE', endDate: '2099-02-01T00:00:00Z' })).toBe(
+        false,
+      );
+    });
+
+    it('should not flag non-ACTIVE sprints even with a past endDate', () => {
+      expect(component.isSprintOverdue({ ...mockSprints[1], status: 'FUTURE', endDate: '2000-01-01T00:00:00Z' })).toBe(
+        false,
+      );
     });
   });
 

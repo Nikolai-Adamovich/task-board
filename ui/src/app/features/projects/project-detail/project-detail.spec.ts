@@ -1,27 +1,32 @@
 /**
- * Tests for the ProjectDetail component.
+ * Tests for the ProjectDetail overview (spec S9, DEC-034).
  *
  * Covers:
- * - Loading project and boards on init
- * - createBoard validation & submission (v5 shape with type)
- * - Dialog state changes
+ * - Loading project/boards/sprints/statuses/tasks resources
+ * - Active-sprint computed
+ * - Status-count computation from per-status totals
+ * - Recent-tasks selection
+ * - Read-only banner keys for archived / deletion-pending projects
  * - isAdmin computed signal
- * - Lifecycle actions (archive/restore/delete/cancelDeletion)
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { submit } from '@angular/forms/signals';
+import { of } from 'rxjs';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { ProjectDetail } from './project-detail';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
+import { SprintClient } from '@services/sprint-client';
+import { StatusClient } from '@services/status-client';
+import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
+import { PreferencesStore } from '@stores/preferences-store';
+import { TenantStore } from '@stores/tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Project, Board } from '@task-board/shared';
+import type { Project, Board, Sprint, Status, Task } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockProject: Project = {
@@ -39,295 +44,228 @@ const mockProject: Project = {
   updatedAt: NOW,
 };
 const mockBoards: Board[] = [
+  { id: 'b1', projectId: mockProject.id, name: 'Board 1', type: 'KANBAN', columns: [], createdAt: NOW, updatedAt: NOW },
+  { id: 'b2', projectId: mockProject.id, name: 'Board 2', type: 'SPRINT', columns: [], createdAt: NOW, updatedAt: NOW },
+];
+const mockSprints: Sprint[] = [
   {
-    id: 'b1',
+    id: 'sp1',
     projectId: mockProject.id,
-    name: 'Board 1',
-    type: 'KANBAN',
-    columns: [],
+    name: 'Sprint 1',
+    status: 'ACTIVE',
+    startDate: '2025-01-01',
+    endDate: '2025-01-14',
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
+];
+const mockStatuses: Status[] = [
+  {
+    id: 's1',
+    projectId: mockProject.id,
+    name: 'TODO',
+    normalizedName: 'todo',
+    position: 0,
     createdAt: NOW,
     updatedAt: NOW,
   },
   {
-    id: 'b2',
+    id: 's2',
     projectId: mockProject.id,
-    name: 'Board 2',
-    type: 'SPRINT',
-    columns: [],
+    name: 'DONE',
+    normalizedName: 'done',
+    position: 1,
     createdAt: NOW,
     updatedAt: NOW,
   },
 ];
 
-describe('ProjectDetail', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let component: any;
-  let projectClientMock: {
-    getById: ReturnType<typeof vi.fn>;
-    archive: ReturnType<typeof vi.fn>;
-    restore: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
-    cancelDeletion: ReturnType<typeof vi.fn>;
+function makeTask(number_: number): Task {
+  return {
+    id: `task-${number_}`,
+    projectId: mockProject.id,
+    number: number_,
+    typeId: 't1',
+    title: `Task ${number_}`,
+    description: null,
+    statusId: 's1',
+    priority: 'MEDIUM',
+    reporterId: null,
+    reporterSnapshot: null,
+    assigneeId: null,
+    assigneeSnapshot: null,
+    sprintId: null,
+    labelIds: [],
+    createdById: 'u1',
+    createdBySnapshot: { displayName: 'User One' },
+    version: 1,
+    createdAt: NOW,
+    updatedAt: NOW,
   };
-  let boardClientMock: {
-    list: ReturnType<typeof vi.fn>;
-    create: ReturnType<typeof vi.fn>;
-  };
-  let authStoreMock: {
-    tenantRole: ReturnType<typeof vi.fn>;
-    isAuthenticated: () => boolean;
-    currentUser: () => null;
-    token: () => null;
-  };
+}
 
-  function setup() {
-    projectClientMock = {
-      getById: vi.fn().mockReturnValue(of(mockProject)),
-      archive: vi.fn().mockReturnValue(of({ success: true })),
-      restore: vi.fn().mockReturnValue(of({ success: true })),
-      delete: vi.fn().mockReturnValue(of({ success: true })),
-      cancelDeletion: vi.fn().mockReturnValue(of({ success: true })),
-    };
-    boardClientMock = {
-      list: vi.fn().mockReturnValue(of(mockBoards)),
-      create: vi.fn().mockReturnValue(of({ ...mockBoards[0], id: 'b3', name: 'New Board' })),
-    };
-    authStoreMock = {
-      tenantRole: vi.fn().mockReturnValue('OWNER'),
-      isAuthenticated: () => false,
-      currentUser: () => null,
-      token: () => null,
-    };
-    TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: API_BASE_URL, useValue: 'http://localhost/api' },
-        { provide: ProjectClient, useValue: projectClientMock },
-        { provide: BoardClient, useValue: boardClientMock },
-        { provide: AuthStore, useValue: authStoreMock },
-        { provide: ProjectStore, useValue: { activeProject: () => ({ id: mockProject.id }), projectRole: () => null } },
-      ],
-    });
+const mockRecentTasks = [makeTask(3), makeTask(2), makeTask(1)];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let component: any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let fixture: any;
+let projectClientMock: Record<string, ReturnType<typeof vi.fn>>;
+let boardClientMock: Record<string, ReturnType<typeof vi.fn>>;
+let sprintClientMock: Record<string, ReturnType<typeof vi.fn>>;
+let statusClientMock: Record<string, ReturnType<typeof vi.fn>>;
+let taskClientMock: Record<string, ReturnType<typeof vi.fn>>;
 
-    const fixture = TestBed.createComponent(ProjectDetail);
+function paginated(data: unknown[], total = data.length) {
+  return of({ data, pagination: { page: 1, limit: 30, total, totalPages: 1 } });
+}
 
-    fixture.componentRef.setInput('projectKey', mockProject.key);
-
-    component = fixture.componentInstance;
+/** Poll until the condition holds (async resources resolve on microtasks/timers) */
+async function until(condition: () => boolean): Promise<void> {
+  for (let i = 0; i < 200 && !condition(); i++) {
     fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
+  fixture.detectChanges();
+}
 
-  // ── Loading on init ─────────────────────────────────────────────────────
+function setup(options: { tenantRole?: string; projectStatus?: Project['status'] } = {}) {
+  const project = options.projectStatus ? { ...mockProject, status: options.projectStatus } : mockProject;
 
-  describe('ngOnInit', () => {
-    beforeEach(() => setup());
+  projectClientMock = { getById: vi.fn().mockReturnValue(of(project)) };
+  boardClientMock = { list: vi.fn().mockReturnValue(of(mockBoards)) };
+  sprintClientMock = { list: vi.fn().mockReturnValue(of(mockSprints)) };
+  statusClientMock = { list: vi.fn().mockReturnValue(of(mockStatuses)) };
+  taskClientMock = {
+    list: vi.fn((_projectId: string, query: Record<string, unknown> = {}) => {
+      if (query.statusId === 's1') return paginated([], 5);
+      if (query.statusId === 's2') return paginated([], 2);
+      if (query.limit === 5) return paginated(mockRecentTasks);
 
-    it('should call projectClient.getById with projectId', () => {
-      expect(projectClientMock.getById).toHaveBeenCalledWith(mockProject.id);
-    });
+      return paginated([]);
+    }),
+  };
 
-    it('should populate the project signal', () => {
-      expect(component.project()).toEqual(mockProject);
-    });
-
-    it('should load boards for the project', () => {
-      expect(boardClientMock.list).toHaveBeenCalledWith(mockProject.id);
-      expect(component.boards()).toEqual(mockBoards);
-    });
-
-    it('should set loading to false', () => {
-      expect(component.loading()).toBe(false);
-    });
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      provideRouter([]),
+      { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+      { provide: ProjectClient, useValue: projectClientMock },
+      { provide: BoardClient, useValue: boardClientMock },
+      { provide: SprintClient, useValue: sprintClientMock },
+      { provide: StatusClient, useValue: statusClientMock },
+      { provide: TaskClient, useValue: taskClientMock },
+      { provide: AuthStore, useValue: { tenantRole: vi.fn().mockReturnValue(options.tenantRole ?? 'OWNER') } },
+      // R3-P8: format tokens consumed by recent tasks / sprint dates
+      {
+        provide: PreferencesStore,
+        useValue: { datePipeFormat: () => 'yyyy-MM-dd', dateTimePipeFormat: () => 'yyyy-MM-dd HH:mm' },
+      },
+      {
+        provide: ProjectStore,
+        useValue: {
+          activeProject: vi.fn().mockReturnValue(project),
+          projectRole: vi.fn().mockReturnValue(null),
+          members: vi.fn().mockReturnValue([
+            { userId: 'u1', role: 'PROJECT_ADMIN', displayName: 'Ada Lovelace' },
+            { userId: 'u2', role: 'EDITOR', email: 'bob@example.com' },
+          ]),
+        },
+      },
+      { provide: TenantStore, useValue: { activeTenant: vi.fn().mockReturnValue({ slug: 'ws' }) } },
+    ],
   });
 
-  // ── createBoard ────────────────────────────────────────────────────────
+  fixture = TestBed.createComponent(ProjectDetail);
+  fixture.componentRef.setInput('projectKey', mockProject.key);
+  component = fixture.componentInstance;
+  fixture.detectChanges();
+}
 
-  describe('createBoard', () => {
-    beforeEach(() => setup());
+describe('ProjectDetail (overview)', () => {
+  it('should load the project and boards', async () => {
+    setup();
+    await until(() => component.project() !== null);
 
-    it('should not create board when name is empty', () => {
-      component.boardModel.update((m: { name: string; type: string }) => ({ ...m, name: '' }));
-      submit(component.createBoardForm);
-      expect(boardClientMock.create).not.toHaveBeenCalled();
-    });
-
-    it('should create board with v5 shape and add to list', () => {
-      component.boardModel.update((m: { name: string; type: string }) => ({ ...m, name: 'New Board' }));
-      submit(component.createBoardForm);
-
-      expect(boardClientMock.create).toHaveBeenCalledWith(mockProject.id, {
-        name: 'New Board',
-        type: 'KANBAN',
-        columns: [
-          { statusIds: [], position: 0 },
-          { statusIds: [], position: 1 },
-          { statusIds: [], position: 2 },
-        ],
-      });
-      expect(component.boards()).toHaveLength(3);
-      expect(component.showCreateBoard()).toBe(false);
-    });
-
-    it('should reset newBoard after creation', () => {
-      component.boardModel.update((m: { name: string; type: string }) => ({ ...m, name: 'New Board' }));
-      submit(component.createBoardForm);
-
-      expect(component.boardModel().name).toBe('');
-    });
-
-    it('should set creatingBoard to false on error', () => {
-      boardClientMock.create.mockReturnValueOnce(throwError(() => new Error('fail')));
-      component.boardModel.update((m: { name: string; type: string }) => ({ ...m, name: 'Fail Board' }));
-      submit(component.createBoardForm);
-
-      expect(component.loading()).toBe(false);
-    });
+    expect(projectClientMock.getById).toHaveBeenCalledWith(mockProject.id);
+    expect(component.project()?.name).toBe('Test Project');
+    expect(boardClientMock.list).toHaveBeenCalledWith(mockProject.id);
+    expect(component.boards()).toHaveLength(2);
   });
 
-  // ── Dialog state changes ───────────────────────────────────────────────
+  it('should expose the ACTIVE sprint', async () => {
+    setup();
+    await until(() => component.activeSprint() !== null);
 
-  describe('dialog state changes', () => {
-    beforeEach(() => setup());
-
-    it('should close create board dialog on closed state', () => {
-      component.showCreateBoard.set(true);
-      component.onDialogStateChange('closed');
-      expect(component.showCreateBoard()).toBe(false);
-    });
+    expect(sprintClientMock.list).toHaveBeenCalledWith(mockProject.id);
+    expect(component.activeSprint()?.name).toBe('Sprint 1');
   });
 
-  // ── isAdmin computed ───────────────────────────────────────────────────
+  it('should compute per-status totals from pagination.total', async () => {
+    setup();
+    await until(() => component.statusCounts().length > 0);
+
+    expect(component.statusCounts()).toEqual([
+      { status: mockStatuses[0], total: 5 },
+      { status: mockStatuses[1], total: 2 },
+    ]);
+    expect(component.totalTasks()).toBe(7);
+  });
+
+  it('should load recent tasks sorted by updatedAt desc', async () => {
+    setup();
+    await until(() => component.recentTasks().length > 0);
+
+    expect(taskClientMock.list).toHaveBeenCalledWith(mockProject.id, { limit: 5, sort: 'updatedAt:desc' });
+    expect(component.recentTasks()).toEqual(mockRecentTasks);
+  });
+
+  it('should show a read-only banner for archived projects', async () => {
+    setup({ projectStatus: 'ARCHIVED' });
+    await until(() => component.project() !== null);
+
+    expect(component.readOnlyBannerKey()).toBe('projectDetail.archivedBanner');
+  });
+
+  it('should show a read-only banner for deletion-pending projects', async () => {
+    setup({ projectStatus: 'DELETION_PENDING' });
+    await until(() => component.project() !== null);
+
+    expect(component.readOnlyBannerKey()).toBe('projectDetail.deletionPendingBanner');
+  });
+
+  it('should not show a banner for active projects', async () => {
+    setup();
+    await until(() => component.project() !== null);
+
+    expect(component.readOnlyBannerKey()).toBe('');
+  });
 
   describe('isAdmin', () => {
-    it('should be true when tenantRole is owner', () => {
-      setup();
-      expect(component.isAdmin()).toBe(true);
-    });
-
-    it('should be true when tenantRole is ADMIN', () => {
-      authStoreMock = {
-        tenantRole: vi.fn().mockReturnValue('ADMIN'),
-        isAuthenticated: () => false,
-        currentUser: () => null,
-        token: () => null,
-      };
-      projectClientMock = {
-        getById: vi.fn().mockReturnValue(of(mockProject)),
-        archive: vi.fn(),
-        restore: vi.fn(),
-        delete: vi.fn(),
-        cancelDeletion: vi.fn(),
-      };
-      boardClientMock = {
-        list: vi.fn().mockReturnValue(of(mockBoards)),
-        create: vi.fn(),
-      };
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
-        providers: [
-          provideHttpClient(),
-          provideHttpClientTesting(),
-          provideRouter([]),
-          { provide: API_BASE_URL, useValue: 'http://localhost/api' },
-          { provide: ProjectClient, useValue: projectClientMock },
-          { provide: BoardClient, useValue: boardClientMock },
-          { provide: AuthStore, useValue: authStoreMock },
-          {
-            provide: ProjectStore,
-            useValue: { activeProject: () => ({ id: mockProject.id }), projectRole: () => null },
-          },
-        ],
-      });
-
-      const fixture = TestBed.createComponent(ProjectDetail);
-
-      fixture.componentRef.setInput('projectKey', mockProject.key);
-
-      component = fixture.componentInstance;
-      fixture.detectChanges();
+    it('should be true for tenant OWNER', async () => {
+      setup({ tenantRole: 'OWNER' });
+      await until(() => component.project() !== null);
 
       expect(component.isAdmin()).toBe(true);
     });
 
-    it('should be false when tenantRole is MEMBER', () => {
-      authStoreMock = {
-        tenantRole: vi.fn().mockReturnValue('MEMBER'),
-        isAuthenticated: () => false,
-        currentUser: () => null,
-        token: () => null,
-      };
-      projectClientMock = {
-        getById: vi.fn().mockReturnValue(of(mockProject)),
-        archive: vi.fn(),
-        restore: vi.fn(),
-        delete: vi.fn(),
-        cancelDeletion: vi.fn(),
-      };
-      boardClientMock = {
-        list: vi.fn().mockReturnValue(of(mockBoards)),
-        create: vi.fn(),
-      };
-
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
-        providers: [
-          provideHttpClient(),
-          provideHttpClientTesting(),
-          provideRouter([]),
-          { provide: API_BASE_URL, useValue: 'http://localhost/api' },
-          { provide: ProjectClient, useValue: projectClientMock },
-          { provide: BoardClient, useValue: boardClientMock },
-          { provide: AuthStore, useValue: authStoreMock },
-          {
-            provide: ProjectStore,
-            useValue: { activeProject: () => ({ id: mockProject.id }), projectRole: () => null },
-          },
-        ],
-      });
-
-      const fixture = TestBed.createComponent(ProjectDetail);
-
-      fixture.componentRef.setInput('projectKey', mockProject.key);
-
-      component = fixture.componentInstance;
-      fixture.detectChanges();
+    it('should be false for tenant MEMBER without project role', async () => {
+      setup({ tenantRole: 'MEMBER' });
+      await until(() => component.project() !== null);
 
       expect(component.isAdmin()).toBe(false);
     });
   });
 
-  // ── Project Lifecycle ──────────────────────────────────────────────────
+  it('should build member initials from display name or email', async () => {
+    setup();
+    await until(() => component.project() !== null);
 
-  describe('project lifecycle', () => {
-    beforeEach(() => setup());
-
-    it('should archive project', () => {
-      component.archiveProject();
-      expect(projectClientMock.archive).toHaveBeenCalledWith(mockProject.id);
-      expect(component.project()?.status).toBe('ARCHIVED');
-    });
-
-    it('should restore project', () => {
-      component.restoreProject();
-      expect(projectClientMock.restore).toHaveBeenCalledWith(mockProject.id);
-      expect(component.project()?.status).toBe('ACTIVE');
-    });
-
-    it('should delete project', () => {
-      component.deleteProject();
-      expect(projectClientMock.delete).toHaveBeenCalledWith(mockProject.id);
-      expect(component.project()?.status).toBe('DELETION_PENDING');
-    });
-
-    it('should cancel deletion', () => {
-      component.cancelDeletion();
-      expect(projectClientMock.cancelDeletion).toHaveBeenCalledWith(mockProject.id);
-      expect(component.project()?.status).toBe('ACTIVE');
-    });
+    expect(component.memberInitials('Ada Lovelace', undefined)).toBe('AL');
+    expect(component.memberInitials(undefined, 'bob@example.com')).toBe('BO');
+    expect(component.memberInitials(undefined, undefined)).toBe('?');
   });
 });

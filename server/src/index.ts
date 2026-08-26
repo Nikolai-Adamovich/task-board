@@ -4,6 +4,12 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import type { AppEnv } from './types/context.js';
 import { connectMongo, runWithDb } from './db/mongo.js';
+import {
+  migrateInvitedMembershipsToRevoked,
+  renameSeedStatusNames,
+  backfillTenantSlugs,
+  ensureTenantSlugUniqueIndex,
+} from './db/migrations.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { authMiddleware } from './middleware/auth.js';
 import { tenantContextMiddleware } from './middleware/tenant-context.js';
@@ -47,6 +53,11 @@ app.use('*', async (c, next) => {
 // cache a single MongoClient.  Each request gets its own client, and
 // `runWithDb` makes the Db available to `getDb()` / `getCollection()`
 // via AsyncLocalStorage.
+
+// Idempotent data migrations run once per isolate on the first DB-backed
+// request (the flag is deployment-scoped, not request-scoped state).
+let migrationsRun = false;
+
 app.use('/api/*', async (c, next) => {
   const uri = c.env.MONGODB_URI;
 
@@ -54,7 +65,16 @@ app.use('/api/*', async (c, next) => {
     const { client, db } = await connectMongo(uri);
 
     try {
-      await runWithDb(db, () => next());
+      await runWithDb(db, async () => {
+        if (!migrationsRun) {
+          await migrateInvitedMembershipsToRevoked(db);
+          await renameSeedStatusNames(db); // DR-1 — raw seed-status keys → display names
+          await backfillTenantSlugs(db); // DEC-032 — must run before the unique slug index
+          await ensureTenantSlugUniqueIndex(db);
+          migrationsRun = true;
+        }
+        await next();
+      });
     } finally {
       client.close().catch(() => {
         /* swallow — socket may already be dead */

@@ -1,11 +1,11 @@
-<div class="mx-auto max-w-3xl">
+<div class="w-full px-6">
   <!-- Page header -->
   <div class="mb-6 flex items-center justify-between">
     <div class="flex items-center gap-3">
       <ng-icon name="lucideShield" class="size-6 text-foreground" />
       <h2 class="text-2xl font-bold text-foreground">{{ 'members.title' | transloco }}</h2>
     </div>
-    @if (canManage()) {
+    @if (canManage() && hasContext()) {
       <button hlmBtn (click)="showInviteDialog.set(true)">
         <ng-icon name="lucideUserPlus" class="mr-1" />
         {{ 'members.invite' | transloco }}
@@ -13,266 +13,39 @@
     }
   </div>
 
-  <div hlmTableContainer>
-    <table hlmTable>
-      <thead hlmTableHeader>
-        <tr hlmTableRow>
-          @for (col of columns; track col.field) {
-            <th hlmTableHead>
-              <div class="flex items-center gap-1">
-                <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort(col.field)">
-                  <span>{{ col.labelKey | transloco }}</span>
-                  <span class="inline-flex size-3 shrink-0">
-                    @if (sortField() === col.field) {
-                      <ng-icon
-                        [name]="sortDirection() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'"
-                        class="size-3"
-                      />
-                    }
-                  </span>
-                </button>
-                <hlm-popover sideOffset="4">
-                  <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon" class="size-6 shrink-0">
-                    <ng-icon name="lucideFilter" class="text-sm" [class.text-primary]="getFilterValue(col.field)" />
-                  </button>
-                  <hlm-popover-content *hlmPopoverPortal [class]="col.popoverWidth">
-                    <div class="flex flex-col gap-2">
-                      @if (col.filterType === 'text') {
-                        <input
-                          hlmInput
-                          type="text"
-                          class="h-8 w-full"
-                          [value]="getFilterValue(col.field)"
-                          (input)="onColumnFilterChange(col.field, $any($event.target).value)"
-                          [placeholder]="col.placeholderKey ? (col.placeholderKey | transloco) : ''"
-                        />
-                      } @else {
-                        <hlm-select
-                          [value]="getFilterValue(col.field)"
-                          (valueChange)="onColumnFilterChange(col.field, $any($event))"
-                        >
-                          <hlm-select-trigger class="w-full" size="sm">
-                            <hlm-select-value
-                              [placeholder]="col.selectAllLabelKey ? (col.selectAllLabelKey | transloco) : ''"
-                            />
-                          </hlm-select-trigger>
-                          <hlm-select-content *hlmSelectPortal>
-                            <hlm-select-group>
-                              <hlm-select-item value="">{{ col.selectAllLabelKey | transloco }}</hlm-select-item>
-                              @for (opt of col.selectOptions ?? []; track opt.value) {
-                                <hlm-select-item [value]="opt.value">{{ opt.labelKey | transloco }}</hlm-select-item>
-                              }
-                            </hlm-select-group>
-                          </hlm-select-content>
-                        </hlm-select>
-                      }
-                    </div>
-                  </hlm-popover-content>
-                </hlm-popover>
-              </div>
-            </th>
-          }
-          @if (canManage()) {
-            <th hlmTableHead class="text-right">{{ 'members.actions' | transloco }}</th>
-          }
-        </tr>
-      </thead>
-      <tbody hlmTableBody>
-        @for (member of paginatedMembers(); track member.userId ?? member.id) {
-          <tr hlmTableRow>
-            <td hlmTableCell>
-              <div class="flex items-center gap-3">
-                <hlm-avatar class="size-8">
-                  <div hlmAvatarFallback class="text-xs font-medium">
-                    {{ initials(member.displayName ?? member.email ?? '??') }}
-                  </div>
-                </hlm-avatar>
-                <span class="text-sm text-foreground">
-                  {{ member.displayName ?? member.email ?? 'Unknown' }}
-                </span>
-              </div>
-            </td>
-            <td hlmTableCell>
-              <span class="text-sm text-muted-foreground">
-                {{ member.email ?? '—' }}
-              </span>
-            </td>
-            <td hlmTableCell>
-              <span hlmBadge [variant]="roleBadgeVariant(member.role)">
-                {{ member.role }}
-              </span>
-            </td>
-            <td hlmTableCell>
-              @if (member.invitation?.status === InvitationStatus.PENDING) {
-                <span hlmBadge [variant]="memberStatusBadgeVariant('PENDING')">
-                  {{ 'members.pending' | transloco }}
-                </span>
-              } @else if (member.status === MemberStatus.ACTIVE) {
-                <span hlmBadge [variant]="memberStatusBadgeVariant(member.status)">
-                  {{ 'members.active' | transloco }}
-                </span>
-              } @else if (member.status === MemberStatus.ACCESS_REVOKED) {
-                <span hlmBadge [variant]="memberStatusBadgeVariant(member.status)">
-                  {{ 'members.accessRevoked' | transloco }}
-                </span>
-              } @else if (member.invitation?.status === InvitationStatus.DECLINED) {
-                <span hlmBadge [variant]="memberStatusBadgeVariant('DECLINED')">
-                  {{ 'members.declined' | transloco }}
-                </span>
-              } @else if (hasExpiredOrRevokedInvitation(member)) {
-                <span hlmBadge [variant]="memberStatusBadgeVariant('DECLINED')">
-                  {{ member.invitation?.status }}
-                </span>
-              }
-            </td>
-            @if (canManage()) {
-              <td hlmTableCell class="text-right">
-                @if (!isOwner(member)) {
-                  <div class="flex items-center justify-end gap-2">
-                    <hlm-native-select [value]="member.role" (valueChange)="changeRole(member, $event)" class="w-32">
-                      @for (role of roles; track role) {
-                        <option hlmNativeSelectOption [value]="role">{{ role }}</option>
-                      }
-                    </hlm-native-select>
-
-                    <!-- Restore membership button (for ACCESS_REVOKED members) -->
-                    @if (member.status === MemberStatus.ACCESS_REVOKED) {
-                      <button
-                        hlmBtn
-                        variant="ghost"
-                        size="sm"
-                        (click)="restoreMembership(member)"
-                        [disabled]="actioningUserId() === member.userId"
-                        [title]="'members.restoreAccess' | transloco"
-                      >
-                        @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="size-4" />
-                        } @else {
-                          <ng-icon name="lucideRotateCcw" class="size-4 text-green-600" />
-                        }
-                      </button>
-                    }
-
-                    <!-- Reinvite button (for expired/revoked invitations) -->
-                    @if (hasExpiredOrRevokedInvitation(member)) {
-                      <button
-                        hlmBtn
-                        variant="ghost"
-                        size="sm"
-                        (click)="reinviteMember(member)"
-                        [disabled]="actioningUserId() === member.userId"
-                        [title]="'members.reinvite' | transloco"
-                      >
-                        @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="size-4" />
-                        } @else {
-                          <ng-icon name="lucideMail" class="size-4 text-blue-600" />
-                        }
-                      </button>
-                    }
-
-                    <!-- Revoke access button (for active or pending members) -->
-                    @if (
-                      member.status === MemberStatus.ACTIVE || member.invitation?.status === InvitationStatus.PENDING
-                    ) {
-                      <button
-                        hlmBtn
-                        variant="ghost"
-                        size="sm"
-                        (click)="revokeAccess(member)"
-                        [disabled]="actioningUserId() === member.userId"
-                        [title]="'members.revokeAccess' | transloco"
-                      >
-                        @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="size-4" />
-                        } @else {
-                          <ng-icon name="lucideBan" class="size-4 text-orange-600" />
-                        }
-                      </button>
-                    }
-
-                    <!-- Resend invitation button (for pending members) -->
-                    @if (member.invitation?.status === InvitationStatus.PENDING) {
-                      <button
-                        hlmBtn
-                        variant="ghost"
-                        size="sm"
-                        (click)="resendInvitation(member)"
-                        [disabled]="actioningUserId() === member.userId"
-                        [title]="'members.resendInvitation' | transloco"
-                      >
-                        @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="size-4" />
-                        } @else {
-                          <ng-icon name="lucideRefreshCw" class="size-4 text-blue-600" />
-                        }
-                      </button>
-                    }
-
-                    <!-- Hard delete button (for access_revoked or declined) -->
-                    @if (
-                      member.status === MemberStatus.ACCESS_REVOKED ||
-                      member.invitation?.status === InvitationStatus.DECLINED
-                    ) {
-                      <button
-                        hlmBtn
-                        variant="ghost"
-                        size="sm"
-                        (click)="hardDeleteMember(member)"
-                        [disabled]="actioningUserId() === member.userId"
-                        [title]="'members.permanentlyDelete' | transloco"
-                      >
-                        @if (actioningUserId() === member.userId) {
-                          <hlm-spinner class="size-4" />
-                        } @else {
-                          <ng-icon name="lucideSkull" class="size-4 text-destructive" />
-                        }
-                      </button>
-                    }
-
-                    <!-- Remove member button (always for non-owner) -->
-                    <button
-                      hlmBtn
-                      variant="ghost"
-                      size="sm"
-                      (click)="removeMember(member)"
-                      [disabled]="removingUserId() === member.userId"
-                      [title]="'members.removeMember' | transloco"
-                    >
-                      @if (removingUserId() === member.userId) {
-                        <hlm-spinner class="size-4" />
-                      } @else {
-                        <ng-icon name="lucideTrash2" class="size-4 text-destructive" />
-                      }
-                    </button>
-                  </div>
-                }
-              </td>
-            }
-          </tr>
-        } @empty {
-          <tr hlmTableRow>
-            <td hlmTableCell [attr.colspan]="columns.length + (canManage() ? 1 : 0)" class="py-12 text-center">
-              <p class="text-sm text-muted-foreground">{{ 'members.noMembers' | transloco }}</p>
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </div>
-
-  <ui-pagination
+  <!-- Shared member table (U4) -->
+  <ui-member-table
+    variant="tenant"
+    [rows]="tableRows()"
+    [canManage]="canManage()"
+    [loading]="loading()"
+    [contextMissing]="!hasContext()"
+    [roles]="roles"
+    [busyUserId]="actioningUserId()"
+    [removingUserId]="removingUserId()"
     [page]="page()"
-    [totalPages]="totalPages()"
     [pageSize]="pageSize()"
     [total]="total()"
-    (pageChange)="onPageChange($event)"
-    (pageSizeChange)="onPageSizeChange($event)"
+    [totalPages]="totalPages()"
+    [sortField]="sortField()"
+    [sortDirection]="sortDirection()"
+    [filters]="filterValues()"
+    (sortToggle)="table.toggleSort($event)"
+    (filterChange)="table.onColumnFilterChange($event.field, $event.value)"
+    (pageChange)="table.onPageChange($event)"
+    (pageSizeChange)="table.onPageSizeChange($event)"
+    (roleChange)="changeRole($event.row, $event.role)"
+    (remove)="removeMember($event)"
+    (resend)="resendInvitation($event)"
+    (revoke)="revokeAccess($event)"
+    (restore)="restoreMembership($event)"
+    (reinvite)="reinviteMember($event)"
+    (hardDelete)="hardDeleteMember($event)"
   />
 
   <!-- Invite Member Dialog -->
   <hlm-dialog [state]="showInviteDialog() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
+    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'members.inviteTitle' | transloco }}</h3>
         <p hlmDialogDescription>{{ 'members.inviteDesc' | transloco }}</p>
@@ -302,9 +75,7 @@
           <label hlmFieldLabel for="invite-role">{{ 'members.role' | transloco }}</label>
           <hlm-native-select id="invite-role" [formField]="inviteForm.role">
             @for (role of roles; track role) {
-              @if (role !== TenantRole.OWNER) {
-                <option hlmNativeSelectOption [value]="role">{{ role }}</option>
-              }
+              <option hlmNativeSelectOption [value]="role">{{ role }}</option>
             }
           </hlm-native-select>
           @if (inviteForm.role().touched() && inviteForm.role().errors().length) {

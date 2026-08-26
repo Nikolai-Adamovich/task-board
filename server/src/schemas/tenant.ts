@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { TenantRoleValues, MemberStatusValues, TenantStatusValues } from '@task-board/shared';
+import {
+  TenantRoleValues,
+  MemberStatusValues,
+  TenantStatusValues,
+  TENANT_SLUG_MAX_LENGTH,
+  TENANT_SLUG_PATTERN,
+} from '@task-board/shared';
 import {
   uuid,
   nonEmptyString,
@@ -11,11 +17,25 @@ import {
 } from '../validators/common.js';
 
 /**
+ * Tenant slug validator (DEC-032): lowercase `[a-z0-9-]`, no leading/trailing
+ * hyphen, max 48 characters.
+ */
+export const tenantSlug = () =>
+  z
+    .string()
+    .max(TENANT_SLUG_MAX_LENGTH, `Slug must be at most ${TENANT_SLUG_MAX_LENGTH} characters`)
+    .regex(
+      TENANT_SLUG_PATTERN,
+      'Slug must contain only lowercase letters, numbers, and hyphens, and must start/end with an alphanumeric character',
+    );
+
+/**
  * Tenant (organization) entity schema.
  */
 export const TenantSchema = z.object({
   id: uuid(),
   name: nonEmptyString(200, 'Tenant name'),
+  slug: tenantSlug(),
   description: nullableOptionalString(500),
   status: z.enum(TenantStatusValues),
   deletionScheduledAt: nullableIsoDateTime(),
@@ -24,11 +44,20 @@ export const TenantSchema = z.object({
 });
 
 /**
- * Schema for creating a new tenant.
+ * Schema for creating a new tenant. The slug is optional — it is generated
+ * from the name when omitted (DEC-032).
  */
 export const CreateTenantSchema = z.object({
   name: nonEmptyString(200, 'Tenant name'),
+  slug: tenantSlug().optional(),
   description: optionalString(500),
+});
+
+/**
+ * Query schema for GET /tenants/slug-available (DEC-032).
+ */
+export const SlugAvailableQuerySchema = z.object({
+  slug: z.string().min(1),
 });
 
 /**

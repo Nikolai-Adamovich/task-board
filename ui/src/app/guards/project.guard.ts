@@ -12,6 +12,9 @@ const BYPASS_TENANT_ROLES: TenantRoleType[] = [TenantRole.OWNER, TenantRole.ADMI
 /**
  * Functional route guard that ensures the user has access to a project.
  *
+ * The tenant is resolved by slug from the `/t/:tenantSlug` URL prefix (DEC-032);
+ * the project is resolved by its human-readable key.
+ *
  * Access is granted when:
  * 1. The user's tenant role is OWNER or ADMIN (bypass — stores PROJECT_ADMIN), OR
  * 2. The user has a project membership with PROJECT_ADMIN, EDITOR, or VIEWER role.
@@ -23,22 +26,22 @@ export const projectGuard: CanActivateFn = async (route) => {
   const authStore = inject(AuthStore);
   const projectStore = inject(ProjectStore);
   const router = inject(Router);
-  const tenantId = route.paramMap.get('tenantId');
+  const tenantSlug = route.paramMap.get('tenantSlug');
   const projectKey = route.paramMap.get('projectKey');
 
-  if (!tenantId || !projectKey) {
+  if (!tenantSlug || !projectKey) {
     return router.parseUrl('/');
   }
 
   const activeTenant = tenantStore.activeTenant();
 
-  if (!activeTenant || activeTenant.id !== tenantId) {
+  if (!activeTenant || activeTenant.slug !== tenantSlug) {
     return router.parseUrl('/');
   }
 
-  // Load project context by key
+  // Load project context by key within the active tenant
   try {
-    await projectStore.loadProjectByKey(tenantId, projectKey);
+    await projectStore.loadProjectByKey(activeTenant.id, projectKey);
   } catch {
     // Project not found or inaccessible — clear and redirect
     projectStore.clearProject();

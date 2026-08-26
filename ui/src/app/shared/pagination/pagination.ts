@@ -16,8 +16,14 @@ export class Pagination {
   readonly pageSizes = input<number[]>([10, 20, 30, 50, 70, 100]);
   /** Whether first/last edge buttons are shown. */
   readonly showEdges = input<boolean>(true, { transform: booleanAttribute });
+  /** Whether an "Auto" entry (viewport-derived size) is offered in the selector. */
+  readonly autoEnabled = input<boolean>(false, { transform: booleanAttribute });
+  /** Whether the Auto option is currently active. */
+  readonly isAuto = input<boolean>(false, { transform: booleanAttribute });
   readonly pageChange = output<number>();
   readonly pageSizeChange = output<number>();
+  /** Emitted when the user selects the Auto option. */
+  readonly autoPageSizeChange = output();
 
   protected onCurrentPageChange(newPage: number): void {
     this.pageChange.emit(newPage);

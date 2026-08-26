@@ -23,6 +23,7 @@ function makePrefs(overrides: Partial<UserProjectBoardPreference> = {}): UserPro
     userId: 'user-1',
     projectId: 'project-1',
     defaultBoardId: 'board-1',
+    taskTableColumns: null,
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:00:00.000Z',
     ...overrides,

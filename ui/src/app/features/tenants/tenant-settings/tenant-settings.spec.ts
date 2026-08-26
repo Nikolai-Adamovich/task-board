@@ -25,6 +25,7 @@ const NOW = '2025-01-01T00:00:00Z';
 const mockTenant: TenantWithRole = {
   id: 't1',
   name: 'Acme',
+  slug: 'acme',
   description: null,
   status: 'ACTIVE',
   deletionScheduledAt: null,

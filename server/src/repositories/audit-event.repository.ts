@@ -34,6 +34,12 @@ export interface AuditQueryOptions {
   limit?: number;
   entityType?: string;
   entityId?: string;
+  /** R3-P7: filter by action (CREATED | UPDATED | DELETED) */
+  action?: string;
+  /** R3-P7: filter by actor user id */
+  actorId?: string;
+  /** R3-P7: sort by createdAt — defaults to 'desc' */
+  sort?: 'asc' | 'desc';
 }
 
 export interface PaginatedResult<T> {
@@ -69,34 +75,40 @@ export class AuditEventRepository {
   }
 
   async findByProject(projectId: string, options: AuditQueryOptions = {}): Promise<PaginatedResult<AuditEvent>> {
-    const { page = 1, limit = 20, entityType, entityId } = options;
+    const { page = 1, limit = 20 } = options;
     const query: Record<string, unknown> = { projectId };
 
-    if (entityType) query.entityType = entityType;
-    if (entityId) query.entityId = entityId;
+    this.applyFilters(query, options);
 
-    const skip = (page - 1) * limit;
-    const [docs, total] = await Promise.all([
-      this.collection.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray(),
-      this.collection.countDocuments(query),
-    ]);
-
-    return {
-      data: docs.map(toDomain),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return this.runQuery(query, options, page, limit);
   }
 
   async findByTenant(tenantId: string, options: AuditQueryOptions = {}): Promise<PaginatedResult<AuditEvent>> {
-    const { page = 1, limit = 20, entityType, entityId } = options;
+    const { page = 1, limit = 20 } = options;
     const query: Record<string, unknown> = { tenantId };
 
-    if (entityType) query.entityType = entityType;
-    if (entityId) query.entityId = entityId;
+    this.applyFilters(query, options);
 
+    return this.runQuery(query, options, page, limit);
+  }
+
+  private applyFilters(query: Record<string, unknown>, options: AuditQueryOptions): void {
+    if (options.entityType) query.entityType = options.entityType;
+    if (options.entityId) query.entityId = options.entityId;
+    if (options.action) query.action = options.action;
+    if (options.actorId) query['actor.userId'] = options.actorId;
+  }
+
+  private async runQuery(
+    query: Record<string, unknown>,
+    options: AuditQueryOptions,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResult<AuditEvent>> {
+    const direction = options.sort === 'asc' ? 1 : -1;
     const skip = (page - 1) * limit;
     const [docs, total] = await Promise.all([
-      this.collection.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray(),
+      this.collection.find(query).sort({ createdAt: direction }).skip(skip).limit(limit).toArray(),
       this.collection.countDocuments(query),
     ]);
 

@@ -1,4 +1,5 @@
 import { Component, inject, input, signal, OnInit, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TaskClient } from '@services/task-client';
 import { PriorityDotColorMap, NeutralDotColor } from '@app/constants/priority';
@@ -10,13 +11,16 @@ import type { Task, Sprint } from '@task-board/shared';
 
 @Component({
   selector: 'ui-sprint-backlog',
-  imports: [TranslocoPipe, HlmButtonImports, HlmSpinnerImports, HlmCardImports],
+  imports: [TranslocoPipe, RouterLink, HlmButtonImports, HlmSpinnerImports, HlmCardImports],
   templateUrl: './sprint-backlog.html',
 })
 export class SprintBacklog implements OnInit {
   private readonly taskClient = inject(TaskClient);
   readonly projectId = input.required<string>();
   readonly targetSprint = input<Sprint | null>(null);
+  /** When set, task titles link to the canonical task URL (DEC-032) */
+  readonly projectKey = input('');
+  readonly tenantSlug = input('');
   readonly taskAdded = output<string>();
   protected readonly backlogTasks = signal<Task[]>([]);
   protected readonly loading = signal(true);

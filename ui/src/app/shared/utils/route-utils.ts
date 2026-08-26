@@ -1,21 +1,21 @@
 import { ActivatedRoute } from '@angular/router';
 
 /**
- * Find the `tenantId` path parameter by walking **up** the route tree.
+ * Find the `tenantSlug` path parameter by walking **up** the route tree.
  *
  * Path params are NOT inherited downwards by default (`paramsInheritanceStrategy:
  * 'emptyOnly'`), so each ancestor segment must be checked individually — walking
  * to the root and reading its paramMap would return nothing.
  *
- * All tenant-scoped routes live under `/tenants/:tenantId`.
+ * All tenant-scoped routes live under `/t/:tenantSlug` (DEC-032).
  */
-export function getTenantId(route: ActivatedRoute): string {
+export function getTenantSlug(route: ActivatedRoute): string {
   let current: ActivatedRoute | null = route;
 
   while (current) {
-    const tenantId = current.snapshot.paramMap.get('tenantId');
+    const tenantSlug = current.snapshot.paramMap.get('tenantSlug');
 
-    if (tenantId) return tenantId;
+    if (tenantSlug) return tenantSlug;
 
     current = current.parent;
   }

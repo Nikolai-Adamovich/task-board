@@ -5,17 +5,58 @@
 } @else if (board(); as b) {
   <div class="flex h-full flex-col">
     <!-- Board header -->
-    <div class="mb-4 flex items-center justify-between">
-      <div>
+    <div class="mb-4 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
         <h2 class="text-xl font-bold text-foreground">{{ b.name }}</h2>
-        <p class="text-xs text-muted-foreground">{{ b.type }}</p>
+        <!-- Sprint scope chip (DEC-038) -->
+        @if (sprintId()) {
+          <span hlmBadge variant="secondary" class="gap-1 py-1 pl-2">
+            {{ 'boardView.sprintChip' | transloco: { name: selectedSprintName() } }}
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon-xs"
+              class="size-4"
+              [attr.aria-label]="'boardView.clearSprint' | transloco"
+              [attr.title]="'boardView.clearSprint' | transloco"
+              (click)="onSprintSelect('')"
+            >
+              <ng-icon name="lucideX" />
+            </button>
+          </span>
+        }
       </div>
-      @if (canCreateTask()) {
-        <button hlmBtn size="sm" (click)="showCreateTask.set(true)">
-          <ng-icon name="lucidePlus" class="mr-1" />
-          {{ 'boardView.newTask' | transloco }}
-        </button>
-      }
+      <div class="flex items-center gap-3">
+        <!-- Sprint selector (DEC-038): writes ?sprintId= which scopes the task query -->
+        <hlm-select
+          [value]="sprintId() ?? ''"
+          (valueChange)="onSprintSelect($any($event))"
+          [itemToString]="sprintItemToString"
+        >
+          <hlm-select-trigger class="w-52" size="sm">
+            <hlm-select-value [placeholder]="'boardView.allTasks' | transloco" />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-group>
+              <hlm-select-item value="">{{ 'boardView.allTasks' | transloco }}</hlm-select-item>
+              @for (sprint of sprints(); track sprint.id) {
+                <hlm-select-item [value]="sprint.id">
+                  <span class="flex items-center gap-2">
+                    {{ sprint.name }}
+                    <span hlmBadge variant="outline" class="text-[10px] uppercase">{{ sprint.status }}</span>
+                  </span>
+                </hlm-select-item>
+              }
+            </hlm-select-group>
+          </hlm-select-content>
+        </hlm-select>
+        @if (canCreateTask()) {
+          <button hlmBtn size="sm" (click)="goToNewTask()">
+            <ng-icon name="lucidePlus" class="mr-1" />
+            {{ 'boardView.newTask' | transloco }}
+          </button>
+        }
+      </div>
     </div>
 
     <!-- Columns -->
@@ -38,13 +79,12 @@
             (cdkDropListDropped)="onTaskDrop($event, column)"
             class="flex flex-1 flex-col gap-2 overflow-y-auto p-2"
           >
+            <!-- Empty columns have no placeholder: the cdkDropList itself is the
+                 drop target (it keeps flex-1 height), so drops into an empty
+                 column still work and the preview lands at the top (index 0). -->
             @for (task of getTasksForColumn(column); track task.id) {
               <div cdkDrag [cdkDragData]="task">
                 <ui-task-card [task]="task" [projectKey]="projectKey()" (click)="goToTask(task)" />
-              </div>
-            } @empty {
-              <div class="flex items-center justify-center py-8 text-xs text-muted-foreground">
-                {{ 'boardView.noTasks' | transloco }}
               </div>
             }
           </div>
@@ -53,111 +93,9 @@
     </div>
   </div>
 
-  <!-- Create Task Modal -->
-  <hlm-dialog [state]="showCreateTask() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
-      <hlm-dialog-header>
-        <h3 hlmDialogTitle>{{ 'boardView.createTaskTitle' | transloco }}</h3>
-        <p hlmDialogDescription>{{ 'boardView.createTaskDesc' | transloco }}</p>
-      </hlm-dialog-header>
-
-      @if (error()) {
-        <hlm-alert variant="destructive" class="mb-4">
-          <div hlmAlertDescription>{{ error() | transloco }}</div>
-        </hlm-alert>
-      }
-
-      <form id="create-task-form" [formRoot]="newTaskForm" class="flex flex-col gap-4">
-        <hlm-field>
-          <label hlmFieldLabel for="task-title">{{ 'boardView.title' | transloco }}</label>
-          <input
-            hlmInput
-            id="task-title"
-            type="text"
-            [formField]="newTaskForm.title"
-            [placeholder]="'boardView.titlePlaceholder' | transloco"
-          />
-        </hlm-field>
-        <hlm-field>
-          <label hlmFieldLabel for="task-desc">{{ 'boardView.description' | transloco }}</label>
-          <textarea
-            hlmTextarea
-            id="task-desc"
-            [formField]="newTaskForm.description"
-            rows="3"
-            [placeholder]="'boardView.descriptionPlaceholder' | transloco"
-          ></textarea>
-        </hlm-field>
-        <hlm-field>
-          <label hlmFieldLabel for="task-priority">{{ 'boardView.priority' | transloco }}</label>
-          <hlm-select
-            [value]="model().priority"
-            (valueChange)="model.update((m) => ({ ...m, priority: $any($event) }))"
-          >
-            <hlm-select-trigger class="w-full" size="sm">
-              <hlm-select-value />
-            </hlm-select-trigger>
-            <hlm-select-content *hlmSelectPortal>
-              <hlm-select-group>
-                <hlm-select-item value="LOW">{{ 'priority.low' | transloco }}</hlm-select-item>
-                <hlm-select-item value="MEDIUM">{{ 'priority.medium' | transloco }}</hlm-select-item>
-                <hlm-select-item value="HIGH">{{ 'priority.high' | transloco }}</hlm-select-item>
-                <hlm-select-item value="CRITICAL">{{ 'priority.critical' | transloco }}</hlm-select-item>
-              </hlm-select-group>
-            </hlm-select-content>
-          </hlm-select>
-        </hlm-field>
-        <hlm-field>
-          <label hlmFieldLabel for="task-status">{{ 'boardView.status' | transloco }}</label>
-          <hlm-select
-            [value]="model().statusId"
-            (valueChange)="model.update((m) => ({ ...m, statusId: $any($event) }))"
-            [itemToString]="statusItemToString"
-          >
-            <hlm-select-trigger class="w-full" size="sm">
-              <hlm-select-value [placeholder]="'boardView.selectStatus' | transloco" />
-            </hlm-select-trigger>
-            <hlm-select-content *hlmSelectPortal>
-              <hlm-select-group>
-                @for (statusId of allStatusIds; track statusId) {
-                  <hlm-select-item [value]="statusId">{{ statusId }}</hlm-select-item>
-                }
-              </hlm-select-group>
-            </hlm-select-content>
-          </hlm-select>
-        </hlm-field>
-        <hlm-field>
-          <label hlmFieldLabel for="task-type">{{ 'boardView.type' | transloco }}</label>
-          <input
-            hlmInput
-            id="task-type"
-            type="text"
-            [formField]="newTaskForm.typeId"
-            [placeholder]="'boardView.typePlaceholder' | transloco"
-          />
-        </hlm-field>
-      </form>
-      <hlm-dialog-footer>
-        <button hlmBtn variant="outline" hlmDialogClose>{{ 'boardView.cancel' | transloco }}</button>
-        <button
-          hlmBtn
-          type="submit"
-          form="create-task-form"
-          [disabled]="newTaskForm().invalid() || newTaskForm().submitting()"
-        >
-          @if (newTaskForm().submitting()) {
-            <hlm-spinner /> {{ 'boardView.creating' | transloco }}
-          } @else {
-            {{ 'boardView.create' | transloco }}
-          }
-        </button>
-      </hlm-dialog-footer>
-    </hlm-dialog-content>
-  </hlm-dialog>
-
   <!-- Status Selection Dialog (for multi-status columns) -->
   <hlm-dialog [state]="showStatusSelect() ? 'open' : 'closed'" (stateChanged)="onStatusSelectDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal>
+    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
       <hlm-dialog-header>
         <h3 hlmDialogTitle>{{ 'boardView.selectStatus' | transloco }}</h3>
         <p hlmDialogDescription>{{ 'boardView.selectStatusDesc' | transloco }}</p>

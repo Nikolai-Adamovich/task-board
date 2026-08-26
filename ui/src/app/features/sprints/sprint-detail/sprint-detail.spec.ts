@@ -9,7 +9,10 @@
  * - Status transitions
  * - Delete sprint
  */
-import { TestBed } from '@angular/core/testing';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router, ActivatedRoute } from '@angular/router';
@@ -19,6 +22,7 @@ import { SprintDetail } from './sprint-detail';
 import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
+import { ProjectRefStore } from '@stores/project-ref-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { NeutralDotColor } from '@app/constants/priority';
 import type { Sprint, Task, User } from '@task-board/shared';
@@ -82,10 +86,12 @@ const mockSprintTasks: Task[] = [
 describe('SprintDetail', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  let fixture: ComponentFixture<SprintDetail>;
   let sprintClientMock: {
     getById: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
+    list: ReturnType<typeof vi.fn>;
   };
   let taskClientMock: { list: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
   let authStoreMock: {
@@ -95,20 +101,35 @@ describe('SprintDetail', () => {
     tenantRole: () => string | null;
   };
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
+  const refStoreMock = {
+    ensure: vi.fn(),
+    invalidate: vi.fn(),
+    options: vi.fn((_pid: string, kind: string) =>
+      kind === 'statuses'
+        ? [
+            { id: 's1', name: 'TODO' },
+            { id: 's2', name: 'DONE' },
+          ]
+        : [],
+    ),
+    nameMap: vi.fn(() => ({})),
+    nameOf: vi.fn(),
+  };
 
-  function setup(sprintOverrides: Partial<Sprint> = {}) {
+  function setup(sprintOverrides: Partial<Sprint> = {}, tasks: Task[] = mockSprintTasks) {
     const sprint = { ...mockSprint, ...sprintOverrides };
 
     sprintClientMock = {
       getById: vi.fn().mockReturnValue(of(sprint)),
       update: vi.fn().mockReturnValue(of({ ...sprint, status: 'COMPLETED' })),
       delete: vi.fn().mockReturnValue(of(undefined)),
+      list: vi.fn().mockReturnValue(of([{ ...mockSprint, id: 'sp-future', name: 'Future', status: 'FUTURE' }])),
     };
     taskClientMock = {
       list: vi
         .fn()
-        .mockReturnValue(of({ data: mockSprintTasks, pagination: { total: 2, page: 1, limit: 200, totalPages: 1 } })),
-      update: vi.fn().mockReturnValue(of(mockSprintTasks[0])),
+        .mockReturnValue(of({ data: tasks, pagination: { total: tasks.length, page: 1, limit: 200, totalPages: 1 } })),
+      update: vi.fn().mockReturnValue(of(tasks[0])),
     };
     authStoreMock = {
       currentUser: vi.fn().mockReturnValue({ id: 'u1' } as User),
@@ -131,6 +152,7 @@ describe('SprintDetail', () => {
         { provide: TaskClient, useValue: taskClientMock },
         { provide: AuthStore, useValue: authStoreMock },
         { provide: Router, useValue: routerMock },
+        { provide: ProjectRefStore, useValue: refStoreMock },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -141,13 +163,16 @@ describe('SprintDetail', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(SprintDetail);
+    fixture = TestBed.createComponent(SprintDetail);
 
     fixture.componentRef.setInput('sprintId', mockSprint.id);
 
     component = fixture.componentInstance;
     fixture.detectChanges();
   }
+
+  /** Tasks whose status is the project's final DONE status (`s2`). */
+  const doneTasks: Task[] = mockSprintTasks.map((t) => ({ ...t, statusId: 's2' }));
 
   // ── Loading ─────────────────────────────────────────────────────
 
@@ -177,6 +202,7 @@ describe('SprintDetail', () => {
         getById: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
         update: vi.fn(),
         delete: vi.fn(),
+        list: vi.fn(),
       };
       taskClientMock = { list: vi.fn(), update: vi.fn() };
       authStoreMock = {
@@ -242,6 +268,30 @@ describe('SprintDetail', () => {
     });
   });
 
+  // ── Overdue indicator (DEC-029) ─────────────────────────
+
+  describe('overdue indicator', () => {
+    beforeEach(() => setup());
+
+    it('should flag an ACTIVE sprint whose endDate is in the past', () => {
+      expect(component.isSprintOverdue({ ...mockSprint, status: 'ACTIVE', endDate: '2000-01-01T00:00:00Z' })).toBe(
+        true,
+      );
+    });
+
+    it('should not flag an ACTIVE sprint with a future endDate', () => {
+      expect(component.isSprintOverdue({ ...mockSprint, status: 'ACTIVE', endDate: '2099-01-01T00:00:00Z' })).toBe(
+        false,
+      );
+    });
+
+    it('should not flag non-ACTIVE sprints even with a past endDate', () => {
+      expect(component.isSprintOverdue({ ...mockSprint, status: 'COMPLETED', endDate: '2000-01-01T00:00:00Z' })).toBe(
+        false,
+      );
+    });
+  });
+
   describe('getPriorityDot', () => {
     beforeEach(() => setup());
 
@@ -284,11 +334,106 @@ describe('SprintDetail', () => {
       expect(component.availableTransitions).toEqual([{ label: 'Reopen Sprint', status: 'ACTIVE' }]);
     });
 
-    it('should call sprintClient.update on transitionSprint', () => {
-      setup({ status: 'ACTIVE' });
+    it('should call sprintClient.update on transitionSprint when no unfinished tasks remain', () => {
+      setup({ status: 'ACTIVE' }, doneTasks);
       component.transitionSprint('COMPLETED');
 
       expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'COMPLETED' });
+    });
+  });
+
+  // ── V4-11: Start must PATCH ACTIVE — never the hardcoded COMPLETED flow ──
+
+  describe('start sprint (V4-11 regression)', () => {
+    it('should PATCH status ACTIVE on Start and not move any tasks', () => {
+      setup({ status: 'FUTURE' }, mockSprintTasks); // unfinished tasks present
+      component.transitionSprint('ACTIVE');
+
+      expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'ACTIVE' });
+      expect(taskClientMock.update).not.toHaveBeenCalled();
+      expect(component.showDispositionDialog()).toBe(false);
+    });
+
+    it('should not open the disposition dialog on Start even with unfinished tasks', () => {
+      setup({ status: 'FUTURE' }, mockSprintTasks);
+      component.transitionSprint('ACTIVE');
+
+      expect(component.showDispositionDialog()).toBe(false);
+    });
+  });
+
+  // ── V1-7: completion disposition dialog ───────────────────────
+
+  describe('completion disposition (V1-7)', () => {
+    it('should compute unfinished tasks from the project final/DONE status', () => {
+      setup({ status: 'ACTIVE' });
+
+      expect(component.unfinishedTasks()).toHaveLength(2);
+      expect(component.finalStatusIds().has('s2')).toBe(true);
+    });
+
+    it('should open the disposition dialog instead of completing when unfinished tasks exist', () => {
+      setup({ status: 'ACTIVE' });
+      component.transitionSprint('COMPLETED');
+
+      expect(component.showDispositionDialog()).toBe(true);
+      expect(sprintClientMock.update).not.toHaveBeenCalled();
+    });
+
+    it('should complete directly when all tasks are done', () => {
+      setup({ status: 'ACTIVE' }, doneTasks);
+      component.transitionSprint('COMPLETED');
+
+      expect(component.showDispositionDialog()).toBe(false);
+      expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'COMPLETED' });
+    });
+
+    it('should bulk-move unfinished tasks to the backlog (default) then complete the sprint', () => {
+      setup({ status: 'ACTIVE' });
+      component.transitionSprint('COMPLETED'); // opens the dialog
+      component.completeSprint();
+
+      for (const task of mockSprintTasks) {
+        expect(taskClientMock.update).toHaveBeenCalledWith(task.id, { sprintId: null, version: task.version });
+      }
+      expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'COMPLETED' });
+      expect(component.showDispositionDialog()).toBe(false);
+    });
+
+    it('should move unfinished tasks to a chosen future sprint then complete', () => {
+      setup({ status: 'ACTIVE' });
+      component.transitionSprint('COMPLETED');
+      component.dispositionTarget.set('sp-future');
+      component.completeSprint();
+
+      for (const task of mockSprintTasks) {
+        expect(taskClientMock.update).toHaveBeenCalledWith(task.id, { sprintId: 'sp-future', version: task.version });
+      }
+      expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'COMPLETED' });
+    });
+
+    // ── V5-1: dialog copy must show the real count, not the raw placeholder ──
+
+    it('should pass the count param and use transloco interpolation syntax in all locales', () => {
+      setup({ status: 'ACTIVE' });
+
+      // The unit-test DOM cannot load translations, so assert the contract that
+      // fixed V5-1 directly: every locale's dispositionDesc uses transloco's
+      // `{{ count }}` interpolation (a bare `{count}` renders literally), and
+      // the component actually has 2 unfinished tasks to interpolate.
+      const i18nDir = join(dirname(fileURLToPath(import.meta.url)), '../../../../../public/assets/i18n');
+
+      for (const file of readdirSync(i18nDir)) {
+        const json = JSON.parse(readFileSync(join(i18nDir, file), 'utf8')) as {
+          sprintDetail: { dispositionDesc: string };
+        };
+
+        expect(file).toMatch(/\.json$/);
+        expect(json.sprintDetail.dispositionDesc).toContain('{{ count }}');
+        expect(json.sprintDetail.dispositionDesc).not.toMatch(/(^|[^{])\{count\}([^}]|$)/);
+      }
+
+      expect(component.unfinishedTasks().length).toBe(2);
     });
   });
 

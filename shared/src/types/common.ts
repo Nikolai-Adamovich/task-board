@@ -1,3 +1,5 @@
+import type { DateFormatPreference, TimeFormatPreference } from '../constants/date-format.js';
+
 /** Describes a single theme entry in the generated manifest. */
 export interface ThemeManifestItem {
   /** Unique theme identifier derived from the CSS filename (e.g., "light", "dark", "light1"). */
@@ -27,6 +29,10 @@ export interface UserPreferences {
   language: string;
   /** Default page size for paginated tables. */
   pageSize: number;
+  /** Preferred date display format (R3-P8). Null = not set. */
+  dateFormat: DateFormatPreference | null;
+  /** Preferred time display format (R3-P8). Null = not set. */
+  timeFormat: TimeFormatPreference | null;
   updatedAt: string;
 }
 
@@ -38,6 +44,10 @@ export interface UpdateUserPreferences {
   language?: string;
   /** Default page size for paginated tables. */
   pageSize?: number;
+  /** Preferred date display format (R3-P8). */
+  dateFormat?: DateFormatPreference | null;
+  /** Preferred time display format (R3-P8). */
+  timeFormat?: TimeFormatPreference | null;
 }
 
 /** Paginated response wrapper */
@@ -64,6 +74,7 @@ export interface PaginationParams {
 /** All error codes from the technical specification §14.3 */
 export type ErrorCode =
   | 'UNAUTHORIZED'
+  | 'INVALID_CREDENTIALS'
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'VALIDATION_ERROR'
@@ -82,6 +93,8 @@ export type ErrorCode =
   | 'PROJECT_KEY_IMMUTABLE'
   | 'TASK_TYPE_IN_USE'
   | 'STATUS_IN_USE'
+  | 'SLUG_TAKEN'
+  | 'INVALID_RESET_TOKEN'
   | 'INTERNAL_ERROR';
 
 /** Standard error response returned by API endpoints on failure */

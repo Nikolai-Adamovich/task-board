@@ -17,6 +17,22 @@ export class EmailService {
     this.frontendUrl = frontendUrl;
   }
 
+  async sendPasswordResetEmail(params: { to: string; resetUrl: string; expiresInMinutes: number }): Promise<void> {
+    const html = `
+      <h2>Password reset request</h2>
+      <p>We received a request to reset your password.</p>
+      <p><a href="${params.resetUrl}">Reset your password</a></p>
+      <p>This link is valid for ${params.expiresInMinutes} minutes and can only be used once. If you didn't request a password reset, you can safely ignore this email.</p>
+    `;
+
+    await this.resend.emails.send({
+      from: this.fromEmail,
+      to: params.to,
+      subject: 'Reset your password',
+      html,
+    });
+  }
+
   async sendInvitationEmail(params: {
     to: string;
     inviterName: string;
@@ -51,7 +67,16 @@ export class EmailService {
 }
 
 /* eslint-disable no-console -- ConsoleEmailService is a dev/test stub that intentionally logs instead of sending emails */
-export class ConsoleEmailService implements Pick<EmailService, 'sendEmail' | 'sendInvitationEmail'> {
+export class ConsoleEmailService implements Pick<
+  EmailService,
+  'sendEmail' | 'sendInvitationEmail' | 'sendPasswordResetEmail'
+> {
+  async sendPasswordResetEmail(params: { to: string; resetUrl: string; expiresInMinutes: number }): Promise<void> {
+    console.log(`[EMAIL] Password reset to ${params.to}`);
+    console.log(`  Reset URL: ${params.resetUrl}`);
+    console.log(`  Expires in: ${params.expiresInMinutes} minutes`);
+  }
+
   async sendInvitationEmail(params: {
     to: string;
     inviterName: string;

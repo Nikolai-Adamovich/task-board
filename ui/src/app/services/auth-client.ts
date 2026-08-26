@@ -2,7 +2,7 @@ import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { AuthResponse, LoginRequest, RegisterRequest, User } from '@task-board/shared';
+import type { AuthResponse, ForgotPasswordResponse, LoginRequest, RegisterRequest, User } from '@task-board/shared';
 
 /**
  * Pure HTTP client for auth endpoints — no state management.
@@ -24,6 +24,20 @@ export class AuthClient {
   register(data: RegisterRequest): Observable<AuthResponse> {
     return this.http
       .post<{ data: AuthResponse }>(`${this.apiBaseUrl}/auth/register`, data)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Request a password-reset link (neutral response regardless of account existence) */
+  forgotPassword(email: string): Observable<ForgotPasswordResponse> {
+    return this.http
+      .post<{ data: ForgotPasswordResponse }>(`${this.apiBaseUrl}/auth/forgot-password`, { email })
+      .pipe(map((res) => res.data));
+  }
+
+  /** Set a new password using a single-use reset token */
+  resetPassword(body: { token: string; newPassword: string }): Observable<{ message: string }> {
+    return this.http
+      .post<{ data: { message: string } }>(`${this.apiBaseUrl}/auth/reset-password`, body)
       .pipe(map((res) => res.data));
   }
 

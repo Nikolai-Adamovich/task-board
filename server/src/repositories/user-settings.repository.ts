@@ -1,4 +1,5 @@
 import type { Collection, ObjectId } from 'mongodb';
+import type { DateFormatPreference, TimeFormatPreference } from '@task-board/shared';
 
 // ─── MongoDB Document Shape ──────────────────────────────────────────────────
 
@@ -9,6 +10,10 @@ export interface UserSettingsDocument {
   theme: string;
   language: string;
   pageSize: number;
+  /** R3-P8: preferred date display format (null = not set). */
+  dateFormat: DateFormatPreference | null;
+  /** R3-P8: preferred time display format (null = not set). */
+  timeFormat: TimeFormatPreference | null;
   updatedAt: Date;
 }
 
@@ -20,6 +25,10 @@ export interface UserSettings {
   theme: string;
   language: string;
   pageSize: number;
+  /** R3-P8: preferred date display format (null = not set). */
+  dateFormat: DateFormatPreference | null;
+  /** R3-P8: preferred time display format (null = not set). */
+  timeFormat: TimeFormatPreference | null;
   updatedAt: string;
 }
 
@@ -28,6 +37,8 @@ export interface UpdateUserSettings {
   theme?: string;
   language?: string;
   pageSize?: number;
+  dateFormat?: DateFormatPreference | null;
+  timeFormat?: TimeFormatPreference | null;
 }
 
 const DEFAULTS = {
@@ -35,6 +46,8 @@ const DEFAULTS = {
   theme: 'light',
   language: 'en',
   pageSize: 20,
+  dateFormat: null,
+  timeFormat: null,
 };
 
 function toDomain(doc: UserSettingsDocument): UserSettings {
@@ -44,6 +57,8 @@ function toDomain(doc: UserSettingsDocument): UserSettings {
     theme: doc.theme,
     language: doc.language,
     pageSize: doc.pageSize ?? DEFAULTS.pageSize,
+    dateFormat: doc.dateFormat ?? DEFAULTS.dateFormat,
+    timeFormat: doc.timeFormat ?? DEFAULTS.timeFormat,
     updatedAt: doc.updatedAt.toISOString(),
   };
 }
@@ -74,7 +89,7 @@ export class UserSettingsRepository {
     const $set: Record<string, unknown> = { updatedAt: now };
     const $setOnInsert: Record<string, unknown> = { userId };
 
-    for (const key of ['zoom', 'theme', 'language', 'pageSize'] as const) {
+    for (const key of ['zoom', 'theme', 'language', 'pageSize', 'dateFormat', 'timeFormat'] as const) {
       if (patch[key] !== undefined) {
         $set[key] = patch[key];
       } else {

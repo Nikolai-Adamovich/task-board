@@ -27,7 +27,8 @@
     "taskTypes": "Typy zadań",
     "labels": "Etykiety",
     "audit": "Audyt",
-    "filters": "Filtry"
+    "filters": "Filtry",
+    "projectSettings": "Project settings"
   },
   "tenantSwitcher": {
     "selectWorkspace": "Wybierz przestrzeń roboczą",
@@ -95,6 +96,26 @@
       "invalidOrExpired": "Nieprawidłowe lub wygasłe zaproszenie.",
       "passwordsNotMatch": "Hasła nie są zgodne.",
       "failedAccept": "Nie udało się zaakceptować zaproszenia."
+    },
+    "forgotPassword": {
+      "title": "Forgot password?",
+      "description": "Enter your email address and we will send you a reset link.",
+      "sentTitle": "Check your inbox",
+      "sentMessage": "If an account exists for that address, we have sent a password reset link.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "description": "Choose a new password for your account.",
+      "missingToken": "This reset link is missing or invalid. Please request a new one.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Reset password",
+      "submitting": "Resetting…",
+      "backToLogin": "Back to sign in"
     }
   },
   "landing": {
@@ -182,15 +203,51 @@
     "title": "Utwórz swoją przestrzeń roboczą",
     "description": "Skonfiguruj przestrzeń roboczą, aby rozpocząć zarządzanie projektami.",
     "name": "Nazwa przestrzeni roboczej",
-    "slug": "Slug",
+    "slug": {
+      "label": "Workspace URL",
+      "checking": "Checking availability…",
+      "taken": "This URL is already taken",
+      "available": "This URL is available",
+      "hint": "Lowercase letters, numbers and hyphens only."
+    },
     "slugHint": "Używany w adresach URL. Tylko małe litery, cyfry i myślniki.",
-    "plan": "Plan subskrypcji",
+    "plan": {
+      "title": "Choose a plan",
+      "subtitle": "Every workspace starts on the Free plan.",
+      "cardTitle": "Free",
+      "price": "$0",
+      "perMonth": "per month",
+      "workspace": "1 workspace",
+      "projects": "Unlimited projects",
+      "users": "Unlimited users"
+    },
     "planFree": "Darmowy — Do 3 projektów i 5 użytkowników",
     "submit": "Utwórz przestrzeń roboczą",
     "submitting": "Tworzenie przestrzeni roboczej…",
     "failed": "Nie udało się utworzyć przestrzeni roboczej. Spróbuj ponownie.",
     "descriptionLabel": "Opis (opcjonalnie)",
-    "descriptionPlaceholder": "Krótki opis Twojej przestrzeni roboczej…"
+    "descriptionPlaceholder": "Krótki opis Twojej przestrzeni roboczej…",
+    "back": "Back",
+    "continue": "Continue",
+    "checkout": {
+      "title": "Checkout",
+      "subtitle": "Review your order before confirming.",
+      "summary": "Summary",
+      "planLabel": "Plan",
+      "planValue": "Free",
+      "workspaceLabel": "Workspace",
+      "urlLabel": "URL",
+      "totalLabel": "Total due today",
+      "totalValue": "$0",
+      "confirm": "Confirm & create workspace",
+      "confirming": "Confirming…",
+      "demoNote": "This is a demo — no payment is required."
+    },
+    "confirmation": {
+      "title": "Workspace created!",
+      "message": "Your workspace is ready. Invite your team and start planning.",
+      "success": "Everything went smoothly."
+    }
   },
   "settings": {
     "title": "Ustawienia",
@@ -200,7 +257,14 @@
     "zoomDescription": "Dostosuj rozmiar czcionki interfejsu.",
     "resetZoom": "Resetuj",
     "language": "Język",
-    "languageDescription": "Wybierz język wyświetlania."
+    "languageDescription": "Wybierz język wyświetlania.",
+    "dateFormat": "Format daty",
+    "dateFormatDescription": "Wybierz sposób wyświetlania dat w aplikacji.",
+    "timeFormat": "Format czasu",
+    "timeFormatDescription": "Wybierz sposób wyświetlania godzin w aplikacji.",
+    "timeFormat24h": "24-godzinny",
+    "timeFormat12h": "12-godzinny (AM/PM)",
+    "systemDefault": "System default"
   },
   "tenantSettings": {
     "title": "Ustawienia dzierżawy",
@@ -276,7 +340,12 @@
     "status": "Status",
     "actions": "Akcje",
     "restoreAccess": "Przywróć dostęp",
-    "reinvite": "Zaproś ponownie"
+    "reinvite": "Zaproś ponownie",
+    "contextError": "Members could not be loaded because the project context is unavailable.",
+    "editRole": "Edit role",
+    "editRoleTitle": "Edit member role",
+    "editRoleDesc": "Choose the role this member has in the project.",
+    "invitationPending": "Invitation pending"
   },
   "projects": {
     "title": "Projekty",
@@ -336,7 +405,22 @@
     "deleteProjectWarning": "Ta akcja zaplanuje projekt do usunięcia. Projekt zostanie trwale usunięty po 30-dniowym okresie karencji.",
     "deleteProjectConsequence": "Wszystkie zadania, tablice, sprinty i dane projektu zostaną trwale usunięte. Tej akcji nie można cofnąć.",
     "deleteProjectConfirmLabel": "Wpisz klucz projektu ({{key}}), aby potwierdzić usunięcie:",
-    "confirmDeleteButton": "Usuń projekt"
+    "confirmDeleteButton": "Usuń projekt",
+    "activeSprint": "Active sprint",
+    "deletionScheduledFor": "Deletion scheduled for {{date}}",
+    "goToSprints": "Go to sprints",
+    "goToTasks": "Go to tasks",
+    "manageBoards": "Manage boards",
+    "moreMembers": "+{{count}} more",
+    "noActiveSprint": "No active sprint",
+    "noTasks": "No tasks yet",
+    "openSprint": "Open sprint",
+    "recentTasks": "Recent tasks",
+    "settings": "Settings",
+    "taskSummary": "Task summary",
+    "totalTasks": "Total tasks",
+    "viewAllMembers": "View all members",
+    "viewAllTasks": "View all tasks"
   },
   "boardView": {
     "loading": "Ładowanie tablicy…",
@@ -357,8 +441,10 @@
     "selectStatus": "Wybierz status…",
     "type": "Typ",
     "typePlaceholder": "Wprowadź typ zadania…",
-    "noTasks": "Brak zadań w tej kolumnie",
-    "multiStatusHint": "Ta kolumna zawiera wiele statusów. Wybierz docelowy status dla tego zadania."
+    "multiStatusHint": "Ta kolumna zawiera wiele statusów. Wybierz docelowy status dla tego zadania.",
+    "allTasks": "All tasks",
+    "clearSprint": "Clear sprint filter",
+    "sprintChip": "Sprint: {{name}}"
   },
   "priority": {
     "low": "Niski",
@@ -400,7 +486,9 @@
     "conflictTitle": "Konflikt wersji",
     "conflictHint": "To zadanie zostało zmodyfikowane przez innego użytkownika. Przeładuj, aby uzyskać najnowszą wersję.",
     "reloadTask": "Przeładuj zadanie",
-    "unknown": "Nieznany"
+    "unknown": "Nieznany",
+    "editTitle": "Edit title",
+    "editDescription": "Edit description"
   },
   "sprints": {
     "title": "Sprinty",
@@ -423,9 +511,15 @@
     "createDesc": "Utwórz nowy sprint dla tego projektu.",
     "future": "Przyszłe",
     "active": "Aktywne",
-    "completed": "Ukończone"
+    "completed": "Ukończone",
+    "backlog": "Backlog",
+    "overdue": "Overdue",
+    "overdueTooltip": "This sprint is past its end date"
   },
   "sprintDetail": {
+    "dispositionTitle": "Zakończ sprint",
+    "dispositionDesc": "{{ count }} niedokończonych zadań zostanie przeniesionych do wybranego poniżej sprintu.",
+    "dispositionTarget": "Przenieś do sprintu",
     "loading": "Ładowanie sprintu…",
     "tasks": "Zadania",
     "backToProject": "Powrót do projektu",
@@ -439,13 +533,18 @@
     "deleteConfirm": "Czy na pewno chcesz usunąć ten sprint?",
     "deleteWarning": "Zadania w tym sprincie nie zostaną usunięte, ale zostaną usunięte ze sprintu.",
     "cancelDelete": "Anuluj",
-    "confirmDelete": "Usuń"
+    "confirmDelete": "Usuń",
+    "moveToBacklog": "Move to backlog",
+    "moveToSprint": "Move to sprint",
+    "completeAndMove": "Complete sprint & move tasks"
   },
   "sprintBacklog": {
     "backlog": "Backlog",
     "loading": "Ładowanie backlogu…",
     "allAssigned": "Wszystkie zadania są przypisane do sprintów.",
-    "addToSprint": "Dodaj do sprintu"
+    "addToSprint": "Dodaj do sprintu",
+    "title": "Backlog",
+    "description": "Tasks without a sprint live here. Move them into an active sprint to start work."
   },
   "docs": {
     "title": "Dokumentacja",
@@ -535,7 +634,8 @@
     "labelNameRequired": "Nazwa etykiety jest wymagana",
     "typeRequired": "Typ zadania jest wymagany",
     "statusRequired": "Status jest wymagany",
-    "priorityRequired": "Priorytet jest wymagany"
+    "priorityRequired": "Priorytet jest wymagany",
+    "titleMaxLength": "Title must be at most 200 characters"
   },
   "errors": {
     "unexpected": "Wystąpił nieoczekiwany błąd. Spróbuj ponownie.",
@@ -672,6 +772,9 @@
     "deleting": "Usuwanie…"
   },
   "taskTable": {
+    "columns": "Kolumny",
+    "selectColumns": "Wybierz kolumny…",
+    "hideColumn": "Ukryj tę kolumnę",
     "filtersDesc": "Filtruj zadania według statusu, priorytetu, przypisania i więcej.",
     "title": "Zadania",
     "searchPlaceholder": "Szukaj zadań…",
@@ -713,7 +816,19 @@
     "noAssignee": "Brak przypisanego",
     "allAssignees": "Wszyscy przypisani",
     "allReporters": "Wszyscy zgłaszający",
-    "allSprints": "Wszystkie sprinty"
+    "allSprints": "Wszystkie sprinty",
+    "activeFilters": "Active filters",
+    "clearFilters": "Clear all filters",
+    "filterSearch": "Search",
+    "filterStatus": "Status",
+    "filterType": "Type",
+    "filterPriority": "Priority",
+    "filterAssignee": "Assignee",
+    "filterReporter": "Reporter",
+    "filterSprint": "Sprint",
+    "filterLabel": "Label",
+    "noMatchingTasks": "No tasks match the current filters.",
+    "removeFilterAria": "Remove filter {{value}}"
   },
   "comments": {
     "title": "Komentarze",
@@ -774,9 +889,17 @@
     "deleteConfirm": "Czy na pewno chcesz usunąć ten zapisany filtr?",
     "cancelDelete": "Anuluj",
     "confirmDelete": "Usuń",
-    "deleteError": "Nie udało się usunąć filtra."
+    "deleteError": "Nie udało się usunąć filtra.",
+    "apply": "Apply"
   },
   "auditLog": {
+    "time": "Czas",
+    "actor": "Aktor",
+    "actionCol": "Akcja",
+    "entity": "Encja",
+    "changes": "Zmiany",
+    "allActions": "Wszystkie akcje",
+    "allActors": "Wszyscy aktorzy",
     "title": "Dziennik audytu",
     "loading": "Ładowanie zdarzeń audytu…",
     "noEvents": "Nie znaleziono zdarzeń audytu.",
@@ -810,7 +933,8 @@
     "results": "{{total}} wyników",
     "perPage": "na stronę",
     "totalItems": "wyników",
-    "pages": "stron"
+    "pages": "stron",
+    "auto": "Auto"
   },
   "states": {
     "archived": "Ten projekt jest zarchiwizowany.",
@@ -828,5 +952,79 @@
     "forbiddenDescription": "Nie masz uprawnień do przeglądania tej strony.",
     "goHome": "Przejdź do strony głównej",
     "goBack": "Wróć"
+  },
+  "projectSettings": {
+    "title": "Project settings",
+    "subtitle": "Configure boards, members and project details.",
+    "general": "General",
+    "generalDesc": "Basic information about this project.",
+    "adminOnly": "Only workspace admins can change these settings.",
+    "name": "Name",
+    "key": "Key",
+    "keyLockedHint": "The project key is permanent and cannot be changed.",
+    "description": "Description",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "creating": "Creating…",
+    "backToHub": "Back to settings hub",
+    "members": "Members",
+    "membersDesc": "Manage who has access to this project.",
+    "boards": "Boards",
+    "boardsDesc": "Create, rename and delete boards for this project.",
+    "newBoard": "New board",
+    "defaultBoard": "Default board",
+    "defaultBoardDeleteHint": "The default board cannot be deleted.",
+    "invalidStatusRefs": "Some columns reference statuses that no longer exist.",
+    "columnsCount": "{{count}} columns",
+    "rename": "Rename",
+    "renameBoardTitle": "Rename board",
+    "delete": "Delete",
+    "deleteBoardTitle": "Delete board",
+    "deleteBoardWarning": "This board will be permanently removed. Tasks are not deleted.",
+    "dangerZone": "Danger zone",
+    "dangerZoneDesc": "Irreversible actions for this project.",
+    "dangerDescription": "Archive or schedule this project for deletion.",
+    "taskTypes": "Typy zadań",
+    "taskTypesDesc": "Zdefiniuj typy zadań dostępne w tym projekcie.",
+    "statuses": "Statusy",
+    "statusesDesc": "Dostosuj statusy przepływu pracy w tym projekcie.",
+    "labels": "Etykiety",
+    "labelsDesc": "Twórz i zarządzaj etykietami do kategoryzacji zadań."
+  },
+  "taskCreate": {
+    "title": "Create task",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Short, descriptive summary",
+    "descriptionLabel": "Description",
+    "status": "Status",
+    "selectStatus": "Select status",
+    "priority": "Priority",
+    "type": "Type",
+    "selectType": "Select type",
+    "assignee": "Assignee",
+    "unassigned": "Unassigned",
+    "sprint": "Sprint",
+    "backlog": "Backlog",
+    "labels": "Labels",
+    "labelsPlaceholder": "Search or create label…",
+    "labelsHint": "Pick an existing label or type a new name to create one.",
+    "noLabelsFound": "No labels found",
+    "createLabel": "Create \"{{name}}\"",
+    "removeLabelAria": "Remove label {{name}}",
+    "cancel": "Cancel",
+    "create": "Create task",
+    "creating": "Creating…"
+  },
+  "tenantHome": {
+    "createProject": "Create project",
+    "manageMembers": "Manage members",
+    "myTasks": "My tasks",
+    "noTasks": "No tasks assigned to you",
+    "noTasksHint": "Tasks assigned to you across all your projects will show up here.",
+    "pendingInvitations": "Pending invitations",
+    "pendingInvitationsCount": "{{count}} pending",
+    "noPendingInvitations": "No pending invitations"
   }
 }

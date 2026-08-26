@@ -1,5 +1,5 @@
 <hlm-dialog [state]="state() ? 'open' : 'closed'" (stateChanged)="onStateChanged($event)">
-  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-md">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
     <hlm-dialog-header>
       <h3 hlmDialogTitle>{{ titleKey() | transloco: titleParams() }}</h3>
       @if (messageKey()) {

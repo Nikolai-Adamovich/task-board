@@ -34,6 +34,24 @@ export const AuthResponseSchema = z.object({
 });
 
 /**
+ * Schema for the forgot-password request body.
+ */
+export const ForgotPasswordSchema = z.object({
+  email: z.email({ message: 'Invalid email address', pattern: z.regexes.html5Email }),
+});
+
+/**
+ * Schema for the reset-password request body.
+ */
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  newPassword: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128, 'Password must be at most 128 characters'),
+});
+
+/**
  * Schema for accepting an invitation to join a tenant.
  */
 export const AcceptInvitationSchema = z.object({

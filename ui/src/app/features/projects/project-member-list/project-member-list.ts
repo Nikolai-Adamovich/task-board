@@ -1,17 +1,9 @@
-import { Component, inject, input, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, computed, inject, input, signal, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
-import {
-  lucideUserPlus,
-  lucideTrash2,
-  lucideSave,
-  lucideCheck,
-  lucideArrowUp,
-  lucideArrowDown,
-  lucideFilter,
-} from '@ng-icons/lucide';
+import { lucideUserPlus } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
 import { form, FormRoot, FormField, schema, required } from '@angular/forms/signals';
 import { ProjectClient } from '@services/project-client';
@@ -19,61 +11,43 @@ import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { canManageProject } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
-import { HlmSelectImports } from '@spartan-ng/helm/select';
-import { HlmBadgeImports } from '@spartan-ng/helm/badge';
-import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
-import { HlmTableImports } from '@spartan-ng/helm/table';
-import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { Pagination } from '@app/shared/pagination/pagination';
-import { ProjectRole } from '@task-board/shared';
-import type { ProjectMember } from '@task-board/shared';
-import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { MemberTable } from '@app/shared/member-table/member-table';
+import type { MemberRow } from '@app/shared/member-table/member-table';
+import { useMemberTable } from '@app/shared/member-list/member-table';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
-import { HlmAlertImports } from '@spartan-ng/helm/alert';
-import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
-import { useMemberTable } from '@app/shared/member-list/member-table';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { ProjectRole } from '@task-board/shared';
+import type { ProjectMember } from '@task-board/shared';
+
+interface AddMemberFormModel {
+  userId: string;
+  role: string;
+}
 
 @Component({
   selector: 'ui-project-member-list',
   imports: [
-    ConfirmDialog,
-    HlmAlertImports,
+    MemberTable,
     FormRoot,
     FormField,
     TranslocoPipe,
     NgIcon,
+    HlmAlertImports,
     HlmButtonImports,
-    HlmCardImports,
+    HlmDialogImports,
     HlmFieldImports,
     HlmInputImports,
-    HlmSpinnerImports,
-    HlmDialogImports,
     HlmNativeSelectImports,
-    HlmSelectImports,
-    HlmBadgeImports,
-    HlmAvatarImports,
-    HlmTableImports,
-    HlmPopoverImports,
-    Pagination,
+    HlmSpinnerImports,
   ],
-  providers: [
-    provideIcons({
-      lucideUserPlus,
-      lucideTrash2,
-      lucideSave,
-      lucideCheck,
-      lucideArrowUp,
-      lucideArrowDown,
-      lucideFilter,
-    }),
-  ],
+  providers: [provideIcons({ lucideUserPlus })],
   templateUrl: './project-member-list.html',
 })
 export class ProjectMemberList implements OnInit, OnDestroy {
@@ -83,29 +57,30 @@ export class ProjectMemberList implements OnInit, OnDestroy {
   private readonly projectStore = inject(ProjectStore);
   private readonly route = inject(ActivatedRoute);
   private queryParamsSub?: Subscription;
-  /** Bound via withComponentInputBinding() — now receives project key from route */
-  readonly projectKey = input.required<string>();
-  /** Resolved project UUID from the store */
+  /** Bound via withComponentInputBinding() — receives project key from route */
+  readonly projectKey = input<string>();
+  /**
+   * Resolved project UUID from the store (loaded by `projectGuard`) — never a raw route
+   * param, so direct URL entry cannot produce an undefined id (V1-10/V2-1 family).
+   */
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
+  /** Guard: until the context resolves, no requests fire and actions stay disabled. */
+  protected readonly hasContext = computed(() => this.projectId() !== '');
   protected readonly members = signal<ProjectMember[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
-  protected readonly savingUserId = signal<string | null>(null);
   protected readonly removingUserId = signal<string | null>(null);
   protected readonly showAddMember = signal(false);
-  protected readonly showRemoveConfirm = signal(false);
-  protected readonly memberToRemove = signal<ProjectMember | null>(null);
-  protected readonly projectRoles = Object.values(ProjectRole);
-  /** Map of userId → pending role value (not yet saved) */
-  protected readonly pendingRoles = signal<Record<string, string>>({});
-  protected readonly isAdmin = computed(() => {
+  protected readonly projectRoles = Object.values(ProjectRole).filter((role) => role !== ProjectRole.PROJECT_ADMIN);
+  /** Only PROJECT_ADMIN+ (project) / ADMIN+ (tenant) may manage members (mirrors server RBAC). */
+  protected readonly canManage = computed(() => {
     return canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole());
   });
   /**
    * Shared sort / column-filter / pagination machinery (see shared/member-list).
    * Filter and sort state is synced to URL query params.
    */
-  private readonly table = useMemberTable<ProjectMember>({
+  protected readonly table = useMemberTable<ProjectMember>({
     source: this.members,
     filters: {
       name: { matches: (m, q) => (m.displayName ?? m.userId).toLowerCase().includes(q) },
@@ -113,7 +88,7 @@ export class ProjectMemberList implements OnInit, OnDestroy {
       role: { matches: (m, q) => m.role === q },
     },
     sorters: {
-      displayName: (m) => m.displayName ?? m.userId,
+      name: (m) => m.displayName ?? m.userId,
       email: (m) => m.email ?? '',
       role: (m) => m.role,
     },
@@ -123,49 +98,34 @@ export class ProjectMemberList implements OnInit, OnDestroy {
   protected readonly pageSize = this.table.pageSize;
   protected readonly total = this.table.total;
   protected readonly totalPages = this.table.totalPages;
-  protected readonly paginatedMembers = this.table.paginated;
   protected readonly sortField = this.table.sortField;
   protected readonly sortDirection = this.table.sortDirection;
-
-  protected filterName(): string {
-    return this.table.getFilterValue('name');
-  }
-
-  protected filterEmail(): string {
-    return this.table.getFilterValue('email');
-  }
-
-  protected filterRole(): string {
-    return this.table.getFilterValue('role');
-  }
-
-  protected toggleSort(field: string): void {
-    this.table.toggleSort(field);
-  }
-
-  protected onColumnFilterChange(field: string, value: string): void {
-    this.table.onColumnFilterChange(field, value);
-  }
-
-  protected onPageChange(newPage: number): void {
-    this.table.onPageChange(newPage);
-  }
-
-  protected onPageSizeChange(newSize: number): void {
-    this.table.onPageSizeChange(newSize);
-  }
-  private readonly memberModel = signal<{ userId: string; role: string }>({
-    userId: '',
-    role: ProjectRole.EDITOR,
-  });
+  /** Rows for the shared table (already sorted/filtered/paginated). */
+  protected readonly tableRows = computed<MemberRow[]>(() =>
+    this.table.paginated().map((m) => ({
+      userId: m.userId,
+      displayName: m.displayName,
+      email: m.email,
+      role: m.role,
+    })),
+  );
+  /** Current column-filter snapshot passed down to the shared table. */
+  protected readonly filterValues = computed<Record<string, string>>(() => ({
+    name: this.table.getFilterValue('name'),
+    email: this.table.getFilterValue('email'),
+    role: this.table.getFilterValue('role'),
+  }));
+  private readonly memberModel = signal<AddMemberFormModel>({ userId: '', role: ProjectRole.EDITOR });
   protected readonly addMemberForm = form(
     this.memberModel,
-    schema<{ userId: string; role: string }>((field) => {
+    schema<AddMemberFormModel>((field) => {
       required(field.userId, { message: 'validation.userIdRequired' });
     }),
     {
       submission: {
         action: async (f) => {
+          if (!this.hasContext()) return;
+
           this.error.set('');
 
           this.projectClient
@@ -186,87 +146,9 @@ export class ProjectMemberList implements OnInit, OnDestroy {
     },
   );
 
-  /** Get the effective role for a member (pending change or current role) */
-  protected getEffectiveRole(member: ProjectMember): string {
-    return this.pendingRoles()[member.userId] ?? member.role;
-  }
-
-  /** Check if a member has an unsaved role change */
-  protected hasPendingChange(member: ProjectMember): boolean {
-    return member.userId in this.pendingRoles() && this.pendingRoles()[member.userId] !== member.role;
-  }
-
-  /** Stage a role change locally (don't send to API yet) */
-  protected onRoleSelect(member: ProjectMember, newRole: string | null | undefined): void {
-    if (!newRole) return;
-
-    this.pendingRoles.update((map) => ({ ...map, [member.userId]: newRole }));
-  }
-
-  /** Save the pending role change to the API */
-  protected saveRole(member: ProjectMember): void {
-    const newRole = this.pendingRoles()[member.userId];
-
-    if (!newRole || newRole === member.role) return;
-
-    this.savingUserId.set(member.userId);
-
-    this.projectClient
-      .updateMemberRole(this.projectId(), member.userId, newRole)
-      .pipe(finalize(() => this.savingUserId.set(null)))
-      .subscribe({
-        next: () => {
-          // Remove pending state and refresh
-          this.pendingRoles.update((map) =>
-            Object.fromEntries(Object.entries(map).filter(([k]) => k !== member.userId)),
-          );
-          this.loadMembers();
-          this.notify.success('toasts.updated');
-        },
-        error: (err) => {
-          this.error.set(getErrorMessage(err));
-        },
-      });
-  }
-
-  protected confirmRemoveMember(member: ProjectMember): void {
-    this.memberToRemove.set(member);
-    this.showRemoveConfirm.set(true);
-  }
-
-  protected removeMember(): void {
-    const member = this.memberToRemove();
-
-    if (!member) return;
-
-    this.removingUserId.set(member.userId);
-
-    this.projectClient
-      .removeMember(this.projectId(), member.userId)
-      .pipe(finalize(() => this.removingUserId.set(null)))
-      .subscribe({
-        next: () => {
-          this.loadMembers();
-          this.showRemoveConfirm.set(false);
-          this.memberToRemove.set(null);
-          this.notify.success('toasts.deleted');
-        },
-        error: (err) => {
-          this.error.set(getErrorMessage(err));
-        },
-      });
-  }
-
   onAddMemberDialogStateChange(state: BrnDialogState): void {
     if (state === 'closed') {
       this.showAddMember.set(false);
-    }
-  }
-
-  protected onRemoveDialogStateChange(open: boolean): void {
-    if (!open) {
-      this.showRemoveConfirm.set(false);
-      this.memberToRemove.set(null);
     }
   }
 
@@ -282,6 +164,14 @@ export class ProjectMemberList implements OnInit, OnDestroy {
   }
 
   private loadMembers(): void {
+    // V1-10/V2-1 guard: never fetch without a resolved project id
+    if (!this.hasContext()) {
+      this.members.set([]);
+      this.loading.set(false);
+
+      return;
+    }
+
     this.loading.set(true);
 
     this.projectClient
@@ -290,6 +180,46 @@ export class ProjectMemberList implements OnInit, OnDestroy {
       .subscribe({
         next: (members) => {
           this.members.set(members);
+        },
+      });
+  }
+
+  /** Optimistic role update with rollback + error toast on failure. */
+  protected changeRole(row: MemberRow, newRole: string): void {
+    if (!row.userId || !newRole || newRole === row.role || !this.hasContext()) return;
+
+    const previous = this.members();
+
+    this.members.update((list) =>
+      list.map((m) => (m.userId === row.userId ? { ...m, role: newRole as ProjectRole } : m)),
+    );
+
+    this.projectClient.updateMemberRole(this.projectId(), row.userId, newRole).subscribe({
+      next: () => {
+        this.notify.success('toasts.updated');
+      },
+      error: (err) => {
+        this.members.set(previous); // rollback
+        this.notify.error(getErrorMessage(err));
+      },
+    });
+  }
+
+  protected removeMember(row: MemberRow): void {
+    if (!row.userId || !this.hasContext()) return;
+
+    this.removingUserId.set(row.userId);
+
+    this.projectClient
+      .removeMember(this.projectId(), row.userId)
+      .pipe(finalize(() => this.removingUserId.set(null)))
+      .subscribe({
+        next: () => {
+          this.loadMembers();
+          this.notify.success('toasts.deleted');
+        },
+        error: (err) => {
+          this.notify.error(getErrorMessage(err));
         },
       });
   }

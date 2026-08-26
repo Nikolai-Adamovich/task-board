@@ -1,231 +1,195 @@
-import { Component, inject, input, signal, computed, OnInit } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { provideIcons, NgIcon } from '@ng-icons/core';
-import { lucidePlus, lucideTrash2, lucideArchive, lucideRotateCcw, lucideXCircle } from '@ng-icons/lucide';
-import { finalize } from 'rxjs';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import {
+  lucideArchive,
+  lucideCalendar,
+  lucideCircleDot,
+  lucideExternalLink,
+  lucideLayoutDashboard,
+  lucideSettings,
+  lucideTrash2,
+  lucideUsers,
+} from '@ng-icons/lucide';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { forkJoin, map, of } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
+import { SprintClient } from '@services/sprint-client';
+import { StatusClient } from '@services/status-client';
+import { TaskClient } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
+import { PreferencesStore } from '@stores/preferences-store';
+import { TenantStore } from '@stores/tenant-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import { HlmFieldImports } from '@spartan-ng/helm/field';
-import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmCardImports } from '@spartan-ng/helm/card';
-import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
-import { TenantRole, ProjectRole, BoardType, ProjectStatus } from '@task-board/shared';
-import { statusBadgeVariant } from '@app/constants/priority';
-import type { Project, Board, CreateBoard } from '@task-board/shared';
-import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { injectToasts } from '@app/shared/utils/toast-utils';
-import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { SprintStatus, ProjectStatus } from '@task-board/shared';
+import { statusBadgeVariant } from '@app/constants/priority';
+import { canManageProject } from '@app/shared/utils/role-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
+import type { Board, Project, Sprint, Status, Task } from '@task-board/shared';
 
-interface BoardFormModel {
-  name: string;
-  type: string;
+/** Per-status task count row */
+interface StatusCount {
+  status: Status;
+  total: number;
 }
 
+/**
+ * Project overview landing page (spec S9, DEC-034).
+ *
+ * Widgets: header (name/key/status/description), task summary by status,
+ * active-sprint block, recent tasks, members preview, board shortcuts.
+ * Lifecycle actions (archive/delete) live in the settings hub danger zone (DEC-035).
+ */
 @Component({
   selector: 'ui-project-detail',
   imports: [
-    HlmAlertImports,
-    HlmEmptyImports,
     RouterLink,
+    DatePipe,
     TranslocoPipe,
     NgIcon,
     HlmButtonImports,
-    HlmDialogImports,
     HlmSpinnerImports,
-    HlmFieldImports,
-    HlmInputImports,
-    HlmTextareaImports,
     HlmBadgeImports,
     HlmCardImports,
-    FormField,
-    FormRoot,
+    HlmEmptyImports,
+    HlmAlertImports,
   ],
-  providers: [provideIcons({ lucidePlus, lucideTrash2, lucideArchive, lucideRotateCcw, lucideXCircle })],
+  providers: [
+    provideIcons({
+      lucideArchive,
+      lucideCalendar,
+      lucideCircleDot,
+      lucideExternalLink,
+      lucideLayoutDashboard,
+      lucideSettings,
+      lucideTrash2,
+      lucideUsers,
+    }),
+  ],
   templateUrl: './project-detail.html',
 })
-export class ProjectDetail implements OnInit {
+export class ProjectDetail {
   /** Shared badge-class helper (see constants/priority.ts) */
   protected readonly statusBadgeVariant = statusBadgeVariant;
-  private readonly notify = injectToasts();
   private readonly projectClient = inject(ProjectClient);
   private readonly boardClient = inject(BoardClient);
+  private readonly sprintClient = inject(SprintClient);
+  private readonly statusClient = inject(StatusClient);
+  private readonly taskClient = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
-  /** Bound via withComponentInputBinding() — now receives project key from route */
+  private readonly preferencesStore = inject(PreferencesStore);
+  /** R3-P8: DatePipe token derived from the user's date format preference */
+  protected readonly dateFmt = this.preferencesStore.datePipeFormat;
+  private readonly tenantStore = inject(TenantStore);
+  /** Bound via withComponentInputBinding() — receives project key from route */
   readonly projectKey = input.required<string>();
   /** Resolved project UUID from the store */
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
-  protected readonly project = signal<Project | null>(null);
-  protected readonly boards = signal<Board[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal('');
-  protected readonly showCreateBoard = signal(false);
-  protected readonly showDeleteConfirm = signal(false);
-  protected readonly deleteConfirmText = signal('');
-  protected readonly boardTypes = Object.values(BoardType);
+  /** Current tenant slug for building links (DEC-032) */
+  protected readonly tenantSlug = computed(() => this.tenantStore.activeTenant()?.slug ?? '');
   protected readonly ProjectStatus = ProjectStatus;
-  /**
-   * Whether the current user has admin privileges.
-   * Tenant OWNER/ADMIN bypass project role checks.
-   * Project PROJECT_ADMIN can manage settings.
-   */
-  protected readonly isAdmin = computed(() => {
-    const tenantRole = this.authStore.tenantRole();
-
-    if (tenantRole === TenantRole.OWNER || tenantRole === TenantRole.ADMIN) return true;
-
-    const projectRole = this.projectStore.projectRole();
-
-    return projectRole === ProjectRole.PROJECT_ADMIN;
+  protected readonly SprintStatus = SprintStatus;
+  private readonly projectResource = rxResource({
+    params: () => ({ projectId: this.projectId() }),
+    stream: ({ params }) => this.projectClient.getById(params.projectId),
   });
-  protected readonly boardModel = signal<BoardFormModel>({ name: '', type: BoardType.KANBAN });
-  protected readonly createBoardForm = form(
-    this.boardModel,
-    schema<BoardFormModel>((field) => {
-      required(field.name, { message: 'validation.boardNameRequired' });
-    }),
-    {
-      submission: {
-        action: async (f) => {
-          this.error.set('');
-
-          const model = this.boardModel();
-          const boardData: CreateBoard = {
-            name: model.name,
-            type: model.type as BoardType,
-            columns: [
-              { statusIds: [], position: 0 },
-              { statusIds: [], position: 1 },
-              { statusIds: [], position: 2 },
-            ],
-          };
-
-          this.boardClient.create(this.projectId(), boardData).subscribe({
-            next: (board) => {
-              this.boards.update((list) => [...list, board]);
-              this.showCreateBoard.set(false);
-              f().reset({ name: '', type: BoardType.KANBAN });
-            },
-            error: (err) => {
-              this.error.set(getErrorMessage(err));
-            },
-          });
-        },
-      },
-    },
+  protected readonly project = computed<Project | null>(() =>
+    this.projectResource.hasValue() ? this.projectResource.value() : null,
   );
+  private readonly boardsResource = rxResource({
+    params: () => ({ projectId: this.projectId() }),
+    stream: ({ params }) => this.boardClient.list(params.projectId),
+    defaultValue: [] as Board[],
+  });
+  protected readonly boards = computed(() => (this.boardsResource.hasValue() ? this.boardsResource.value() : []));
+  private readonly sprintsResource = rxResource({
+    params: () => ({ projectId: this.projectId() }),
+    stream: ({ params }) => this.sprintClient.list(params.projectId),
+    defaultValue: [] as Sprint[],
+  });
+  protected readonly activeSprint = computed<Sprint | null>(() => {
+    const sprints = this.sprintsResource.hasValue() ? this.sprintsResource.value() : [];
 
-  protected onDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
-      this.showCreateBoard.set(false);
-    }
-  }
+    return sprints.find((s) => s.status === SprintStatus.ACTIVE) ?? null;
+  });
+  private readonly statusesResource = rxResource({
+    params: () => ({ projectId: this.projectId() }),
+    stream: ({ params }) => this.statusClient.list(params.projectId),
+    defaultValue: [] as Status[],
+  });
+  /** One lightweight request per status (limit=1) reads pagination.total as the count */
+  private readonly statusCountsResource = rxResource({
+    params: () => ({ projectId: this.projectId(), statuses: this.statusesResource.value() }),
+    stream: ({ params }) => {
+      if (!params.projectId || params.statuses.length === 0) return of([] as StatusCount[]);
 
-  protected onDeleteDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
-      this.showDeleteConfirm.set(false);
-      this.deleteConfirmText.set('');
-    }
-  }
+      return forkJoin(
+        params.statuses.map((status) =>
+          this.taskClient
+            .list(params.projectId, { statusId: status.id, limit: 1 })
+            .pipe(map((res) => ({ status, total: res.pagination.total }))),
+        ),
+      );
+    },
+    defaultValue: [] as StatusCount[],
+  });
+  protected readonly statusCounts = computed(() =>
+    this.statusCountsResource.hasValue() ? this.statusCountsResource.value() : [],
+  );
+  protected readonly totalTasks = computed(() => this.statusCounts().reduce((sum, entry) => sum + entry.total, 0));
+  private readonly recentTasksResource = rxResource({
+    params: () => ({ projectId: this.projectId() }),
+    stream: ({ params }) =>
+      this.taskClient.list(params.projectId, { limit: 5, sort: 'updatedAt:desc' }).pipe(map((res) => res.data)),
+    defaultValue: [] as Task[],
+  });
+  protected readonly recentTasks = computed(() =>
+    this.recentTasksResource.hasValue() ? this.recentTasksResource.value() : [],
+  );
+  protected readonly loading = computed(() => this.projectResource.isLoading());
+  protected readonly error = computed(() => {
+    const err = this.projectResource.error();
 
-  /** Whether the project is archived — disables all write controls */
-  protected get isArchived(): boolean {
-    return this.project()?.status !== ProjectStatus.ACTIVE;
-  }
+    return err ? getErrorMessage(err) : '';
+  });
+  /** Members preview comes from the project context store (loaded by projectGuard) */
+  protected readonly membersPreview = computed(() => this.projectStore.members().slice(0, 5));
+  protected readonly extraMembersCount = computed(() =>
+    Math.max(this.projectStore.members().length - this.membersPreview().length, 0),
+  );
+  /**
+   * Whether the current user can manage project settings (PROJECT_ADMIN+).
+   * Tenant OWNER/ADMIN bypass project role checks.
+   */
+  protected readonly isAdmin = computed(() =>
+    canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole()),
+  );
+  /** Read-only banner shown for archived / deletion-pending projects */
+  protected readonly readOnlyBannerKey = computed(() => {
+    const status = this.project()?.status;
 
-  /** Whether the delete confirmation text matches the project key */
-  protected get canConfirmDelete(): boolean {
-    const p = this.project();
+    if (status === ProjectStatus.ARCHIVED) return 'projectDetail.archivedBanner';
+    if (status === ProjectStatus.DELETION_PENDING) return 'projectDetail.deletionPendingBanner';
 
-    return p !== null && this.deleteConfirmText() === p.key;
-  }
+    return '';
+  });
 
-  protected requestDeleteProject(): void {
-    this.deleteConfirmText.set('');
-    this.showDeleteConfirm.set(true);
-  }
+  protected memberInitials(name: string | undefined, email: string | undefined): string {
+    const source = name || email || '?';
+    const parts = source.trim().split(/\s+/);
 
-  protected confirmDeleteProject(): void {
-    this.deleteProject();
-    this.showDeleteConfirm.set(false);
-    this.deleteConfirmText.set('');
-  }
-
-  ngOnInit(): void {
-    this.loadProject();
-  }
-
-  private loadProject(): void {
-    this.loading.set(true);
-    this.error.set('');
-    this.projectClient
-      .getById(this.projectId())
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (project) => {
-          this.project.set(project);
-          this.loadBoards();
-        },
-        error: (err) => {
-          this.error.set(getErrorMessage(err));
-        },
-      });
-  }
-
-  private loadBoards(): void {
-    this.boardClient.list(this.projectId()).subscribe({
-      next: (boards) => this.boards.set(boards),
-    });
-  }
-
-  // ─── Project Lifecycle ────────────────────────────────────────────────────
-
-  protected archiveProject(): void {
-    this.projectClient.archive(this.projectId()).subscribe({
-      next: () => {
-        this.project.update((p) => (p ? { ...p, status: ProjectStatus.ARCHIVED } : p));
-        this.notify.success('toasts.updated');
-      },
-      error: (err) => this.error.set(getErrorMessage(err)),
-    });
-  }
-
-  protected restoreProject(): void {
-    this.projectClient.restore(this.projectId()).subscribe({
-      next: () => {
-        this.project.update((p) => (p ? { ...p, status: ProjectStatus.ACTIVE, deletionScheduledAt: null } : p));
-        this.notify.success('toasts.updated');
-      },
-      error: (err) => this.error.set(getErrorMessage(err)),
-    });
-  }
-
-  protected deleteProject(): void {
-    this.projectClient.delete(this.projectId()).subscribe({
-      next: () => {
-        this.project.update((p) => (p ? { ...p, status: ProjectStatus.DELETION_PENDING } : p));
-        this.notify.success('toasts.deleted');
-      },
-      error: (err) => this.error.set(getErrorMessage(err)),
-    });
-  }
-
-  protected cancelDeletion(): void {
-    this.projectClient.cancelDeletion(this.projectId()).subscribe({
-      next: () => {
-        this.project.update((p) => (p ? { ...p, status: ProjectStatus.ACTIVE, deletionScheduledAt: null } : p));
-      },
-      error: (err) => this.error.set(getErrorMessage(err)),
-    });
+    return parts.length > 1
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : source.slice(0, 2).toUpperCase();
   }
 }

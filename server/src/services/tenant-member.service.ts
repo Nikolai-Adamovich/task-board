@@ -68,7 +68,7 @@ export class TenantMemberService {
     if (existingUser) {
       const existingMember = await this.tenantMemberRepo.findByUserAndTenant(existingUser.id, tenantId);
 
-      if (existingMember && existingMember.status === MemberStatus.ACTIVE) {
+      if (existingMember && existingMember.status === MemberStatus.ACTIVE && !existingMember.invitation) {
         throw new ConflictError('User is already a member of this tenant');
       }
     }
@@ -81,6 +81,7 @@ export class TenantMemberService {
       tokenHash,
       invitedBy: requesterId,
       invitedOn: new Date(),
+      invitedEmail: email.toLowerCase().trim(),
     };
     // If user doesn't exist, create a placeholder user
     let userId = existingUser?.id;
@@ -99,12 +100,13 @@ export class TenantMemberService {
     const existingMember = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
 
     if (existingMember && existingMember.invitation?.status === InvitationStatus.PENDING) {
-      // Replace existing invitation with new token
+      // Replace existing invitation with new token — membership stays ACCESS_REVOKED until accepted (DEC-018)
       const replacementDoc: InvitationDocument = {
         status: InvitationStatus.PENDING,
         tokenHash,
         invitedBy: requesterId,
         invitedOn: new Date(),
+        invitedEmail: email.toLowerCase().trim(),
       };
 
       await this.tenantMemberRepo.update(existingMember.id, {
@@ -134,11 +136,13 @@ export class TenantMemberService {
       } as unknown as TenantMember;
     }
 
+    // DEC-018: an invited membership persists as ACCESS_REVOKED + invitation PENDING;
+    // only explicit acceptance flips it to ACTIVE.
     const member = await this.tenantMemberRepo.create({
       userId,
       tenantId,
       role,
-      status: MemberStatus.ACTIVE, // Member doc is ACTIVE; invitation tracks the pending state
+      status: MemberStatus.ACCESS_REVOKED,
       invitation: invitationDoc,
     });
 
@@ -211,7 +215,7 @@ export class TenantMemberService {
       throw new NotFoundError('Invitation is no longer pending');
     }
 
-    // Check TTL expiration
+    // Check TTL expiration — membership stays ACCESS_REVOKED (DEC-018); only the invitation flips to EXPIRED
     const invitedOn = new Date(member.invitation.invitedOn).getTime();
 
     if (Date.now() - invitedOn > INVITATION_TTL_MS) {
@@ -247,62 +251,75 @@ export class TenantMemberService {
     });
   }
 
-  async revokeInvitation(requesterId: string, tenantId: string, memberId: string): Promise<void> {
+  /**
+   * V2-7: all member-scoped lifecycle operations address the target by
+   * **userId** (consistent with invite / update-role / remove), resolving the
+   * membership document internally via findByUserAndTenant.
+   */
+  private async requireMembershipByUserId(userId: string, tenantId: string): Promise<TenantMember> {
+    const member = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
+
+    if (!member) {
+      throw new NotFoundError('Member not found in this tenant');
+    }
+
+    return member;
+  }
+
+  async revokeInvitation(requesterId: string, tenantId: string, userId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can revoke invitations');
     }
 
-    const member = await this.tenantMemberRepo.findById(memberId);
-
-    if (!member || member.tenantId !== tenantId) {
-      throw new NotFoundError('Invitation not found in this tenant');
-    }
+    const member = await this.requireMembershipByUserId(userId, tenantId);
 
     if (!member.invitation || member.invitation.status !== InvitationStatus.PENDING) {
       throw new ConflictError('Invitation is no longer pending');
     }
 
-    await this.tenantMemberRepo.update(memberId, {
-      invitation: { ...member.invitation, status: InvitationStatus.REVOKED },
+    await this.tenantMemberRepo.update(member.id, {
+      invitation: {
+        ...member.invitation,
+        status: InvitationStatus.REVOKED,
+        invitedOn: new Date(member.invitation.invitedOn),
+      },
     });
   }
 
-  async reinviteUser(requesterId: string, tenantId: string, memberId: string): Promise<void> {
+  async reinviteUser(requesterId: string, tenantId: string, userId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can reinvite users');
     }
 
-    const member = await this.tenantMemberRepo.findById(memberId);
-
-    if (!member || member.tenantId !== tenantId) {
-      throw new NotFoundError('Member not found in this tenant');
-    }
-
+    const member = await this.requireMembershipByUserId(userId, tenantId);
     // Generate new token
     const token = randomUUID();
     const tokenHash = hashToken(token);
+    const user = await this.userRepo.findById(member.userId);
     const invitationDoc: InvitationDocument = {
       status: InvitationStatus.PENDING,
       tokenHash,
       invitedBy: requesterId,
       invitedOn: new Date(),
+      invitedEmail: user?.email.toLowerCase().trim() ?? null,
     };
 
-    await this.tenantMemberRepo.update(memberId, { invitation: invitationDoc });
+    // DEC-018 invariant: a membership with a PENDING invitation is never ACTIVE
+    await this.tenantMemberRepo.update(member.id, { status: MemberStatus.ACCESS_REVOKED, invitation: invitationDoc });
 
     // Send email
     try {
-      const user = await this.userRepo.findById(member.userId);
+      const freshUser = await this.userRepo.findById(member.userId);
       const tenant = await this.requireActiveTenant(tenantId);
       const inviter = await this.userRepo.findById(requesterId);
 
-      if (user) {
+      if (freshUser) {
         await this.emailService.sendInvitationEmail({
-          to: user.email,
+          to: freshUser.email,
           inviterName: inviter?.displayName ?? 'A team member',
           tenantName: tenant.name,
           role: member.role,
@@ -314,64 +331,57 @@ export class TenantMemberService {
     }
   }
 
-  async restoreMembership(requesterId: string, tenantId: string, memberId: string): Promise<void> {
+  async restoreMembership(requesterId: string, tenantId: string, userId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can restore memberships');
     }
 
-    const member = await this.tenantMemberRepo.findById(memberId);
-
-    if (!member || member.tenantId !== tenantId) {
-      throw new NotFoundError('Member not found in this tenant');
-    }
+    const member = await this.requireMembershipByUserId(userId, tenantId);
 
     if (member.status !== MemberStatus.ACCESS_REVOKED) {
       throw new ConflictError('Only ACCESS_REVOKED memberships can be restored');
     }
 
-    await this.tenantMemberRepo.update(memberId, { status: MemberStatus.ACTIVE });
+    // BR-036 / DEC-018: a pending invitation can only be activated by the invitee's explicit acceptance
+    if (member.invitation?.status === InvitationStatus.PENDING) {
+      throw new ConflictError('Cannot restore a membership with a pending invitation — the invitee must accept it');
+    }
+
+    await this.tenantMemberRepo.update(member.id, { status: MemberStatus.ACTIVE });
   }
 
-  async revokeAccess(requesterId: string, tenantId: string, memberId: string): Promise<void> {
+  async revokeAccess(requesterId: string, tenantId: string, userId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can revoke access');
     }
 
-    const membership = await this.tenantMemberRepo.findById(memberId);
-
-    if (!membership || membership.tenantId !== tenantId) {
-      throw new NotFoundError('Member not found in this tenant');
-    }
+    const membership = await this.requireMembershipByUserId(userId, tenantId);
 
     if (membership.role === TenantRole.OWNER) {
       throw new ForbiddenError("Cannot revoke the owner's access");
     }
 
-    await this.tenantMemberRepo.update(memberId, { status: MemberStatus.ACCESS_REVOKED });
+    await this.tenantMemberRepo.update(membership.id, { status: MemberStatus.ACCESS_REVOKED });
   }
 
-  async hardDeleteMember(requesterId: string, tenantId: string, memberId: string): Promise<void> {
+  async hardDeleteMember(requesterId: string, tenantId: string, userId: string): Promise<void> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can permanently remove members');
     }
 
-    const membership = await this.tenantMemberRepo.findById(memberId);
-
-    if (!membership || membership.tenantId !== tenantId) {
-      throw new NotFoundError('Member not found in this tenant');
-    }
+    const membership = await this.requireMembershipByUserId(userId, tenantId);
 
     if (membership.role === TenantRole.OWNER) {
       throw new ForbiddenError('Cannot permanently remove the owner');
     }
 
-    await this.tenantMemberRepo.deleteById(memberId);
+    await this.tenantMemberRepo.deleteById(membership.id);
   }
 
   async getMyInvitations(email: string): Promise<MyInvitation[]> {

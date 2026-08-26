@@ -1,14 +1,20 @@
 import { ProjectStatus, SprintStatus } from '@task-board/shared';
 import type { Sprint, CreateSprint, UpdateSprint } from '@task-board/shared';
-import { AppError, NotFoundError } from '../errors/app-error.js';
+import { AppError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { SprintRepository } from '../repositories/sprint.repository.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
+import { ensurePermission } from './rbac.service.js';
 import type { AuditService } from './audit.service.js';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
 export interface SprintServiceTaskRepo {
   clearSprintFromTasks(projectId: string, sprintId: string): Promise<void>;
+}
+
+/** Minimal project-member repository interface to resolve the caller's project role */
+export interface SprintServiceProjectMemberRepo {
+  findByUserAndProject(userId: string, projectId: string): Promise<{ role: string } | null>;
 }
 
 // ─── Sprint Service ──────────────────────────────────────────────────────────
@@ -19,7 +25,33 @@ export class SprintService {
     private readonly projectRepo: ProjectRepository,
     private readonly taskRepo: SprintServiceTaskRepo,
     private readonly auditService?: AuditService,
+    private readonly projectMemberRepo?: SprintServiceProjectMemberRepo,
   ) {}
+
+  /**
+   * V2-4: gate sprint mutations behind the RBAC matrix (create_sprint /
+   * change_sprint_status — PROJECT_ADMIN only; tenant Owner/Admin bypass
+   * inside the matrix). Routes with `:projectId` in the path are additionally
+   * gated by requirePermission — this is the id-based-route layer.
+   */
+  private async ensureSprintPermission(
+    action: 'create_sprint' | 'change_sprint_status',
+    projectId: string,
+    userId?: string,
+    userRole?: string,
+  ): Promise<void> {
+    if (!userId || !userRole) {
+      return; // no caller context → nothing to enforce against (legacy/test callers)
+    }
+
+    if (!this.projectMemberRepo) {
+      throw new ForbiddenError('Project membership lookup is unavailable');
+    }
+
+    const membership = await this.projectMemberRepo.findByUserAndProject(userId, projectId);
+
+    ensurePermission(action, userRole, membership?.role ?? null);
+  }
 
   async getSprintsByProject(projectId: string): Promise<Sprint[]> {
     return this.sprintRepo.findByProject(projectId);
@@ -34,7 +66,9 @@ export class SprintService {
     return sprint;
   }
 
-  async createSprint(projectId: string, input: CreateSprint, userId?: string): Promise<Sprint> {
+  async createSprint(projectId: string, input: CreateSprint, userId?: string, userRole?: string): Promise<Sprint> {
+    await this.ensureSprintPermission('create_sprint', projectId, userId, userRole);
+
     // Validate project exists and is ACTIVE
     const project = await this.projectRepo.findById(projectId);
 
@@ -74,12 +108,14 @@ export class SprintService {
     return sprint;
   }
 
-  async updateSprint(id: string, input: UpdateSprint, userId?: string): Promise<Sprint> {
+  async updateSprint(id: string, input: UpdateSprint, userId?: string, userRole?: string): Promise<Sprint> {
     const sprint = await this.sprintRepo.findById(id);
 
     if (!sprint) {
       throw new NotFoundError('Sprint not found');
     }
+
+    await this.ensureSprintPermission('change_sprint_status', sprint.projectId, userId, userRole);
 
     // Handle status transitions with date side effects
     const updates: {
@@ -94,13 +130,10 @@ export class SprintService {
     if (input.status !== undefined && input.status !== sprint.status) {
       updates.status = input.status;
 
-      // Starting sprint: set startDate to now if null, endDate to now if null (spec §7.4)
+      // Starting sprint: set startDate to now only when null (DEC-016 — endDate is never modified on start)
       if (input.status === SprintStatus.ACTIVE) {
         if (!sprint.startDate && !input.startDate) {
           updates.startDate = new Date();
-        }
-        if (!sprint.endDate && !input.endDate) {
-          updates.endDate = new Date();
         }
       }
 
@@ -159,12 +192,14 @@ export class SprintService {
     return updated;
   }
 
-  async deleteSprint(id: string, userId?: string): Promise<void> {
+  async deleteSprint(id: string, userId?: string, userRole?: string): Promise<void> {
     const sprint = await this.sprintRepo.findById(id);
 
     if (!sprint) {
       throw new NotFoundError('Sprint not found');
     }
+
+    await this.ensureSprintPermission('change_sprint_status', sprint.projectId, userId, userRole);
 
     // Set sprintId = null on all affected tasks
     await this.taskRepo.clearSprintFromTasks(sprint.projectId, id);

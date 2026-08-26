@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { authMiddleware } from '../middleware/auth.js';
 
@@ -37,16 +38,22 @@ export function createInvitationRoutes(): Hono<AppEnv> {
   });
 
   /**
-   * POST /invitations/:invitationId/decline — decline an invitation.
+   * POST /invitations/:invitationId/decline — decline an invitation (canonical).
    */
-  router.post('/:invitationId/decline', async (c) => {
+  const decline = async (c: Context) => {
     const userId = c.get('userId');
     const invitationId = c.req.param('invitationId');
 
     await c.get('svc').tenantMembers.declineInvitation(invitationId, userId);
 
     return c.json({ data: { success: true } });
-  });
+  };
+
+  router.post('/:invitationId/decline', decline);
+
+  // V2-3: the UI's decline action fires `DELETE /invitations/:id`; expose the
+  // same operation under that method so the flow works end-to-end.
+  router.delete('/:invitationId', decline);
 
   return router;
 }

@@ -41,6 +41,10 @@ vi.mock('../services/auth.service.js', () => ({
     me: vi
       .fn()
       .mockResolvedValue({ id: '1', email: 'test@test', displayName: 'Test', avatarUrl: null, deletedAt: null }),
+    requestPasswordReset: vi.fn().mockResolvedValue({
+      message: 'If an account exists for that email, a password reset link has been sent.',
+    }),
+    resetPassword: vi.fn().mockResolvedValue({ message: 'Password has been reset.' }),
   })),
 }));
 
@@ -363,5 +367,104 @@ describe('GET /api/auth/invitations/:token', () => {
     expect(data.role).toBe('MEMBER');
     expect(data.status).toBe('PENDING');
     expect(data.isRegistered).toBe(false);
+  });
+});
+
+// ─── POST /api/auth/forgot-password ───────────────────────────────────────
+
+describe('POST /api/auth/forgot-password', () => {
+  const app = createTestApp();
+
+  it('should return 200 with neutral { data: { message } } envelope', async () => {
+    const res = await postJson(app, '/api/auth/forgot-password', { email: 'user@example.com' });
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).toHaveProperty('data');
+
+    const data = body.data as Record<string, unknown>;
+    const message = data.message as string;
+
+    expect(typeof message).toBe('string');
+    expect(message.length).toBeGreaterThan(0);
+  });
+
+  it.each(['', 'not-an-email', '@example.com', 'user@'])('should return 400 for invalid email: %s', async (email) => {
+    const res = await postJson(app, '/api/auth/forgot-password', { email });
+
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.error).toBeDefined();
+  });
+
+  it('should return 400 for missing email', async () => {
+    const res = await postJson(app, '/api/auth/forgot-password', {});
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should return 400 for missing body', async () => {
+    const res = await postJson(app, '/api/auth/forgot-password', {});
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── POST /api/auth/reset-password ────────────────────────────────────────
+
+describe('POST /api/auth/reset-password', () => {
+  const app = createTestApp();
+  const validBody = { token: 'reset-token-abc123', newPassword: 'newSecurePass123' };
+
+  it('should return 200 with { data: { message } } envelope for a valid request', async () => {
+    const res = await postJson(app, '/api/auth/reset-password', validBody);
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).toHaveProperty('data');
+
+    const data = body.data as Record<string, unknown>;
+
+    expect(typeof data.message).toBe('string');
+  });
+
+  it.each(['', undefined])('should return 400 for missing/empty token (%s)', async (token) => {
+    const res = await postJson(app, '/api/auth/reset-password', { token, newPassword: 'newSecurePass123' });
+
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.error).toBeDefined();
+  });
+
+  it('should return 400 for password shorter than 8 chars', async () => {
+    const res = await postJson(app, '/api/auth/reset-password', { token: 'tok', newPassword: 'short' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should return 400 for password longer than 128 chars', async () => {
+    const res = await postJson(app, '/api/auth/reset-password', { token: 'tok', newPassword: 'a'.repeat(129) });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should accept password at minimum boundary (8 chars)', async () => {
+    const res = await postJson(app, '/api/auth/reset-password', { token: 'tok', newPassword: '12345678' });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('should return 400 for missing body', async () => {
+    const res = await postJson(app, '/api/auth/reset-password', {});
+
+    expect(res.status).toBe(400);
   });
 });
