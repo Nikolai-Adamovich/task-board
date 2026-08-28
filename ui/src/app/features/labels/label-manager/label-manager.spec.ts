@@ -5,7 +5,7 @@
  * - Loading labels on init
  * - Create label validation & submission
  * - Inline rename (startEdit / saveEdit / cancelEdit)
- * - Delete label
+ * - Delete label (incl. undo toast recreating the deleted label)
  * - Dialog state changes
  */
 import { TestBed } from '@angular/core/testing';
@@ -20,6 +20,7 @@ import { LabelClient } from '@services/label-client';
 import { ProjectStore } from '@stores/project-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
+import { toast } from '@spartan-ng/brain/sonner';
 import type { Label } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -39,7 +40,16 @@ describe('LabelManager', () => {
     delete: ReturnType<typeof vi.fn>;
   };
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   function setup() {
+    // Spy on the sonner toast object directly — module mocking is unreliable
+    // under the Angular vitest builder when several specs mock the same module.
+    vi.spyOn(toast, 'success').mockReturnValue('toast-id');
+    vi.spyOn(toast, 'error').mockReturnValue('toast-id');
+
     labelClientMock = {
       list: vi.fn().mockReturnValue(of([...mockLabels])),
       create: vi.fn().mockImplementation((_pid: string, data: { name: string }) =>
@@ -220,6 +230,27 @@ describe('LabelManager', () => {
       expect(component.labels()).toHaveLength(2);
       expect(component.showDeleteDialog()).toBe(false);
       expect(component.deletingLabel()).toBeNull();
+    });
+
+    it('should offer undo that recreates the label with the same name (Q11)', () => {
+      vi.mocked(toast.success).mockClear();
+      component.confirmDelete(mockLabels[0]);
+      component.deleteLabel();
+
+      expect(component.labels()).toHaveLength(2);
+
+      // The delete success toast carries an Undo action button.
+      const calls = vi.mocked(toast.success).mock.calls;
+      const action = calls.at(-1)?.[1]?.action;
+
+      expect(calls.length).toBeGreaterThan(0);
+      expect(action?.label).toBeTruthy();
+
+      action?.onClick?.(new MouseEvent('click'));
+
+      expect(labelClientMock.create).toHaveBeenCalledWith('p1', { name: 'feature' });
+      expect(component.labels()).toHaveLength(3);
+      expect(component.labels().some((l: Label) => l.name === 'feature')).toBe(true);
     });
   });
 

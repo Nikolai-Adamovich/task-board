@@ -11,6 +11,10 @@
 
 <ng-template #helpMenu>
   <hlm-dropdown-menu>
+    <button hlmDropdownMenuItem type="button" (click)="openHotkeys()">
+      <ng-icon name="lucideKeyboard" />
+      <span>{{ 'header.hotkeys' | transloco }}</span>
+    </button>
     <a hlmDropdownMenuItem routerLink="/faq">
       <ng-icon name="lucideBookOpen" />
       <span>{{ 'header.faq' | transloco }}</span>

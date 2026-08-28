@@ -129,53 +129,65 @@
       <div class="flex items-center justify-center py-6">
         <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'filters.loading' | transloco }}</span>
       </div>
-    } @else if (error()) {
+    } @else if (loadError()) {
       <hlm-alert variant="destructive">
-        <div hlmAlertDescription>{{ error() | transloco }}</div>
+        <div hlmAlertDescription>{{ 'filters.loadError' | transloco }}</div>
       </hlm-alert>
     } @else {
       <!-- Save form -->
       @if (showSaveForm()) {
-        <div class="mb-4 flex flex-col gap-3 rounded-md border p-3">
+        <form [formRoot]="saveForm" class="mb-4 flex flex-col gap-3 rounded-md border p-3">
           <hlm-field>
             <label hlmFieldLabel for="filter-name">{{ 'filters.name' | transloco }}</label>
             <input
               hlmInput
               id="filter-name"
               type="text"
+              [formField]="saveForm.name"
               [placeholder]="'filters.namePlaceholder' | transloco"
-              [value]="filterName()"
-              (input)="onFilterNameInput($event)"
             />
           </hlm-field>
           <div class="flex gap-2">
-            <button hlmBtn size="sm" (click)="saveFilter()" [disabled]="!filterName().trim() || saving()">
+            <button hlmBtn size="sm" type="button" (click)="submitSave()" [disabled]="saveForm().invalid() || saving()">
               @if (saving()) {
                 <hlm-spinner class="mr-1" /> {{ 'filters.saving' | transloco }}
               } @else {
                 {{ 'filters.save' | transloco }}
               }
             </button>
-            <button hlmBtn variant="outline" size="sm" (click)="showSaveForm.set(false)">
+            <button hlmBtn variant="outline" size="sm" type="button" (click)="showSaveForm.set(false)">
               {{ 'filters.cancel' | transloco }}
             </button>
           </div>
-        </div>
+        </form>
       }
 
-      <!-- Filter list -->
+      <!-- Saved views list -->
       <div class="flex flex-col gap-2">
-        @for (filter of filters(); track filter.id) {
+        @for (view of filters(); track view.id) {
           <div class="flex items-center justify-between rounded-md border p-2">
-            <button hlmBtn variant="ghost" size="sm" class="flex-1 justify-start text-sm" (click)="applyFilter(filter)">
-              {{ filter.name }}
+            <button hlmBtn variant="ghost" size="sm" class="flex-1 justify-start text-sm" (click)="applyFilter(view)">
+              @if (view.id === activeViewId()) {
+                <ng-icon name="lucideCheck" class="mr-1 size-4 text-primary" aria-hidden="true" />
+              }
+              {{ view.name }}
+            </button>
+            <button
+              hlmBtn
+              variant="ghost"
+              size="sm"
+              class="h-6 px-2 text-xs"
+              (click)="startRename(view)"
+              [attr.aria-label]="'filters.rename' | transloco"
+            >
+              <ng-icon name="lucidePencil" />
             </button>
             <button
               hlmBtn
               variant="ghost"
               size="sm"
               class="h-6 px-2 text-xs text-red-600"
-              (click)="confirmDelete(filter)"
+              (click)="confirmDelete(view)"
             >
               {{ 'filters.delete' | transloco }}
             </button>
@@ -187,6 +199,31 @@
     }
   </div>
 </hlm-card>
+
+<!-- Rename View Dialog (stateChanged fires for BOTH 'open' and 'closed' — guard on 'closed') -->
+<hlm-dialog [state]="renameTarget() ? 'open' : 'closed'" (stateChanged)="$event === 'closed' && closeRename()">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-md">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ 'filters.renameTitle' | transloco }}</h3>
+    </hlm-dialog-header>
+    <form [formRoot]="renameForm" class="flex flex-col gap-4">
+      <hlm-field>
+        <label hlmFieldLabel for="rename-view-name">{{ 'filters.name' | transloco }}</label>
+        <input hlmInput id="rename-view-name" type="text" [formField]="renameForm.name" />
+      </hlm-field>
+    </form>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" (click)="closeRename()">{{ 'filters.cancel' | transloco }}</button>
+      <button hlmBtn (click)="confirmRename()" [disabled]="renameForm().invalid() || renaming()">
+        @if (renaming()) {
+          <hlm-spinner class="mr-1" /> {{ 'filters.renaming' | transloco }}
+        } @else {
+          {{ 'filters.rename' | transloco }}
+        }
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
 
 <!-- Delete Confirmation Dialog -->
 <ui-confirm-dialog

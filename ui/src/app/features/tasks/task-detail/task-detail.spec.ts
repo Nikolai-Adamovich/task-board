@@ -95,7 +95,12 @@ describe('TaskDetail', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [
+        TranslocoTestingModule.forRoot({
+          langs: { en: {} },
+          translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+        }),
+      ],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -174,7 +179,12 @@ describe('TaskDetail', () => {
         tenantRole: vi.fn().mockReturnValue(null),
       };
       TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+        imports: [
+          TranslocoTestingModule.forRoot({
+            langs: { en: {} },
+            translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          }),
+        ],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -230,11 +240,11 @@ describe('TaskDetail', () => {
       expect(component.priorityBadgeVariant('unknown')).toBe('outline');
     });
 
-    it('should return title-case display labels (R3-P5)', async () => {
-      expect(component.priorityLabel('LOW')).toBe('Low');
-      expect(component.priorityLabel('MEDIUM')).toBe('Medium');
-      expect(component.priorityLabel('HIGH')).toBe('High');
-      expect(component.priorityLabel('CRITICAL')).toBe('Critical');
+    it('should return translated display labels (P11); unknown values render verbatim', async () => {
+      expect(component.priorityLabel('LOW')).toBe('priority.low');
+      expect(component.priorityLabel('MEDIUM')).toBe('priority.medium');
+      expect(component.priorityLabel('HIGH')).toBe('priority.high');
+      expect(component.priorityLabel('CRITICAL')).toBe('priority.critical');
       expect(component.priorityLabel('unknown')).toBe('unknown');
     });
   });
@@ -457,8 +467,8 @@ describe('TaskDetail', () => {
 
       expect(component.editingTitle()).toBe(false);
       expect(component.editingDescription()).toBe(false);
-      // Priority renders as a plain title-case label
-      expect(el.textContent).toContain('High');
+      // Priority renders as a translated label (test dict is empty → the i18n key)
+      expect(el.textContent).toContain('priority.high');
     });
   });
 

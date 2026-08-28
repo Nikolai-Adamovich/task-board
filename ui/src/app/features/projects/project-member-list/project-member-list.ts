@@ -4,11 +4,12 @@ import { Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideUserPlus } from '@ng-icons/lucide';
-import { finalize } from 'rxjs';
+import { finalize, tap } from 'rxjs';
 import { form, FormRoot, FormField, schema, required } from '@angular/forms/signals';
 import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
+import { PreferencesStore } from '@stores/preferences-store';
 import { canManageProject } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -20,11 +21,12 @@ import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { MemberTable } from '@app/shared/member-table/member-table';
 import type { MemberRow } from '@app/shared/member-table/member-table';
 import { useMemberTable } from '@app/shared/member-list/member-table';
-import { injectToasts } from '@app/shared/utils/toast-utils';
+import { injectUndoToasts } from '@app/shared/utils/undo-toast';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ProjectRole } from '@task-board/shared';
 import type { ProjectMember } from '@task-board/shared';
+import { AUTO_PAGE_SIZE_SENTINEL } from '@app/shared/auto-table/auto-page-size';
 
 interface AddMemberFormModel {
   userId: string;
@@ -51,7 +53,7 @@ interface AddMemberFormModel {
   templateUrl: './project-member-list.html',
 })
 export class ProjectMemberList implements OnInit, OnDestroy {
-  private readonly notify = injectToasts();
+  private readonly notify = injectUndoToasts();
   private readonly projectClient = inject(ProjectClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
@@ -66,6 +68,11 @@ export class ProjectMemberList implements OnInit, OnDestroy {
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
   /** Guard: until the context resolves, no requests fire and actions stay disabled. */
   protected readonly hasContext = computed(() => this.projectId() !== '');
+  /** Q2 (F-05): Auto page-size preference (sentinel 0) shared with the tasks table. */
+  protected readonly preferencesStore = inject(PreferencesStore);
+  protected readonly isAutoMode = computed(() => this.preferencesStore.pageSize() === AUTO_PAGE_SIZE_SENTINEL);
+  /** Measured member-table wrapper height feeding the Auto page size. */
+  protected readonly autoHeight = signal(0);
   protected readonly members = signal<ProjectMember[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
@@ -93,6 +100,7 @@ export class ProjectMemberList implements OnInit, OnDestroy {
       role: (m) => m.role,
     },
     load: () => this.loadMembers(),
+    autoAvailableHeight: this.autoHeight,
   });
   protected readonly page = this.table.page;
   protected readonly pageSize = this.table.pageSize;
@@ -208,15 +216,21 @@ export class ProjectMemberList implements OnInit, OnDestroy {
   protected removeMember(row: MemberRow): void {
     if (!row.userId || !this.hasContext()) return;
 
-    this.removingUserId.set(row.userId);
+    const userId = row.userId;
+    const previousRole = row.role;
+
+    this.removingUserId.set(userId);
 
     this.projectClient
-      .removeMember(this.projectId(), row.userId)
+      .removeMember(this.projectId(), userId)
       .pipe(finalize(() => this.removingUserId.set(null)))
       .subscribe({
         next: () => {
           this.loadMembers();
-          this.notify.success('toasts.deleted');
+          // Q11 (DEC-053): undo re-adds the member with their previous role.
+          this.notify.successWithUndo('toasts.deleted', () =>
+            this.projectClient.addMember(this.projectId(), userId, previousRole).pipe(tap(() => this.loadMembers())),
+          );
         },
         error: (err) => {
           this.notify.error(getErrorMessage(err));

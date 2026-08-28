@@ -1,8 +1,32 @@
-import { type Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, type Route, type Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 import { tenantGuard } from './guards/tenant.guard';
 import { projectGuard } from './guards/project.guard';
 import { tenantRedirectGuard } from './guards/tenant-redirect.guard';
+import { pendingChangesGuard } from '@app/shared/pending-changes/pending-changes.guard';
+
+/**
+ * Compatibility redirect for the pre-Round-5 `/t/...` URL scheme.
+ *
+ * A matcher consumes every segment of a URL whose first segment is `t`; the
+ * `redirectTo` function then rebuilds the same URL with only the first segment
+ * rewritten to `w` — deep links like `/t/acme/projects/ABC/tasks/ABC-1` land on
+ * `/w/acme/projects/ABC/tasks/ABC-1` with query params and fragment intact.
+ * `/t` alone redirects to `/w`, which falls through to the `**` fallback (root).
+ */
+export const legacyTenantRedirectRoute: Route = {
+  matcher: (segments) => (segments.length > 0 && segments[0].path === 't' ? { consumed: segments } : null),
+  redirectTo: (redirectData) => {
+    const router = inject(Router);
+    const rest = redirectData.url.slice(1).map((segment) => segment.path);
+
+    return router.createUrlTree(['/w', ...rest], {
+      queryParams: redirectData.queryParams,
+      fragment: redirectData.fragment ?? undefined,
+    });
+  },
+};
 
 export const routes: Routes = [
   // Auth routes (unauthenticated)
@@ -39,9 +63,9 @@ export const routes: Routes = [
     loadComponent: () => import('./features/tenants/create-workspace/create-workspace').then((m) => m.CreateWorkspace),
   },
 
-  // Tenant-scoped routes via slug (DEC-032): /t/:tenantSlug/...
+  // Tenant-scoped routes via slug (DEC-032, segment renamed t→w in Round 5): /w/:tenantSlug/...
   {
-    path: 't/:tenantSlug',
+    path: 'w/:tenantSlug',
     canActivate: [authGuard, tenantGuard],
     loadComponent: () => import('./shell/app-shell/app-shell').then((m) => m.AppShell),
     children: [
@@ -59,8 +83,10 @@ export const routes: Routes = [
           import('./features/tenants/tenant-member-list/tenant-member-list').then((m) => m.TenantMemberList),
       },
       {
+        // F-10 / D-47: projects list page removed — bookmarks redirect to the
+        // tenant overview (tenant home lists projects + Create project CTA).
         path: 'projects',
-        loadComponent: () => import('./features/projects/project-list/project-list').then((m) => m.ProjectList),
+        redirectTo: '',
       },
       {
         path: 'projects/:projectKey',
@@ -82,6 +108,8 @@ export const routes: Routes = [
           {
             // Must be registered BEFORE `tasks/:taskNumber` so "new" is not treated as a task number (U1)
             path: 'tasks/new',
+            // P13b (Fix 4): confirm before discarding unsaved form input
+            canDeactivate: [pendingChangesGuard],
             loadComponent: () => import('./features/tasks/create-task/create-task').then((m) => m.TaskCreate),
           },
           {
@@ -91,10 +119,6 @@ export const routes: Routes = [
           {
             path: 'sprints',
             loadComponent: () => import('./features/sprints/sprint-list/sprint-list').then((m) => m.SprintList),
-          },
-          {
-            path: 'sprints/backlog',
-            loadComponent: () => import('./features/sprints/backlog-view/backlog-view').then((m) => m.BacklogView),
           },
           {
             path: 'sprints/:sprintId',
@@ -150,12 +174,16 @@ export const routes: Routes = [
     ],
   },
 
-  // Legacy /tenants/:id paths → redirect to the slug URL (DEC-032)
   {
     path: 'tenants/:tenantId',
     canActivate: [authGuard, tenantRedirectGuard],
     redirectTo: '',
   },
+
+  // Legacy /t/... URLs (pre Round-5 rename) → same URL with the first segment
+  // rewritten to /w/... — deep links like /t/:slug/projects/KEY/tasks keep
+  // working (query params + fragment are preserved by string redirects).
+  legacyTenantRedirectRoute,
 
   // Help pages (public)
   {

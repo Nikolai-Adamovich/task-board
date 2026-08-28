@@ -20,7 +20,7 @@ export const ProjectSchema = z.object({
   tenantId: uuid(),
   key: projectKey(),
   name: nonEmptyString(200, 'Project name'),
-  description: nullableOptionalString(2000),
+  description: nullableOptionalString(120),
   status: z.enum(ProjectStatusValues),
   defaultStatusId: z.string(),
   defaultBoardId: z.string(),
@@ -36,7 +36,7 @@ export const ProjectSchema = z.object({
 export const CreateProjectSchema = z.object({
   key: projectKey(),
   name: nonEmptyString(200, 'Project name'),
-  description: optionalString(2000),
+  description: optionalString(120),
 });
 
 /**
@@ -45,7 +45,7 @@ export const CreateProjectSchema = z.object({
  */
 export const UpdateProjectSchema = z.object({
   name: nonEmptyString(200, 'Project name').optional(),
-  description: optionalString(2000),
+  description: optionalString(120),
 });
 
 /**

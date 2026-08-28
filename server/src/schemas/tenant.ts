@@ -36,7 +36,7 @@ export const TenantSchema = z.object({
   id: uuid(),
   name: nonEmptyString(200, 'Tenant name'),
   slug: tenantSlug(),
-  description: nullableOptionalString(500),
+  description: nullableOptionalString(120),
   status: z.enum(TenantStatusValues),
   deletionScheduledAt: nullableIsoDateTime(),
   createdAt: isoDateTime(),
@@ -50,7 +50,7 @@ export const TenantSchema = z.object({
 export const CreateTenantSchema = z.object({
   name: nonEmptyString(200, 'Tenant name'),
   slug: tenantSlug().optional(),
-  description: optionalString(500),
+  description: optionalString(120),
 });
 
 /**
@@ -65,7 +65,7 @@ export const SlugAvailableQuerySchema = z.object({
  */
 export const UpdateTenantSchema = z.object({
   name: nonEmptyString(200, 'Tenant name').optional(),
-  description: optionalString(500),
+  description: optionalString(120),
 });
 
 /**
@@ -77,6 +77,8 @@ export const TenantMemberSchema = z.object({
   userId: uuid(),
   role: z.enum(TenantRoleValues),
   status: z.enum(MemberStatusValues),
+  /** DEC-055: membership expiration (null = never expires) */
+  expiresAt: nullableIsoDateTime(),
   createdAt: isoDateTime(),
   updatedAt: isoDateTime(),
 });
@@ -95,6 +97,21 @@ export const InviteMemberSchema = z.object({
  */
 export const UpdateMemberRoleSchema = z.object({
   role: z.enum([TenantRoleValues[1], TenantRoleValues[2]] as [string, ...string[]]),
+});
+
+/**
+ * DEC-055: full member update — role, expiration date and the underlying
+ * user's profile (display name / email). All fields optional; the service
+ * applies only the provided ones.
+ */
+export const UpdateMemberSchema = z.object({
+  role: z.enum([TenantRoleValues[1], TenantRoleValues[2]] as [string, ...string[]]).optional(),
+  /** ISO 8601 datetime or null (null clears the expiration) */
+  expiresAt: nullableIsoDateTime().optional(),
+  /** Updates the underlying USER record's display name */
+  name: nonEmptyString(200, 'Member name').optional(),
+  /** Updates the underlying USER record's email (uniqueness enforced in the service) */
+  email: email().optional(),
 });
 
 /**

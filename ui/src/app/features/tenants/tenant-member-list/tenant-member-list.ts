@@ -4,11 +4,12 @@ import { Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucideShield, lucideUserPlus } from '@ng-icons/lucide';
-import { finalize } from 'rxjs';
+import { finalize, tap } from 'rxjs';
 import { form, FormRoot, FormField, schema, required } from '@angular/forms/signals';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
+import { PreferencesStore } from '@stores/preferences-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -17,13 +18,15 @@ import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { MemberTable } from '@app/shared/member-table/member-table';
-import type { MemberRow } from '@app/shared/member-table/member-table';
+import type { MemberEditChange, MemberRow } from '@app/shared/member-table/member-table';
 import { useMemberTable } from '@app/shared/member-list/member-table';
-import { injectToasts } from '@app/shared/utils/toast-utils';
+import { injectUndoToasts } from '@app/shared/utils/undo-toast';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { hasMinTenantRole } from '@app/shared/utils/role-utils';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { InvitationStatus, MemberStatus, TenantRole } from '@task-board/shared';
 import type { TenantMember } from '@task-board/shared';
+import { AUTO_PAGE_SIZE_SENTINEL } from '@app/shared/auto-table/auto-page-size';
 
 interface InviteFormModel {
   email: string;
@@ -50,7 +53,7 @@ interface InviteFormModel {
   templateUrl: './tenant-member-list.html',
 })
 export class TenantMemberList implements OnInit, OnDestroy {
-  private readonly notify = injectToasts();
+  private readonly notify = injectUndoToasts();
   private readonly tenantClient = inject(TenantClient);
   private readonly authStore = inject(AuthStore);
   private readonly tenantStore = inject(TenantStore);
@@ -63,6 +66,11 @@ export class TenantMemberList implements OnInit, OnDestroy {
   protected readonly tenantId = computed(() => this.tenantStore.activeTenant()?.id ?? '');
   /** Guard: until the context resolves, no requests fire and actions stay disabled. */
   protected readonly hasContext = computed(() => this.tenantId() !== '');
+  /** Q2 (F-05): Auto page-size preference (sentinel 0) shared with the tasks table. */
+  protected readonly preferencesStore = inject(PreferencesStore);
+  protected readonly isAutoMode = computed(() => this.preferencesStore.pageSize() === AUTO_PAGE_SIZE_SENTINEL);
+  /** Measured member-table wrapper height feeding the Auto page size. */
+  protected readonly autoHeight = signal(0);
   protected readonly members = signal<TenantMember[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
@@ -103,11 +111,7 @@ export class TenantMemberList implements OnInit, OnDestroy {
   protected readonly removingUserId = signal<string | null>(null);
   protected readonly actioningUserId = signal<string | null>(null);
   /** Only Owner/Tenant Admin may manage members (mirrors server RBAC). */
-  protected readonly canManage = computed(() => {
-    const role = this.authStore.tenantRole();
-
-    return role === TenantRole.OWNER || role === TenantRole.ADMIN;
-  });
+  protected readonly canManage = computed(() => hasMinTenantRole(this.authStore.tenantRole(), TenantRole.ADMIN));
   /**
    * Shared sort / column-filter / pagination machinery (see shared/member-list).
    * Filter and sort state is synced to URL query params.
@@ -119,14 +123,17 @@ export class TenantMemberList implements OnInit, OnDestroy {
       email: { matches: (m, q) => (m.email ?? '').toLowerCase().includes(q) },
       role: { matches: (m, q) => m.role === q },
       status: { matches: (m, q) => m.status === q },
+      expiresAt: { matches: (m, q) => (m.expiresAt ?? '').toLowerCase().includes(q) },
     },
     sorters: {
       name: (m) => m.displayName ?? m.email ?? m.userId ?? '',
       email: (m) => m.email ?? '',
       role: (m) => m.role,
       status: (m) => m.status,
+      expiresAt: (m) => m.expiresAt ?? '',
     },
     load: () => this.loadMembers(),
+    autoAvailableHeight: this.autoHeight,
   });
   protected readonly page = this.table.page;
   protected readonly pageSize = this.table.pageSize;
@@ -143,6 +150,7 @@ export class TenantMemberList implements OnInit, OnDestroy {
       role: m.role,
       status: m.status,
       invitationStatus: m.invitation?.status ?? null,
+      expiresAt: m.expiresAt,
     })),
   );
   /** Current column-filter snapshot passed down to the shared table. */
@@ -151,6 +159,7 @@ export class TenantMemberList implements OnInit, OnDestroy {
     email: this.table.getFilterValue('email'),
     role: this.table.getFilterValue('role'),
     status: this.table.getFilterValue('status'),
+    expiresAt: this.table.getFilterValue('expiresAt'),
   }));
 
   protected onDialogStateChange(state: BrnDialogState): void {
@@ -190,25 +199,51 @@ export class TenantMemberList implements OnInit, OnDestroy {
       });
   }
 
-  /** Optimistic role update with rollback + error toast on failure. */
-  protected changeRole(row: MemberRow, newRole: string): void {
-    if (!row.userId || !newRole || newRole === row.role || !this.hasContext()) return;
+  /**
+   * DEC-055: full member edit (role + name/email/expiration). The response is
+   * the enriched member — it replaces the local row so profile changes show up.
+   */
+  protected onMemberChange(change: MemberEditChange): void {
+    const { row, role, name, email, expiresAt } = change;
+
+    if (!row.userId || !this.hasContext()) return;
+
+    // Pure role no-op (the dialog already suppresses full no-ops)
+    if (name === undefined && email === undefined && expiresAt === undefined && role === row.role) return;
 
     const previous = this.members();
 
     this.members.update((list) =>
-      list.map((m) => (m.userId === row.userId ? { ...m, role: newRole as TenantRole } : m)),
+      list.map((m) =>
+        m.userId === row.userId
+          ? {
+              ...m,
+              role: role as TenantRole,
+              displayName: name ?? m.displayName,
+              email: email ?? m.email,
+              expiresAt: expiresAt ?? null,
+            }
+          : m,
+      ),
     );
 
-    this.tenantClient.updateMemberRole(this.tenantId(), row.userId, newRole as TenantRole).subscribe({
-      next: () => {
-        this.notify.success('toasts.updated');
-      },
-      error: (err) => {
-        this.members.set(previous); // rollback
-        this.notify.error(getErrorMessage(err));
-      },
-    });
+    this.tenantClient
+      .updateMember(this.tenantId(), row.userId, {
+        role,
+        ...(name !== undefined ? { name } : {}),
+        ...(email !== undefined ? { email } : {}),
+        ...(expiresAt !== undefined ? { expiresAt } : {}),
+      })
+      .subscribe({
+        next: (updated) => {
+          this.members.update((list) => list.map((m) => (m.userId === row.userId ? updated : m)));
+          this.notify.success('toasts.updated');
+        },
+        error: (err) => {
+          this.members.set(previous); // rollback
+          this.notify.error(getErrorMessage(err));
+        },
+      });
   }
 
   protected removeMember(row: MemberRow): void {
@@ -237,17 +272,26 @@ export class TenantMemberList implements OnInit, OnDestroy {
   protected revokeAccess(row: MemberRow): void {
     if (!row.userId || !this.hasContext()) return;
 
+    const userId = row.userId;
     const isPendingInvitation = row.invitationStatus === InvitationStatus.PENDING;
 
-    this.actioningUserId.set(row.userId);
+    this.actioningUserId.set(userId);
 
     const request$ = isPendingInvitation
-      ? this.tenantClient.revokeInvitation(this.tenantId(), row.userId)
-      : this.tenantClient.revokeAccess(this.tenantId(), row.userId);
+      ? this.tenantClient.revokeInvitation(this.tenantId(), userId)
+      : this.tenantClient.revokeAccess(this.tenantId(), userId);
 
     request$.pipe(finalize(() => this.actioningUserId.set(null))).subscribe({
       next: () => {
         this.loadMembers();
+        // Q11 (DEC-053): undo restores a revoked ACTIVE membership. A revoked
+        // PENDING invitation has no compensating restore op — re-sending it is
+        // the separate reinvite flow — so no undo is offered there.
+        if (!isPendingInvitation) {
+          this.notify.successWithUndo('toasts.updated', () =>
+            this.tenantClient.restoreMembership(this.tenantId(), userId).pipe(tap(() => this.loadMembers())),
+          );
+        }
       },
       error: (err) => {
         this.notify.error(getErrorMessage(err));

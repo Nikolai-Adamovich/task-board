@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { createTenantRoutes } from './tenants.js';
 import { TenantService } from '../services/tenant.service.js';
 import { TenantMemberService } from '../services/tenant-member.service.js';
-import { ConflictError } from '../errors/app-error.js';
+import { ConflictError, ForbiddenError } from '../errors/app-error.js';
 import { errorHandler } from '../middleware/error-handler.js';
 import type { AppEnv } from '../types/context.js';
 
@@ -67,6 +67,7 @@ vi.mock('../services/tenant.service.js', () => ({
 }));
 
 // V2-7: shared spies for the membership lifecycle routes
+const mockUpdateMember = vi.fn().mockResolvedValue(mockMember);
 const mockRevokeAccess = vi.fn().mockResolvedValue(undefined);
 const mockRestoreMembership = vi.fn().mockResolvedValue(undefined);
 const mockReinviteUser = vi.fn().mockResolvedValue(undefined);
@@ -77,7 +78,7 @@ vi.mock('../services/tenant-member.service.js', () => ({
   TenantMemberService: vi.fn().mockImplementation(() => ({
     getTenantMembers: vi.fn().mockResolvedValue([mockMember, mockInvitedMember]),
     inviteUser: vi.fn().mockResolvedValue(mockInvitedMember),
-    updateMemberRole: vi.fn().mockResolvedValue(mockMember),
+    updateMember: mockUpdateMember,
     removeMember: vi.fn().mockResolvedValue(undefined),
     revokeAccess: mockRevokeAccess,
     restoreMembership: mockRestoreMembership,
@@ -340,6 +341,67 @@ describe('GET /api/tenants/:tenantId/members includes invited members', () => {
 
     expect(body.data).toHaveLength(2);
     expect(body.data.some((m) => m.status === 'ACCESS_REVOKED')).toBe(true);
+  });
+});
+
+// ─── DEC-055: member update (role / expiration / profile) ────────────────────
+
+describe('PATCH /api/tenants/:tenantId/members/:memberUserId (DEC-055)', () => {
+  it('passes expiresAt through to the service and returns the member', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/tenants/${T}/members/${UID}`, {
+      expiresAt: '2030-01-01T00:00:00.000Z',
+    });
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { id: string } };
+
+    expect(body.data.id).toBe(mockMember.id);
+    expect(mockUpdateMember).toHaveBeenCalledWith(expect.any(String), T, UID, {
+      expiresAt: '2030-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('accepts a combined role + expiresAt + profile update', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/tenants/${T}/members/${UID}`, {
+      role: 'ADMIN',
+      expiresAt: null,
+      name: 'New Name',
+      email: 'new@test.com',
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateMember).toHaveBeenCalledWith(expect.any(String), T, UID, {
+      role: 'ADMIN',
+      expiresAt: null,
+      name: 'New Name',
+      email: 'new@test.com',
+    });
+  });
+
+  it('returns 400 for an invalid expiresAt value', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/tenants/${T}/members/${UID}`, { expiresAt: 'not-a-date' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for an invalid role', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/tenants/${T}/members/${UID}`, { role: 'OWNER' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('propagates the owner-expiration ForbiddenError as 403', async () => {
+    mockUpdateMember.mockRejectedValueOnce(new ForbiddenError('Cannot set an expiration date on the workspace owner'));
+
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/tenants/${T}/members/${UID}`, { expiresAt: '2030-01-01T00:00:00.000Z' });
+
+    expect(res.status).toBe(403);
   });
 });
 

@@ -68,6 +68,7 @@ describe('TenantMemberRepository', () => {
         tenantId: 'tenant-1',
         role: 'OWNER',
         status: 'ACTIVE',
+        expiresAt: null,
         invitation: null,
         displayName: null,
         email: null,

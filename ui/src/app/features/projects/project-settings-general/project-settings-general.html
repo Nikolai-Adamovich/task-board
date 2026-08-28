@@ -46,7 +46,20 @@
         </hlm-field>
         <hlm-field>
           <label hlmFieldLabel for="project-description">{{ 'projectSettings.description' | transloco }}</label>
-          <textarea hlmInput id="project-description" rows="3" [formField]="generalForm.description"></textarea>
+          <!-- Round 5: hlmInput ships `field-sizing-content min-h-16`, which makes an
+               empty textarea collapse to ~2 rows and ignores rows="3" — enforce 3 rows
+               via min-h instead. maxlength attribute is forbidden by [formField]; the
+               maxLength(120) schema rule enforces the limit and blocks submit. -->
+          <textarea
+            hlmInput
+            id="project-description"
+            rows="3"
+            class="min-h-24"
+            [formField]="generalForm.description"
+          ></textarea>
+          <p class="text-xs text-muted-foreground" data-testid="desc-char-count">
+            {{ 'common.charCount' | transloco: { count: model().description.length, max: 120 } }}
+          </p>
         </hlm-field>
       </form>
     </div>

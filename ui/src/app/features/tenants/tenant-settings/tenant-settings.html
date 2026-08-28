@@ -30,7 +30,28 @@
         <form id="settings-form" [formRoot]="settingsForm" class="flex flex-col gap-4">
           <hlm-field>
             <label hlmFieldLabel for="tenant-name">{{ 'tenantSettings.name' | transloco }}</label>
-            <input hlmInput id="tenant-name" type="text" [formField]="settingsForm.name" placeholder="Tenant Name" />
+            <input
+              hlmInput
+              id="tenant-name"
+              type="text"
+              [formField]="settingsForm.name"
+              [placeholder]="'tenantSettings.name' | transloco"
+            />
+          </hlm-field>
+          <hlm-field>
+            <label hlmFieldLabel for="tenant-description">{{ 'tenantSettings.description' | transloco }}</label>
+            <!-- Same pattern as project-settings-general: maxlength attribute is forbidden by
+                 [formField]; the maxLength(120) schema rule enforces the limit and blocks submit. -->
+            <textarea
+              hlmInput
+              id="tenant-description"
+              rows="3"
+              class="min-h-24"
+              [formField]="settingsForm.description"
+            ></textarea>
+            <p class="text-xs text-muted-foreground" data-testid="desc-char-count">
+              {{ 'common.charCount' | transloco: { count: model().description.length, max: 120 } }}
+            </p>
           </hlm-field>
         </form>
       </div>

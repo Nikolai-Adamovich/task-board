@@ -1,7 +1,7 @@
 /**
  * Tests for the legacy tenant redirect guard (DEC-032).
  *
- * Legacy `/tenants/:ref` URLs (id or slug) must redirect to `/t/:slug`.
+ * Legacy `/tenants/:ref` URLs (id or slug) must redirect to `/w/:slug`.
  */
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -55,7 +55,7 @@ describe('tenantRedirectGuard', () => {
     const result = await TestBed.runInInjectionContext(() => tenantRedirectGuard(makeRoute('tenant-1'), mockState));
 
     expect(result).toBeInstanceOf(UrlTree);
-    expect((result as UrlTree).toString()).toBe('/t/acme');
+    expect((result as UrlTree).toString()).toBe('/w/acme');
   });
 
   it('should also accept a legacy slug segment', async () => {
@@ -68,7 +68,7 @@ describe('tenantRedirectGuard', () => {
     const result = await TestBed.runInInjectionContext(() => tenantRedirectGuard(makeRoute('acme'), mockState));
 
     expect(result).toBeInstanceOf(UrlTree);
-    expect((result as UrlTree).toString()).toBe('/t/acme');
+    expect((result as UrlTree).toString()).toBe('/w/acme');
   });
 
   it('should fall back to / for an unknown tenant', async () => {

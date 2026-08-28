@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   NeutralDotColor,
   priorityBadgeVariant,
-  priorityLabel,
+  priorityLabelKey,
   statusBadgeVariant,
   roleBadgeVariant,
   memberStatusBadgeVariant,
@@ -22,16 +22,16 @@ describe('priorityBadgeVariant', () => {
   });
 });
 
-describe('priorityLabel', () => {
-  it('should return title-case labels for every priority value', () => {
-    expect(priorityLabel('LOW')).toBe('Low');
-    expect(priorityLabel('MEDIUM')).toBe('Medium');
-    expect(priorityLabel('HIGH')).toBe('High');
-    expect(priorityLabel('CRITICAL')).toBe('Critical');
+describe('priorityLabelKey', () => {
+  it('should return the i18n key for every priority value', () => {
+    expect(priorityLabelKey('LOW')).toBe('priority.low');
+    expect(priorityLabelKey('MEDIUM')).toBe('priority.medium');
+    expect(priorityLabelKey('HIGH')).toBe('priority.high');
+    expect(priorityLabelKey('CRITICAL')).toBe('priority.critical');
   });
 
-  it('should fall back to the raw value for unknown priorities', () => {
-    expect(priorityLabel('unknown')).toBe('unknown');
+  it('should return an empty key for unknown priorities so callers fall back to the raw value', () => {
+    expect(priorityLabelKey('unknown')).toBe('');
   });
 });
 

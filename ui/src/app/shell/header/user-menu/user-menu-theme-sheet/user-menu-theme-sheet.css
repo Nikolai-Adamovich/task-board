@@ -1,0 +1,8 @@
+/* Selected-theme name chip — highlights BOTH per-mode selections (light + dark),
+   so in Auto mode the user sees the chosen light AND the chosen dark theme. */
+.theme-name-selected {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  padding: 0 0.5rem;
+  border-radius: var(--radius);
+}

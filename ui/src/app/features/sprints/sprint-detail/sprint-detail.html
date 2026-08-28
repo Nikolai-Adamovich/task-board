@@ -3,7 +3,7 @@
     <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'sprintDetail.loading' | transloco }}</span>
   </div>
 } @else if (sprint(); as s) {
-  <div class="mx-auto max-w-6xl px-6">
+  <div class="mx-auto max-w-6xl">
     <!-- Sprint header -->
     <div class="mb-6 flex items-center justify-between">
       <div>
@@ -13,13 +13,27 @@
             {{ s.status }}
           </span>
           @if (isSprintOverdue(s)) {
-            <span hlmBadge variant="destructive" [title]="'sprints.overdueTooltip' | transloco">
+            <span hlmBadge variant="destructive" [hlmTooltip]="'sprints.overdueTooltip' | transloco">
               {{ 'sprints.overdue' | transloco }}
             </span>
           }
         </div>
-        <p class="mt-1 text-xs text-muted-foreground">
-          {{ s.startDate | date: dateFmt() }} — {{ s.endDate | date: dateFmt() }}
+        <p class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          {{ s.startDate | date: dateFmt() : undefined : lang() }} —
+          {{ s.endDate | date: dateFmt() : undefined : lang() }}
+          @if (canManage()) {
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon-xs"
+              class="size-5"
+              [attr.aria-label]="'sprintDetail.editDates' | transloco"
+              [hlmTooltip]="'sprintDetail.editDates' | transloco"
+              (click)="openEditDates()"
+            >
+              <ng-icon name="lucideCalendarDays" />
+            </button>
+          }
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -58,7 +72,7 @@
               <div class="flex items-center gap-3">
                 <span class="size-2 rounded-full" [class]="getPriorityDot(task.priority)"></span>
                 <a
-                  [routerLink]="['/t', tenantSlug(), 'projects', projectKey(), 'tasks', taskNumber(task)]"
+                  [routerLink]="['/w', tenantSlug(), 'projects', projectKey(), 'tasks', taskNumber(task)]"
                   class="text-sm font-medium text-foreground hover:text-primary hover:underline"
                 >
                   {{ task.title }}
@@ -79,7 +93,7 @@
                     variant="ghost"
                     size="icon-xs"
                     (click)="removeTaskFromSprint(task)"
-                    [title]="'sprintDetail.removeFromSprint' | transloco"
+                    [hlmTooltip]="'sprintDetail.removeFromSprint' | transloco"
                   >
                     <ng-icon name="lucideX" />
                   </button>
@@ -140,6 +154,51 @@
             <hlm-spinner />
           }
           {{ 'sprintDetail.completeAndMove' | transloco }}
+        </button>
+      </hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <!-- V8: dedicated start/end date edit dialog -->
+  <hlm-dialog [state]="showEditDates() ? 'open' : 'closed'" (stateChanged)="onEditDatesDialogStateChange($event)">
+    <!-- form-narrow token (= max-w-md, product-analysis/32-ui-polish-plan.md) -->
+    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-md">
+      <hlm-dialog-header>
+        <h3 hlmDialogTitle>{{ 'sprintDetail.editDatesTitle' | transloco }}</h3>
+      </hlm-dialog-header>
+
+      <div class="flex flex-col gap-4">
+        <hlm-field>
+          <label hlmFieldLabel for="edit-start-date">{{ 'sprintDetail.startDateLabel' | transloco }}</label>
+          <input
+            hlmInput
+            id="edit-start-date"
+            type="date"
+            [value]="editStartDate()"
+            (change)="editStartDate.set($any($event.target).value)"
+          />
+        </hlm-field>
+        <hlm-field>
+          <label hlmFieldLabel for="edit-end-date">{{ 'sprintDetail.endDateLabel' | transloco }}</label>
+          <input
+            hlmInput
+            id="edit-end-date"
+            type="date"
+            [value]="editEndDate()"
+            (change)="editEndDate.set($any($event.target).value)"
+          />
+        </hlm-field>
+      </div>
+
+      <hlm-dialog-footer>
+        <button hlmBtn variant="outline" hlmDialogClose [disabled]="savingDates()">
+          {{ 'common.cancel' | transloco }}
+        </button>
+        <button hlmBtn (click)="saveDates()" [disabled]="savingDates()">
+          @if (savingDates()) {
+            <hlm-spinner />
+          }
+          {{ 'sprintDetail.saveDates' | transloco }}
         </button>
       </hlm-dialog-footer>
     </hlm-dialog-content>

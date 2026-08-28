@@ -68,7 +68,14 @@ Paste the output as the `JWT_SECRET` value.
 
 ### 4. Start the application
 
-Open two terminals:
+One-command alternative (builds shared, starts MongoDB via docker compose, launches server + ui in a zellij layout;
+assumes Docker, zellij and konsole):
+
+```bash
+./start-local.sh
+```
+
+Or open two terminals manually:
 
 ```bash
 # Terminal 1 — Backend API (http://localhost:8787)

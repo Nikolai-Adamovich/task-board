@@ -5,8 +5,9 @@
 } @else if (board(); as b) {
   <div class="flex h-full flex-col">
     <!-- Board header -->
-    <div class="mb-4 flex items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
+    <!-- Q6 (F-13): header wraps on mobile instead of overflowing -->
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      <div class="flex min-w-0 flex-wrap items-center gap-3">
         <h2 class="text-xl font-bold text-foreground">{{ b.name }}</h2>
         <!-- Sprint scope chip (DEC-038) -->
         @if (sprintId()) {
@@ -18,22 +19,56 @@
               size="icon-xs"
               class="size-4"
               [attr.aria-label]="'boardView.clearSprint' | transloco"
-              [attr.title]="'boardView.clearSprint' | transloco"
+              [hlmTooltip]="'boardView.clearSprint' | transloco"
               (click)="onSprintSelect('')"
             >
               <ng-icon name="lucideX" />
             </button>
           </span>
         }
+        <!-- F-08: active assignee filter chip -->
+        @if (selectedAssigneeLabel()) {
+          <span hlmBadge variant="secondary" class="gap-1 py-1 pl-2">
+            {{ 'boardView.assigneeChip' | transloco: { name: selectedAssigneeLabel() } }}
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon-xs"
+              class="size-4"
+              [attr.aria-label]="'boardView.clearAssignee' | transloco"
+              [hlmTooltip]="'boardView.clearAssignee' | transloco"
+              (click)="onAssigneeSelect('')"
+            >
+              <ng-icon name="lucideX" />
+            </button>
+          </span>
+        }
+        <!-- F-08: active priority filter chip -->
+        @if (selectedPriorityLabel()) {
+          <span hlmBadge variant="secondary" class="gap-1 py-1 pl-2">
+            {{ 'boardView.priorityChip' | transloco: { priority: selectedPriorityLabel() } }}
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon-xs"
+              class="size-4"
+              [attr.aria-label]="'boardView.clearPriority' | transloco"
+              [hlmTooltip]="'boardView.clearPriority' | transloco"
+              (click)="onPrioritySelect('')"
+            >
+              <ng-icon name="lucideX" />
+            </button>
+          </span>
+        }
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto">
         <!-- Sprint selector (DEC-038): writes ?sprintId= which scopes the task query -->
         <hlm-select
           [value]="sprintId() ?? ''"
           (valueChange)="onSprintSelect($any($event))"
           [itemToString]="sprintItemToString"
         >
-          <hlm-select-trigger class="w-52" size="sm">
+          <hlm-select-trigger class="w-full sm:w-52" size="sm">
             <hlm-select-value [placeholder]="'boardView.allTasks' | transloco" />
           </hlm-select-trigger>
           <hlm-select-content *hlmSelectPortal>
@@ -50,6 +85,45 @@
             </hlm-select-group>
           </hlm-select-content>
         </hlm-select>
+        <!-- F-08: assignee filter (All / Current user / Unassigned / member) -->
+        <hlm-select
+          [value]="assignee() ?? ''"
+          (valueChange)="onAssigneeSelect($any($event))"
+          [itemToString]="assigneeItemToString"
+        >
+          <hlm-select-trigger class="w-full sm:w-44" size="sm">
+            <hlm-select-value [placeholder]="'boardView.allAssignees' | transloco" />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-group>
+              <hlm-select-item value="">{{ 'boardView.allAssignees' | transloco }}</hlm-select-item>
+              <hlm-select-item value="me">{{ 'boardView.currentUser' | transloco }}</hlm-select-item>
+              <hlm-select-item value="unassigned">{{ 'boardView.unassigned' | transloco }}</hlm-select-item>
+              @for (opt of memberOptions(); track opt.id) {
+                <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+              }
+            </hlm-select-group>
+          </hlm-select-content>
+        </hlm-select>
+        <!-- F-08: priority filter (All + task priorities) -->
+        <hlm-select
+          [value]="priority() ?? ''"
+          (valueChange)="onPrioritySelect($any($event))"
+          [itemToString]="priorityItemToString"
+        >
+          <hlm-select-trigger class="w-full sm:w-40" size="sm">
+            <hlm-select-value [placeholder]="'boardView.allPriorities' | transloco" />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-group>
+              <hlm-select-item value="">{{ 'boardView.allPriorities' | transloco }}</hlm-select-item>
+              <hlm-select-item value="LOW">{{ 'priority.low' | transloco }}</hlm-select-item>
+              <hlm-select-item value="MEDIUM">{{ 'priority.medium' | transloco }}</hlm-select-item>
+              <hlm-select-item value="HIGH">{{ 'priority.high' | transloco }}</hlm-select-item>
+              <hlm-select-item value="CRITICAL">{{ 'priority.critical' | transloco }}</hlm-select-item>
+            </hlm-select-group>
+          </hlm-select-content>
+        </hlm-select>
         @if (canCreateTask()) {
           <button hlmBtn size="sm" (click)="goToNewTask()">
             <ng-icon name="lucidePlus" class="mr-1" />
@@ -60,14 +134,18 @@
     </div>
 
     <!-- Columns -->
-    <div class="flex flex-1 gap-4 overflow-x-auto pb-4">
+    <!-- min-w-0: only this container scrolls horizontally, never the page body -->
+    <div class="flex min-w-0 flex-1 gap-4 overflow-x-auto pb-4">
       @for (column of b.columns; track column.id) {
         <div class="flex min-w-70 flex-1 flex-col rounded-lg border border-border bg-muted/30">
+          <!-- Q9 (RQ-04 ⑥): WIP count next to the column title — reflects the
+               active assignee/priority filters because it derives from
+               `filteredTasks` via `getTasksForColumn`. -->
           <div class="border-b border-border px-3 py-2">
-            <h3 class="text-sm font-semibold text-foreground">
-              {{ getColumnName(column) }}
-              <span class="ml-1 text-xs font-normal text-muted-foreground">
-                ({{ getTasksForColumn(column).length }})
+            <h3 class="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+              <span class="truncate">{{ getColumnName(column) }}</span>
+              <span class="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                {{ getTasksForColumn(column).length }}
               </span>
             </h3>
           </div>

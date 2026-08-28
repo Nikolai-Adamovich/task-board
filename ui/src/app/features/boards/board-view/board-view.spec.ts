@@ -19,6 +19,7 @@ import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
 import { SprintClient } from '@services/sprint-client';
 import { StatusClient } from '@services/status-client';
+import { ProjectClient } from '@services/project-client';
 import { ProjectStore } from '@stores/project-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
@@ -132,6 +133,7 @@ describe('BoardView', () => {
     statuses: { id: string; name: string }[] = [],
     board: Board = mockBoard,
     tasks: Task[] = mockTasks,
+    authUser: { id: string } | null = null,
   ) {
     boardClientMock = createBoardClientMock(board);
     taskClientMock = createTaskClientMock(tasks);
@@ -148,8 +150,8 @@ describe('BoardView', () => {
         {
           provide: AuthStore,
           useValue: {
-            isAuthenticated: () => false,
-            currentUser: () => null,
+            isAuthenticated: () => authUser !== null,
+            currentUser: () => authUser,
             token: () => null,
             tenantRole: () => null,
           },
@@ -158,6 +160,7 @@ describe('BoardView', () => {
         { provide: TaskClient, useValue: taskClientMock },
         { provide: SprintClient, useValue: sprintClientMock },
         { provide: StatusClient, useValue: { list: vi.fn().mockReturnValue(of(statuses)) } },
+        { provide: ProjectClient, useValue: { listMembers: vi.fn().mockReturnValue(of([])) } },
         { provide: Router, useValue: routerMock },
         {
           provide: ActivatedRoute,
@@ -375,7 +378,7 @@ describe('BoardView', () => {
 
       component.goToTask(task);
 
-      expect(routerMock.navigate).toHaveBeenCalledWith(['/t', 't1', 'projects', 't1', 'tasks', `t1-${task.number}`]);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 't1', 'projects', 't1', 'tasks', `t1-${task.number}`]);
     });
   });
 
@@ -387,7 +390,7 @@ describe('BoardView', () => {
     it('should navigate to the unified create-task page instead of opening a dialog', () => {
       component.goToNewTask();
 
-      expect(routerMock.navigate).toHaveBeenCalledWith(['/t', 't1', 'projects', 't1', 'tasks', 'new']);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 't1', 'projects', 't1', 'tasks', 'new']);
     });
   });
 
@@ -452,6 +455,120 @@ describe('BoardView', () => {
     });
   });
 
+  // ── Board assignee/priority filters (F-08) ──────────────
+
+  describe('board filters (F-08)', () => {
+    it('should resolve ?assignee=me to the current user id at query time', () => {
+      TestBed.resetTestingModule();
+      setup({ assignee: 'me' }, [], mockBoard, mockTasks, { id: 'u1' });
+
+      expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
+        limit: 200,
+        assigneeId: 'u1',
+      });
+    });
+
+    it('should pass a concrete member id server-side', () => {
+      TestBed.resetTestingModule();
+      setup({ assignee: 'u2' });
+
+      expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
+        limit: 200,
+        assigneeId: 'u2',
+      });
+    });
+
+    it('should not send assigneeId for ?assignee=unassigned and post-filter client-side', () => {
+      TestBed.resetTestingModule();
+
+      const assigned = makeTask({ id: 'tk-assigned', statusId: 's1', title: 'Assigned', number: 9, assigneeId: 'u2' });
+
+      setup({ assignee: 'unassigned' }, [], mockBoard, [...mockTasks, assigned]);
+
+      const call = taskClientMock.list.mock.calls[0][1] as Record<string, unknown>;
+
+      expect(call.assigneeId).toBeUndefined();
+      expect(component.filteredTasks().map((t: Task) => t.id)).not.toContain('tk-assigned');
+      expect(component.filteredTasks()).toHaveLength(mockTasks.length);
+    });
+
+    it('should send the priority filter server-side', () => {
+      TestBed.resetTestingModule();
+      setup({ priority: 'HIGH' });
+
+      expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
+        limit: 200,
+        priority: 'HIGH',
+      });
+    });
+
+    it('should write ?assignee= to the URL on selection and clear with the empty value', () => {
+      setup();
+
+      component.onAssigneeSelect('u2');
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { assignee: 'u2' },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }),
+      );
+
+      component.onAssigneeSelect('');
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { assignee: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }),
+      );
+    });
+
+    it('should write ?priority= to the URL on selection and clear with the empty value', () => {
+      setup();
+
+      component.onPrioritySelect('HIGH');
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { priority: 'HIGH' },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }),
+      );
+
+      component.onPrioritySelect('');
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { priority: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }),
+      );
+    });
+
+    it('should fall back to the raw id for the assignee chip label when members are not loaded', () => {
+      TestBed.resetTestingModule();
+      setup({ assignee: 'u2' });
+
+      expect(component.selectedAssigneeLabel()).toBe('u2');
+    });
+
+    it('should produce an empty chip label when no assignee filter is set', () => {
+      setup();
+
+      expect(component.selectedAssigneeLabel()).toBe('');
+      expect(component.selectedPriorityLabel()).toBe('');
+    });
+  });
+
   // ── Status display names (DR-1 / U5) ────────────────────
 
   describe('status display names (DR-1)', () => {
@@ -480,6 +597,23 @@ describe('BoardView', () => {
       const fx = setup({});
 
       expect(fx.nativeElement.textContent).toContain('Column 1');
+    });
+  });
+
+  // ── WIP counts in column headers (Q9 / RQ-04 ⑥) ─────────
+
+  describe('WIP counts in column headers (Q9)', () => {
+    it('should render a muted count badge with the number of tasks in each column', async () => {
+      const fx = setup({});
+
+      // Wait for the board + tasks to render (mockTasks: 2×s1 → col1, 1×s3 → col2)
+      await until(fx, () => !!fx.nativeElement.querySelector('.cdk-drop-list'));
+
+      const counts = Array.from(fx.nativeElement.querySelectorAll('h3 span:last-child')).map((span) =>
+        (span as HTMLElement).textContent?.trim(),
+      );
+
+      expect(counts).toEqual(['2', '1', '0']);
     });
   });
 

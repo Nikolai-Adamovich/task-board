@@ -32,8 +32,15 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
 
       <nav hlmPagination>
         <ul hlmPaginationContent>
-          @if (showEdges() && !_isFirstPageActive()) {
-            <li hlmPaginationItem (click)="goToPrevious()">
+          <!-- Edge items stay rendered (shadcn disabled pattern) so the
+               Previous/Next labels don't shift the layout between pages. -->
+          @if (showEdges()) {
+            <li
+              hlmPaginationItem
+              (click)="goToPrevious()"
+              [class.pointer-events-none]="_isFirstPageActive()"
+              [class.opacity-50]="_isFirstPageActive()"
+            >
               <hlm-pagination-previous [text]="previousText()" />
             </li>
           }
@@ -50,8 +57,13 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
             </li>
           }
 
-          @if (showEdges() && !_isLastPageActive()) {
-            <li hlmPaginationItem (click)="goToNext()">
+          @if (showEdges()) {
+            <li
+              hlmPaginationItem
+              (click)="goToNext()"
+              [class.pointer-events-none]="_isLastPageActive()"
+              [class.opacity-50]="_isLastPageActive()"
+            >
               <hlm-pagination-next [text]="nextText()" />
             </li>
           }
@@ -197,10 +209,12 @@ export class HlmNumberedPagination {
   });
 
   protected goToPrevious(): void {
+    if (this._isFirstPageActive()) return;
     this.currentPage.set(this.currentPage() - 1);
   }
 
   protected goToNext(): void {
+    if (this._isLastPageActive()) return;
     this.currentPage.set(this.currentPage() + 1);
   }
 

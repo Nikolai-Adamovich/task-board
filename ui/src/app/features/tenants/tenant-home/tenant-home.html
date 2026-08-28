@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-6xl px-6 py-8">
+<div class="mx-auto max-w-6xl py-8">
   <!-- Workspace header: name + role badge + status badge -->
   <div class="mb-6">
     <div class="flex items-center gap-3">
@@ -24,11 +24,11 @@
       </button>
     }
     @if (isOwnerOrAdmin()) {
-      <a hlmBtn variant="outline" [routerLink]="['/t', tenant()?.slug, 'settings']">
+      <a hlmBtn variant="outline" [routerLink]="['/w', tenant()?.slug, 'settings']">
         <ng-icon name="lucideSettings" class="mr-2 size-4" />
         {{ 'workspace.settings' | transloco }}
       </a>
-      <a hlmBtn variant="outline" [routerLink]="['/t', tenant()?.slug, 'settings', 'members']">
+      <a hlmBtn variant="outline" [routerLink]="['/w', tenant()?.slug, 'settings', 'members']">
         <ng-icon name="lucideUsers" class="mr-2 size-4" />
         {{ 'workspace.members' | transloco }}
       </a>
@@ -59,7 +59,7 @@
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @for (project of projects(); track project.id) {
           <a
-            [routerLink]="['/t', tenant()?.slug, 'projects', project.key]"
+            [routerLink]="['/w', tenant()?.slug, 'projects', project.key]"
             class="block rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-md"
           >
             <div class="flex items-center gap-2">
@@ -98,7 +98,7 @@
           @for (item of myTaskItems().slice(0, 10); track item.task.id) {
             <a
               [routerLink]="[
-                '/t',
+                '/w',
                 tenant()?.slug,
                 'projects',
                 item.projectKey,
@@ -117,7 +117,9 @@
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <span hlmBadge [variant]="priorityBadgeVariant(item.task.priority)">{{ item.task.priority }}</span>
+                <span hlmBadge [variant]="priorityBadgeVariant(item.task.priority)">
+                  {{ priorityLabel(item.task.priority) }}
+                </span>
                 <ng-icon name="lucideArrowRight" class="size-4 text-muted-foreground" />
               </div>
             </a>
@@ -157,7 +159,7 @@
               variant="outline"
               size="sm"
               class="mt-4"
-              [routerLink]="['/t', tenant()?.slug, 'settings', 'members']"
+              [routerLink]="['/w', tenant()?.slug, 'settings', 'members']"
             >
               {{ 'tenantHome.manageMembers' | transloco }}
             </a>
@@ -199,6 +201,8 @@
       </hlm-field>
       <hlm-field>
         <label hlmFieldLabel for="project-desc">{{ 'projects.description' | transloco }}</label>
+        <!-- maxlength attribute is forbidden by [formField]; the maxLength(120)
+             schema rule enforces the limit and blocks submit. -->
         <textarea
           hlmTextarea
           id="project-desc"
@@ -206,6 +210,9 @@
           rows="3"
           [placeholder]="'projects.descriptionPlaceholder' | transloco"
         ></textarea>
+        <p class="text-xs text-muted-foreground" data-testid="desc-char-count">
+          {{ 'common.charCount' | transloco: { count: model().description.length, max: 120 } }}
+        </p>
       </hlm-field>
     </form>
     <hlm-dialog-footer>

@@ -7,7 +7,7 @@
  * - onDragStart emitting
  * - taskClick output
  */
-import { TestBed } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
@@ -46,10 +46,16 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 describe('TaskCard', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  let fixture: ComponentFixture<TaskCard>;
 
   function setup(taskOverrides: Partial<Task> = {}, projectKey = 'PROJ') {
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [
+        TranslocoTestingModule.forRoot({
+          langs: { en: {} },
+          translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+        }),
+      ],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -58,7 +64,7 @@ describe('TaskCard', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(TaskCard);
+    fixture = TestBed.createComponent(TaskCard);
 
     fixture.componentRef.setInput('task', makeTask(taskOverrides));
     fixture.componentRef.setInput('projectKey', projectKey);
@@ -66,6 +72,21 @@ describe('TaskCard', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
   }
+
+  // ── priorityLabel (P11: translated display label) ────────────────────────
+
+  describe('priorityLabel', () => {
+    it('should render the priority label through i18n (P11)', () => {
+      setup({ priority: 'MEDIUM' });
+      // Test dictionary is empty → the i18n key renders, proving the badge label is translated
+      expect(fixture.nativeElement.textContent).toContain('priority.medium');
+    });
+
+    it('should render unknown priorities verbatim', () => {
+      setup({ priority: 'unknown' as Task['priority'] });
+      expect(component.priorityLabel('unknown')).toBe('unknown');
+    });
+  });
 
   // ── priorityVariant ──────────────────────────────────────────────────────
 

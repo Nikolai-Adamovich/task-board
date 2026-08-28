@@ -101,6 +101,28 @@ export async function ensureTenantSlugUniqueIndex(db: Db): Promise<void> {
   await db.collection('tenants').createIndex({ slug: 1 }, { unique: true });
 }
 
+// ─── DEC-055 Migration ───────────────────────────────────────────────────────
+
+/**
+ * Backfill the tenant-member `expiresAt` field (DEC-055).
+ *
+ * Members created before the field existed have no `expiresAt`; the domain
+ * contract is `Date | null`, so legacy documents are set to `null`
+ * (= never expires). Idempotent: only documents missing the field are
+ * touched. Returns the number of backfilled documents.
+ */
+export async function backfillMemberExpiresAt(db: Db): Promise<number> {
+  const result = await db
+    .collection('tenant_members')
+    .updateMany({ expiresAt: { $exists: false } }, { $set: { expiresAt: null } });
+
+  if (result.modifiedCount > 0) {
+    console.warn(`[migrations] DEC-055: backfilled expiresAt on ${result.modifiedCount} member document(s)`);
+  }
+
+  return result.modifiedCount;
+}
+
 // ─── DR-1 Migration ──────────────────────────────────────────────────────────
 
 /**

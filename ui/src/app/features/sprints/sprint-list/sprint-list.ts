@@ -32,6 +32,7 @@ import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 
 export interface CreateSprintForm {
   name: string;
@@ -64,6 +65,7 @@ interface SprintGroup {
     HlmNativeSelectImports,
     HlmCollapsibleImports,
     HlmBadgeImports,
+    HlmTooltipImports,
   ],
   providers: [provideIcons({ lucidePlus, lucideCalendar, lucideChevronRight, lucideChevronsUpDown, lucideInbox })],
   templateUrl: './sprint-list.html',
@@ -77,6 +79,8 @@ export class SprintList {
   private readonly preferencesStore = inject(PreferencesStore);
   /** R3-P8: DatePipe token derived from the user's date format preference */
   protected readonly dateFmt = this.preferencesStore.datePipeFormat;
+  /** P12 (item 28): active language passed as the DatePipe locale for localized month names */
+  protected readonly lang = this.preferencesStore.language;
   private readonly sprintClient = inject(SprintClient);
   private readonly taskClient = inject(TaskClient);
   private readonly authStore = inject(AuthStore);

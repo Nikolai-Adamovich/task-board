@@ -7,6 +7,7 @@ import {
   renameSeedStatusNames,
   backfillTenantSlugs,
   ensureTenantSlugUniqueIndex,
+  backfillMemberExpiresAt,
 } from './migrations.js';
 
 describe('migrateInvitedMembershipsToRevoked', () => {
@@ -144,5 +145,28 @@ describe('renameSeedStatusNames (DR-1)', () => {
     for (const call of updateMany.mock.calls) {
       expect(call[0].name).toBe(call[0].normalizedName.toUpperCase());
     }
+  });
+});
+
+// ─── DEC-055 ─────────────────────────────────────────────────────────────────
+
+describe('backfillMemberExpiresAt (DEC-055)', () => {
+  it('sets expiresAt to null on legacy member documents missing the field', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ modifiedCount: 5 });
+    const collection = vi.fn().mockReturnValue({ updateMany });
+    const db = { collection } as never;
+    const count = await backfillMemberExpiresAt(db);
+
+    expect(count).toBe(5);
+    expect(collection).toHaveBeenCalledWith('tenant_members');
+    expect(updateMany).toHaveBeenCalledWith({ expiresAt: { $exists: false } }, { $set: { expiresAt: null } });
+  });
+
+  it('is idempotent — a conformed database yields modifiedCount 0', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ modifiedCount: 0 });
+    const db = { collection: vi.fn().mockReturnValue({ updateMany }) } as never;
+    const count = await backfillMemberExpiresAt(db);
+
+    expect(count).toBe(0);
   });
 });

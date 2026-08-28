@@ -21,10 +21,11 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
-import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
+import { form, FormField, FormRoot, schema, required, maxLength } from '@angular/forms/signals';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
+import { hasMinTenantRole } from '@app/shared/utils/role-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 
 @Component({
@@ -71,16 +72,13 @@ export class TenantSettings implements OnInit {
   protected readonly currentTenantName = computed(() => this.tenantStore.activeTenant()?.name ?? '');
   protected readonly currentStatus = computed(() => this.tenantStore.activeTenant()?.status ?? TenantStatus.ACTIVE);
   private readonly tenantId = computed(() => this.tenantStore.activeTenant()?.id ?? null);
-  protected readonly canEdit = computed(() => {
-    const role = this.authStore.tenantRole();
-
-    return role === TenantRole.OWNER || role === TenantRole.ADMIN;
-  });
-  private readonly model = signal<{ name: string }>({ name: '' });
+  protected readonly canEdit = computed(() => hasMinTenantRole(this.authStore.tenantRole(), TenantRole.ADMIN));
+  protected readonly model = signal<{ name: string; description: string }>({ name: '', description: '' });
   protected readonly settingsForm = form(
     this.model,
-    schema<{ name: string }>((field) => {
+    schema<{ name: string; description: string }>((field) => {
       required(field.name, { message: 'validation.nameRequired' });
+      maxLength(field.description, 120, { message: 'validation.descriptionMax' });
     }),
     {
       submission: {
@@ -92,7 +90,10 @@ export class TenantSettings implements OnInit {
           if (!id) return;
 
           try {
-            await this.tenantStore.updateTenant(id, { name: this.model().name });
+            await this.tenantStore.updateTenant(id, {
+              name: this.model().name,
+              description: this.model().description,
+            });
             this.router.navigate(['/']);
           } catch (err) {
             this.error.set(getErrorMessage(err));
@@ -113,7 +114,7 @@ export class TenantSettings implements OnInit {
     const tenant = this.tenantStore.activeTenant();
 
     if (tenant) {
-      this.model.set({ name: tenant.name });
+      this.model.set({ name: tenant.name, description: tenant.description ?? '' });
       this.loading.set(false);
     } else {
       this.loading.set(false);

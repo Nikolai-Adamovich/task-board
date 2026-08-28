@@ -96,7 +96,11 @@ describe('AuditLogViewer (R3-P7 table)', () => {
     fixture.detectChanges();
   }
 
-  function setup(listFn?: ReturnType<typeof vi.fn>) {
+  /** Current persisted rows-per-page preference (0 = Auto sentinel) — mutable per test. */
+  let preferencesPageSize = 20;
+
+  function setup(listFn?: ReturnType<typeof vi.fn>, persistedPageSize = 20) {
+    preferencesPageSize = persistedPageSize;
     auditClientMock = {
       listByProject: listFn ?? vi.fn().mockReturnValue(of(mockPaginatedResponse)),
     };
@@ -112,10 +116,17 @@ describe('AuditLogViewer (R3-P7 table)', () => {
       ],
       providers: [
         { provide: AuditClient, useValue: auditClientMock },
-        // R3-P8: format tokens consumed by the Time column
+        // R3-P8 format tokens + Q2 page-size preference consumed by the viewer
         {
           provide: PreferencesStore,
-          useValue: { datePipeFormat: () => 'yyyy-MM-dd', dateTimePipeFormat: () => 'yyyy-MM-dd HH:mm' },
+          useValue: {
+            datePipeFormat: () => 'yyyy-MM-dd',
+            dateTimePipeFormat: () => 'yyyy-MM-dd HH:mm',
+            // P12 (item 28): active language used as the DatePipe locale
+            language: () => 'en',
+            pageSize: () => preferencesPageSize,
+            setPageSize: vi.fn(),
+          },
         },
         { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
         { provide: Router, useValue: routerMock },
@@ -285,5 +296,23 @@ describe('AuditLogViewer (R3-P7 table)', () => {
     expect(heading.className).toContain('flex');
     expect(heading.className).toContain('items-center');
     expect(heading.querySelector('ng-icon')).toBeTruthy();
+  });
+
+  describe('Q2 (F-05) full-height + Auto page size', () => {
+    it('renders no loading spinner — the defaultValue empty state shows directly', async () => {
+      await setup(vi.fn().mockReturnValue(new Subject())); // never emits — stays loading forever
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('hlm-spinner')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('Loading audit events');
+    });
+
+    it('derives the effective limit from the measured wrapper when the Auto sentinel is persisted', async () => {
+      await setup(undefined, 0); // AUTO_PAGE_SIZE_SENTINEL
+      await settle();
+
+      // jsdom wrapper has no height → clamped to the minimum of 5 rows
+      expect(auditClientMock.listByProject).toHaveBeenCalledWith('p1', expect.objectContaining({ limit: 5 }));
+    });
   });
 });

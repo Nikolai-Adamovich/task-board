@@ -1,4 +1,9 @@
-<div class="w-full px-6">
+<!-- Q2 (F-05): full-height flex column — exactly viewport minus the app header
+     (--header-height: 4rem) and the shell <main> vertical padding (p-6 → 2×1.5rem);
+     the member table fills the rest so its pagination stays at the page bottom. -->
+<div
+  class="flex h-[calc(100dvh-var(--header-height)-3rem)] max-sm:h-[calc(100dvh-var(--header-height)-2rem)] w-full min-w-0 flex-col"
+>
   <!-- Page header -->
   <div class="mb-6 flex items-center justify-between">
     <div class="flex items-center gap-3">
@@ -13,35 +18,40 @@
     }
   </div>
 
-  <!-- Shared member table (U4) -->
-  <ui-member-table
-    variant="tenant"
-    [rows]="tableRows()"
-    [canManage]="canManage()"
-    [loading]="loading()"
-    [contextMissing]="!hasContext()"
-    [roles]="roles"
-    [busyUserId]="actioningUserId()"
-    [removingUserId]="removingUserId()"
-    [page]="page()"
-    [pageSize]="pageSize()"
-    [total]="total()"
-    [totalPages]="totalPages()"
-    [sortField]="sortField()"
-    [sortDirection]="sortDirection()"
-    [filters]="filterValues()"
-    (sortToggle)="table.toggleSort($event)"
-    (filterChange)="table.onColumnFilterChange($event.field, $event.value)"
-    (pageChange)="table.onPageChange($event)"
-    (pageSizeChange)="table.onPageSizeChange($event)"
-    (roleChange)="changeRole($event.row, $event.role)"
-    (remove)="removeMember($event)"
-    (resend)="resendInvitation($event)"
-    (revoke)="revokeAccess($event)"
-    (restore)="restoreMembership($event)"
-    (reinvite)="reinviteMember($event)"
-    (hardDelete)="hardDeleteMember($event)"
-  />
+  <!-- Shared member table (U4) — full-height + Auto rows-per-page (Q2/F-05) -->
+  <div class="flex min-h-0 flex-1 flex-col">
+    <ui-member-table
+      variant="tenant"
+      [rows]="tableRows()"
+      [canManage]="canManage()"
+      [contextMissing]="!hasContext()"
+      [roles]="roles"
+      [busyUserId]="actioningUserId()"
+      [removingUserId]="removingUserId()"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      [total]="total()"
+      [totalPages]="totalPages()"
+      [sortField]="sortField()"
+      [sortDirection]="sortDirection()"
+      [filters]="filterValues()"
+      [autoEnabled]="true"
+      [isAuto]="isAutoMode()"
+      (rowsHeightChange)="autoHeight.set($event)"
+      (autoPageSizeChange)="preferencesStore.setPageSize(0)"
+      (sortToggle)="table.toggleSort($event)"
+      (filterChange)="table.onColumnFilterChange($event.field, $event.value)"
+      (pageChange)="table.onPageChange($event)"
+      (pageSizeChange)="table.onPageSizeChange($event)"
+      (memberChange)="onMemberChange($event)"
+      (remove)="removeMember($event)"
+      (resend)="resendInvitation($event)"
+      (revoke)="revokeAccess($event)"
+      (restore)="restoreMembership($event)"
+      (reinvite)="reinviteMember($event)"
+      (hardDelete)="hardDeleteMember($event)"
+    />
+  </div>
 
   <!-- Invite Member Dialog -->
   <hlm-dialog [state]="showInviteDialog() ? 'open' : 'closed'" (stateChanged)="onDialogStateChange($event)">

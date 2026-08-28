@@ -2,7 +2,7 @@ import { Component, computed, inject, input, OnInit, signal } from '@angular/cor
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucidePlus, lucidePencil, lucideTrash2, lucideCheck, lucideX, lucideTag } from '@ng-icons/lucide';
-import { finalize } from 'rxjs';
+import { finalize, tap } from 'rxjs';
 import { LabelClient } from '@services/label-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
@@ -16,7 +16,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Label, CreateLabel } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { injectToasts } from '@app/shared/utils/toast-utils';
+import { injectUndoToasts } from '@app/shared/utils/undo-toast';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
@@ -47,7 +47,7 @@ interface CreateLabelForm {
   templateUrl: './label-manager.html',
 })
 export class LabelManager implements OnInit {
-  private readonly notify = injectToasts();
+  private readonly notify = injectUndoToasts();
   private readonly labelClient = inject(LabelClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
@@ -149,7 +149,13 @@ export class LabelManager implements OnInit {
           this.labels.update((list) => list.filter((l) => l.id !== label.id));
           this.showDeleteDialog.set(false);
           this.deletingLabel.set(null);
-          this.notify.success('toasts.deleted');
+          // Q11 (DEC-053): undo recreates the label with the same name — labels
+          // carry no color in this app, so name is the full restorable state.
+          this.notify.successWithUndo('toasts.deleted', () =>
+            this.labelClient
+              .create(this.projectId(), { name: label.name })
+              .pipe(tap((created) => this.labels.update((list) => [...list, created]))),
+          );
         },
         error: (err) => {
           this.error.set(getErrorMessage(err));

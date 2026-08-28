@@ -1,25 +1,44 @@
-import { Service, signal, computed, inject, effect } from '@angular/core';
+import { Service, signal, computed, inject, effect, DestroyRef } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { DEFAULT_THEME_ID } from '@task-board/shared';
 import type {
   DateFormatPreference,
   TaskTableColumnKey,
+  ThemeMode,
   TimeFormatPreference,
-  UserPreferences,
   UpdateUserPreferences,
+  UserPreferences,
 } from '@task-board/shared';
 import { toDatePipeDateFormat, toDatePipeDateTimeFormat } from '@app/utils/date-format';
 import { UserPreferencesClient } from '@services/user-preferences-client';
 import { AuthStore } from '@stores/auth-store';
 import { ThemeLoader } from '@services/theme-loader';
+import { ThemeRegistry } from '@services/theme-registry';
 
-const THEME_KEY = 'taskboard_theme';
+/** localStorage key for the mode-aware theme preferences (v2). */
+const THEME_PREFS_KEY = 'taskboard_theme_v2';
+/** Legacy localStorage key holding a single theme id (pre-mode model). */
+const LEGACY_THEME_KEY = 'taskboard_theme';
+
+/** Shape persisted to localStorage for pre-auth theme restoration. */
+interface StoredThemePrefs {
+  themeMode: ThemeMode;
+  lightTheme: string | null;
+  darkTheme: string | null;
+}
 
 /**
  * Signal-based preferences store.
- * Manages per-user UI settings: zoom, theme, language, and per-project board preferences.
+ * Manages per-user UI settings: zoom, theme (mode-aware), language, and per-project board preferences.
  * Uses UserPreferencesClient for all HTTP calls — the store only handles orchestration and state.
+ *
+ * Theme model: `themeMode` ('auto' | 'light' | 'dark') plus per-mode theme choices
+ * (`lightTheme` / `darkTheme`). The effective theme is resolved centrally:
+ * - 'light' → lightTheme ?? 'light'
+ * - 'dark'  → darkTheme ?? 'dark'
+ * - 'auto'  → browser prefers-color-scheme ? (darkTheme ?? 'dark') : (lightTheme ?? 'light')
+ * In 'auto' mode the store listens to matchMedia 'change' and re-applies live.
  */
 @Service()
 export class PreferencesStore {
@@ -27,8 +46,52 @@ export class PreferencesStore {
   private readonly authStore = inject(AuthStore);
   private readonly transloco = inject(TranslocoService);
   private readonly themeLoader = inject(ThemeLoader);
+  private readonly themeRegistry = inject(ThemeRegistry);
+  private readonly destroyRef = inject(DestroyRef);
   readonly zoom = signal<number>(100);
-  readonly theme = signal<string>(DEFAULT_THEME_ID);
+  /** Theme mode: 'auto' (default) follows the browser's prefers-color-scheme. */
+  readonly themeMode = signal<ThemeMode>('auto');
+  /** Theme applied in light mode (null = default 'light'). */
+  readonly lightTheme = signal<string | null>(null);
+  /** Theme applied in dark mode (null = default 'dark'). */
+  readonly darkTheme = signal<string | null>(null);
+  /** Live view of the browser's prefers-color-scheme (drives 'auto' mode). */
+  readonly systemPrefersDark = signal<boolean>(false);
+  /** Legacy single-theme id being migrated (cleared once resolved against the manifest). */
+  private readonly legacyThemeId = signal<string | null>(null);
+  /** Effective theme id resolved from mode + per-mode choices + system scheme. */
+  readonly effectiveTheme = computed<string>(() => {
+    const legacy = this.legacyThemeId();
+
+    if (legacy) return legacy;
+
+    switch (this.themeMode()) {
+      case 'light':
+        return this.lightTheme() ?? DEFAULT_THEME_ID;
+
+      case 'dark':
+        return this.darkTheme() ?? 'dark';
+
+      default:
+        return this.systemPrefersDark() ? (this.darkTheme() ?? 'dark') : (this.lightTheme() ?? DEFAULT_THEME_ID);
+    }
+  });
+  /**
+   * The theme id shown as "selected" for the current mode: the per-mode choice
+   * in light/dark mode; the effective (browser-driven) theme in auto mode.
+   */
+  readonly selectedTheme = computed<string>(() => {
+    switch (this.themeMode()) {
+      case 'light':
+        return this.lightTheme() ?? DEFAULT_THEME_ID;
+
+      case 'dark':
+        return this.darkTheme() ?? 'dark';
+
+      default:
+        return this.effectiveTheme();
+    }
+  });
   readonly language = signal<string>('en');
   readonly pageSize = signal<number>(20);
   /** R3-P8: preferred date display format (null = not set → ISO fallback). */
@@ -45,11 +108,26 @@ export class PreferencesStore {
   private readonly projectTaskTableColumns = signal<Record<string, TaskTableColumnKey[] | null>>({});
   /** Tracks the last zoom applied locally but not yet persisted to the backend. */
   private pendingZoom: number | null = null;
-  /** Tracks the last theme applied locally but not yet persisted to the backend. */
-  private pendingTheme: string | null = null;
+  /** Tracks the pending theme-preferences partial to be flushed to the backend on commit. */
+  private pendingThemePrefs: Partial<Pick<UpdateUserPreferences, 'themeMode' | 'lightTheme' | 'darkTheme'>> | null =
+    null;
+  /** Last theme id applied via the ThemeLoader (dedupes reactive re-application). */
+  private lastAppliedTheme: string | null = null;
 
   constructor() {
     this.restoreThemeFromLocalStorage();
+    this.initSystemThemeListener();
+
+    // Apply the resolved theme immediately (before first paint)…
+    this.applyEffectiveTheme();
+
+    // …and re-apply reactively whenever the resolution changes (mode switch,
+    // per-mode theme pick, or a live prefers-color-scheme flip in auto mode).
+    effect(() => {
+      if (this.effectiveTheme() !== this.lastAppliedTheme) {
+        this.applyEffectiveTheme();
+      }
+    });
 
     // Load preferences from backend once the user is authenticated.
     effect(() => {
@@ -134,13 +212,38 @@ export class PreferencesStore {
     }
   }
 
-  /** Restore theme preference from localStorage and apply the theme CSS. */
+  /**
+   * Restore theme preferences from localStorage and apply the resolved theme.
+   * Reads the v2 mode-aware payload; falls back to migrating a legacy single-theme
+   * id (its mode is resolved against the manifest once available). With nothing
+   * persisted the default is Auto (browser-driven).
+   * P8-13: the theme must be applied at bootstrap so the login page and landing
+   * are themed from the start.
+   */
   restoreThemeFromLocalStorage(): void {
-    const stored = localStorage.getItem(THEME_KEY);
+    const raw = localStorage.getItem(THEME_PREFS_KEY);
 
-    if (stored) {
-      this.theme.set(stored);
-      this.themeLoader.loadTheme(stored);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as Partial<StoredThemePrefs>;
+
+        this.themeMode.set(parsed.themeMode ?? 'auto');
+        this.lightTheme.set(parsed.lightTheme ?? null);
+        this.darkTheme.set(parsed.darkTheme ?? null);
+      } catch {
+        // Corrupted payload — keep defaults (Auto).
+      }
+
+      return;
+    }
+
+    const legacy = localStorage.getItem(LEGACY_THEME_KEY);
+
+    if (legacy) {
+      // Legacy single-theme value: apply it right away and migrate to the
+      // mode model once the manifest tells us the theme's mode.
+      this.legacyThemeId.set(legacy);
+      void this.migrateLegacyTheme(legacy);
     }
   }
 
@@ -166,19 +269,39 @@ export class PreferencesStore {
     }
   }
 
-  /** Set theme, load the corresponding CSS file, and sync localStorage — without saving to backend. */
-  setThemeLocal(themeId: string): void {
-    this.theme.set(themeId);
-    this.themeLoader.loadTheme(themeId);
-    localStorage.setItem(THEME_KEY, themeId);
-    this.pendingTheme = themeId;
+  /**
+   * Set the theme mode ('auto' | 'light' | 'dark'), apply the resolved theme,
+   * and sync localStorage — without saving to backend.
+   */
+  setThemeModeLocal(mode: ThemeMode): void {
+    this.themeMode.set(mode);
+    this.legacyThemeId.set(null);
+    this.persistThemePrefsLocal();
+    this.pendingThemePrefs = { ...this.pendingThemePrefs, themeMode: mode };
   }
 
-  /** Persist the pending theme change to the backend. No-op if nothing is pending. */
+  /**
+   * Store a theme choice for its mode (lightTheme or darkTheme depending on the
+   * theme's mode), sync localStorage — without saving to backend. In 'auto' mode
+   * the applied theme keeps following the browser; the choice is per-mode.
+   */
+  setThemeChoiceLocal(themeId: string, mode: 'light' | 'dark'): void {
+    if (mode === 'light') {
+      this.lightTheme.set(themeId);
+    } else {
+      this.darkTheme.set(themeId);
+    }
+
+    this.legacyThemeId.set(null);
+    this.persistThemePrefsLocal();
+    this.pendingThemePrefs = { ...this.pendingThemePrefs, [mode === 'light' ? 'lightTheme' : 'darkTheme']: themeId };
+  }
+
+  /** Persist the pending theme-preferences change to the backend. No-op if nothing is pending. */
   commitTheme(): void {
-    if (this.pendingTheme !== null) {
-      this.saveToBackend({ theme: this.pendingTheme });
-      this.pendingTheme = null;
+    if (this.pendingThemePrefs !== null) {
+      this.saveToBackend(this.pendingThemePrefs);
+      this.pendingThemePrefs = null;
     }
   }
 
@@ -210,7 +333,6 @@ export class PreferencesStore {
   /** Apply all preference values from a backend response. */
   private applyPreferences(prefs: UserPreferences): void {
     this.zoom.set(prefs.zoom);
-    this.theme.set(prefs.theme);
     this.language.set(prefs.language);
     this.pageSize.set(prefs.pageSize ?? 20);
     this.dateFormat.set(prefs.dateFormat ?? null);
@@ -219,9 +341,86 @@ export class PreferencesStore {
 
     document.documentElement.style.setProperty('font-size', `${prefs.zoom}%`);
 
-    this.themeLoader.loadTheme(prefs.theme);
+    if (prefs.themeMode) {
+      // Mode-aware payload from the server.
+      this.themeMode.set(prefs.themeMode);
+      this.lightTheme.set(prefs.lightTheme ?? null);
+      this.darkTheme.set(prefs.darkTheme ?? null);
+      this.legacyThemeId.set(null);
+    } else if (prefs.theme) {
+      // Legacy server payload (single theme id): migrate to the mode model.
+      void this.migrateLegacyTheme(prefs.theme);
+    }
 
-    localStorage.setItem(THEME_KEY, prefs.theme);
+    this.persistThemePrefsLocal();
+    // Re-apply synchronously so the resolved theme is loaded without waiting
+    // for the next effect flush (the effect dedupes via lastAppliedTheme).
+    this.applyEffectiveTheme();
+  }
+
+  /**
+   * Migrate a legacy single-theme id to the mode model: resolve the theme's
+   * mode from the manifest, set themeMode accordingly and store the id as the
+   * per-mode choice. Persists locally and to the backend.
+   */
+  private async migrateLegacyTheme(themeId: string): Promise<void> {
+    await this.themeRegistry.load();
+
+    const mode = this.themeRegistry.findById(themeId)?.mode ?? 'light';
+
+    this.themeMode.set(mode);
+
+    if (mode === 'light') {
+      this.lightTheme.set(themeId);
+      this.darkTheme.set(null);
+    } else {
+      this.darkTheme.set(themeId);
+      this.lightTheme.set(null);
+    }
+
+    this.legacyThemeId.set(null);
+    this.persistThemePrefsLocal();
+    // Only persist to the backend when there is a session to persist for.
+    if (this.authStore.isAuthenticated()) {
+      this.saveToBackend({ themeMode: mode, lightTheme: this.lightTheme(), darkTheme: this.darkTheme() });
+    }
+    // Re-apply synchronously — the effective theme may have changed with the migration.
+    this.applyEffectiveTheme();
+  }
+
+  /** Subscribe to prefers-color-scheme changes so 'auto' mode reacts live. */
+  private initSystemThemeListener(): void {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+
+    this.systemPrefersDark.set(mql.matches);
+
+    const listener = (event: MediaQueryListEvent): void => {
+      this.systemPrefersDark.set(event.matches);
+    };
+
+    mql.addEventListener('change', listener);
+    this.destroyRef.onDestroy(() => mql.removeEventListener('change', listener));
+  }
+
+  /** Apply the currently resolved theme via the ThemeLoader. */
+  private applyEffectiveTheme(): void {
+    const themeId = this.effectiveTheme();
+
+    this.lastAppliedTheme = themeId;
+    void this.themeLoader.loadTheme(themeId);
+  }
+
+  /** Mirror the mode-aware theme preferences to localStorage (pre-auth restore). */
+  private persistThemePrefsLocal(): void {
+    const payload: StoredThemePrefs = {
+      themeMode: this.themeMode(),
+      lightTheme: this.lightTheme(),
+      darkTheme: this.darkTheme(),
+    };
+
+    localStorage.setItem(THEME_PREFS_KEY, JSON.stringify(payload));
   }
 
   /** Persist a partial preferences update to the backend. */

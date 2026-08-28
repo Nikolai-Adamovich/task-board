@@ -2,8 +2,9 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
 import { validateBody } from '../middleware/validation.js';
 import { requirePermission } from '../middleware/rbac.js';
+import { AppError } from '../errors/app-error.js';
 import type { TaskQueryOptions } from '../repositories/task.repository.js';
-import { CreateTaskSchema, UpdateTaskSchema } from '../schemas/task.js';
+import { BulkUpdateTasksSchema, CreateTaskSchema, UpdateTaskSchema } from '../schemas/task.js';
 
 // ─── Task Routes ─────────────────────────────────────────────────────────────
 
@@ -26,6 +27,18 @@ export function createTaskRoutes(): Hono<AppEnv> {
       sort = { field, direction: direction === 'asc' ? 'asc' : 'desc' };
     }
 
+    // Q13/F-01: inclusive ISO date (`YYYY-MM-DD`) range filters — invalid format → 400
+    const isoDateParam = (name: string): string | undefined => {
+      const value = c.req.query(name);
+
+      if (value === undefined) return undefined;
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        throw new AppError(400, 'VALIDATION_ERROR', `${name} must be an ISO date (YYYY-MM-DD)`);
+      }
+
+      return value;
+    };
     const options: TaskQueryOptions = {
       page: pageStr ? parseInt(pageStr, 10) : 1,
       limit: limitStr ? parseInt(limitStr, 10) : 20,
@@ -37,6 +50,10 @@ export function createTaskRoutes(): Hono<AppEnv> {
       reporterId: c.req.query('reporterId'),
       sprintId: c.req.query('sprintId'),
       labelId: c.req.query('labelId'),
+      createdFrom: isoDateParam('createdFrom'),
+      createdTo: isoDateParam('createdTo'),
+      updatedFrom: isoDateParam('updatedFrom'),
+      updatedTo: isoDateParam('updatedTo'),
       sort,
     };
     const result = await c.get('svc').tasks.getTasksByProject(projectId, options);
@@ -97,6 +114,23 @@ export function createTaskRoutes(): Hono<AppEnv> {
     const task = await c.get('svc').tasks.updateTask(taskId, body, userId, tenantRole);
 
     return c.json({ data: task });
+  });
+
+  /**
+   * Q10 (RQ-04 ③): PATCH /projects/:projectId/tasks/bulk — bulk status/assignee/sprint update.
+   * Body contract (exactly one `data` field) is enforced by Zod; per-task
+   * failures (unknown id, wrong project, version conflict) are reported in the
+   * response instead of failing the whole request. Authorization (`edit_task`)
+   * is enforced inside the service, same as single-task update.
+   */
+  router.patch('/projects/:projectId/tasks/bulk', validateBody(BulkUpdateTasksSchema), async (c) => {
+    const projectId = c.req.param('projectId');
+    const userId = c.get('userId');
+    const tenantRole = c.get('tenantRole');
+    const body = c.req.valid('json');
+    const result = await c.get('svc').tasks.bulkUpdateTasks(projectId, body.taskIds, body.data, userId, tenantRole);
+
+    return c.json({ data: result });
   });
 
   /**

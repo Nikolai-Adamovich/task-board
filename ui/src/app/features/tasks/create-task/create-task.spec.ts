@@ -153,6 +153,31 @@ describe('TaskCreate (U1 — unified create-task page)', () => {
     expect(component.model().priority).toBe('MEDIUM');
   });
 
+  // P13b (Fix 4): pending-changes tracking for the canDeactivate guard
+  it('should report pending changes only after the user modifies a field or picks a label', async () => {
+    await setup();
+
+    expect(component.hasPendingChanges()).toBe(false);
+
+    // Simulate user typing in the title (marks the Signal Form dirty)
+    component.model.update((m: { title: string }) => ({ ...m, title: 'Half-typed task' }));
+    fixture.detectChanges();
+    component.createForm().markAsDirty();
+
+    expect(component.hasPendingChanges()).toBe(true);
+
+    // Resetting the form (post-create path) clears the pending state
+    component.createForm().reset();
+    fixture.detectChanges();
+
+    expect(component.hasPendingChanges()).toBe(false);
+
+    // Picked labels count as pending too
+    component.onLabelPicked({ id: 'lb-bug', name: 'bug' });
+
+    expect(component.hasPendingChanges()).toBe(true);
+  });
+
   it('should honor defaultStatusId even when its name is not "To Do"', async () => {
     refOptions.statuses = [{ id: 'st-ip', name: 'In Progress' }];
     mockProject['defaultStatusId'] = 'st-ip';
@@ -194,7 +219,7 @@ describe('TaskCreate (U1 — unified create-task page)', () => {
       expect.objectContaining({ title: 'Created Task', statusId: 'st-todo', typeId: 'type-task' }),
     );
     // The ActivatedRoute mock resolves every param to 'ABC' — including tenantSlug
-    expect(routerMock.navigate).toHaveBeenCalledWith(['/t', 'ABC', 'projects', 'ABC', 'tasks', 'ABC-7']);
+    expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 'ABC', 'projects', 'ABC', 'tasks', 'ABC-7']);
   });
 
   it('should show an inline validation error for an empty title without calling the API', async () => {

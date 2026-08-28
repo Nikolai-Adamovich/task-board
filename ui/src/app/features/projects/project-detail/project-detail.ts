@@ -90,6 +90,8 @@ export class ProjectDetail {
   private readonly preferencesStore = inject(PreferencesStore);
   /** R3-P8: DatePipe token derived from the user's date format preference */
   protected readonly dateFmt = this.preferencesStore.datePipeFormat;
+  /** P12 (item 28): active language passed as the DatePipe locale for localized month names */
+  protected readonly lang = this.preferencesStore.language;
   private readonly tenantStore = inject(TenantStore);
   /** Bound via withComponentInputBinding() — receives project key from route */
   readonly projectKey = input.required<string>();

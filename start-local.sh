@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+#
+# One-command local startup for the Task Board monorepo.
+# Builds the shared workspace, starts MongoDB via docker compose (idempotent,
+# includes healthcheck + rs.initiate), then opens a zellij layout with
+# server (wrangler dev) and ui (ng serve) panes side by side.
+#
+# Assumes: Docker, zellij and konsole are installed.
 
 set -e
 
@@ -15,7 +22,7 @@ layout {
 
         pane {
             command "bash"
-            args "-c" "docker start task-board-mongo && cd '$PROJECT_DIR' && npm run dev -w server"
+            args "-c" "docker compose up -d && cd '$PROJECT_DIR' && npm run dev -w server"
         }
 
         pane {

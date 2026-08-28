@@ -96,10 +96,17 @@ export class TenantClient {
       .pipe(map((res) => res.data));
   }
 
-  /** Update a member's role. */
-  updateMemberRole(tenantId: string, userId: string, role: string): Observable<TenantMember> {
+  /**
+   * Update a member — role, expiration date (DEC-055) and the underlying
+   * user's profile (name/email). Only provided fields are applied.
+   */
+  updateMember(
+    tenantId: string,
+    userId: string,
+    patch: { role?: string; expiresAt?: string | null; name?: string; email?: string },
+  ): Observable<TenantMember> {
     return this.http
-      .patch<{ data: TenantMember }>(`${this.apiBaseUrl}/tenants/${tenantId}/members/${userId}`, { role })
+      .patch<{ data: TenantMember }>(`${this.apiBaseUrl}/tenants/${tenantId}/members/${userId}`, patch)
       .pipe(map((res) => res.data));
   }
 

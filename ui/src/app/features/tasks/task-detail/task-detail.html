@@ -1,11 +1,11 @@
 @if (error()) {
-  <div class="mx-auto max-w-6xl px-6 py-8">
+  <div class="mx-auto max-w-6xl py-8">
     <hlm-alert variant="destructive" class="mb-4">
       <div hlmAlertDescription>{{ error() | transloco }}</div>
     </hlm-alert>
   </div>
 } @else if (task(); as t) {
-  <div class="mx-auto max-w-6xl px-6">
+  <div class="mx-auto max-w-6xl">
     <!-- Header (R3-P5): key never wraps, title clamps, priority badge on its own row -->
     <div class="mb-6">
       <span class="whitespace-nowrap font-mono text-sm text-muted-foreground">{{ taskLabel() }}</span>
@@ -70,8 +70,9 @@
       </div>
 
       <p class="mt-1 text-xs text-muted-foreground">
-        {{ 'taskDetail.created' | transloco: { date: (t.createdAt | date: dateTimeFmt()) } }} &middot;
-        {{ 'taskDetail.updated' | transloco: { date: (t.updatedAt | date: dateTimeFmt()) } }}
+        {{ 'taskDetail.created' | transloco: { date: (t.createdAt | date: dateTimeFmt() : undefined : lang()) } }}
+        &middot;
+        {{ 'taskDetail.updated' | transloco: { date: (t.updatedAt | date: dateTimeFmt() : undefined : lang()) } }}
       </p>
     </div>
 

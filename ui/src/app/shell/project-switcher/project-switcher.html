@@ -1,0 +1,59 @@
+@if (isCollapsedIconMode()) {
+  <!-- Collapsed-icon mode: icon-only trigger with tooltip (same menu) -->
+  <button
+    hlmSidebarMenuButton
+    variant="outline"
+    size="lg"
+    class="justify-center"
+    [hlmDropdownMenuTrigger]="projectMenu"
+    (hlmDropdownMenuOpened)="onMenuOpened()"
+    (hlmDropdownMenuClosed)="onMenuClosed()"
+    [tooltip]="collapsedTooltip() ?? ('projectSwitcher.selectProject' | transloco)"
+  >
+    <ng-icon name="lucideFolderKanban" />
+  </button>
+} @else {
+  <!-- Expanded mode: styled 1:1 on the tenant switcher -->
+  <button
+    hlmBtn
+    variant="outline"
+    size="lg"
+    class="w-full"
+    [hlmDropdownMenuTrigger]="projectMenu"
+    (hlmDropdownMenuOpened)="onMenuOpened()"
+    (hlmDropdownMenuClosed)="onMenuClosed()"
+  >
+    @if (currentProjectKey(); as key) {
+      @if (projects().find((p) => p.key === key); as project) {
+        <span class="font-medium">{{ project.name }}</span>
+      } @else {
+        <span class="text-muted-foreground">{{ 'projectSwitcher.selectProject' | transloco }}</span>
+      }
+    } @else {
+      <span class="text-muted-foreground">{{ 'projectSwitcher.selectProject' | transloco }}</span>
+    }
+    <ng-icon name="lucideChevronDown" class="ml-1" />
+  </button>
+}
+
+<ng-template #projectMenu>
+  <div hlmDropdownMenu class="w-full min-w-56">
+    @for (project of projects(); track project.id) {
+      <button hlmDropdownMenuItem (click)="selectProject(project)">
+        {{ project.name }}
+        @if (isActive(project)) {
+          <ng-icon name="lucideCheck" class="ml-auto text-primary" />
+        }
+      </button>
+    } @empty {
+      <div class="px-3 py-2 text-sm text-muted-foreground">{{ 'projectSwitcher.noProjects' | transloco }}</div>
+    }
+    @if (canCreateProject()) {
+      <hlm-dropdown-menu-separator />
+      <button hlmDropdownMenuItem (click)="navigateToCreateProject()">
+        <ng-icon name="lucidePlus" />
+        {{ 'projectSwitcher.createProject' | transloco }}
+      </button>
+    }
+  </div>
+</ng-template>

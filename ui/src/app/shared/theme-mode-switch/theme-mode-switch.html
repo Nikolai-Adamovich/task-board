@@ -1,0 +1,35 @@
+<hlm-radio-group
+  class="grid grid-flow-col auto-cols-fr gap-1 rounded-lg border bg-muted/40 p-1"
+  [value]="$any(preferencesStore.themeMode())"
+  (valueChange)="onModeChange($any($event))"
+  [attr.aria-label]="'themes.mode' | transloco"
+  (keydown)="onKeydown($event)"
+>
+  <label
+    for="theme-mode-auto"
+    class="flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&:has([data-checked=true])]:bg-background [&:has([data-checked=true])]:text-foreground [&:has([data-checked=true])]:shadow-sm [&:has(input:focus)]:border-ring [&:has(input:focus)]:ring-3 [&:has(input:focus)]:ring-ring/50"
+  >
+    <hlm-radio inputId="theme-mode-auto" value="auto" class="flex items-center gap-1.5">
+      <ng-icon name="lucideMonitor" class="size-4" aria-hidden="true" />
+    </hlm-radio>
+    <span>{{ 'themes.modeAuto' | transloco }}</span>
+  </label>
+  <label
+    for="theme-mode-light"
+    class="flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&:has([data-checked=true])]:bg-background [&:has([data-checked=true])]:text-foreground [&:has([data-checked=true])]:shadow-sm [&:has(input:focus)]:border-ring [&:has(input:focus)]:ring-3 [&:has(input:focus)]:ring-ring/50"
+  >
+    <hlm-radio inputId="theme-mode-light" value="light" class="flex items-center gap-1.5">
+      <ng-icon name="lucideSun" class="size-4" aria-hidden="true" />
+    </hlm-radio>
+    <span>{{ 'themes.modeLight' | transloco }}</span>
+  </label>
+  <label
+    for="theme-mode-dark"
+    class="flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&:has([data-checked=true])]:bg-background [&:has([data-checked=true])]:text-foreground [&:has([data-checked=true])]:shadow-sm [&:has(input:focus)]:border-ring [&:has(input:focus)]:ring-3 [&:has(input:focus)]:ring-ring/50"
+  >
+    <hlm-radio inputId="theme-mode-dark" value="dark" class="flex items-center gap-1.5">
+      <ng-icon name="lucideMoon" class="size-4" aria-hidden="true" />
+    </hlm-radio>
+    <span>{{ 'themes.modeDark' | transloco }}</span>
+  </label>
+</hlm-radio-group>

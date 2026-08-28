@@ -65,6 +65,26 @@ describe('UserSettingsRepository', () => {
       expect(result.dateFormat).toBeNull();
       expect(result.timeFormat).toBeNull();
     });
+
+    it('falls back to themeMode "auto" and null per-mode themes for legacy documents', async () => {
+      collection.findOne.mockResolvedValue(makeDoc({ themeMode: undefined as never }));
+
+      const result = await repo.findByUserId('user-1');
+
+      expect(result.themeMode).toBe('auto');
+      expect(result.lightTheme).toBeNull();
+      expect(result.darkTheme).toBeNull();
+    });
+
+    it('maps persisted themeMode/lightTheme/darkTheme to the domain shape', async () => {
+      collection.findOne.mockResolvedValue(makeDoc({ themeMode: 'dark', lightTheme: null, darkTheme: 'nord' }));
+
+      const result = await repo.findByUserId('user-1');
+
+      expect(result.themeMode).toBe('dark');
+      expect(result.lightTheme).toBeNull();
+      expect(result.darkTheme).toBe('nord');
+    });
   });
 
   describe('upsert', () => {
@@ -90,6 +110,22 @@ describe('UserSettingsRepository', () => {
       expect(update.$set.zoom).toBe(125);
       expect(update.$setOnInsert.dateFormat).toBeNull();
       expect(update.$setOnInsert.timeFormat).toBeNull();
+      expect(update.$setOnInsert.themeMode).toBe('auto');
+      expect(update.$setOnInsert.lightTheme).toBeNull();
+      expect(update.$setOnInsert.darkTheme).toBeNull();
+    });
+
+    it('persists themeMode/lightTheme/darkTheme when provided', async () => {
+      // The mock re-read (findByUserId after updateOne) returns the updated document.
+      collection.findOne.mockResolvedValue(makeDoc({ themeMode: 'light', lightTheme: 'github-light' }));
+
+      const result = await repo.upsert('user-1', { themeMode: 'light', lightTheme: 'github-light' });
+      const update = collection.updateOne.mock.calls[0][1] as Record<string, Record<string, unknown>>;
+
+      expect(update.$set.themeMode).toBe('light');
+      expect(update.$set.lightTheme).toBe('github-light');
+      expect(result.themeMode).toBe('light');
+      expect(result.lightTheme).toBe('github-light');
     });
   });
 });

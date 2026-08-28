@@ -1,6 +1,7 @@
 import { inject, signal, computed, type Signal, type WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PreferencesStore } from '@stores/preferences-store';
+import { AUTO_PAGE_SIZE_SENTINEL, computeAutoPageSize } from '@app/shared/auto-table/auto-page-size';
 
 /** Definition of a per-column text/select filter. */
 export interface MemberColumnFilter<T> {
@@ -18,6 +19,12 @@ export interface MemberTableConfig<T> {
   sorters: Record<string, (item: T) => string>;
   /** Load callback invoked whenever URL query params change. */
   load: () => void;
+  /**
+   * Q2 (F-05): measured table-wrapper height enabling Auto page-size mode — when the
+   * persisted preference is the Auto sentinel (0), the effective page size is derived
+   * from this signal via `computeAutoPageSize`.
+   */
+  autoAvailableHeight?: Signal<number>;
 }
 
 /** Shared sort / column-filter / pagination state for member tables. */
@@ -52,8 +59,14 @@ export function useMemberTable<T>(config: MemberTableConfig<T>): MemberTableStat
   const route = inject(ActivatedRoute);
   const preferencesStore = inject(PreferencesStore);
   const page = signal(1);
-  // `0` is the Auto sentinel persisted by the tasks table — fall back to the default here.
-  const pageSize = signal(preferencesStore.pageSize() || 20);
+  // Raw persisted value; `0` is the shared Auto sentinel and is resolved below.
+  const pageSize = signal(preferencesStore.pageSize());
+  /** Q2 (F-05): true when the persisted preference is the Auto sentinel. */
+  const isAutoMode = computed(() => pageSize() === AUTO_PAGE_SIZE_SENTINEL);
+  /** Effective numeric page size — derived from the measured height in Auto mode. */
+  const effectivePageSize = computed(() =>
+    isAutoMode() ? computeAutoPageSize(config.autoAvailableHeight?.() ?? 0) : pageSize(),
+  );
   const sortField = signal('');
   const sortDirection = signal<'asc' | 'desc'>('asc');
   const filterValues = signal<Record<string, string>>({});
@@ -87,11 +100,12 @@ export function useMemberTable<T>(config: MemberTableConfig<T>): MemberTableStat
     return list;
   });
   const total = computed(() => filtered().length);
-  const totalPages = computed(() => Math.max(1, Math.ceil(total() / pageSize())));
+  const totalPages = computed(() => Math.max(1, Math.ceil(total() / effectivePageSize())));
   const paginated = computed(() => {
-    const start = (page() - 1) * pageSize();
+    const size = effectivePageSize();
+    const start = (page() - 1) * size;
 
-    return filtered().slice(start, start + pageSize());
+    return filtered().slice(start, start + size);
   });
 
   function syncToUrl(): void {

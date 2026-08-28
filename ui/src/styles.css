@@ -13,10 +13,28 @@
   --role-member: oklch(0.65 0.15 80);
 }
 
+/* P6/9b: sidebar palette fallbacks. The vendored sidebar menu button styles use
+   bg-sidebar-accent / text-sidebar-accent-foreground for hover + active states,
+   but not every theme sheet defines the --sidebar-* tokens (light, light2 don't).
+   These fallbacks alias the generic accent tokens so hover/active are visible in
+   every theme; theme sheets are appended to <head> AFTER this stylesheet, so
+   themes that define their own --sidebar-* values (dark, light1) win the cascade. */
+:root {
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--card-foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -33,4 +51,13 @@ body {
   scrollbar-gutter: stable;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Q9 (RQ-04 ⑤): compact table density — reduces vertical cell padding on every
+   data table carrying `.table-density-compact` (tasks table, audit log, member
+   tables). Unlayered rule → wins over the layered Tailwind utilities the Helm
+   table cells apply, without touching horizontal padding. */
+table.table-density-compact td,
+table.table-density-compact th {
+  padding: 0.15rem;
 }

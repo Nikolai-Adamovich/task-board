@@ -6,6 +6,7 @@
  * - "My Tasks" widget scoped to the active tenant's projects (KEY-NUMBER links)
  * - Pending-invitations summary for OWNER/ADMIN only
  */
+import { signal, type WritableSignal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -96,6 +97,7 @@ const mockPendingInvite: TenantMember = {
   userId: 'u9',
   role: 'MEMBER',
   status: 'ACCESS_REVOKED',
+  expiresAt: null,
   invitation: { status: 'PENDING', tokenHash: 'h', invitedBy: 'u1', invitedOn: NOW },
   displayName: null,
   email: 'new@example.com',
@@ -110,7 +112,9 @@ describe('TenantHome', () => {
   let projectClientMock: { list: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
   let taskClientMock: { getMyTasks: ReturnType<typeof vi.fn> };
   let tenantClientMock: { listMembers: ReturnType<typeof vi.fn> };
-  let tenantStoreMock: { activeTenant: ReturnType<typeof vi.fn> };
+  // Real signal so tests can simulate switching the active workspace (Round 5 F-01)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let tenantStoreMock: { activeTenant: WritableSignal<any> };
   let authStoreMock: { currentUser: ReturnType<typeof vi.fn>; tenantRole: ReturnType<typeof vi.fn> };
 
   function setup(opts: { role?: string; myTasks?: Task[] } = {}) {
@@ -127,7 +131,7 @@ describe('TenantHome', () => {
       listMembers: vi.fn().mockReturnValue(of([mockPendingInvite])),
     };
     tenantStoreMock = {
-      activeTenant: vi.fn().mockReturnValue(mockTenant),
+      activeTenant: signal(mockTenant),
     };
     authStoreMock = {
       currentUser: vi.fn().mockReturnValue({ id: 'u1' }),
@@ -135,7 +139,13 @@ describe('TenantHome', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } }), TenantHome],
+      imports: [
+        TranslocoTestingModule.forRoot({
+          langs: { en: { common: { charCount: '{{count}}/{{max}}' } } },
+          translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+        }),
+        TenantHome,
+      ],
       providers: [
         provideRouter([]),
         { provide: ProjectClient, useValue: projectClientMock },
@@ -195,6 +205,35 @@ describe('TenantHome', () => {
     expect(tenantClientMock.listMembers).not.toHaveBeenCalled();
   });
 
+  // ── Round 5 F-01: resources must re-run when the active workspace changes ──
+
+  it('should re-fetch projects and my tasks when the active tenant switches (Round 5 F-01)', async () => {
+    setup();
+
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(projectClientMock.list).toHaveBeenCalledTimes(1);
+    expect(taskClientMock.getMyTasks).toHaveBeenCalledTimes(1);
+    expect(component.projects()).toEqual(mockProjects);
+
+    const tenantB = { ...mockTenant, id: 't2', slug: 'globex', name: 'Globex' };
+    const projectsB: Project[] = [{ ...mockProjects[0], id: 'p2', tenantId: 't2', name: 'Beta' }];
+
+    projectClientMock.list.mockReturnValue(of(projectsB));
+    taskClientMock.getMyTasks.mockReturnValue(of([]));
+    tenantStoreMock.activeTenant.set(tenantB);
+
+    for (let i = 0; i < 20 && component.projects() !== projectsB; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    fixture.detectChanges();
+
+    expect(projectClientMock.list).toHaveBeenCalledTimes(2);
+    expect(taskClientMock.getMyTasks).toHaveBeenCalledTimes(2);
+    expect(component.projects()).toEqual(projectsB);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Beta');
+  });
+
   it('should render the standard empty state (icon + title + hint) when My Tasks is empty (DR-8)', async () => {
     setup({ myTasks: [] });
 
@@ -230,5 +269,29 @@ describe('TenantHome', () => {
     setup({ role: 'MEMBER' });
 
     expect(component.canCreate()).toBe(false);
+  });
+
+  // ── Round 5 P2: project description 120-char limit ────────────
+
+  it('should mark the create-project description invalid over 120 characters (Round 5 P2)', () => {
+    setup({ role: 'OWNER' });
+
+    component.model.update((m: { description: string }) => ({ ...m, description: 'a'.repeat(121) }));
+
+    expect(component.newProjectForm.description().invalid()).toBe(true);
+    expect(component.newProjectForm().invalid()).toBe(true);
+  });
+
+  it('should accept a create-project description of exactly 120 characters (Round 5 P2)', () => {
+    setup({ role: 'OWNER' });
+
+    component.model.update((m: { name: string; key: string; description: string }) => ({
+      ...m,
+      name: 'Alpha',
+      key: 'ABC',
+      description: 'a'.repeat(120),
+    }));
+
+    expect(component.newProjectForm.description().valid()).toBe(true);
   });
 });

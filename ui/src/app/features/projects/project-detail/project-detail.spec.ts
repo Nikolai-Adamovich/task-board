@@ -162,7 +162,12 @@ function setup(options: { tenantRole?: string; projectStatus?: Project['status']
       // R3-P8: format tokens consumed by recent tasks / sprint dates
       {
         provide: PreferencesStore,
-        useValue: { datePipeFormat: () => 'yyyy-MM-dd', dateTimePipeFormat: () => 'yyyy-MM-dd HH:mm' },
+        useValue: {
+          datePipeFormat: () => 'yyyy-MM-dd',
+          dateTimePipeFormat: () => 'yyyy-MM-dd HH:mm',
+          // P12 (item 28): active language used as the DatePipe locale
+          language: () => 'en',
+        },
       },
       {
         provide: ProjectStore,
@@ -267,5 +272,22 @@ describe('ProjectDetail (overview)', () => {
     expect(component.memberInitials('Ada Lovelace', undefined)).toBe('AL');
     expect(component.memberInitials(undefined, 'bob@example.com')).toBe('BO');
     expect(component.memberInitials(undefined, undefined)).toBe('?');
+  });
+
+  // ── Round 5: equal-height overview cards ─────────────────────
+
+  it('should render equal-height overview cards (items-stretch grid + h-full cards)', async () => {
+    setup();
+    await until(() => component.project() !== null);
+
+    const el: HTMLElement = fixture.nativeElement;
+    const grid = el.querySelector('div.grid.items-stretch');
+
+    expect(grid).not.toBeNull();
+
+    const cards = el.querySelectorAll('hlm-card');
+
+    expect(cards.length).toBe(4);
+    cards.forEach((card) => expect(card.classList.contains('h-full')).toBe(true));
   });
 });

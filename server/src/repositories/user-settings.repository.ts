@@ -1,5 +1,5 @@
 import type { Collection, ObjectId } from 'mongodb';
-import type { DateFormatPreference, TimeFormatPreference } from '@task-board/shared';
+import type { DateFormatPreference, ThemeMode, TimeFormatPreference } from '@task-board/shared';
 
 // ─── MongoDB Document Shape ──────────────────────────────────────────────────
 
@@ -7,7 +7,14 @@ export interface UserSettingsDocument {
   _id?: ObjectId;
   userId: string;
   zoom: number;
+  /** Legacy single-theme field kept for backward compatibility with older clients. */
   theme: string;
+  /** Theme mode (default 'auto'): 'auto' follows the browser's prefers-color-scheme. */
+  themeMode?: ThemeMode;
+  /** Theme applied when mode is 'light' (or in 'auto' with a light system scheme). */
+  lightTheme?: string | null;
+  /** Theme applied when mode is 'dark' (or in 'auto' with a dark system scheme). */
+  darkTheme?: string | null;
   language: string;
   pageSize: number;
   /** R3-P8: preferred date display format (null = not set). */
@@ -22,7 +29,14 @@ export interface UserSettingsDocument {
 export interface UserSettings {
   userId: string;
   zoom: number;
+  /** Legacy single-theme field kept for backward compatibility with older clients. */
   theme: string;
+  /** Theme mode (default 'auto'): 'auto' follows the browser's prefers-color-scheme. */
+  themeMode: ThemeMode;
+  /** Theme applied when mode is 'light' (or in 'auto' with a light system scheme). */
+  lightTheme: string | null;
+  /** Theme applied when mode is 'dark' (or in 'auto' with a dark system scheme). */
+  darkTheme: string | null;
   language: string;
   pageSize: number;
   /** R3-P8: preferred date display format (null = not set). */
@@ -35,6 +49,9 @@ export interface UserSettings {
 export interface UpdateUserSettings {
   zoom?: number;
   theme?: string;
+  themeMode?: ThemeMode;
+  lightTheme?: string | null;
+  darkTheme?: string | null;
   language?: string;
   pageSize?: number;
   dateFormat?: DateFormatPreference | null;
@@ -44,6 +61,9 @@ export interface UpdateUserSettings {
 const DEFAULTS = {
   zoom: 100,
   theme: 'light',
+  themeMode: 'auto' as ThemeMode,
+  lightTheme: null,
+  darkTheme: null,
   language: 'en',
   pageSize: 20,
   dateFormat: null,
@@ -55,6 +75,9 @@ function toDomain(doc: UserSettingsDocument): UserSettings {
     userId: doc.userId,
     zoom: doc.zoom,
     theme: doc.theme,
+    themeMode: doc.themeMode ?? DEFAULTS.themeMode,
+    lightTheme: doc.lightTheme ?? DEFAULTS.lightTheme,
+    darkTheme: doc.darkTheme ?? DEFAULTS.darkTheme,
     language: doc.language,
     pageSize: doc.pageSize ?? DEFAULTS.pageSize,
     dateFormat: doc.dateFormat ?? DEFAULTS.dateFormat,
@@ -89,7 +112,17 @@ export class UserSettingsRepository {
     const $set: Record<string, unknown> = { updatedAt: now };
     const $setOnInsert: Record<string, unknown> = { userId };
 
-    for (const key of ['zoom', 'theme', 'language', 'pageSize', 'dateFormat', 'timeFormat'] as const) {
+    for (const key of [
+      'zoom',
+      'theme',
+      'themeMode',
+      'lightTheme',
+      'darkTheme',
+      'language',
+      'pageSize',
+      'dateFormat',
+      'timeFormat',
+    ] as const) {
       if (patch[key] !== undefined) {
         $set[key] = patch[key];
       } else {

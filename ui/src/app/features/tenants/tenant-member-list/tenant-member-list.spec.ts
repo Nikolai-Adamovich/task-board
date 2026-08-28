@@ -32,6 +32,7 @@ const mockMembers: TenantMember[] = [
     userId: 'u1',
     role: 'OWNER',
     status: 'ACTIVE',
+    expiresAt: null,
     invitation: null,
     displayName: 'Owner User',
     email: 'owner@example.com',
@@ -44,6 +45,7 @@ const mockMembers: TenantMember[] = [
     userId: 'u2',
     role: 'MEMBER',
     status: 'ACTIVE',
+    expiresAt: null,
     invitation: null,
     displayName: 'Member User',
     email: 'member@example.com',
@@ -56,6 +58,7 @@ const mockMembers: TenantMember[] = [
     userId: 'u3',
     role: 'MEMBER',
     status: 'ACTIVE',
+    expiresAt: null,
     invitation: {
       status: 'PENDING',
       tokenHash: 'hash',
@@ -75,7 +78,7 @@ describe('TenantMemberList', () => {
   let tenantClientMock: {
     listMembers: ReturnType<typeof vi.fn>;
     inviteMember: ReturnType<typeof vi.fn>;
-    updateMemberRole: ReturnType<typeof vi.fn>;
+    updateMember: ReturnType<typeof vi.fn>;
     removeMember: ReturnType<typeof vi.fn>;
     revokeAccess: ReturnType<typeof vi.fn>;
     revokeInvitation: ReturnType<typeof vi.fn>;
@@ -96,7 +99,7 @@ describe('TenantMemberList', () => {
     tenantClientMock = {
       listMembers: vi.fn().mockReturnValue(of(mockMembers)),
       inviteMember: vi.fn().mockReturnValue(of(mockMembers[0])),
-      updateMemberRole: vi.fn().mockReturnValue(of({ ...mockMembers[1], role: 'ADMIN' })),
+      updateMember: vi.fn().mockReturnValue(of({ ...mockMembers[1], role: 'ADMIN' })),
       removeMember: vi.fn().mockReturnValue(of(undefined)),
       revokeAccess: vi.fn().mockReturnValue(of({ success: true })),
       revokeInvitation: vi.fn().mockReturnValue(of({ success: true })),
@@ -130,6 +133,8 @@ describe('TenantMemberList', () => {
 
     component = fixture.componentInstance;
     fixture.detectChanges();
+
+    return fixture;
   }
 
   // ── Loading ─────────────────────────────────────────────────────
@@ -170,12 +175,12 @@ describe('TenantMemberList', () => {
       expect(tenantClientMock.inviteMember).not.toHaveBeenCalled();
     });
 
-    it('should not call updateMemberRole when no active tenant is resolved', () => {
+    it('should not call updateMember when no active tenant is resolved', () => {
       setup('OWNER', null);
 
-      component.changeRole({ userId: 'u2', role: 'MEMBER' }, 'ADMIN');
+      component.onMemberChange({ row: { userId: 'u2', role: 'MEMBER' }, role: 'ADMIN' });
 
-      expect(tenantClientMock.updateMemberRole).not.toHaveBeenCalled();
+      expect(tenantClientMock.updateMember).not.toHaveBeenCalled();
     });
   });
 
@@ -208,30 +213,43 @@ describe('TenantMemberList', () => {
     });
   });
 
-  // ── changeRole (optimistic + rollback) ─────────────────────────
+  // ── onMemberChange (optimistic + rollback) ─────────────────────
 
-  describe('changeRole', () => {
+  describe('onMemberChange', () => {
     beforeEach(() => setup());
 
-    it('should not call API when role is unchanged', () => {
-      component.changeRole({ userId: 'u1', role: 'OWNER' }, 'OWNER');
-      expect(tenantClientMock.updateMemberRole).not.toHaveBeenCalled();
+    it('should not call API when the role is unchanged', () => {
+      component.onMemberChange({ row: { userId: 'u1', role: 'OWNER' }, role: 'OWNER' });
+      expect(tenantClientMock.updateMember).not.toHaveBeenCalled();
     });
 
-    it('should apply the change optimistically and call updateMemberRole', () => {
-      component.changeRole({ userId: 'u2', role: 'MEMBER' }, 'ADMIN');
+    it('should apply the change optimistically and call updateMember', () => {
+      component.onMemberChange({ row: { userId: 'u2', role: 'MEMBER' }, role: 'ADMIN' });
 
       // Optimistic: applied before the response arrives
       expect(component.members().find((m: TenantMember) => m.userId === 'u2')?.role).toBe('ADMIN');
-      expect(tenantClientMock.updateMemberRole).toHaveBeenCalledWith('t1', 'u2', 'ADMIN');
+      expect(tenantClientMock.updateMember).toHaveBeenCalledWith('t1', 'u2', { role: 'ADMIN' });
     });
 
     it('should roll back the optimistic change on error', () => {
-      tenantClientMock.updateMemberRole.mockReturnValueOnce(throwError(() => new Error('forbidden')));
+      tenantClientMock.updateMember.mockReturnValueOnce(throwError(() => new Error('forbidden')));
 
-      component.changeRole({ userId: 'u2', role: 'MEMBER' }, 'ADMIN');
+      component.onMemberChange({ row: { userId: 'u2', role: 'MEMBER' }, role: 'ADMIN' });
 
       expect(component.members().find((m: TenantMember) => m.userId === 'u2')?.role).toBe('MEMBER');
+    });
+
+    it('should send expiresAt when set (DEC-055)', () => {
+      component.onMemberChange({
+        row: { userId: 'u2', role: 'MEMBER' },
+        role: 'MEMBER',
+        expiresAt: '2030-01-01T00:00:00.000Z',
+      });
+
+      expect(tenantClientMock.updateMember).toHaveBeenCalledWith('t1', 'u2', {
+        role: 'MEMBER',
+        expiresAt: '2030-01-01T00:00:00.000Z',
+      });
     });
   });
 
@@ -322,6 +340,34 @@ describe('TenantMemberList', () => {
     it('should be false for MEMBER', () => {
       setup('MEMBER');
       expect(component.canManage()).toBe(false);
+    });
+  });
+
+  // ── Layout (Q2/F-05: full-height flex column, like the task table) ──
+
+  describe('layout', () => {
+    it('should lay out as a fixed-height flex column with a flexing member-table area', () => {
+      const fixture = setup();
+      const root: HTMLElement = fixture.nativeElement.children[0];
+
+      // Exactly viewport minus app header (--header-height: 4rem) minus main vertical padding
+      expect(root.classList.contains('h-[calc(100dvh-var(--header-height)-3rem)]')).toBe(true);
+      expect(root.classList.contains('flex-col')).toBe(true);
+
+      const tableArea = root.children[1] as HTMLElement;
+
+      expect(tableArea.classList.contains('flex-1')).toBe(true);
+      expect(tableArea.classList.contains('min-h-0')).toBe(true);
+    });
+
+    it('should stretch the member-table host so the pagination pins to the page bottom', () => {
+      const fixture = setup();
+      const host = fixture.nativeElement.querySelector('ui-member-table') as HTMLElement;
+
+      expect(host).toBeTruthy();
+      expect(host.classList.contains('flex-1')).toBe(true);
+      expect(host.classList.contains('min-h-0')).toBe(true);
+      expect(host.classList.contains('flex-col')).toBe(true);
     });
   });
 });

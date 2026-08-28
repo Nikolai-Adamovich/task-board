@@ -4,11 +4,11 @@
   </div>
 } @else if (error()) {
   <!-- V4-4: error() holds a transloco key from getErrorMessage — translate it -->
-  <hlm-alert variant="destructive" class="mx-auto max-w-6xl px-6">
+  <hlm-alert variant="destructive" class="mx-auto max-w-6xl">
     <div hlmAlertDescription>{{ error() | transloco }}</div>
   </hlm-alert>
 } @else if (project(); as p) {
-  <div class="mx-auto max-w-6xl px-6">
+  <div class="mx-auto max-w-6xl">
     <!-- Read-only banner for archived / deletion-pending projects -->
     @if (readOnlyBannerKey(); as bannerKey) {
       <hlm-alert variant="destructive" class="mb-6">
@@ -51,10 +51,12 @@
       </div>
     </div>
 
-    <!-- Widgets grid -->
-    <div class="mb-8 grid gap-4 lg:grid-cols-2">
+    <!-- Widgets grid.
+         Round 5: items-stretch + h-full cards so both cards in a row share the
+         same height; card content grows (flex-1) so footers align at the bottom. -->
+    <div class="mb-8 grid items-stretch gap-4 lg:grid-cols-2">
       <!-- Task summary by status -->
-      <hlm-card>
+      <hlm-card class="h-full">
         <hlm-card-header>
           <h3 hlmCardTitle>{{ 'projectDetail.taskSummary' | transloco }}</h3>
         </hlm-card-header>
@@ -89,7 +91,7 @@
       </hlm-card>
 
       <!-- Active sprint -->
-      <hlm-card>
+      <hlm-card class="h-full">
         <hlm-card-header>
           <h3 hlmCardTitle>{{ 'projectDetail.activeSprint' | transloco }}</h3>
         </hlm-card-header>
@@ -109,7 +111,11 @@
                 <p class="text-sm text-muted-foreground">
                   {{
                     'projectDetail.sprintDates'
-                      | transloco: { start: sprint.startDate | date: dateFmt(), end: sprint.endDate | date: dateFmt() }
+                      | transloco
+                        : {
+                            start: sprint.startDate | date: dateFmt() : undefined : lang(),
+                            end: sprint.endDate | date: dateFmt() : undefined : lang(),
+                          }
                   }}
                 </p>
               }
@@ -138,11 +144,11 @@
       </hlm-card>
 
       <!-- Recent tasks -->
-      <hlm-card>
+      <hlm-card class="h-full">
         <hlm-card-header>
           <h3 hlmCardTitle>{{ 'projectDetail.recentTasks' | transloco }}</h3>
         </hlm-card-header>
-        <div hlmCardContent>
+        <div hlmCardContent class="flex-1">
           @if (recentTasks().length === 0) {
             <p class="text-sm text-muted-foreground">{{ 'projectDetail.noTasks' | transloco }}</p>
           } @else {
@@ -159,7 +165,7 @@
                       {{ task.title }}
                     </span>
                     <span class="ml-2 shrink-0 text-xs text-muted-foreground">
-                      {{ task.updatedAt | date: dateFmt() }}
+                      {{ task.updatedAt | date: dateFmt() : undefined : lang() }}
                     </span>
                   </a>
                 </li>
@@ -175,11 +181,11 @@
       </hlm-card>
 
       <!-- Members preview -->
-      <hlm-card>
+      <hlm-card class="h-full">
         <hlm-card-header>
           <h3 hlmCardTitle>{{ 'projectDetail.members' | transloco }}</h3>
         </hlm-card-header>
-        <div hlmCardContent>
+        <div hlmCardContent class="flex-1">
           @if (membersPreview().length === 0) {
             <p class="text-sm text-muted-foreground">{{ 'projectDetail.noMembers' | transloco }}</p>
           } @else {

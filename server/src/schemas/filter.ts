@@ -5,6 +5,11 @@ import { nonEmptyString, uuid } from '../validators/common.js';
 /**
  * Filter criteria schema — all fields are optional and combined with AND logic.
  */
+/**
+ * ISO date string (`YYYY-MM-DD`) used by the date-range criteria fields
+ * (`createdFrom`/`createdTo`/`updatedFrom`/`updatedTo`).
+ */
+const isoDate = () => z.iso.date();
 const FilterCriteriaSchema = z.object({
   search: z.string().optional(),
   statusIds: z.array(uuid()).optional(),
@@ -14,6 +19,10 @@ const FilterCriteriaSchema = z.object({
   reporterIds: z.array(uuid()).optional(),
   sprintIds: z.array(uuid()).optional(),
   labelIds: z.array(uuid()).optional(),
+  createdFrom: isoDate().optional(),
+  createdTo: isoDate().optional(),
+  updatedFrom: isoDate().optional(),
+  updatedTo: isoDate().optional(),
 });
 /**
  * Sort specification schema.

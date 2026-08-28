@@ -18,6 +18,14 @@ export interface FilterCriteria {
   sprintIds?: string[];
   /** Filter by label IDs */
   labelIds?: string[];
+  /** Only tasks created on/after this ISO date (`YYYY-MM-DD`, inclusive) */
+  createdFrom?: string;
+  /** Only tasks created on/before this ISO date (`YYYY-MM-DD`, inclusive) */
+  createdTo?: string;
+  /** Only tasks updated on/after this ISO date (`YYYY-MM-DD`, inclusive) */
+  updatedFrom?: string;
+  /** Only tasks updated on/before this ISO date (`YYYY-MM-DD`, inclusive) */
+  updatedTo?: string;
 }
 
 /** Sort specification */

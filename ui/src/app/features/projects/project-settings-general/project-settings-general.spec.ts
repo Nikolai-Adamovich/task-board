@@ -38,6 +38,7 @@ const mockProject: Project = {
 };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let component: any;
+let fixture: ReturnType<typeof TestBed.createComponent<ProjectSettingsGeneral>>;
 let projectClientMock: Record<string, ReturnType<typeof vi.fn>>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let activeProjectMock: any;
@@ -63,7 +64,12 @@ function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
 
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+    imports: [
+      TranslocoTestingModule.forRoot({
+        langs: { en: { common: { charCount: '{{count}}/{{max}}' } } },
+        translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+      }),
+    ],
     providers: [
       provideRouter([]),
       provideHttpClient(),
@@ -81,7 +87,7 @@ function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
     ],
   });
 
-  const fixture = TestBed.createComponent(ProjectSettingsGeneral);
+  fixture = TestBed.createComponent(ProjectSettingsGeneral);
 
   fixture.componentRef.setInput('projectKey', mockProject.key);
   component = fixture.componentInstance;
@@ -129,6 +135,33 @@ describe('ProjectSettingsGeneral', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(component.error()).toBeTruthy();
+  });
+
+  // ── Round 5 P2: description 120-char limit + counter ──────────────────
+
+  it('should mark the description invalid over 120 characters (Round 5 P2)', () => {
+    setup();
+    component.model.update((m: { description: string }) => ({ ...m, description: 'a'.repeat(121) }));
+
+    expect(component.generalForm.description().invalid()).toBe(true);
+    expect(component.generalForm().invalid()).toBe(true);
+  });
+
+  it('should accept a description of exactly 120 characters (Round 5 P2)', () => {
+    setup();
+    component.model.update((m: { description: string }) => ({ ...m, description: 'a'.repeat(120) }));
+
+    expect(component.generalForm.description().valid()).toBe(true);
+  });
+
+  it('should render the character counter under the description field (Round 5 P2)', () => {
+    setup();
+    fixture.detectChanges();
+
+    const counter = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="desc-char-count"]');
+
+    // Seeded description is 'A project for testing' (21 chars)
+    expect(counter?.textContent?.trim()).toBe('21/120');
   });
 
   describe('isAdmin', () => {

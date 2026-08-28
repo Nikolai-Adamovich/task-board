@@ -18,12 +18,13 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 import { BoardType, type Status } from '@task-board/shared';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Board, CreateBoard } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { canManageProject } from '@app/shared/utils/role-utils';
-import { injectToasts } from '@app/shared/utils/toast-utils';
+import { injectUndoToasts } from '@app/shared/utils/undo-toast';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 
 interface BoardFormModel {
@@ -53,6 +54,7 @@ interface BoardFormModel {
     HlmCardImports,
     HlmEmptyImports,
     HlmAlertImports,
+    HlmTooltipImports,
     FormField,
     FormRoot,
   ],
@@ -60,7 +62,7 @@ interface BoardFormModel {
   templateUrl: './board-manager.html',
 })
 export class BoardManager {
-  private readonly notify = injectToasts();
+  private readonly notify = injectUndoToasts();
   private readonly boardClient = inject(BoardClient);
   private readonly statusClient = inject(StatusClient);
   private readonly authStore = inject(AuthStore);
@@ -232,6 +234,10 @@ export class BoardManager {
           this.boardsResource.value.update((list) => list.filter((b) => b.id !== board.id));
         }
         this.deletingBoard.set(null);
+        // Q11 (DEC-053): deliberately NO undo toast here — a deleted board
+        // cannot be faithfully recreated client-side: the new board gets a new
+        // id (breaking saved links and default-board references) and its
+        // columns may reference statuses that were deleted along with it.
         this.notify.success('toasts.deleted');
       },
       error: (err) => {

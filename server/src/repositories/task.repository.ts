@@ -57,6 +57,11 @@ export interface TaskQueryOptions {
   sprintId?: string;
   labelId?: string;
   search?: string;
+  /** Q13/F-01: inclusive ISO date (`YYYY-MM-DD`) range filters */
+  createdFrom?: string;
+  createdTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -131,6 +136,10 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       sprintId,
       labelId,
       search,
+      createdFrom,
+      createdTo,
+      updatedFrom,
+      updatedTo,
     } = options;
     const query: Record<string, unknown> = { projectId };
 
@@ -141,6 +150,22 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     if (reporterId) query.reporterId = reporterId;
     if (sprintId) query.sprintId = sprintId;
     if (labelId) query.labelIds = labelId;
+
+    // Q13/F-01: inclusive date-range filters (ISO dates → Date boundaries).
+    // `{ projectId, createdAt: -1 }` / `{ projectId, updatedAt: -1 }` indexes cover these.
+    if (createdFrom || createdTo) {
+      query.createdAt = {
+        ...(createdFrom ? { $gte: new Date(`${createdFrom}T00:00:00.000Z`) } : {}),
+        ...(createdTo ? { $lte: new Date(`${createdTo}T23:59:59.999Z`) } : {}),
+      };
+    }
+
+    if (updatedFrom || updatedTo) {
+      query.updatedAt = {
+        ...(updatedFrom ? { $gte: new Date(`${updatedFrom}T00:00:00.000Z`) } : {}),
+        ...(updatedTo ? { $lte: new Date(`${updatedTo}T23:59:59.999Z`) } : {}),
+      };
+    }
     if (search) {
       const regex = { $regex: search, $options: 'i' };
 

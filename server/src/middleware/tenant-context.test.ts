@@ -7,11 +7,14 @@ import type { AppEnv } from '../types/context.js';
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 const mockMemberFindOne = vi.fn();
+const mockMemberUpdateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
 const mockTenantFindOne = vi.fn();
 
 vi.mock('../db/mongo.js', () => ({
   getCollection: vi.fn((name: string) =>
-    name === 'tenants' ? { findOne: mockTenantFindOne } : { findOne: mockMemberFindOne },
+    name === 'tenants'
+      ? { findOne: mockTenantFindOne }
+      : { findOne: mockMemberFindOne, updateOne: mockMemberUpdateOne },
   ),
 }));
 
@@ -63,6 +66,7 @@ describe('tenantContextMiddleware', () => {
   beforeEach(() => {
     mockMemberFindOne.mockReset();
     mockTenantFindOne.mockReset();
+    mockMemberUpdateOne.mockClear();
   });
 
   // ── DEC-032: resolution by slug (backward compatible with id) ────────────
@@ -192,6 +196,48 @@ describe('tenantContextMiddleware', () => {
 
     expect(json.error.code).toBe('FORBIDDEN');
     expect(json.error.message).toBe('Your access to this tenant has been revoked');
+  });
+
+  // DEC-055: an ACTIVE membership past its expiresAt is treated as revoked at
+  // access time (lazy evaluation) and the stored status is flipped.
+  it('returns 403 for an ACTIVE membership whose expiresAt has passed and flips the stored status', async () => {
+    mockMemberFindOne.mockResolvedValue({
+      userId: 'user-1',
+      tenantId: 'tenant-1',
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      expiresAt: new Date(Date.now() - 1000),
+    });
+
+    const app = createTestApp();
+    const res = await app.request('/tenant-protected/resource', { headers: { 'X-Tenant-Id': 'tenant-1' } }, TEST_ENV);
+
+    expect(res.status).toBe(403);
+
+    const json = (await res.json()) as { error: { code: string; message: string } };
+
+    expect(json.error.code).toBe('FORBIDDEN');
+    expect(json.error.message).toBe('Your membership has expired');
+    expect(mockMemberUpdateOne).toHaveBeenCalledWith(
+      { userId: 'user-1', tenantId: 'tenant-1' },
+      expect.objectContaining({ $set: expect.objectContaining({ status: 'ACCESS_REVOKED' }) }),
+    );
+  });
+
+  it('allows an ACTIVE membership whose expiresAt is in the future', async () => {
+    mockMemberFindOne.mockResolvedValue({
+      userId: 'user-1',
+      tenantId: 'tenant-1',
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const app = createTestApp();
+    const res = await app.request('/tenant-protected/resource', { headers: { 'X-Tenant-Id': 'tenant-1' } }, TEST_ENV);
+
+    expect(res.status).toBe(200);
+    expect(mockMemberUpdateOne).not.toHaveBeenCalled();
   });
 
   // DEC-018: an invited-but-unaccepted member is stored as ACCESS_REVOKED + invitation PENDING;

@@ -67,3 +67,31 @@ export interface UpdateTask {
   labelIds?: string[];
   version: number;
 }
+
+/**
+ * Q10 (RQ-04 ③): bulk update request body.
+ * Exactly ONE field of `data` must be present per request — enforced by the
+ * server's Zod schema; nullable `assigneeId`/`sprintId` unassign/clear.
+ */
+export interface BulkUpdateTasks {
+  /** Target task ids (1..100) */
+  taskIds: string[];
+  data: {
+    statusId?: string;
+    assigneeId?: string | null;
+    sprintId?: string | null;
+  };
+}
+
+/** A single task that could not be bulk-updated (never throws for these). */
+export interface BulkUpdateTaskFailure {
+  taskId: string;
+  /** Machine-readable reason, e.g. TASK_NOT_FOUND | TASK_NOT_IN_PROJECT | VERSION_CONFLICT */
+  reason: string;
+}
+
+/** Bulk update response — per-task failures are reported, not thrown. */
+export interface BulkUpdateTasksResult {
+  updated: number;
+  failed?: BulkUpdateTaskFailure[];
+}

@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-6xl px-6">
+<div class="mx-auto max-w-6xl">
   <div class="mb-6 flex items-center justify-between">
     <h2 class="text-2xl font-bold text-foreground">{{ 'sprints.title' | transloco }}</h2>
     @if (canCreate()) {
@@ -27,22 +27,15 @@
     </hlm-empty>
   } @else {
     <div class="flex flex-col gap-6">
-      <!-- Backlog group (DEC-039): unassigned tasks — the group header itself links to the backlog view (DR-6) -->
+      <!-- Backlog group (DEC-039): unassigned tasks — find them via the tasks-table sprint filter -->
       <div class="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-4 py-3">
-        <a
-          [routerLink]="['/t', tenantSlug(), 'projects', projectKey(), 'sprints', 'backlog']"
-          class="group flex items-center gap-3"
-        >
+        <div class="flex items-center gap-3">
           <ng-icon name="lucideInbox" class="size-5 text-muted-foreground" />
-          <h3 class="text-lg font-semibold text-foreground group-hover:text-primary">
+          <h3 class="text-lg font-semibold text-foreground">
             {{ 'sprints.backlog' | transloco }}
           </h3>
           <span hlmBadge variant="secondary">{{ 'sprints.tasks' | transloco: { count: backlogCount() } }}</span>
-          <ng-icon
-            name="lucideChevronRight"
-            class="size-5 text-muted-foreground transition-transform group-hover:translate-x-1"
-          />
-        </a>
+        </div>
       </div>
 
       <!-- Grouped by status: Active, Future, Completed -->
@@ -64,7 +57,7 @@
             <div class="flex flex-col gap-2 rounded-b-lg border border-t-0 border-border bg-card p-3">
               @for (sprint of group.sprints; track sprint.id) {
                 <a
-                  [routerLink]="['/t', tenantSlug(), 'projects', projectKey(), 'sprints', sprint.id]"
+                  [routerLink]="['/w', tenantSlug(), 'projects', projectKey(), 'sprints', sprint.id]"
                   class="group flex items-center justify-between rounded-md border border-border bg-background p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
                 >
                   <div>
@@ -76,13 +69,14 @@
                         {{ sprint.status }}
                       </span>
                       @if (isSprintOverdue(sprint)) {
-                        <span hlmBadge variant="destructive" [title]="'sprints.overdueTooltip' | transloco">
+                        <span hlmBadge variant="destructive" [hlmTooltip]="'sprints.overdueTooltip' | transloco">
                           {{ 'sprints.overdue' | transloco }}
                         </span>
                       }
                     </div>
                     <p class="mt-1 text-xs text-muted-foreground">
-                      {{ sprint.startDate | date: dateFmt() }} — {{ sprint.endDate | date: dateFmt() }}
+                      {{ sprint.startDate | date: dateFmt() : undefined : lang() }} —
+                      {{ sprint.endDate | date: dateFmt() : undefined : lang() }}
                     </p>
                   </div>
                   <ng-icon

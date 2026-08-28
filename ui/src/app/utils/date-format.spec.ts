@@ -1,8 +1,9 @@
 /**
- * Unit tests for the date/time format helpers (R3-P8).
+ * Unit tests for the date/time format helpers (R3-P8, P12/DEC-056).
  *
- * Covers both formats of each preference plus the null fallbacks and the
- * combined date+time token used by tables / detail meta rendering.
+ * Covers the legacy presets, free-form whitelisted token strings, the null
+ * fallbacks and the combined date+time token used by tables / detail meta
+ * rendering.
  */
 import { toDatePipeDateFormat, toDatePipeDateTimeFormat, toDatePipeTimeFormat } from './date-format';
 
@@ -20,8 +21,24 @@ describe('date-format helpers', () => {
       expect(toDatePipeDateFormat('YYYY-MM-DD')).toBe('yyyy-MM-dd');
     });
 
+    it('maps user tokens YYYY YY DD D to DatePipe tokens (P12)', () => {
+      expect(toDatePipeDateFormat('DD MMM YY')).toBe('dd MMM yy');
+      expect(toDatePipeDateFormat('D/M/YYYY')).toBe('d/M/yyyy');
+    });
+
+    it('passes month tokens and separators through unchanged (P12)', () => {
+      expect(toDatePipeDateFormat('MMMM D, YYYY')).toBe('MMMM d, yyyy');
+      expect(toDatePipeDateFormat('D.M.YYYY')).toBe('d.M.yyyy');
+    });
+
     it('falls back to ISO when the preference is null (not set)', () => {
       expect(toDatePipeDateFormat(null)).toBe('yyyy-MM-dd');
+    });
+
+    it('falls back to ISO for empty or invalid preferences (P12)', () => {
+      expect(toDatePipeDateFormat('')).toBe('yyyy-MM-dd');
+      expect(toDatePipeDateFormat('QQ YYYY')).toBe('yyyy-MM-dd');
+      expect(toDatePipeDateFormat('YYYY; DROP')).toBe('yyyy-MM-dd');
     });
   });
 
@@ -46,6 +63,10 @@ describe('date-format helpers', () => {
 
     it('supports the 12h variant', () => {
       expect(toDatePipeDateTimeFormat('MM/DD/YYYY', '12h')).toBe('MM/dd/yyyy h:mm a');
+    });
+
+    it('supports a custom date format (P12)', () => {
+      expect(toDatePipeDateTimeFormat('DD MMM YY', '24h')).toBe('dd MMM yy HH:mm');
     });
 
     it('uses defaults for unset preferences', () => {

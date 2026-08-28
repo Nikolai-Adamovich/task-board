@@ -1,12 +1,22 @@
-import { Component, computed, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideCheck } from '@ng-icons/lucide';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { DATE_FORMAT_PREFERENCES, TIME_FORMAT_PREFERENCES } from '@task-board/shared';
+import { HlmInputImports } from '@spartan-ng/helm/input';
+import {
+  DATE_FORMAT_PREFERENCES,
+  DEFAULT_THEME_ID,
+  TIME_FORMAT_PREFERENCES,
+  isValidDateFormat,
+} from '@task-board/shared';
 import type { DateFormatPreference, TimeFormatPreference } from '@task-board/shared';
+import { injectThemePickToasts } from '@app/shared/utils/theme-pick-toast';
 import { PreferencesStore } from '@stores/preferences-store';
 import { ThemeRegistry } from '@services/theme-registry';
+import { ThemeModeSwitch } from '@app/shared/theme-mode-switch/theme-mode-switch';
 import { ZOOM_VALUES } from '@shell/header/zoom.util';
 
 interface LanguageOption {
@@ -20,7 +30,16 @@ interface LanguageOption {
  */
 @Component({
   selector: 'ui-settings',
-  imports: [TranslocoPipe, HlmCardImports, HlmSelectImports, HlmButtonImports],
+  imports: [
+    TranslocoPipe,
+    HlmCardImports,
+    HlmSelectImports,
+    HlmButtonImports,
+    HlmInputImports,
+    ThemeModeSwitch,
+    NgIcon,
+  ],
+  providers: [provideIcons({ lucideCheck })],
   templateUrl: './settings.html',
 })
 export class Settings implements OnInit {
@@ -28,7 +47,12 @@ export class Settings implements OnInit {
   private readonly themeRegistry = inject(ThemeRegistry);
   private readonly transloco = inject(TranslocoService);
   protected readonly zoom = this.preferencesStore.zoom;
-  protected readonly theme = this.preferencesStore.theme;
+  /** Auto/Light/Dark mode (default Auto — follows the browser). */
+  protected readonly themeMode = this.preferencesStore.themeMode;
+  /** Per-mode raw choices — BOTH are marked in the dropdown regardless of the active mode. */
+  protected readonly lightTheme = this.preferencesStore.lightTheme;
+  protected readonly darkTheme = this.preferencesStore.darkTheme;
+  protected readonly notify = injectThemePickToasts();
   protected readonly language = this.preferencesStore.language;
   /** R3-P8: date/time display format preferences */
   protected readonly dateFormat = this.preferencesStore.dateFormat;
@@ -36,11 +60,27 @@ export class Settings implements OnInit {
   protected readonly dateFormatValues = DATE_FORMAT_PREFERENCES;
   protected readonly timeFormatValues = TIME_FORMAT_PREFERENCES;
   protected readonly themes = this.themeRegistry.themes;
+  /** Two separate pickers: one per mode — both are always visible. */
+  protected readonly lightThemes = computed(() => this.themes().filter((t) => t.mode === 'light'));
+  protected readonly darkThemes = computed(() => this.themes().filter((t) => t.mode === 'dark'));
+  /** Closed-trigger values for the two per-mode dropdowns (defaults when unset). */
+  protected readonly selectedLightTheme = computed(() => this.lightTheme() ?? DEFAULT_THEME_ID);
+  protected readonly selectedDarkTheme = computed(() => this.darkTheme() ?? 'dark');
   protected readonly availableLangs = computed(() => this.transloco.getAvailableLangs() as LanguageOption[]);
   protected readonly zoomValues = ZOOM_VALUES;
+  /** P12 (DEC-056): free-form custom date format, validated live against the shared whitelist */
+  protected readonly customFormat = signal('');
+  /** Empty means "untouched" — only non-empty values are validated */
+  protected readonly customFormatInvalid = computed(() => {
+    const value = this.customFormat();
+
+    return value !== '' && !isValidDateFormat(value);
+  });
 
   ngOnInit(): void {
     void this.themeRegistry.load();
+    // P12: prefill the custom input with the stored format (custom values are not presets)
+    this.customFormat.set(this.dateFormat() ?? '');
   }
 
   /** V5-3: itemToString — closed trigger shows the theme name, not the raw id */
@@ -63,18 +103,53 @@ export class Settings implements OnInit {
     }
   }
 
-  protected onThemeChange(themeId: string): void {
-    this.preferencesStore.setThemeLocal(themeId);
+  /** Pick from the "Light themes" dropdown — always stores the light-mode choice. */
+  protected onLightThemeChange(themeId: string): void {
+    this.preferencesStore.setThemeChoiceLocal(themeId, 'light');
     this.preferencesStore.commitTheme();
+    this.notify.warnIfDeferred(themeId, 'light', this.preferencesStore.effectiveTheme());
+  }
+
+  /** Pick from the "Dark themes" dropdown — always stores the dark-mode choice. */
+  protected onDarkThemeChange(themeId: string): void {
+    this.preferencesStore.setThemeChoiceLocal(themeId, 'dark');
+    this.preferencesStore.commitTheme();
+    this.notify.warnIfDeferred(themeId, 'dark', this.preferencesStore.effectiveTheme());
+  }
+
+  /**
+   * Whether the theme is the per-mode selection for ITS dropdown — marked with a
+   * checkmark + semibold name regardless of the active mode.
+   */
+  protected isLightSelected(themeId: string): boolean {
+    return themeId === this.selectedLightTheme();
+  }
+
+  protected isDarkSelected(themeId: string): boolean {
+    return themeId === this.selectedDarkTheme();
   }
 
   protected onLanguageChange(lang: string): void {
     this.preferencesStore.setLanguage(lang);
   }
 
+  /** V7-5/P12: itemToString — a stored custom format shows verbatim in the closed trigger */
+  protected readonly dateFormatLabel = (value: string): string => value;
+
   /** R3-P8: persist the preferred date display format */
   protected onDateFormatChange(value: string | DateFormatPreference | null): void {
     this.preferencesStore.setDateFormat(value as DateFormatPreference);
+    // P12: keep the custom input in sync with the preset pick
+    this.customFormat.set(value ?? '');
+  }
+
+  /** P12 (DEC-056): live-validate the custom format; persist only whitelisted values */
+  protected onCustomDateFormatChange(value: string): void {
+    this.customFormat.set(value);
+
+    if (isValidDateFormat(value)) {
+      this.preferencesStore.setDateFormat(value);
+    }
   }
 
   /** R3-P8: persist the preferred time display format */

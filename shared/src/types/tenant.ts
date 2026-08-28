@@ -63,6 +63,13 @@ export interface TenantMember {
   role: TenantRole;
   /** Member status */
   status: MemberStatus;
+  /**
+   * Membership expiration timestamp (ISO 8601, null = no expiration).
+   * DEC-055: on/after this date the member is treated as ACCESS_REVOKED
+   * (lazy evaluation at access time) — the membership record, projects and
+   * roles are kept so access can be restored anytime.
+   */
+  expiresAt: string | null;
   /** Embedded invitation data (null for direct members) */
   invitation: Invitation | null;
   /** Resolved user display name (null if user deleted/not found) */

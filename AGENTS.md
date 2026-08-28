@@ -105,6 +105,9 @@ Full rationale in [`docs/architecture.md`](docs/architecture.md) §Decisions.
 - UI resource-based components resolve asynchronously: poll the signal state
   (`for (… && !component.task()) await setTimeout(10)`) instead of fixed timeouts.
 - Known flaky historically: milkdown spec — fixed by state polling; keep that pattern.
+- **E2E/Playwright policy**: do NOT run Playwright/e2e after every iteration (too slow). When e2e or live-browser
+  verification is needed, the ORCHESTRATING agent must delegate it to a subagent — never run it in the main agent's
+  context (it bloats context with screenshots/snapshots). Unit tests (`npm test`) are fine to run directly.
 
 ## Where to dig deeper
 

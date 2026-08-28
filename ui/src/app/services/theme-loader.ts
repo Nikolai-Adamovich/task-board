@@ -13,14 +13,14 @@ export class ThemeLoader {
 
   /**
    * Load and apply a theme CSS file.
-   * @param themeId The theme identifier (e.g., "light", "dark", "light1").
+   * @param themeId The theme identifier (e.g., "light", "dark", "claude").
    */
   async loadTheme(themeId: string): Promise<void> {
     const token = ++this.loadToken;
     const newLink = document.createElement('link');
 
     newLink.rel = 'stylesheet';
-    newLink.href = `${THEMES_DIR}/${themeId}-theme.css`;
+    newLink.href = `${THEMES_DIR}/${themeId}.css`;
     newLink.dataset.theme = themeId;
 
     await new Promise<void>((resolve, reject) => {

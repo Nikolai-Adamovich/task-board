@@ -12,9 +12,10 @@ import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { PreferencesStore } from '@stores/preferences-store';
 import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
-import { priorityBadgeVariant, priorityLabel } from '@app/constants/priority';
+import { priorityBadgeVariant, priorityLabelKey } from '@app/constants/priority';
+import { TranslocoService } from '@jsverse/transloco';
 import { TaskPriorityValues } from '@task-board/shared';
-import type { Task } from '@task-board/shared';
+import type { Task, UpdateTask } from '@task-board/shared';
 import { canManageProject, canWrite } from '@app/shared/utils/role-utils';
 import { HttpErrorResponse } from '@angular/common/http';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -68,8 +69,15 @@ import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 export class TaskDetail implements OnInit {
   /** Shared badge/label helpers (see constants/priority.ts) */
   protected readonly priorityBadgeVariant = priorityBadgeVariant;
-  protected readonly priorityLabel = priorityLabel;
   protected readonly TaskPriorityValues = TaskPriorityValues;
+  private readonly i18n = inject(TranslocoService);
+
+  /** Translated priority label (P11); unknown values render verbatim. */
+  protected priorityLabel(priority: string): string {
+    const key = priorityLabelKey(priority);
+
+    return key ? this.i18n.translate(key) : priority;
+  }
   private readonly notify = injectToasts();
   private readonly taskClient = inject(TaskClient);
   private readonly labelClient = inject(LabelClient);
@@ -78,6 +86,8 @@ export class TaskDetail implements OnInit {
   private readonly preferencesStore = inject(PreferencesStore);
   /** R3-P8: DatePipe token derived from the user's date/time format preference */
   protected readonly dateTimeFmt = this.preferencesStore.dateTimePipeFormat;
+  /** P12 (item 28): active language passed as the DatePipe locale for localized month names */
+  protected readonly lang = this.preferencesStore.language;
   private readonly refStore = inject(ProjectRefStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -139,7 +149,7 @@ export class TaskDetail implements OnInit {
   protected readonly typeItemToString = (id: string) => this.typeOptions().find((o) => o.id === id)?.name ?? id;
   protected readonly assigneeItemToString = (id: string) => this.memberOptions().find((o) => o.id === id)?.name ?? id;
   protected readonly sprintItemToString = (id: string) => this.sprintOptions().find((o) => o.id === id)?.name ?? id;
-  protected readonly priorityItemToString = (value: string) => priorityLabel(value);
+  protected readonly priorityItemToString = (value: string) => this.priorityLabel(value);
   // ─── Labels: case-insensitive autocomplete + create-new (BR-019, R3-P5) ─────
   /** Free-text search buffer for the label autocomplete */
   protected readonly labelSearch = signal('');
@@ -315,14 +325,17 @@ export class TaskDetail implements OnInit {
 
   // ─── Generic single-field update (Jira-style immediate apply) ───────────────
 
-  protected updateField(field: string, value: unknown): void {
+  /** P14 (item 32): typed single-field update — `field` is constrained to the
+   * updatable `UpdateTask` keys. Template selects may emit null/undefined while
+   * settling; the value is forwarded verbatim (server validates the body). */
+  protected updateField<K extends keyof UpdateTask>(field: K, value: UpdateTask[K] | null | undefined): void {
     const t = this.task();
 
     if (!t) return;
 
-    const update = { [field]: value, version: t.version } as Record<string, unknown>;
+    const update = { version: t.version, [field]: value } as UpdateTask;
 
-    this.taskClient.update(t.id, update as never).subscribe({
+    this.taskClient.update(t.id, update).subscribe({
       next: (updated) => this.taskResource.value.set(updated),
       error: (err) => this.handleUpdateError(err),
     });
@@ -373,7 +386,7 @@ export class TaskDetail implements OnInit {
         // Navigate using project key from store
         const projectKey = this.projectStore.activeProject()?.key ?? task.projectId;
 
-        this.router.navigate(['/t', getTenantSlug(this.route), 'projects', projectKey]);
+        this.router.navigate(['/w', getTenantSlug(this.route), 'projects', projectKey]);
       },
     });
   }

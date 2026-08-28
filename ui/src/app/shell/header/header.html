@@ -1,6 +1,17 @@
 <header
   class="sticky top-0 z-50 flex h-(--header-height) items-center justify-between border-b border-border bg-card pr-4 pl-2 md:pr-4 md:pl-2"
 >
+  <!-- DEC-052a: mobile-only hamburger — opens the sidebar as an offcanvas sheet below md -->
+  <button
+    hlmBtn
+    variant="ghost"
+    size="icon-sm"
+    class="md:hidden"
+    [attr.aria-label]="'header.openMenu' | transloco"
+    (click)="openMobileSidebar()"
+  >
+    <ng-icon name="lucideMenu" />
+  </button>
   <ui-header-branding />
   <ui-header-actions />
 </header>

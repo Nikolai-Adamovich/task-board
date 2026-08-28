@@ -10,10 +10,18 @@ import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
 import { getTenantSlug } from '@app/shared/utils/route-utils';
 import { AuthStore } from '@stores/auth-store';
 import { canWrite } from '@app/shared/utils/role-utils';
-import { DatePipe } from '@angular/common';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideArrowUp, lucideArrowDown, lucideColumns2, lucideEyeOff, lucideFilter, lucideX } from '@ng-icons/lucide';
+import {
+  lucideArrowUp,
+  lucideArrowDown,
+  lucideColumns2,
+  lucideEyeOff,
+  lucideFilter,
+  lucideRows3,
+  lucideX,
+} from '@ng-icons/lucide';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmInputImports } from '@spartan-ng/helm/input';
@@ -23,28 +31,60 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 import { HlmCheckboxImports } from '@spartan-ng/helm/checkbox';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
+import { HlmDatePickerImports } from '@spartan-ng/helm/date-picker';
 import { TaskClient } from '@services/task-client';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { FilterPanel } from '@features/filters/filter-panel/filter-panel';
 import { AppliedFilterState } from '@features/filters/filter-panel/filter-panel';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import type { Task, TaskPriority, FilterCriteria, FilterSort, TaskTableColumnKey } from '@task-board/shared';
+// P13b: BrnPopover is read from the cursor-anchored popover so the programmatic
+// open can call `setOrigin` (a trigger click would do this implicitly).
+import { BrnPopover } from '@spartan-ng/brain/popover';
+import type {
+  Task,
+  TaskPriority,
+  FilterCriteria,
+  FilterSort,
+  TaskTableColumnKey,
+  BulkUpdateTasks,
+} from '@task-board/shared';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { TASK_TABLE_COLUMN_KEYS, TASK_TABLE_PINNED_COLUMNS, DEFAULT_TASK_TABLE_COLUMNS } from '@task-board/shared';
-import { taskTypeBadgeVariant, priorityBadgeVariant, priorityLabel } from '@app/constants/priority';
+import { taskTypeBadgeVariant, priorityBadgeVariant, priorityLabelKey } from '@app/constants/priority';
+import {
+  AUTO_PAGE_SIZE_SENTINEL,
+  computeAutoPageSize,
+  rowHeightForDensity,
+} from '@app/shared/auto-table/auto-page-size';
+import { useAutoRowMeasurement } from '@app/shared/auto-table/use-auto-row-measurement';
+import { useTableDensity } from '@app/shared/auto-table/table-density';
 
 interface TaskColumnDef {
   field: string;
   /** R3-P4: stable preference key shared with the server (`taskTableColumns`) */
   columnKey: TaskTableColumnKey;
   labelKey: string;
-  filterType: 'none' | 'text' | 'select';
+  filterType: 'none' | 'text' | 'select' | 'date';
   width?: string;
   popoverWidth?: string;
+  /**
+   * Round-4 F3: overlay alignment for the header filter popover. The rightmost
+   * columns (Created/Updated) use `'end'` so the popover opens leftward and is
+   * not clipped at the right viewport edge.
+   */
+  align?: 'start' | 'center' | 'end';
   getFilterValue: () => string;
   setFilterValue?: (value: string) => void;
   getOptions?: () => SelectOption[];
+  /** Q13/F-01: date-range accessors for `filterType: 'date'` columns */
+  getDateFrom?: () => string;
+  getDateTo?: () => string;
+  /** Empty string on either side clears that bound */
+  setDateRange?: (from: string, to: string) => void;
   allLabelKey?: string;
   placeholder?: string;
   staticOptions?: { value: string; labelKey: string }[];
@@ -65,23 +105,13 @@ export function safeNumericParam(value: unknown): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-// ─── Auto page-size (U3 / R3-P3) ──────────────────────────────────────────────
-/** Sentinel persisted in PreferencesStore.pageSize meaning "Auto" (measured-height derived). */
-export const AUTO_PAGE_SIZE_SENTINEL = 0;
-/** Fixed row height of the tasks table — the basis of all Auto math and min-height. */
-export const TASK_ROW_HEIGHT_PX = 48;
-/** Auto page-size clamp bounds. */
-export const AUTO_MIN_ROWS = 5;
-export const AUTO_MAX_ROWS = 100;
-
 /**
- * Rows that fit the available table-body height: floor(availableHeight / 48)
- * clamped to [5..100]. `availableHeight` is MEASURED from the table wrapper via a
- * ResizeObserver (R3-P3) — no window/chrome constants.
+ * Q10: sentinels for the nullable bulk-select options — hlm-select values are
+ * strings, so "unassign"/"clear sprint" need a non-empty marker that maps to
+ * `null` in the request body.
  */
-export function computeAutoPageSize(availableHeight: number): number {
-  return Math.min(AUTO_MAX_ROWS, Math.max(AUTO_MIN_ROWS, Math.floor(availableHeight / TASK_ROW_HEIGHT_PX)));
-}
+const BULK_UNASSIGNED = '__unassigned__';
+const BULK_NO_SPRINT = '__no_sprint__';
 
 /** Case-insensitive name → id resolution against a loaded option list */
 function resolveNameToId(name: string, options: SelectOption[]): string {
@@ -99,6 +129,7 @@ function resolveNameToId(name: string, options: SelectOption[]): string {
   selector: 'ui-task-table',
   imports: [
     DatePipe,
+    NgTemplateOutlet,
     TranslocoPipe,
     NgIcon,
     HlmButtonImports,
@@ -112,19 +143,37 @@ function resolveNameToId(name: string, options: SelectOption[]): string {
     HlmPopoverImports,
     HlmCheckboxImports,
     HlmDropdownMenuImports,
+    HlmTooltipImports,
+    HlmDatePickerImports,
     Pagination,
     FilterPanel,
   ],
-  providers: [provideIcons({ lucideArrowUp, lucideArrowDown, lucideColumns2, lucideEyeOff, lucideFilter, lucideX })],
+  providers: [
+    provideIcons({
+      lucideArrowUp,
+      lucideArrowDown,
+      lucideColumns2,
+      lucideEyeOff,
+      lucideFilter,
+      lucideRows3,
+      lucideX,
+    }),
+  ],
   templateUrl: './task-table.html',
 })
 export class TaskTable {
   private readonly taskClient = inject(TaskClient);
+  /** Round-4 F1: translates the date-mode select values for its trigger display */
+  private readonly transloco = inject(TranslocoService);
+  /** Q10: bulk-update success/failure feedback */
+  private readonly notify = injectToasts();
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
   private readonly preferencesStore = inject(PreferencesStore);
   /** R3-P8: DatePipe token derived from the user's date/time format preference */
   protected readonly dateTimeFmt = this.preferencesStore.dateTimePipeFormat;
+  /** P12 (item 28): active language passed as the DatePipe locale for localized month names */
+  protected readonly lang = this.preferencesStore.language;
   private readonly refStore = inject(ProjectRefStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -141,6 +190,11 @@ export class TaskTable {
   readonly reporter = input('');
   readonly sprint = input('');
   readonly label = input('');
+  // Q12: date-range filter params (set via column-header popovers) — captured by saved views
+  readonly createdFrom = input('');
+  readonly createdTo = input('');
+  readonly updatedFrom = input('');
+  readonly updatedTo = input('');
   /** `${field}:${direction}` */
   readonly sort = input('');
   // ─── Derived state ─────────────────────────────────────────────────────────
@@ -152,12 +206,29 @@ export class TaskTable {
    */
   protected readonly isAutoMode = computed(() => this.preferencesStore.pageSize() === AUTO_PAGE_SIZE_SENTINEL);
   /**
-   * R3-P3: height available for table ROWS, measured from the table wrapper via a
-   * ResizeObserver (wrapper height minus its header row). Replaces the old
-   * window.innerHeight − chrome-constant math so the table bottom aligns with the
-   * page bottom at any viewport height.
+   * Q9 (RQ-04 ⑤): device-local table density. Compact mode shrinks vertical cell
+   * padding via a class on the `<table>`; the Auto math below reacts through the
+   * density-aware fallback row height.
    */
-  protected readonly availableRowsHeight = signal(0);
+  private readonly density = useTableDensity();
+  protected readonly isCompact = this.density.compact;
+  protected readonly toggleDensity = this.density.toggle;
+  /** Density-aware fallback row height used by the Auto page-size math */
+  private readonly rowHeightPx = computed(() => rowHeightForDensity(this.density.compact()));
+  /**
+   * R3-P3: height available for table ROWS, measured from the table wrapper via a
+   * shared ResizeObserver (wrapper height minus its header row). No window/chrome
+   * constants — the table bottom aligns with the page bottom at any viewport height.
+   */
+  private readonly measurement = useAutoRowMeasurement();
+  protected readonly availableRowsHeight = this.measurement.availableRowsHeight;
+  /**
+   * Effective row height for the Auto math: the REAL measured
+   * body-row height when available (real rows are ~44px vs the 48px fallback —
+   * using the fallback undercounts how many rows fit), otherwise the
+   * density-aware constant.
+   */
+  private readonly effectiveRowHeightPx = computed(() => this.measurement.measuredRowHeight() || this.rowHeightPx());
   private readonly tableWrapRef = viewChild<ElementRef<HTMLDivElement>>('tableWrap');
   /**
    * Effective numeric page size used for fetching/rendering. In Auto mode this is
@@ -166,16 +237,8 @@ export class TaskTable {
    */
   protected readonly pageSize = computed(() =>
     this.isAutoMode()
-      ? computeAutoPageSize(this.availableRowsHeight())
+      ? computeAutoPageSize(this.availableRowsHeight(), this.effectiveRowHeightPx())
       : this.limit() || this.preferencesStore.pageSize(),
-  );
-  /**
-   * Height of the invisible spacer row that keeps the table body at
-   * page-size × row-height even on a short last page, so the pagination footer
-   * does not jump vertically.
-   */
-  protected readonly bodySpacerHeight = computed(() =>
-    Math.max(0, this.pageSize() * TASK_ROW_HEIGHT_PX - this.tasks().length * TASK_ROW_HEIGHT_PX),
   );
   /** Safe page number — falls back to 1 when the query param is absent */
   protected readonly safePage = computed(() => this.page() || 1);
@@ -218,12 +281,39 @@ export class TaskTable {
   /** Shared badge-variant/label helpers (see constants/priority.ts) */
   protected readonly taskTypeBadgeVariant = taskTypeBadgeVariant;
   protected readonly priorityBadgeVariant = priorityBadgeVariant;
-  protected readonly priorityLabel = priorityLabel;
+
+  /** Translated priority label (P11); unknown values render verbatim. */
+  protected priorityLabel(priority: string): string {
+    const key = priorityLabelKey(priority);
+
+    return key ? this.transloco.translate(key) : priority;
+  }
   // ─── Data ──────────────────────────────────────────────────────────────────
   protected readonly tasks = signal<Task[]>([]);
   protected readonly total = signal(0);
   protected readonly totalPages = signal(0);
   protected readonly loading = signal(true);
+  // ─── Q10 (RQ-04 ③): multi-select + bulk actions ─────────────────────────────
+  /** Page-scoped selection set — cleared whenever the table data reloads */
+  protected readonly selectedIds = signal<Set<string>>(new Set());
+  protected readonly selectedCount = computed(() => this.selectedIds().size);
+  protected readonly allSelected = computed(
+    () => this.tasks().length > 0 && this.tasks().every((task) => this.selectedIds().has(task.id)),
+  );
+  /** Bulk-bar field buffers (empty string = untouched) */
+  protected readonly bulkStatus = signal('');
+  protected readonly bulkAssignee = signal('');
+  protected readonly bulkSprint = signal('');
+  protected readonly applyingBulk = signal(false);
+  /** Mirrors the server's exactly-one-field contract client-side */
+  protected readonly canApplyBulk = computed(
+    () => [this.bulkStatus(), this.bulkAssignee(), this.bulkSprint()].filter((v) => v !== '').length === 1,
+  );
+  /**
+   * colspan for empty/spacer rows — visible columns plus the selection
+   * checkbox column when it is rendered.
+   */
+  protected readonly renderedColumnCount = computed(() => this.visibleColumnCount() + (this.canCreateTasks() ? 1 : 0));
   // ─── Column definitions for @for header rendering ──────────────────────────
   // V4-8 (reopened): under `table-fixed` the fixed px widths of the non-title
   // columns must stay well below typical container widths — otherwise the Title
@@ -236,7 +326,7 @@ export class TaskTable {
       columnKey: 'key',
       labelKey: 'taskTable.key',
       filterType: 'none',
-      width: 'w-[90px]',
+      width: 'w-23',
       getFilterValue: () => '',
     },
     {
@@ -247,7 +337,7 @@ export class TaskTable {
       // V4-8 (reopened): `w-auto` alone collapses to 0px when the fixed widths of
       // the other columns consume the container. An explicit percentage width keeps
       // a proportional share under `table-fixed` at every viewport.
-      width: 'w-[30%] min-w-[200px]',
+      width: 'w-[30%] min-w-50',
       popoverWidth: 'w-56',
       getFilterValue: () => this.searchInput(),
       setFilterValue: (v) => this.onSearchInput(v),
@@ -258,7 +348,7 @@ export class TaskTable {
       columnKey: 'type',
       labelKey: 'taskTable.type',
       filterType: 'select',
-      width: 'w-[90px]',
+      width: 'w-23',
       getFilterValue: () => this.filterType(),
       setFilterValue: (v) => this.onColumnFilterChange('type', v),
       getOptions: () => this.typeOptions(),
@@ -270,7 +360,7 @@ export class TaskTable {
       columnKey: 'status',
       labelKey: 'taskTable.status',
       filterType: 'select',
-      width: 'w-[130px]',
+      width: 'w-33',
       getFilterValue: () => this.filterStatus(),
       setFilterValue: (v) => this.onColumnFilterChange('status', v),
       getOptions: () => this.statusOptions(),
@@ -282,7 +372,7 @@ export class TaskTable {
       columnKey: 'priority',
       labelKey: 'taskTable.priority',
       filterType: 'select',
-      width: 'w-[100px]',
+      width: 'w-25',
       getFilterValue: () => this.priority(),
       setFilterValue: (v) => this.onColumnFilterChange('priority', v),
       allLabelKey: 'taskTable.allPriorities',
@@ -298,7 +388,7 @@ export class TaskTable {
       columnKey: 'assignee',
       labelKey: 'taskTable.assignee',
       filterType: 'select',
-      width: 'w-[130px]',
+      width: 'w-33',
       getFilterValue: () => this.filterAssignee(),
       setFilterValue: (v) => this.onColumnFilterChange('assignee', v),
       getOptions: () => this.memberOptions(),
@@ -310,7 +400,7 @@ export class TaskTable {
       columnKey: 'reporter',
       labelKey: 'taskTable.reporter',
       filterType: 'select',
-      width: 'w-[130px]',
+      width: 'w-33',
       getFilterValue: () => this.filterReporter(),
       setFilterValue: (v) => this.onColumnFilterChange('reporter', v),
       getOptions: () => this.memberOptions(),
@@ -322,7 +412,7 @@ export class TaskTable {
       columnKey: 'sprint',
       labelKey: 'taskTable.sprint',
       filterType: 'select',
-      width: 'w-[110px]',
+      width: 'w-28',
       getFilterValue: () => this.filterSprint(),
       setFilterValue: (v) => this.onColumnFilterChange('sprint', v),
       getOptions: () => this.sprintOptions(),
@@ -334,24 +424,35 @@ export class TaskTable {
       columnKey: 'labels',
       labelKey: 'taskTable.labels',
       filterType: 'none',
-      width: 'w-[140px]',
+      width: 'w-35',
       getFilterValue: () => '',
     },
     {
       field: 'createdAt',
       columnKey: 'created',
       labelKey: 'taskTable.created',
-      filterType: 'none',
-      width: 'w-[100px]',
+      // Q13/F-01: date-range filter (on/before/after/between) via header popover
+      filterType: 'date',
+      width: 'w-25',
+      // Round-4 F3: rightmost column — open the popover leftward (no viewport clipping)
+      align: 'end',
       getFilterValue: () => '',
+      getDateFrom: () => this.createdFrom(),
+      getDateTo: () => this.createdTo(),
+      setDateRange: (from, to) => this.patchParams({ createdFrom: from || null, createdTo: to || null }),
     },
     {
       field: 'updatedAt',
       columnKey: 'updated',
       labelKey: 'taskTable.updated',
-      filterType: 'none',
-      width: 'w-[100px]',
+      filterType: 'date',
+      width: 'w-25',
+      // Round-4 F3: rightmost column — open the popover leftward (no viewport clipping)
+      align: 'end',
       getFilterValue: () => '',
+      getDateFrom: () => this.updatedFrom(),
+      getDateTo: () => this.updatedTo(),
+      setDateRange: (from, to) => this.patchParams({ updatedFrom: from || null, updatedTo: to || null }),
     },
   ];
   protected readonly COLUMN_COUNT = COLUMN_COUNT;
@@ -380,11 +481,21 @@ export class TaskTable {
   protected readonly visibleFields = computed(() => new Set(this.visibleTaskColumns().map((col) => col.field)));
   /** colspan for empty/spacer rows — follows the visible column count */
   protected readonly visibleColumnCount = computed(() => this.visibleTaskColumns().length);
-  /** Column-chooser popover visibility */
+  /** Column-chooser popover visibility (toolbar instance) */
   protected readonly showColumnChooser = signal(false);
+  /**
+   * Round-5 P9 (item 24): cursor-anchored chooser instance — opened from the
+   * header context menu so the chooser appears near the cursor, not at the
+   * toolbar button. Shares state/handlers with the toolbar instance.
+   */
+  protected readonly showContextColumnChooser = signal(false);
   /** Column targeted by the header context menu */
   protected readonly contextColumn = signal<TaskColumnDef | null>(null);
   private readonly ctxAnchorRef = viewChild<ElementRef<HTMLSpanElement>>('ctxAnchor');
+  /** Hidden trigger button of the cursor-anchored chooser popover */
+  private readonly ctxChooserAnchorRef = viewChild<ElementRef<HTMLButtonElement>>('ctxChooserAnchor');
+  /** P13b: the BrnPopover hosting the cursor-anchored chooser (for setOrigin). */
+  private readonly ctxChooserPopover = viewChild('ctxChooserAnchor', { read: BrnPopover });
   private readonly ctxMenuTrigger = viewChild(CdkMenuTrigger);
   /** Debounced persistence of column toggles (~400 ms) */
   private static readonly COLUMN_PERSIST_DEBOUNCE_MS = 400;
@@ -399,6 +510,11 @@ export class TaskTable {
     if (this.filterType()) filters.typeIds = [this.filterType()];
     if (this.filterAssignee()) filters.assigneeIds = [this.filterAssignee()];
     if (this.search()) filters.search = this.search();
+    // Q12: date ranges participate in save/active-detection of saved views
+    if (this.createdFrom()) filters.createdFrom = this.createdFrom();
+    if (this.createdTo()) filters.createdTo = this.createdTo();
+    if (this.updatedFrom()) filters.updatedFrom = this.updatedFrom();
+    if (this.updatedTo()) filters.updatedTo = this.updatedTo();
 
     return filters;
   });
@@ -416,6 +532,11 @@ export class TaskTable {
     reporterId: this.filterReporter() || undefined,
     sprintId: this.filterSprint() || undefined,
     labelId: this.filterLabel() || undefined,
+    // Q13/F-01: inclusive ISO date-range filters (server applies $gte/$lte)
+    createdFrom: this.createdFrom() || undefined,
+    createdTo: this.createdTo() || undefined,
+    updatedFrom: this.updatedFrom() || undefined,
+    updatedTo: this.updatedTo() || undefined,
     sort: this.sortField() ? `${this.sortField()}:${this.sortDirection()}` : undefined,
     page: this.safePage(),
     limit: this.pageSize(),
@@ -431,6 +552,12 @@ export class TaskTable {
    * to the table always re-runs the query — the list can never go stale.
    */
   private readonly reloadTick = signal(0);
+  /**
+   * P8-12: scope key of the last completed fetch (see the fetch effect).
+   * Null until the first response lands — the initial load must not "clear"
+   * an already-empty selection.
+   */
+  private lastScopeKey: string | null = null;
   private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
@@ -455,6 +582,14 @@ export class TaskTable {
 
       if (!pid) return;
 
+      // P8-12: identity of THIS request's query scope — everything that changes
+      // WHICH tasks are listed (project, filters, page, sort) but NOT the page
+      // size. Captured synchronously so the response handler can tell a scope
+      // change (clear selection) from a limit-only refetch (keep it).
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { limit: _limit, ...scope } = query;
+      const scopeKey = JSON.stringify({ pid, scope });
+
       this.loading.set(true);
       this.taskClient.list(pid, query).subscribe({
         next: (res) => {
@@ -462,6 +597,15 @@ export class TaskTable {
           this.total.set(res.pagination.total);
           this.totalPages.set(res.pagination.totalPages);
           this.loading.set(false);
+          // Q10/P8-12: selection is page-scoped — cleared when the query scope
+          // (filters/page/sort/project) changes, but NOT on limit-only refetches.
+          // Clicking a row checkbox renders the bulk bar, which shrinks the table
+          // wrapper; in Auto page-size mode the ResizeObserver then recomputes the
+          // size and refetches — that refetch must not wipe the fresh selection.
+          if (this.lastScopeKey !== null && scopeKey !== this.lastScopeKey) {
+            this.selectedIds.set(new Set());
+          }
+          this.lastScopeKey = scopeKey;
 
           // Handle invalid page — move to nearest valid page
           if (res.pagination.totalPages > 0 && this.page() > res.pagination.totalPages) {
@@ -498,29 +642,11 @@ export class TaskTable {
         this.reloadTick.update((tick) => tick + 1);
       });
 
-    // R3-P3: measure the table wrapper with a ResizeObserver instead of deriving the
-    // Auto page size from window.innerHeight. The fetch effect depends on `pageSize`,
-    // so a refetch only happens when the computed row count actually changes.
+    // R3-P3: measure the table wrapper via the shared ResizeObserver instead of
+    // deriving the Auto page size from window.innerHeight. The fetch effect depends
+    // on `pageSize`, so a refetch only happens when the row count actually changes.
     effect(() => {
-      const el = this.tableWrapRef()?.nativeElement;
-
-      if (!el || typeof ResizeObserver === 'undefined') return;
-
-      const measure = (entry?: ResizeObserverEntry) => {
-        // Prefer the observed contentRect; fall back to a direct read for the first pass
-        const wrapperHeight = Math.round(entry?.contentRect.height ?? el.getBoundingClientRect().height);
-        const head = el.querySelector('thead');
-        const headHeight = head ? Math.round(head.getBoundingClientRect().height) : 0;
-
-        this.availableRowsHeight.set(Math.max(0, wrapperHeight - headHeight));
-      };
-
-      measure(); // synchronous first measurement — avoids an initial min-rows fetch
-
-      const observer = new ResizeObserver((entries) => measure(entries[0]));
-
-      observer.observe(el);
-      this.destroyRef.onDestroy(() => observer.disconnect());
+      this.measurement.observe(this.tableWrapRef()?.nativeElement, 'thead');
     });
 
     this.destroyRef.onDestroy(() => {
@@ -549,7 +675,23 @@ export class TaskTable {
     );
 
     this.localColumns.set([...nextKeys]);
+    this.scheduleColumnPersist(nextKeys);
+  }
 
+  /**
+   * Round-5 P9 (item 25): bulk show/hide of ALL non-pinned columns at once.
+   * Pinned Key/Title always stay; persistence goes through the same debounced
+   * path as single toggles so rapid changes coalesce into one request.
+   */
+  protected toggleAllColumns(visible: boolean): void {
+    const nextKeys: TaskTableColumnKey[] = visible ? [...TASK_TABLE_COLUMN_KEYS] : [...TASK_TABLE_PINNED_COLUMNS];
+
+    this.localColumns.set([...nextKeys]);
+    this.scheduleColumnPersist(nextKeys);
+  }
+
+  /** Debounced persistence of the visible-column set (~400 ms) */
+  private scheduleColumnPersist(nextKeys: readonly TaskTableColumnKey[]): void {
     if (this.columnPersistHandle !== null) clearTimeout(this.columnPersistHandle);
 
     const pid = this.projectId();
@@ -558,9 +700,22 @@ export class TaskTable {
 
     this.columnPersistHandle = setTimeout(() => {
       this.columnPersistHandle = null;
-      this.preferencesStore.setTaskTableColumns(pid, nextKeys);
+      this.preferencesStore.setTaskTableColumns(pid, [...nextKeys]);
     }, TaskTable.COLUMN_PERSIST_DEBOUNCE_MS);
   }
+
+  /** Round-5 P9 (item 25): Select-all state over the toggleable (non-pinned) columns */
+  protected readonly toggleableColumns = computed(() =>
+    this.taskColumns.filter((col) => !this.isPinnedColumn(col.columnKey)),
+  );
+  protected readonly allColumnsSelected = computed(() =>
+    this.toggleableColumns().every((col) => this.visibleColumnKeys().has(col.columnKey)),
+  );
+  protected readonly someColumnsSelected = computed(() => {
+    const selected = this.toggleableColumns().filter((col) => this.visibleColumnKeys().has(col.columnKey)).length;
+
+    return selected > 0 && selected < this.toggleableColumns().length;
+  });
 
   /** Right-click on a column header → open the context menu at the cursor */
   protected onHeaderContextMenu(event: MouseEvent, col: TaskColumnDef): void {
@@ -574,8 +729,51 @@ export class TaskTable {
     anchor.style.left = `${event.clientX}px`;
     anchor.style.top = `${event.clientY}px`;
 
+    // Round-5 P9 (item 24): keep the cursor-anchored chooser trigger at the
+    // same coordinates so "Select columns" opens the popover at the cursor.
+    const chooserAnchor = this.ctxChooserAnchorRef()?.nativeElement;
+
+    if (chooserAnchor) {
+      chooserAnchor.style.left = `${event.clientX}px`;
+      chooserAnchor.style.top = `${event.clientY}px`;
+    }
+
     // Open once the anchor position is committed to the DOM
-    setTimeout(() => this.ctxMenuTrigger()?.open());
+    setTimeout(() => {
+      this.ctxMenuTrigger()?.open();
+      // Round-4 F4: Linux fires `contextmenu` on mousedown — when the right button
+      // is released the browser fires `auxclick`/`click` on the `<th>`, which CDK's
+      // overlay outside-click dispatcher treats as an outside click and closes the
+      // menu immediately. Swallow that single terminating event.
+      this.swallowNextClick();
+    });
+  }
+
+  /**
+   * Round-4 F4: swallow exactly ONE terminating click after a programmatic menu
+   * open. One-shot capture-phase listeners on `document` stop the event before it
+   * reaches CDK's body-level outside-click dispatcher; they remove themselves after
+   * the first event (or after ~500 ms as a safety), so a later click that selects a
+   * menu item is never eaten.
+   */
+  private swallowNextClick(): void {
+    let handle: ReturnType<typeof setTimeout> | null = null;
+    const cleanup = (): void => {
+      document.removeEventListener('auxclick', swallow, true);
+      document.removeEventListener('click', swallow, true);
+
+      if (handle !== null) clearTimeout(handle);
+
+      handle = null;
+    };
+    const swallow = (event: Event): void => {
+      event.stopPropagation();
+      cleanup();
+    };
+
+    handle = setTimeout(cleanup, 500);
+    document.addEventListener('auxclick', swallow, true);
+    document.addEventListener('click', swallow, true);
   }
 
   protected canHideContextColumn(): boolean {
@@ -590,14 +788,48 @@ export class TaskTable {
     if (col) this.toggleColumn(col.columnKey, false);
   }
 
+  /** Round-5 P9 (item 24): open the CURSOR-anchored instance, never the toolbar one */
   protected openChooserFromContextMenu(): void {
-    this.showColumnChooser.set(true);
+    // P13b: the popover is opened via the `[state]` binding (not a trigger
+    // click), so BrnPopoverTrigger never runs `setOrigin` — without an origin
+    // the overlay fell back to its default (mid-table) position. Point it at
+    // the hidden cursor-anchored trigger button first.
+    const anchor = this.ctxChooserAnchorRef()?.nativeElement;
+
+    if (anchor) this.ctxChooserPopover()?.setOrigin(anchor);
+
+    this.showColumnChooser.set(false);
+    this.showContextColumnChooser.set(true);
   }
 
   protected onChooserStateChange(state: 'open' | 'closed'): void {
-    if (state === 'closed') {
+    // P13b: when the toolbar popover is opened by CLICKING its trigger, the
+    // overlay's internal state goes 'open' but the `[state]` binding signal
+    // stayed false — so the × button's `showColumnChooser.set(false)` was a
+    // no-op (same value → input never changes → BrnOverlay's effect never
+    // closes). Mirror the overlay state into the signal so the binding is the
+    // single source of truth. Round-5 P9: only one instance open at a time.
+    if (state === 'open') {
+      this.showColumnChooser.set(true);
+      this.showContextColumnChooser.set(false);
+    } else {
       this.showColumnChooser.set(false);
     }
+  }
+
+  protected onContextChooserStateChange(state: 'open' | 'closed'): void {
+    if (state === 'open') {
+      this.showContextColumnChooser.set(true);
+      this.showColumnChooser.set(false);
+    } else {
+      this.showContextColumnChooser.set(false);
+    }
+  }
+
+  /** Round-5 P9 (item 25): × button in the shared chooser header — closes whichever instance is open */
+  protected closeColumnChooser(): void {
+    this.showColumnChooser.set(false);
+    this.showContextColumnChooser.set(false);
   }
 
   // ─── URL sync ──────────────────────────────────────────────────────────────
@@ -644,6 +876,21 @@ export class TaskTable {
       }
       this.searchInput.set('');
     }
+    // Q13/F-01: date chips clear BOTH bounds of their range
+    if (param === 'createdFrom' || param === 'createdTo') {
+      const createdCol = this.taskColumns.find((c) => c.columnKey === 'created');
+
+      if (createdCol) this.clearDateModeOverride(createdCol);
+      this.patchParams({ createdFrom: null, createdTo: null });
+      return;
+    }
+    if (param === 'updatedFrom' || param === 'updatedTo') {
+      const updatedCol = this.taskColumns.find((c) => c.columnKey === 'updated');
+
+      if (updatedCol) this.clearDateModeOverride(updatedCol);
+      this.patchParams({ updatedFrom: null, updatedTo: null });
+      return;
+    }
     this.onColumnFilterChange(param, '');
   }
 
@@ -654,6 +901,8 @@ export class TaskTable {
       this.searchDebounceHandle = null;
     }
     this.searchInput.set('');
+    // Round-4 F2: drop any explicit UI-mode overrides — derived mode takes over again
+    this.dateModeOverrides.set({});
     this.patchParams({
       search: null,
       priority: null,
@@ -663,6 +912,10 @@ export class TaskTable {
       reporter: null,
       sprint: null,
       label: null,
+      createdFrom: null,
+      createdTo: null,
+      updatedFrom: null,
+      updatedTo: null,
       page: null,
     });
   }
@@ -677,7 +930,11 @@ export class TaskTable {
       !!this.assignee() ||
       !!this.reporter() ||
       !!this.sprint() ||
-      !!this.label(),
+      !!this.label() ||
+      !!this.createdFrom() ||
+      !!this.createdTo() ||
+      !!this.updatedFrom() ||
+      !!this.updatedTo(),
   );
   /** Active filters as removable chips rendered above the table */
   protected readonly activeFilterChips = computed<{ param: string; labelKey: string; value: string }[]>(() => {
@@ -688,8 +945,12 @@ export class TaskTable {
       chips.push({ param: 'search', labelKey: 'taskTable.filterSearch', value: this.search() });
     }
     if (this.priority()) {
-      // R3-P5: title-case display label instead of the raw enum value
-      chips.push({ param: 'priority', labelKey: 'taskTable.filterPriority', value: priorityLabel(this.priority()) });
+      // P11: translated display label instead of the raw enum value
+      chips.push({
+        param: 'priority',
+        labelKey: 'taskTable.filterPriority',
+        value: this.priorityLabel(this.priority()),
+      });
     }
     if (this.filterStatus()) {
       chips.push({
@@ -733,6 +994,24 @@ export class TaskTable {
         value: this.refStore.nameOf(pid, 'labels', this.filterLabel()),
       });
     }
+
+    // Q13/F-01: date-range chips — one chip per bounded column
+    const dateChip = (param: 'createdFrom' | 'updatedFrom', from: string, to: string, labelKey: string): void => {
+      if (!from && !to) return;
+
+      let value: string;
+
+      if (from && to) {
+        value = from === to ? from : `${from} … ${to}`;
+      } else {
+        value = from || `≤ ${to}`;
+      }
+
+      chips.push({ param, labelKey, value });
+    };
+
+    dateChip('createdFrom', this.createdFrom(), this.createdTo(), 'taskTable.filterCreated');
+    dateChip('updatedFrom', this.updatedFrom(), this.updatedTo(), 'taskTable.filterUpdated');
 
     return chips;
   });
@@ -803,7 +1082,269 @@ export class TaskTable {
       this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? task.projectId;
 
     // Canonical task URL uses the project key + task number (DEC-032)
-    this.router.navigate(['/t', tenantSlug, 'projects', projectKey, 'tasks', `${projectKey}-${task.number}`]);
+    this.router.navigate(['/w', tenantSlug, 'projects', projectKey, 'tasks', `${projectKey}-${task.number}`]);
+  }
+
+  /** Q13/F-03: middle-click (auxclick, button 1) opens the task in a new tab */
+  protected openTaskInNewTab(event: MouseEvent, task: Task): void {
+    if (event.button !== 1) return;
+
+    event.preventDefault();
+
+    const tenantSlug = getTenantSlug(this.route);
+    const projectKey =
+      this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? task.projectId;
+    const url = this.router.serializeUrl(
+      this.router.createUrlTree(['/w', tenantSlug, 'projects', projectKey, 'tasks', `${projectKey}-${task.number}`]),
+    );
+
+    window.open(url, '_blank');
+  }
+
+  // ─── Q13/F-01: date-range filter helpers ───────────────────────────────────
+
+  private static toIsoDate(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+
+    return `${y}-${m}-${d}`;
+  }
+
+  protected isoToDate(value: string): Date | undefined {
+    if (!value) return undefined;
+
+    const [y, m, d] = value.split('-').map(Number);
+
+    return new Date(y, m - 1, d);
+  }
+
+  /**
+   * P12 (item 28): trigger label formatter for the date-filter pickers — the
+   * selected date renders with the user's date format + active locale via
+   * DatePipe (no weekday), instead of the picker's raw default. Passed as
+   * `formatDate` to the `hlm-date-picker` instances in the template.
+   */
+  protected readonly dateFilterTriggerFormat = (date: Date): string => {
+    const locale = this.preferencesStore.language();
+
+    return new DatePipe(locale).transform(date, this.preferencesStore.datePipeFormat(), undefined, locale) ?? '';
+  };
+  /**
+   * Round-4 F2: per-column UI-mode override. Picking e.g. 'between' before any
+   * dates exist must NOT invent bounds — the override keeps the UI in the chosen
+   * mode until real bounds determine it again (or the filter is removed/cleared).
+   */
+  private readonly dateModeOverrides = signal<Partial<Record<string, string>>>({});
+
+  private setDateModeOverride(col: TaskColumnDef, mode: string): void {
+    this.dateModeOverrides.update((overrides) => ({ ...overrides, [col.columnKey]: mode }));
+  }
+
+  private clearDateModeOverride(col: TaskColumnDef): void {
+    this.dateModeOverrides.update((overrides) => {
+      if (!(col.columnKey in overrides)) return overrides;
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { [col.columnKey]: _removed, ...rest } = overrides;
+
+      return rest;
+    });
+  }
+
+  /** Derive the popover's mode select value from the current from/to bounds */
+  protected dateMode(col: TaskColumnDef): 'none' | 'on' | 'before' | 'after' | 'between' {
+    // Round-4 F2: an explicit user choice wins over the derived mode
+    const override = this.dateModeOverrides()[col.columnKey];
+
+    if (
+      override === 'none' ||
+      override === 'on' ||
+      override === 'before' ||
+      override === 'after' ||
+      override === 'between'
+    ) {
+      return override;
+    }
+
+    const from = col.getDateFrom?.() ?? '';
+    const to = col.getDateTo?.() ?? '';
+
+    if (!from && !to) return 'none';
+    if (from && to) return from === to ? 'on' : 'between';
+
+    return to ? 'before' : 'after';
+  }
+
+  /**
+   * Round-4 F1: translated trigger label for the date-mode select (values are raw
+   * mode strings — without this the trigger shows 'none'/'between'/… verbatim).
+   */
+  protected readonly dateModeToString = (mode: string): string =>
+    this.transloco.translate(`taskTable.dateMode.${mode}`);
+
+  /**
+   * Round-4 F2: switching modes NEVER invents dates (the old `today` fallback wrote
+   * createdFrom=createdTo=<today> the moment 'between' was picked). Only EXISTING
+   * bounds are rearranged; the UI-mode override keeps the chosen mode visible.
+   */
+  protected onDateModeChange(col: TaskColumnDef, mode: string): void {
+    const from = col.getDateFrom?.() ?? '';
+    const to = col.getDateTo?.() ?? '';
+
+    switch (mode) {
+      case 'none':
+        this.clearDateModeOverride(col);
+        col.setDateRange?.('', '');
+        break;
+
+      case 'on': {
+        this.setDateModeOverride(col, mode);
+
+        const d = from || to;
+
+        col.setDateRange?.(d, d);
+        break;
+      }
+
+      case 'before':
+        this.setDateModeOverride(col, mode);
+        col.setDateRange?.('', to || from);
+        break;
+
+      case 'after':
+        this.setDateModeOverride(col, mode);
+        col.setDateRange?.(from || to, '');
+        break;
+
+      case 'between': {
+        this.setDateModeOverride(col, mode);
+
+        if (from) {
+          col.setDateRange?.(from, '');
+        } else if (to) {
+          col.setDateRange?.('', to);
+        } else {
+          col.setDateRange?.('', '');
+        }
+        break;
+      }
+    }
+  }
+
+  protected onDateFromChange(col: TaskColumnDef, value: Date | null): void {
+    col.setDateRange?.(value ? TaskTable.toIsoDate(value) : '', col.getDateTo?.() ?? '');
+  }
+
+  protected onDateToChange(col: TaskColumnDef, value: Date | null): void {
+    col.setDateRange?.(col.getDateFrom?.() ?? '', value ? TaskTable.toIsoDate(value) : '');
+  }
+
+  /** Single-bound modes ('on'/'before'/'after') share one picker */
+  protected onSingleDateChange(col: TaskColumnDef, value: Date | null): void {
+    const iso = value ? TaskTable.toIsoDate(value) : '';
+
+    if (this.dateMode(col) === 'before') {
+      col.setDateRange?.('', iso);
+    } else {
+      col.setDateRange?.(iso, this.dateMode(col) === 'on' ? iso : '');
+    }
+  }
+
+  // ─── Q10 (RQ-04 ③): multi-select + bulk actions ────────────────────────────
+
+  /** Toggle a single row's checkbox */
+  protected toggleRowSelection(taskId: string, checked: boolean): void {
+    const next = new Set(this.selectedIds());
+
+    if (checked) {
+      next.add(taskId);
+    } else {
+      next.delete(taskId);
+    }
+    this.selectedIds.set(next);
+  }
+
+  /** Header select-all — page-scoped (only the tasks currently loaded) */
+  protected toggleSelectAll(checked: boolean): void {
+    this.selectedIds.set(checked ? new Set(this.tasks().map((task) => task.id)) : new Set());
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  /** V9-4: resolve the selected status id to its label for the bulk trigger */
+  protected readonly statusItemToString = (id: string) => this.refStore.nameOf(this.projectId(), 'statuses', id);
+
+  /** Setting one bulk field clears the others (exactly-one contract) */
+  protected onBulkStatusChange(value: string): void {
+    this.bulkStatus.set(value);
+
+    if (value) {
+      this.bulkAssignee.set('');
+      this.bulkSprint.set('');
+    }
+  }
+
+  protected onBulkAssigneeChange(value: string): void {
+    this.bulkAssignee.set(value);
+
+    if (value) {
+      this.bulkStatus.set('');
+      this.bulkSprint.set('');
+    }
+  }
+
+  protected onBulkSprintChange(value: string): void {
+    this.bulkSprint.set(value);
+
+    if (value) {
+      this.bulkStatus.set('');
+      this.bulkAssignee.set('');
+    }
+  }
+
+  private resetBulkFields(): void {
+    this.bulkStatus.set('');
+    this.bulkAssignee.set('');
+    this.bulkSprint.set('');
+  }
+
+  /** Apply the single chosen field to every selected task */
+  protected applyBulkUpdate(): void {
+    if (!this.canApplyBulk() || this.applyingBulk() || this.selectedCount() === 0) return;
+
+    const data: BulkUpdateTasks['data'] = {};
+
+    if (this.bulkStatus()) {
+      data.statusId = this.bulkStatus();
+    } else if (this.bulkAssignee()) {
+      data.assigneeId = this.bulkAssignee() === BULK_UNASSIGNED ? null : this.bulkAssignee();
+    } else if (this.bulkSprint()) {
+      data.sprintId = this.bulkSprint() === BULK_NO_SPRINT ? null : this.bulkSprint();
+    }
+
+    this.applyingBulk.set(true);
+    this.taskClient.bulkUpdate(this.projectId(), { taskIds: [...this.selectedIds()], data }).subscribe({
+      next: (res) => {
+        this.applyingBulk.set(false);
+
+        if (res.failed && res.failed.length > 0) {
+          this.notify.error('taskTable.bulk.partial', { count: res.updated, failed: res.failed.length });
+        } else {
+          this.notify.success('taskTable.bulk.success', { count: res.updated });
+        }
+        this.clearSelection();
+        this.resetBulkFields();
+        // Re-fetch the current page so updated rows are reflected
+        this.reloadTick.update((tick) => tick + 1);
+      },
+      error: (err) => {
+        this.applyingBulk.set(false);
+        this.notify.error(getErrorMessage(err));
+      },
+    });
   }
 
   // ─── Filter Panel Dialog ──────────────────────────────────────────────────
@@ -827,6 +1368,11 @@ export class TaskTable {
       reporter: this.idToName('members', criteria.reporterIds?.[0] ?? ''),
       sprint: this.idToName('sprints', criteria.sprintIds?.[0] ?? ''),
       label: this.idToName('labels', criteria.labelIds?.[0] ?? ''),
+      // Q12: re-apply saved date ranges like any other criterion
+      createdFrom: criteria.createdFrom ?? null,
+      createdTo: criteria.createdTo ?? null,
+      updatedFrom: criteria.updatedFrom ?? null,
+      updatedTo: criteria.updatedTo ?? null,
       page: null,
     };
 
@@ -843,6 +1389,6 @@ export class TaskTable {
     const tenantSlug = getTenantSlug(this.route);
     const projectKey = this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? '';
 
-    this.router.navigate(['/t', tenantSlug, 'projects', projectKey, 'tasks', 'new']);
+    this.router.navigate(['/w', tenantSlug, 'projects', projectKey, 'tasks', 'new']);
   }
 }

@@ -1,5 +1,10 @@
-import { Component, inject, input, output, signal, computed, effect, OnInit } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideCheck, lucidePencil, lucideTrash2 } from '@ng-icons/lucide';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { of, tap } from 'rxjs';
+import { form, FormField, FormRoot, required, schema } from '@angular/forms/signals';
 import { FilterClient } from '@services/filter-client';
 import { ProjectRefStore } from '@stores/project-ref-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -9,9 +14,9 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
-import { finalize } from 'rxjs';
 import type { Filter, FilterCriteria, FilterSort, CreateFilter, TaskPriority } from '@task-board/shared';
-import { injectToasts } from '@app/shared/utils/toast-utils';
+import { injectUndoToasts } from '@app/shared/utils/undo-toast';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 
@@ -23,12 +28,38 @@ export interface AppliedFilterState {
 /** Single-value criteria keys editable through the panel's select fields */
 type SingleFilterKey = 'statusIds' | 'typeIds' | 'assigneeIds' | 'reporterIds' | 'sprintIds' | 'labelIds';
 
+/** Signal-Forms model for the save / rename name inputs */
+interface ViewNameForm {
+  name: string;
+}
+
+/**
+ * Order-insensitive structural comparison used for active-view detection:
+ * two views match the current state when their criteria and sort are deeply
+ * equal regardless of key insertion order.
+ */
+export function stableValue(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableValue).join(',')}]`;
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+
+    return `{${Object.keys(record)
+      .sort()
+      .map((k) => `${k}:${stableValue(record[k])}`)
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value) ?? 'null';
+}
+
 @Component({
   selector: 'ui-filter-panel',
   imports: [
     ConfirmDialog,
     HlmAlertImports,
     TranslocoPipe,
+    NgIcon,
     HlmButtonImports,
     HlmSpinnerImports,
     HlmCardImports,
@@ -36,11 +67,14 @@ type SingleFilterKey = 'statusIds' | 'typeIds' | 'assigneeIds' | 'reporterIds' |
     HlmDialogImports,
     HlmFieldImports,
     HlmNativeSelectImports,
+    FormField,
+    FormRoot,
   ],
+  providers: [provideIcons({ lucideCheck, lucidePencil, lucideTrash2 })],
   templateUrl: './filter-panel.html',
 })
-export class FilterPanel implements OnInit {
-  private readonly notify = injectToasts();
+export class FilterPanel {
+  private readonly notify = injectUndoToasts();
   private readonly filterClient = inject(FilterClient);
   /** Per-project reference data for the filter-field option lists */
   private readonly refStore = inject(ProjectRefStore);
@@ -64,15 +98,33 @@ export class FilterPanel implements OnInit {
       f.assigneeIds?.length ||
       f.reporterIds?.length ||
       f.sprintIds?.length ||
-      f.labelIds?.length
+      f.labelIds?.length ||
+      // Q12: date-range criteria captured from the URL count as active state too
+      f.createdFrom ||
+      f.createdTo ||
+      f.updatedFrom ||
+      f.updatedTo
     );
     const hasSort = !!(s.field && s.field !== 'createdAt') || (s.field === 'createdAt' && s.direction !== 'desc');
 
     return hasFilters || hasSort;
   });
-  protected readonly filters = signal<Filter[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal('');
+  /**
+   * Saved views — loaded reactively per project. The URL query params remain
+   * the single source of truth for applied filters; views only write params.
+   * V9-5: skip the request until the project id resolves — an empty id hits
+   * `/projects//filters`, whose SPA-fallback HTML response (200) previously
+   * poisoned the resource with a JSON-parse error.
+   */
+  private readonly viewsResource = rxResource({
+    params: () => ({ projectId: this.projectId() }),
+    stream: ({ params }) => (params.projectId ? this.filterClient.list(params.projectId) : of([] as Filter[])),
+    defaultValue: [] as Filter[],
+  });
+  protected readonly filters = computed(() => (this.viewsResource.hasValue() ? this.viewsResource.value() : []));
+  protected readonly loading = computed(() => this.viewsResource.isLoading());
+  /** V9-5: rxResource.error() returns `undefined` (not null) on success — coerce to boolean */
+  protected readonly loadError = computed(() => Boolean(this.viewsResource.error()));
   // ─── V4-10: editable filter fields ──────────────────────────────────────────
   /** Reference-data option lists (reactive — empty until ProjectRefStore loads) */
   protected readonly statusOptions = computed(() => this.refStore.options(this.projectId(), 'statuses'));
@@ -128,35 +180,43 @@ export class FilterPanel implements OnInit {
     this.draft.set({});
     this.applyDraft();
   }
-  // Save form
-  protected readonly filterName = signal('');
+  // ─── Saved views: save / rename / delete / active detection ────────────────
   protected readonly saving = signal(false);
   protected readonly showSaveForm = signal(false);
+  private readonly saveModel = signal<ViewNameForm>({ name: '' });
+  protected readonly saveForm = form(
+    this.saveModel,
+    schema<ViewNameForm>((field) => {
+      required(field.name, { message: 'filters.nameRequired' });
+    }),
+  );
+  /** View currently being renamed (drives the rename dialog) */
+  protected readonly renameTarget = signal<Filter | null>(null);
+  protected readonly renaming = signal(false);
+  private readonly renameModel = signal<ViewNameForm>({ name: '' });
+  protected readonly renameForm = form(
+    this.renameModel,
+    schema<ViewNameForm>((field) => {
+      required(field.name, { message: 'filters.nameRequired' });
+    }),
+  );
   // Delete confirmation
   protected readonly showDeleteConfirm = signal(false);
   protected readonly filterToDelete = signal<Filter | null>(null);
+  /**
+   * The view whose stored criteria+sort exactly match the current URL-derived
+   * state (order-insensitive deep compare). Powers the active checkmark.
+   */
+  protected readonly activeViewId = computed(() => {
+    const current = stableValue({ filters: this.currentFilters(), sort: this.currentSort() });
 
-  ngOnInit(): void {
-    this.loadFilters();
-  }
+    return this.filters().find((v) => stableValue({ filters: v.filters, sort: v.sort }) === current)?.id ?? null;
+  });
 
-  protected loadFilters(): void {
-    this.loading.set(true);
-    this.filterClient
-      .list(this.projectId())
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (data) => {
-          this.filters.set(data);
-        },
-        error: () => {
-          this.error.set('filters.loadError');
-        },
-      });
-  }
+  protected submitSave(): void {
+    if (this.saveForm().invalid() || this.saving()) return;
 
-  protected saveFilter(): void {
-    const name = this.filterName().trim();
+    const name = this.saveModel().name.trim();
 
     if (!name) return;
 
@@ -167,28 +227,57 @@ export class FilterPanel implements OnInit {
     };
 
     this.saving.set(true);
-    this.filterClient
-      .create(this.projectId(), payload)
-      .pipe(finalize(() => this.saving.set(false)))
-      .subscribe({
-        next: (filter) => {
-          this.filters.update((list) => [...list, filter]);
-          this.filterName.set('');
-          this.showSaveForm.set(false);
-          this.notify.success('toasts.created');
-        },
-        error: () => {
-          this.error.set('filters.createError');
-        },
-      });
+    this.filterClient.create(this.projectId(), payload).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.saveForm().reset();
+        this.showSaveForm.set(false);
+        this.viewsResource.reload();
+        this.notify.success('toasts.created');
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.notify.error(getErrorMessage(err, 'filters.createError'));
+      },
+    });
   }
 
-  protected applyFilter(filter: Filter): void {
-    this.filterApplied.emit({ filters: filter.filters, sort: filter.sort });
+  protected applyFilter(view: Filter): void {
+    this.filterApplied.emit({ filters: view.filters, sort: view.sort });
   }
 
-  protected confirmDelete(filter: Filter): void {
-    this.filterToDelete.set(filter);
+  protected startRename(view: Filter): void {
+    this.renameTarget.set(view);
+    this.renameForm().reset({ name: view.name });
+  }
+
+  protected closeRename(): void {
+    this.renameTarget.set(null);
+  }
+
+  protected confirmRename(): void {
+    const target = this.renameTarget();
+    const name = this.renameModel().name.trim();
+
+    if (!target || this.renameForm().invalid() || this.renaming() || !name || name === target.name) return;
+
+    this.renaming.set(true);
+    this.filterClient.update(target.id, { name }).subscribe({
+      next: () => {
+        this.renaming.set(false);
+        this.closeRename();
+        this.viewsResource.reload();
+        this.notify.success('toasts.saved');
+      },
+      error: (err) => {
+        this.renaming.set(false);
+        this.notify.error(getErrorMessage(err, 'filters.renameError'));
+      },
+    });
+  }
+
+  protected confirmDelete(view: Filter): void {
+    this.filterToDelete.set(view);
     this.showDeleteConfirm.set(true);
   }
 
@@ -200,24 +289,27 @@ export class FilterPanel implements OnInit {
   }
 
   protected deleteFilter(): void {
-    const filter = this.filterToDelete();
+    const view = this.filterToDelete();
 
-    if (!filter) return;
+    if (!view) return;
 
-    this.filterClient.delete(filter.id).subscribe({
+    this.filterClient.delete(view.id).subscribe({
       next: () => {
-        this.filters.update((list) => list.filter((f) => f.id !== filter.id));
         this.showDeleteConfirm.set(false);
         this.filterToDelete.set(null);
-        this.notify.success('toasts.deleted');
+        this.viewsResource.reload();
+        // Q11 (DEC-053): undo recreates the saved view with the same name,
+        // criteria and sort. The new view gets a new id and belongs to the
+        // current user — acceptable for a personal saved view.
+        this.notify.successWithUndo('toasts.deleted', () =>
+          this.filterClient
+            .create(this.projectId(), { name: view.name, filters: view.filters, sort: view.sort })
+            .pipe(tap(() => this.viewsResource.reload())),
+        );
       },
-      error: () => {
-        this.error.set('filters.deleteError');
+      error: (err) => {
+        this.notify.error(getErrorMessage(err, 'filters.deleteError'));
       },
     });
-  }
-
-  protected onFilterNameInput(event: Event): void {
-    this.filterName.set((event.target as HTMLInputElement).value);
   }
 }

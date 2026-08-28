@@ -1,23 +1,30 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ProjectStore } from '@stores/project-store';
 import { PreferencesStore } from '@stores/preferences-store';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
-import { lucideHistory, lucideFilter, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
+import { lucideHistory, lucideFilter, lucideArrowUp, lucideArrowDown, lucideRows3 } from '@ng-icons/lucide';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { AuditClient, type AuditListParams } from '@services/audit-client';
 import type { AuditEvent, PaginatedResponse } from '@task-board/shared';
 import { AuditEntityType } from '@task-board/shared';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
-import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
+import {
+  AUTO_PAGE_SIZE_SENTINEL,
+  computeAutoPageSize,
+  rowHeightForDensity,
+} from '@app/shared/auto-table/auto-page-size';
+import { useAutoRowMeasurement } from '@app/shared/auto-table/use-auto-row-measurement';
+import { useTableDensity } from '@app/shared/auto-table/table-density';
 
 /** R3-P7: strict numeric query-param transform — non-positive/garbage → 0 (caller applies defaults). */
 function safeNumericParam(value: unknown): number {
@@ -46,12 +53,12 @@ const EMPTY_PAGE: PaginatedResponse<AuditEvent> = {
     NgIcon,
     HlmButtonImports,
     HlmBadgeImports,
-    HlmSpinnerImports,
     HlmSelectImports,
     HlmTableImports,
+    HlmTooltipImports,
     Pagination,
   ],
-  providers: [provideIcons({ lucideHistory, lucideFilter, lucideArrowUp, lucideArrowDown })],
+  providers: [provideIcons({ lucideHistory, lucideFilter, lucideArrowUp, lucideArrowDown, lucideRows3 })],
   templateUrl: './audit-log-viewer.html',
 })
 export class AuditLogViewer {
@@ -60,6 +67,8 @@ export class AuditLogViewer {
   private readonly preferencesStore = inject(PreferencesStore);
   /** R3-P8: DatePipe token derived from the user's date/time format preference */
   protected readonly dateTimeFmt = this.preferencesStore.dateTimePipeFormat;
+  /** P12 (item 28): active language passed as the DatePipe locale for localized month names */
+  protected readonly lang = this.preferencesStore.language;
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   /** Bound via withComponentInputBinding() — receives the project key from the route */
@@ -78,6 +87,37 @@ export class AuditLogViewer {
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
   protected readonly safePage = computed(() => this.page() || 1);
   protected readonly safeLimit = computed(() => this.limit() || 20);
+  /**
+   * Q2 (F-05): Auto page-size mode — the persisted preference sentinel (0) means the
+   * effective page size is derived from the measured table-wrapper height instead of
+   * a fixed number. Same semantics as the tasks table.
+   */
+  protected readonly isAutoMode = computed(() => this.preferencesStore.pageSize() === AUTO_PAGE_SIZE_SENTINEL);
+  /**
+   * Q9 (RQ-04 ⑤): device-local table density — compact mode shrinks vertical cell
+   * padding via a class on the `<table>`; the Auto math reacts through the
+   * density-aware fallback row height.
+   */
+  private readonly density = useTableDensity();
+  protected readonly isCompact = this.density.compact;
+  protected readonly toggleDensity = this.density.toggle;
+  /** Density-aware fallback row height used by the Auto page-size math */
+  private readonly rowHeightPx = computed(() => rowHeightForDensity(this.density.compact()));
+  /** Height available for table ROWS, measured from the table wrapper via a shared ResizeObserver. */
+  private readonly measurement = useAutoRowMeasurement();
+  private readonly availableRowsHeight = this.measurement.availableRowsHeight;
+  private readonly tableWrapRef = viewChild<ElementRef<HTMLDivElement>>('tableWrap');
+  /** Effective numeric page size used for fetching/rendering. */
+  protected readonly effectiveLimit = computed(() =>
+    this.isAutoMode() ? computeAutoPageSize(this.availableRowsHeight(), this.rowHeightPx()) : this.safeLimit(),
+  );
+
+  constructor() {
+    // Measure the table wrapper so Auto mode derives its row count from real space
+    effect(() => {
+      this.measurement.observe(this.tableWrapRef()?.nativeElement, 'thead');
+    });
+  }
   /** All available entity types for the filter dropdown */
   protected readonly entityTypes = Object.values(AuditEntityType);
   protected readonly actions = ['CREATED', 'UPDATED', 'DELETED'] as const;
@@ -98,7 +138,7 @@ export class AuditLogViewer {
     params: () => ({
       projectId: this.projectId(),
       page: this.safePage(),
-      limit: this.safeLimit(),
+      limit: this.effectiveLimit(),
       sort: this.sort(),
       action: (this.action() || undefined) as AuditListParams['action'],
       entityType: (this.entityType() || undefined) as AuditListParams['entityType'],
@@ -167,6 +207,18 @@ export class AuditLogViewer {
     if (newPage < 1 || newPage > this.totalPages()) return;
 
     this.patchParams({ page: newPage === 1 ? null : newPage });
+  }
+
+  /** Numeric rows-per-page selection — persisted like the tasks table preference; URL override cleared. */
+  protected onPageSizeChange(size: number): void {
+    this.preferencesStore.setPageSize(size);
+    this.patchParams({ limit: null, page: null });
+  }
+
+  /** Auto rows-per-page selection — persists the shared sentinel preference. */
+  protected onAutoPageSize(): void {
+    this.preferencesStore.setPageSize(AUTO_PAGE_SIZE_SENTINEL);
+    this.patchParams({ limit: null, page: null });
   }
 
   protected toggleExpand(eventId: string): void {

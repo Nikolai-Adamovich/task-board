@@ -1,7 +1,70 @@
 <ui-sidebar>
   <div class="flex flex-1 flex-col overflow-hidden">
-    <main class="flex-1 overflow-auto p-6">
+    <!-- F-12: single source of truth for page padding — pages must not add their own px -->
+    <main class="flex-1 overflow-auto px-3 py-4 sm:p-6">
       <router-outlet />
     </main>
   </div>
 </ui-sidebar>
+
+<!-- Q9 (RQ-04 ②): `?`/F1 opens the shortcut-help dialog.
+     BrnDialog emits stateChanged with BOTH 'open' and 'closed' — reacting to
+     'open' would immediately re-close the dialog, so guard on 'closed' only. -->
+<hlm-dialog
+  [state]="shortcuts.helpOpen() ? 'open' : 'closed'"
+  (stateChanged)="$event === 'closed' && shortcuts.closeHelp()"
+>
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-md">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ 'shortcuts.title' | transloco }}</h3>
+    </hlm-dialog-header>
+    <ul class="flex flex-col gap-2 text-sm">
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.newTask' | transloco }}</span>
+        <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">C</kbd>
+      </li>
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.goTasks' | transloco }}</span>
+        <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">T</kbd>
+      </li>
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.goBoard' | transloco }}</span>
+        <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">B</kbd>
+      </li>
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.focusSearch' | transloco }}</span>
+        <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">/</kbd>
+      </li>
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.userMenu' | transloco }}</span>
+        <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">M</kbd>
+      </li>
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.workspaceSwitcher' | transloco }}</span>
+        <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">W</kbd>
+      </li>
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.projectSwitcher' | transloco }}</span>
+        <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">P</kbd>
+      </li>
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.toggleSidebar' | transloco }}</span>
+        <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">X</kbd>
+      </li>
+      <li class="flex items-center justify-between gap-4">
+        <span>{{ 'shortcuts.showHelp' | transloco }}</span>
+        <span class="flex items-center gap-1">
+          <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">F1</kbd>
+          <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">?</kbd>
+        </span>
+      </li>
+    </ul>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" hlmDialogClose>{{ 'shortcuts.close' | transloco }}</button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
+
+<!-- P13b (Fix 4): unsaved-changes confirmation, driven by pendingChangesGuard
+     through the root-provided PendingChangesService. -->
+<ui-pending-changes-dialog />

@@ -6,7 +6,7 @@ import { TenantStore } from '@stores/tenant-store';
  * Redirect guard for the legacy `/tenants/:tenantId` URLs (pre DEC-032 scheme).
  *
  * Resolves the legacy path segment (a tenant id **or** slug) against the
- * user's tenant list and redirects to the canonical `/t/:tenantSlug` home.
+ * user's tenant list and redirects to the canonical `/w/:tenantSlug` home.
  * Unknown tenants fall back to the root entry.
  */
 export const tenantRedirectGuard: CanActivateFn = async (route) => {
@@ -29,5 +29,5 @@ export const tenantRedirectGuard: CanActivateFn = async (route) => {
 
   const match = tenantStore.tenants().find((t) => t.id === ref || t.slug === ref);
 
-  return match ? router.parseUrl(`/t/${match.slug}`) : router.parseUrl('/');
+  return match ? router.parseUrl(`/w/${match.slug}`) : router.parseUrl('/');
 };

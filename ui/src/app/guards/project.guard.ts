@@ -12,7 +12,7 @@ const BYPASS_TENANT_ROLES: TenantRoleType[] = [TenantRole.OWNER, TenantRole.ADMI
 /**
  * Functional route guard that ensures the user has access to a project.
  *
- * The tenant is resolved by slug from the `/t/:tenantSlug` URL prefix (DEC-032);
+ * The tenant is resolved by slug from the `/w/:tenantSlug` URL prefix (DEC-032);
  * the project is resolved by its human-readable key.
  *
  * Access is granted when:

@@ -5,7 +5,7 @@ import {
   CreateTenantSchema,
   UpdateTenantSchema,
   InviteMemberSchema,
-  UpdateMemberRoleSchema,
+  UpdateMemberSchema,
   SlugAvailableQuerySchema,
 } from '../schemas/tenant.js';
 
@@ -113,12 +113,14 @@ export function createTenantRoutes(): Hono<AppEnv> {
     return c.json({ data: member }, 201);
   });
 
-  router.patch('/:tenantId/members/:memberUserId', validateBody(UpdateMemberRoleSchema), async (c) => {
+  // DEC-055: full member update — role, expiration date and the underlying
+  // user's profile (name/email). All fields optional.
+  router.patch('/:tenantId/members/:memberUserId', validateBody(UpdateMemberSchema), async (c) => {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     const memberUserId = c.req.param('memberUserId');
     const body = c.req.valid('json');
-    const member = await c.get('svc').tenantMembers.updateMemberRole(userId, tenantId, memberUserId, body.role);
+    const member = await c.get('svc').tenantMembers.updateMember(userId, tenantId, memberUserId, body);
 
     return c.json({ data: member });
   });

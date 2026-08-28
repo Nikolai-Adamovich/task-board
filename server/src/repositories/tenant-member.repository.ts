@@ -26,6 +26,8 @@ export interface TenantMemberDocument {
   userId: string;
   role: string;
   status: string;
+  /** DEC-055: membership expiration (null/undefined = never expires) */
+  expiresAt?: Date | null;
   invitation: InvitationDocument | null;
   createdAt: Date;
   updatedAt: Date;
@@ -40,6 +42,7 @@ function toDomain(doc: TenantMemberDocument): TenantMember {
     userId: doc.userId,
     role: doc.role as TenantMember['role'],
     status: doc.status as TenantMember['status'],
+    expiresAt: doc.expiresAt ? doc.expiresAt.toISOString() : null,
     invitation: doc.invitation
       ? {
           status: doc.invitation.status as Invitation['status'],
@@ -127,6 +130,7 @@ export class TenantMemberRepository {
     userId: string;
     role: string;
     status: string;
+    expiresAt?: Date | null;
     invitation?: InvitationDocument | null;
   }): Promise<TenantMember> {
     const now = new Date();
@@ -136,6 +140,7 @@ export class TenantMemberRepository {
       userId: input.userId,
       role: input.role,
       status: input.status,
+      expiresAt: input.expiresAt ?? null,
       invitation: input.invitation ?? null,
       createdAt: now,
       updatedAt: now,
@@ -147,7 +152,7 @@ export class TenantMemberRepository {
 
   async update(
     id: string,
-    input: Partial<Pick<TenantMemberDocument, 'role' | 'status' | 'invitation'>>,
+    input: Partial<Pick<TenantMemberDocument, 'role' | 'status' | 'expiresAt' | 'invitation'>>,
   ): Promise<TenantMember | null> {
     const result = await this.collection.findOneAndUpdate(
       { id },

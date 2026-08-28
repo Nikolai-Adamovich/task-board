@@ -26,6 +26,7 @@ const mockInvitations: MyInvitation[] = [
     userId: 'u1',
     role: 'MEMBER',
     status: 'ACTIVE',
+    expiresAt: null,
     invitation: { status: 'PENDING', tokenHash: 'hash', invitedBy: 'u9', invitedOn: NOW },
     displayName: null,
     email: null,

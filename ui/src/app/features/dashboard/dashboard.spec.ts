@@ -3,7 +3,7 @@
  *
  * Covers:
  * - dashboardState computed signal (visitor / new-user / pending-invitations / redirecting)
- * - Redirect to the last/first accessible tenant home `/t/:tenantSlug`
+ * - Redirect to the last/first accessible tenant home `/w/:tenantSlug`
  * - Auth flow (fetchCurrentUser when token but no user)
  * - onInvitationHandled reload
  */
@@ -117,7 +117,7 @@ describe('Dashboard', () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(tenantStoreMock.loadTenants).toHaveBeenCalled();
-    expect(routerNavigateSpy).toHaveBeenCalledWith(['/t', 'acme'], { replaceUrl: true });
+    expect(routerNavigateSpy).toHaveBeenCalledWith(['/w', 'acme'], { replaceUrl: true });
     expect(component.dashboardState()).toBe('redirecting');
   });
 
@@ -158,7 +158,7 @@ describe('Dashboard', () => {
 
       await component.onInvitationHandled();
 
-      expect(routerNavigateSpy).toHaveBeenCalledWith(['/t', 'acme'], { replaceUrl: true });
+      expect(routerNavigateSpy).toHaveBeenCalledWith(['/w', 'acme'], { replaceUrl: true });
     });
   });
 });

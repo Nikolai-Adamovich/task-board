@@ -2,8 +2,8 @@
 /**
  * Theme Manifest Generator
  *
- * Scans ui/public/themes/ for *-theme.css files, extracts preview colors
- * using PostCSS, and generates manifest.json.
+ * Scans ui/public/themes/ for <id>.css files (one :root block per theme),
+ * extracts preview colors using PostCSS, and generates manifest.json.
  *
  * Usage: node scripts/generate-theme-manifest.mjs
  */
@@ -18,18 +18,121 @@ const OUTPUT_FILE = join(THEMES_DIR, 'manifest.json');
 const REQUIRED_PREVIEW_VARS = ['--primary', '--muted', '--foreground', '--card', '--border'];
 const BACKGROUND_VAR = '--background';
 
+/** Curated display names for the theme pack (id → human name). */
+const THEME_NAMES = {
+  light: 'Light',
+  dark: 'Dark',
+  'winter-light': 'Winter Light',
+  'modern-minimal': 'Modern Minimal',
+  'modern-minimal-dark': 'Modern Minimal Dark',
+  't3-chat': 'T3 Chat',
+  twitter: 'Twitter',
+  'mocha-mousse': 'Mocha Mousse',
+  bubblegum: 'Bubblegum',
+  'doom-64': 'Doom 64',
+  catppuccin: 'Catppuccin',
+  'catppuccin-latte': 'Catppuccin Latte',
+  'catppuccin-frappe': 'Catppuccin Frappé',
+  'catppuccin-macchiato': 'Catppuccin Macchiato',
+  graphite: 'Graphite',
+  perpetuity: 'Perpetuity',
+  'kodama-grove': 'Kodama Grove',
+  'cosmic-night': 'Cosmic Night',
+  tangerine: 'Tangerine',
+  'quantum-rose': 'Quantum Rose',
+  nature: 'Nature',
+  'bold-tech': 'Bold Tech',
+  'elegant-luxury': 'Elegant Luxury',
+  'amber-minimal': 'Amber Minimal',
+  supabase: 'Supabase',
+  'neo-brutalism': 'Neo Brutalism',
+  'solar-dusk': 'Solar Dusk',
+  claymorphism: 'Claymorphism',
+  cyberpunk: 'Cyberpunk',
+  'pastel-dreams': 'Pastel Dreams',
+  'clean-slate': 'Clean Slate',
+  caffeine: 'Caffeine',
+  'ocean-breeze': 'Ocean Breeze',
+  'retro-arcade': 'Retro Arcade',
+  'midnight-bloom': 'Midnight Bloom',
+  candyland: 'Candyland',
+  'northern-lights': 'Northern Lights',
+  'vintage-paper': 'Vintage Paper',
+  'sunset-horizon': 'Sunset Horizon',
+  'starry-night': 'Starry Night',
+  claude: 'Claude',
+  'claude-dark': 'Claude Dark',
+  vercel: 'Vercel',
+  'vercel-dark': 'Vercel Dark',
+  mono: 'Mono',
+  nord: 'Nord',
+  'solarized-light': 'Solarized Light',
+  'solarized-dark': 'Solarized Dark',
+  'rose-pine': 'Rosé Pine',
+  'everforest-dark': 'Everforest',
+  dracula: 'Dracula',
+  'tokyo-night': 'Tokyo Night',
+  'gruvbox-dark': 'Gruvbox Dark',
+  perplexity: 'Perplexity',
+  // Theme pack #2
+  'github-light': 'GitHub Light',
+  'github-dark': 'GitHub Dark',
+  'github-dim': 'GitHub Dim',
+  'slack-light': 'Slack Light',
+  'slack-dark': 'Slack Dark',
+  'notion-light': 'Notion',
+  'notion-dark': 'Notion Dark',
+  'linear-light': 'Linear Light',
+  'linear-dark': 'Linear Dark',
+  discord: 'Discord',
+  spotify: 'Spotify',
+  'firebase-light': 'Firebase Light',
+  'firebase-dark': 'Firebase Dark',
+  'material-light': 'Material Light',
+  'material-dark': 'Material Dark',
+  poimandres: 'Poimandres',
+  kanagawa: 'Kanagawa',
+  zenburn: 'Zenburn',
+  'ayu-light': 'Ayu Light',
+  'ayu-dark': 'Ayu Dark',
+  'ayu-mirage': 'Ayu Mirage',
+  'one-light': 'One Light',
+  'one-dark': 'One Dark',
+  'flexoki-light': 'Flexoki Light',
+  'flexoki-dark': 'Flexoki Dark',
+  vesper: 'Vesper',
+  lumen: 'Lumen',
+  'night-owl': 'Night Owl',
+  'synthwave-84': "Synthwave '84",
+  cobalt2: 'Cobalt2',
+  monokai: 'Monokai',
+  'monokai-pro': 'Monokai Pro',
+  palenight: 'Palenight',
+  moonlight: 'Moonlight',
+  horizon: 'Horizon',
+  andromeda: 'Andromeda',
+  'gruvbox-light': 'Gruvbox Light',
+  'everforest-light': 'Everforest Light',
+  'rose-pine-dawn': 'Rosé Pine Dawn',
+  'rose-pine-moon': 'Rosé Pine Moon',
+  'tokyo-night-light': 'Tokyo Night Light',
+  'tokyo-night-storm': 'Tokyo Night Storm',
+  'nord-light': 'Nord Light',
+  sonokai: 'Sonokai',
+  iceberg: 'Iceberg',
+  miramare: 'Miramare',
+  'melange-light': 'Melange Light',
+  'melange-dark': 'Melange Dark',
+  oxocarbon: 'Oxocarbon',
+  'high-contrast-dark': 'High Contrast Dark',
+};
+
 /**
- * Derive a human-readable name from a theme id.
- * "light" → "Light", "light1" → "Light 1", "dark" → "Dark"
+ * Resolve a human-readable name for a theme id.
+ * Falls back to capitalizing the id for themes not in the curated map.
  */
 function deriveName(id) {
-  const match = id.match(/^(.*?)(\d+)$/);
-
-  if (match) {
-    return `${capitalize(match[1])} ${match[2]}`;
-  }
-
-  return capitalize(id);
+  return THEME_NAMES[id] ?? capitalize(id.replaceAll('-', ' '));
 }
 
 function capitalize(str) {
@@ -88,10 +191,10 @@ async function main() {
   console.log('🎨 Generating theme manifest...\n');
 
   const entries = await readdir(THEMES_DIR);
-  const cssFiles = entries.filter((f) => f.endsWith('-theme.css')).sort();
+  const cssFiles = entries.filter((f) => f.endsWith('.css') && f !== 'manifest.json').sort();
 
   if (cssFiles.length === 0) {
-    console.error('❌ No *-theme.css files found in', THEMES_DIR);
+    console.error('❌ No theme CSS files found in', THEMES_DIR);
     process.exit(1);
   }
 
@@ -99,7 +202,7 @@ async function main() {
   const seenIds = new Set();
 
   for (const file of cssFiles) {
-    const id = basename(file, '-theme.css');
+    const id = basename(file, '.css');
     console.log(`  📄 ${file} → id: "${id}"`);
 
     // Check for duplicate ids
@@ -154,12 +257,19 @@ async function main() {
     });
   }
 
-  // Sort manifest: light and dark first, then alphabetically
+  // Sort manifest: app defaults first, then light themes, then dark themes (alphabetical within)
+  const DEFAULT_ORDER = { light: 0, dark: 1 };
   manifest.sort((a, b) => {
-    if (a.id === 'light') return -1;
-    if (b.id === 'light') return 1;
-    if (a.id === 'dark') return -1;
-    if (b.id === 'dark') return 1;
+    const aDefault = DEFAULT_ORDER[a.id];
+    const bDefault = DEFAULT_ORDER[b.id];
+
+    if (aDefault !== undefined || bDefault !== undefined) {
+      return (aDefault ?? 99) - (bDefault ?? 99);
+    }
+
+    if (a.mode !== b.mode) {
+      return a.mode === 'light' ? -1 : 1;
+    }
 
     return a.id.localeCompare(b.id, undefined, { numeric: true });
   });

@@ -13,7 +13,7 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
-import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
+import { form, FormField, FormRoot, schema, required, maxLength } from '@angular/forms/signals';
 import { canManageProject } from '@app/shared/utils/role-utils';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
@@ -67,7 +67,7 @@ export class ProjectSettingsGeneral {
   protected readonly error = computed(() => this.actionError());
   /** Seed the form from the project context loaded by projectGuard */
   private readonly initialProject = this.projectStore.activeProject();
-  private readonly model = signal<GeneralFormModel>({
+  protected readonly model = signal<GeneralFormModel>({
     name: this.initialProject?.name ?? '',
     description: this.initialProject?.description ?? '',
   });
@@ -75,6 +75,7 @@ export class ProjectSettingsGeneral {
     this.model,
     schema<GeneralFormModel>((field) => {
       required(field.name, { message: 'validation.nameRequired' });
+      maxLength(field.description, 120, { message: 'validation.descriptionMax' });
     }),
     {
       submission: {

@@ -6,7 +6,7 @@ import { ProjectStore } from '@stores/project-store';
 
 /**
  * Functional route guard that ensures an active tenant is selected.
- * Resolves the tenant by its URL **slug** (`/t/:tenantSlug`, DEC-032).
+ * Resolves the tenant by its URL **slug** (`/w/:tenantSlug`, DEC-032).
  *
  * After a page reload, tenants haven't been loaded yet. The guard therefore:
  * 1. If tenants are already loaded and a match is found → pass immediately.

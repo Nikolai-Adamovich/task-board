@@ -5,14 +5,38 @@
       {{ 'tenantSwitcher.createWorkspace' | transloco }}
     </button>
   } @else {
-    <button hlmBtn variant="outline" size="lg" class="w-full" [hlmDropdownMenuTrigger]="tenantMenu">
-      @if (tenantStore.activeTenant(); as tenant) {
-        <span class="font-medium">{{ tenant.name }}</span>
-      } @else {
-        <span class="text-muted-foreground">{{ 'tenantSwitcher.selectWorkspace' | transloco }}</span>
-      }
-      <ng-icon name="lucideChevronDown" class="ml-1" />
-    </button>
+    @if (isCollapsedIconMode()) {
+      <!-- Collapsed-icon mode: compact icon trigger with tooltip (same menu) -->
+      <button
+        hlmSidebarMenuButton
+        variant="outline"
+        size="lg"
+        class="justify-center"
+        [hlmDropdownMenuTrigger]="tenantMenu"
+        (hlmDropdownMenuOpened)="onMenuOpened()"
+        (hlmDropdownMenuClosed)="onMenuClosed()"
+        [tooltip]="collapsedTooltip() ?? ('tenantSwitcher.selectWorkspace' | transloco)"
+      >
+        <ng-icon name="lucideBuilding2" />
+      </button>
+    } @else {
+      <button
+        hlmBtn
+        variant="outline"
+        size="lg"
+        class="w-full"
+        [hlmDropdownMenuTrigger]="tenantMenu"
+        (hlmDropdownMenuOpened)="onMenuOpened()"
+        (hlmDropdownMenuClosed)="onMenuClosed()"
+      >
+        @if (tenantStore.activeTenant(); as tenant) {
+          <span class="font-medium">{{ tenant.name }}</span>
+        } @else {
+          <span class="text-muted-foreground">{{ 'tenantSwitcher.selectWorkspace' | transloco }}</span>
+        }
+        <ng-icon name="lucideChevronDown" class="ml-1" />
+      </button>
+    }
 
     <ng-template #tenantMenu>
       <div hlmDropdownMenu class="w-full min-w-56">

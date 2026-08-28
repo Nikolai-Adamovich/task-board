@@ -2,7 +2,6 @@ import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
-import { toast } from '@spartan-ng/brain/sonner';
 import { AuthStore } from '@stores/auth-store';
 import type { ErrorResponse } from '@task-board/shared';
 
@@ -116,8 +115,11 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
       // Surface unexpected errors (network failures / server errors) as toasts.
       // Expected client errors (4xx) are handled inline by the calling component.
+      // P14 (item 32): brn-sonner is loaded via dynamic import — a static
+      // import here would pin the whole ~49 kB module into the initial bundle
+      // (the deferred <hlm-toaster> shares the same module file).
       if (error.status === 0 || error.status >= 500) {
-        toast.error(transloco.translate(userMessage));
+        void import('@spartan-ng/brain/sonner').then(({ toast }) => toast.error(transloco.translate(userMessage)));
       }
 
       // Auto-logout on 401 — but NOT for auth endpoints themselves:

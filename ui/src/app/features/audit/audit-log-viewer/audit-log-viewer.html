@@ -1,16 +1,35 @@
-<div class="flex w-full flex-col px-6">
+<!-- Q2 (F-05)/Q6 (F-13): full-height flex column — exactly viewport minus the app header
+     (--header-height: 4rem) and the shell <main> vertical padding (py-4 → 2rem below
+     sm, p-6 → 3rem from sm up). Horizontal padding comes from the shell (F-12).
+     Header / table / pagination stack vertically; the table wrapper flexes to fill
+     the rest so the table bottom aligns with the page bottom (no dead space).
+     Toolbar wraps instead of overflowing on mobile. -->
+<div
+  class="flex h-[calc(100dvh-var(--header-height)-3rem)] max-sm:h-[calc(100dvh-var(--header-height)-2rem)] w-full min-w-0 flex-col"
+>
   <!-- R3-P7: heading + icon aligned via flex items-center -->
-  <div class="mb-6 flex items-center justify-between">
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
     <h2 class="flex items-center gap-2 text-2xl font-bold text-foreground">
       <ng-icon name="lucideHistory" class="inline-block" />
       <span>{{ 'auditLog.title' | transloco }}</span>
     </h2>
 
-    <!-- Filters: action · entity type · actor (URL-synced) -->
-    <div class="flex items-center gap-2">
+    <!-- Filters: action · entity type · actor (URL-synced); wrap below sm -->
+    <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
       <ng-icon name="lucideFilter" class="text-muted-foreground" />
+      <!-- Q9 (RQ-04 ⑤): compact/comfortable density toggle (device-local preference) -->
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        [hlmTooltip]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
+        [attr.aria-label]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
+        (click)="toggleDensity()"
+      >
+        <ng-icon name="lucideRows3" />
+      </button>
       <hlm-select [value]="action()" (valueChange)="onActionChange($any($event))">
-        <hlm-select-trigger class="w-36" size="sm">
+        <hlm-select-trigger class="w-full sm:w-36" size="sm">
           <hlm-select-value [placeholder]="'auditLog.allActions' | transloco" />
         </hlm-select-trigger>
         <hlm-select-content *hlmSelectPortal>
@@ -24,7 +43,7 @@
       </hlm-select>
 
       <hlm-select [value]="entityType()" (valueChange)="onEntityTypeChange($any($event))">
-        <hlm-select-trigger class="w-44" size="sm">
+        <hlm-select-trigger class="w-full sm:w-44" size="sm">
           <hlm-select-value [placeholder]="'auditLog.allEntityTypes' | transloco" />
         </hlm-select-trigger>
         <hlm-select-content *hlmSelectPortal>
@@ -38,7 +57,7 @@
       </hlm-select>
 
       <hlm-select [value]="actor()" (valueChange)="onActorChange($any($event))">
-        <hlm-select-trigger class="w-44" size="sm">
+        <hlm-select-trigger class="w-full sm:w-44" size="sm">
           <hlm-select-value [placeholder]="'auditLog.allActors' | transloco" />
         </hlm-select-trigger>
         <hlm-select-content *hlmSelectPortal>
@@ -59,118 +78,124 @@
     </hlm-alert>
   }
 
-  @if (loading()) {
-    <div class="flex items-center justify-center py-12">
-      <hlm-spinner />
-      <span class="ml-2 text-sm text-muted-foreground">{{ 'auditLog.loading' | transloco }}</span>
-    </div>
-  } @else {
-    <div hlmTableContainer class="w-full">
-      <table hlmTable class="w-full">
-        <thead hlmTableHeader>
-          <tr hlmTableRow>
-            <!-- Time — sortable asc/desc toggle, default desc -->
-            <th hlmTableHead class="w-[180px] whitespace-nowrap">
-              <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort()">
-                <span>{{ 'auditLog.time' | transloco }}</span>
-                <span class="inline-flex size-3 shrink-0">
-                  @if (sort() === 'asc') {
-                    <ng-icon name="lucideArrowUp" class="size-3" />
-                  } @else {
-                    <ng-icon name="lucideArrowDown" class="size-3" />
-                  }
-                </span>
-              </button>
-            </th>
-            <th hlmTableHead class="w-[200px] whitespace-nowrap">{{ 'auditLog.actor' | transloco }}</th>
-            <th hlmTableHead class="w-[110px] whitespace-nowrap">{{ 'auditLog.actionCol' | transloco }}</th>
-            <th hlmTableHead class="w-[240px] whitespace-nowrap">{{ 'auditLog.entity' | transloco }}</th>
-            <th hlmTableHead class="whitespace-nowrap">{{ 'auditLog.changes' | transloco }}</th>
-          </tr>
-        </thead>
-        <tbody hlmTableBody>
-          @for (event of events(); track event.id) {
-            <tr
-              hlmTableRow
-              class="cursor-pointer"
-              [class.bg-muted/40]="expandedEventId() === event.id"
-              (click)="toggleExpand(event.id)"
-            >
-              <td hlmTableCell class="whitespace-nowrap text-xs text-muted-foreground">
-                {{ event.createdAt | date: dateTimeFmt() }}
-              </td>
-              <td hlmTableCell class="truncate">
-                <span class="flex items-center gap-2">
-                  <span
-                    class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary"
-                    [title]="event.actor.displayName"
-                  >
-                    {{ initials(event.actor.displayName) }}
-                  </span>
-                  <span class="truncate text-sm">{{ event.actor.displayName }}</span>
-                </span>
-              </td>
-              <td hlmTableCell>
-                <span
-                  class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                  [class]="getActionVariant(event.action)"
-                >
-                  {{ event.action }}
-                </span>
-              </td>
-              <td hlmTableCell class="truncate">
-                <span class="flex items-center gap-2">
-                  <span
-                    class="inline-flex shrink-0 items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
-                  >
-                    {{ event.entityType }}
-                  </span>
-                  <!-- Server-resolved human label — never a raw UUID -->
-                  <span class="truncate text-sm" [title]="event.entityLabel ?? ''">
-                    {{ event.entityLabel ?? '\u2014' }}
-                  </span>
-                </span>
-              </td>
-              <td hlmTableCell class="max-w-0">
-                @if (event.changes.length > 0) {
-                  <div class="flex flex-col gap-0.5">
-                    @for (
-                      change of expandedEventId() === event.id ? event.changes : visibleChanges(event);
-                      track change.field
-                    ) {
-                      <div class="flex max-w-full items-center gap-1.5 text-xs">
-                        <span class="shrink-0 font-medium text-muted-foreground">{{ change.field }}:</span>
-                        @if (change.oldValue !== null) {
-                          <span
-                            class="max-w-[220px] truncate rounded bg-destructive/10 px-1.5 py-0.5 text-destructive"
-                            [title]="changeValue(change, 'old')"
-                          >
-                            {{ changeValue(change, 'old') }}
-                          </span>
-                          <span class="shrink-0 text-muted-foreground">&rarr;</span>
-                        }
-                        @if (change.newValue !== null) {
-                          <span
-                            class="max-w-[220px] truncate rounded bg-green-50 px-1.5 py-0.5 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                            [title]="changeValue(change, 'new')"
-                          >
-                            {{ changeValue(change, 'new') }}
-                          </span>
-                        }
-                      </div>
-                    }
-                    @if (expandedEventId() !== event.id && event.changes.length > visibleChanges(event).length) {
-                      <span class="text-xs text-muted-foreground"
-                        >+{{ event.changes.length - visibleChanges(event).length }}</span
-                      >
-                    }
-                  </div>
+  <!-- Q2 (F-05): no loading spinner — the resource carries a defaultValue, so the
+       empty state renders directly; `#tableWrap` is measured by a ResizeObserver to
+       derive the Auto page size; `min-h-0 flex-1` lets it fill the fixed-height column. -->
+  <div hlmTableContainer #tableWrap class="min-h-0 w-full flex-1">
+    <table hlmTable class="w-full" [class.table-density-compact]="isCompact()">
+      <thead hlmTableHeader>
+        <tr hlmTableRow>
+          <!-- Time — sortable asc/desc toggle, default desc -->
+          <th hlmTableHead class="w-45 whitespace-nowrap">
+            <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort()">
+              <span>{{ 'auditLog.time' | transloco }}</span>
+              <span class="inline-flex size-3 shrink-0">
+                @if (sort() === 'asc') {
+                  <ng-icon name="lucideArrowUp" class="size-3" />
                 } @else {
-                  <span class="text-xs text-muted-foreground">&mdash;</span>
+                  <ng-icon name="lucideArrowDown" class="size-3" />
                 }
-              </td>
-            </tr>
-          } @empty {
+              </span>
+            </button>
+          </th>
+          <th hlmTableHead class="w-50 whitespace-nowrap">{{ 'auditLog.actor' | transloco }}</th>
+          <th hlmTableHead class="w-28 whitespace-nowrap">{{ 'auditLog.actionCol' | transloco }}</th>
+          <th hlmTableHead class="w-60 whitespace-nowrap">{{ 'auditLog.entity' | transloco }}</th>
+          <th hlmTableHead class="whitespace-nowrap">{{ 'auditLog.changes' | transloco }}</th>
+        </tr>
+      </thead>
+      <tbody hlmTableBody>
+        @for (event of events(); track event.id) {
+          <tr
+            hlmTableRow
+            class="cursor-pointer"
+            [class.bg-muted/40]="expandedEventId() === event.id"
+            (click)="toggleExpand(event.id)"
+          >
+            <td hlmTableCell class="whitespace-nowrap text-xs text-muted-foreground">
+              {{ event.createdAt | date: dateTimeFmt() : undefined : lang() }}
+            </td>
+            <td hlmTableCell class="truncate">
+              <span class="flex items-center gap-2">
+                <span
+                  class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary"
+                  [hlmTooltip]="event.actor.displayName"
+                >
+                  {{ initials(event.actor.displayName) }}
+                </span>
+                <span class="truncate text-sm">{{ event.actor.displayName }}</span>
+              </span>
+            </td>
+            <td hlmTableCell>
+              <span
+                class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                [class]="getActionVariant(event.action)"
+              >
+                {{ event.action }}
+              </span>
+            </td>
+            <td hlmTableCell class="truncate">
+              <span class="flex items-center gap-2">
+                <span
+                  class="inline-flex shrink-0 items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                >
+                  {{ event.entityType }}
+                </span>
+                <!-- Server-resolved human label — never a raw UUID -->
+                <span
+                  class="truncate text-sm"
+                  [hlmTooltip]="event.entityLabel ?? ''"
+                  [tooltipDisabled]="!event.entityLabel"
+                >
+                  {{ event.entityLabel ?? '\u2014' }}
+                </span>
+              </span>
+            </td>
+            <td hlmTableCell class="max-w-0">
+              @if (event.changes.length > 0) {
+                <div class="flex flex-col gap-0.5">
+                  @for (
+                    change of expandedEventId() === event.id ? event.changes : visibleChanges(event);
+                    track change.field
+                  ) {
+                    <div class="flex max-w-full items-center gap-1.5 text-xs">
+                      <span class="shrink-0 font-medium text-muted-foreground">{{ change.field }}:</span>
+                      @if (change.oldValue !== null) {
+                        <span
+                          class="max-w-55 truncate rounded bg-destructive/10 px-1.5 py-0.5 text-destructive"
+                          [hlmTooltip]="changeValue(change, 'old')"
+                          [tooltipDisabled]="!changeValue(change, 'old')"
+                        >
+                          {{ changeValue(change, 'old') }}
+                        </span>
+                        <span class="shrink-0 text-muted-foreground">&rarr;</span>
+                      }
+                      @if (change.newValue !== null) {
+                        <span
+                          class="max-w-55 truncate rounded bg-green-50 px-1.5 py-0.5 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                          [hlmTooltip]="changeValue(change, 'new')"
+                          [tooltipDisabled]="!changeValue(change, 'new')"
+                        >
+                          {{ changeValue(change, 'new') }}
+                        </span>
+                      }
+                    </div>
+                  }
+                  @if (expandedEventId() !== event.id && event.changes.length > visibleChanges(event).length) {
+                    <span class="text-xs text-muted-foreground"
+                      >+{{ event.changes.length - visibleChanges(event).length }}</span
+                    >
+                  }
+                </div>
+              } @else {
+                <span class="text-xs text-muted-foreground">&mdash;</span>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <!-- "No results" only when not loading — during a fetch the previous/empty
+                 page stays visible instead of flashing the empty state. -->
+          @if (!loading()) {
             <tr hlmTableRow>
               <td hlmTableCell colspan="5" class="py-12 text-center">
                 <hlm-empty>
@@ -182,22 +207,21 @@
               </td>
             </tr>
           }
-        </tbody>
-      </table>
-    </div>
+        }
+      </tbody>
+    </table>
+  </div>
 
-    <!-- Pagination controls -->
-    @if (totalPages() > 1) {
-      <div class="mt-6">
-        <ui-pagination
-          [page]="safePage()"
-          [total]="total()"
-          [pageSize]="safeLimit()"
-          [pageSizes]="[safeLimit()]"
-          [showEdges]="false"
-          (pageChange)="goToPage($event)"
-        />
-      </div>
-    }
-  }
+  <!-- Pagination controls (always at the bottom, incl. the Auto rows-per-page option) -->
+  <ui-pagination
+    class="mt-4"
+    [page]="safePage()"
+    [total]="total()"
+    [pageSize]="effectiveLimit()"
+    [autoEnabled]="true"
+    [isAuto]="isAutoMode()"
+    (pageChange)="goToPage($event)"
+    (pageSizeChange)="onPageSizeChange($event)"
+    (autoPageSizeChange)="onAutoPageSize()"
+  />
 </div>

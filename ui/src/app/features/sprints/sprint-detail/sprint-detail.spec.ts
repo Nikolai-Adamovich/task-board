@@ -458,6 +458,63 @@ describe('SprintDetail', () => {
     });
   });
 
+  // ── V8: dedicated start/end date edit dialog ─────────────────
+
+  describe('date edit dialog (V8)', () => {
+    beforeEach(() => setup());
+
+    it('should pre-fill the date inputs from the sprint when opened', () => {
+      component.openEditDates();
+
+      expect(component.showEditDates()).toBe(true);
+      expect(component.editStartDate()).toBe(NOW.slice(0, 10));
+      expect(component.editEndDate()).toBe('2025-02-01');
+    });
+
+    it('should save dates via sprintClient.update with YYYY-MM-DD values and close the dialog', () => {
+      component.openEditDates();
+      component.editStartDate.set('2025-03-01');
+      component.saveDates();
+
+      expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, {
+        startDate: '2025-03-01',
+        endDate: '2025-02-01',
+      });
+      expect(component.showEditDates()).toBe(false);
+      expect(component.savingDates()).toBe(false);
+    });
+
+    it('should send null to clear an emptied date input', () => {
+      component.openEditDates();
+      component.editStartDate.set('');
+      component.saveDates();
+
+      expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, {
+        startDate: null,
+        endDate: '2025-02-01',
+      });
+    });
+
+    it('should update the sprint signal with the saved sprint', () => {
+      const saved = { ...mockSprint, startDate: '2025-03-01T00:00:00Z' };
+
+      sprintClientMock.update.mockReturnValue(of(saved));
+
+      component.openEditDates();
+      component.editStartDate.set('2025-03-01');
+      component.saveDates();
+
+      expect(component.sprint().startDate).toBe('2025-03-01T00:00:00Z');
+    });
+
+    it('should close the dialog when its state changes to closed', () => {
+      component.openEditDates();
+      component.onEditDatesDialogStateChange('closed');
+
+      expect(component.showEditDates()).toBe(false);
+    });
+  });
+
   // ── Delete sprint ─────────────────────────────────────────────
 
   describe('deleteSprint', () => {

@@ -2,7 +2,7 @@ import { Service, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Task, CreateTask, UpdateTask } from '@task-board/shared';
+import type { Task, CreateTask, UpdateTask, BulkUpdateTasks, BulkUpdateTasksResult } from '@task-board/shared';
 import type { MoveTask } from '@app/types/frontend';
 
 /** Query params for filtering tasks */
@@ -20,6 +20,11 @@ export interface TaskQuery {
   limit?: number;
   /** Sort field and direction, e.g. "createdAt:desc" */
   sort?: string;
+  /** Q13/F-01: inclusive ISO date (`YYYY-MM-DD`) range filters */
+  createdFrom?: string;
+  createdTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
 }
 
 /** Paginated list response shape */
@@ -50,6 +55,10 @@ export class TaskClient {
     if (query.typeId) params = params.set('typeId', query.typeId);
     if (query.labelId) params = params.set('labelId', query.labelId);
     if (query.search) params = params.set('search', query.search);
+    if (query.createdFrom) params = params.set('createdFrom', query.createdFrom);
+    if (query.createdTo) params = params.set('createdTo', query.createdTo);
+    if (query.updatedFrom) params = params.set('updatedFrom', query.updatedFrom);
+    if (query.updatedTo) params = params.set('updatedTo', query.updatedTo);
     if (query.page) params = params.set('page', query.page.toString());
     if (query.limit) params = params.set('limit', query.limit.toString());
     if (query.sort) params = params.set('sort', query.sort);
@@ -71,6 +80,13 @@ export class TaskClient {
   /** Update an existing task (version required for optimistic concurrency) */
   update(id: string, data: UpdateTask): Observable<Task> {
     return this.http.patch<{ data: Task }>(`${this.baseUrl}/tasks/${id}`, data).pipe(map((res) => res.data));
+  }
+
+  /** Q10 (RQ-04 ③): bulk status/assignee/sprint update for the tasks table */
+  bulkUpdate(projectId: string, body: BulkUpdateTasks): Observable<BulkUpdateTasksResult> {
+    return this.http
+      .patch<{ data: BulkUpdateTasksResult }>(`${this.baseUrl}/projects/${projectId}/tasks/bulk`, body)
+      .pipe(map((res) => res.data));
   }
 
   /** Delete a task */

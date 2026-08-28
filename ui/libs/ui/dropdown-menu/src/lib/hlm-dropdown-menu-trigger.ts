@@ -19,6 +19,49 @@ export class HlmDropdownMenuTrigger {
   private readonly _cdkTrigger = inject(CdkMenuTrigger, { host: true });
   private readonly _config = injectHlmDropdownMenuConfig();
 
+  /** P13 (item 31b): programmatic open/close for keyboard-shortcut coordination. */
+  public toggle(): void {
+    this._cdkTrigger.toggle();
+  }
+
+  /** P13b: open the menu (no-op when already open — CDK guards internally). */
+  public open(): void {
+    this._cdkTrigger.open();
+  }
+
+  /** P13b: close the menu (no-op when already closed). */
+  public close(): void {
+    this._cdkTrigger.close();
+  }
+
+  /** P13b: actual overlay state — callers must branch on this instead of blind-toggling. */
+  public isOpen(): boolean {
+    return this._cdkTrigger.isOpen();
+  }
+
+  /**
+   * P13b: open the menu AND move focus into it. CDK only focuses the first item
+   * when the trigger is activated via click/keydown (`_handleClick` /
+   * `_toggleOnKeydown`); a programmatic `open()` attaches the overlay without
+   * focusing, which left the menu keyboard-inert. The menu content renders in
+   * the overlay after attach, so poll briefly for the `CdkMenu` to register
+   * with this trigger before focusing its first item.
+   */
+  public openFocused(attempts = 10): void {
+    this.open();
+
+    if (attempts <= 0) return;
+
+    setTimeout(() => {
+      if (!this.isOpen()) return;
+
+      const menu = this._cdkTrigger.getMenu();
+
+      if (menu) menu.focusFirstItem('keyboard');
+      else this.openFocused(attempts - 1);
+    });
+  }
+
   public readonly align = input<MenuAlign>(this._config.align);
   public readonly side = input<MenuSide>(this._config.side);
   public readonly disableHoverOpen = input(false);

@@ -11,9 +11,10 @@
  * - Context-missing guard (V1-10/V2-1): error state instead of table
  * - Empty / loading states
  */
-import { TestBed } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
+import { PreferencesStore } from '@stores/preferences-store';
 import { MemberTable } from './member-table';
 import type { MemberRow } from './member-table';
 
@@ -55,7 +56,16 @@ const revokedRow: MemberRow = {
 describe('MemberTable', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
+  let fixture: ComponentFixture<MemberTable>;
   let el: HTMLElement;
+
+  /**
+   * Q5 (F-07): native `[title]` was replaced by the Spartan `hlmTooltip` directive,
+   * which leaves no DOM attribute — action buttons are located via their icon instead.
+   */
+  function actionButton(iconName: string): HTMLButtonElement | null {
+    return el.querySelector(`ng-icon[name="${iconName}"]`)?.closest('button') ?? null;
+  }
 
   function create(
     variant: 'tenant' | 'project',
@@ -66,10 +76,22 @@ describe('MemberTable', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } }), MemberTable],
-      providers: [provideRouter([])],
+      providers: [
+        provideRouter([]),
+        {
+          provide: PreferencesStore,
+          useValue: {
+            datePipeFormat: () => 'yyyy-MM-dd',
+            // P12 (item 28): active language used as the DatePipe locale
+            language: () => 'en',
+          },
+        },
+      ],
     });
 
-    const fixtureRef = TestBed.createComponent(MemberTable);
+    fixture = TestBed.createComponent(MemberTable);
+
+    const fixtureRef = fixture;
 
     fixtureRef.componentRef.setInput('variant', variant);
     fixtureRef.componentRef.setInput('rows', tableRows);
@@ -85,6 +107,19 @@ describe('MemberTable', () => {
     component = fixtureRef.componentInstance;
     el = fixtureRef.nativeElement as HTMLElement;
   }
+
+  // ── Layout (Q2/F-05: full-height flex column) ─────────────────
+
+  it('should put the full-height flex classes on the HOST element so the table stretches inside the page column', () => {
+    create('tenant');
+
+    const host: HTMLElement = fixture.nativeElement;
+
+    expect(host.classList.contains('flex')).toBe(true);
+    expect(host.classList.contains('flex-col')).toBe(true);
+    expect(host.classList.contains('flex-1')).toBe(true);
+    expect(host.classList.contains('min-h-0')).toBe(true);
+  });
 
   // ── Rendering ──────────────────────────────────────────────────
 
@@ -116,50 +151,91 @@ describe('MemberTable', () => {
     create('tenant', rows, false);
 
     expect(el.textContent).not.toContain('members.actions');
-    expect(el.querySelector('button[title$="members.editRole"]')).toBeNull();
-    expect(el.querySelector('button[title$="members.removeMember"]')).toBeNull();
+    expect(actionButton('lucidePencil')).toBeNull();
+    expect(actionButton('lucideTrash2')).toBeNull();
   });
 
   it('should not render actions for the owner row', () => {
     create('tenant');
-    // eslint-disable-next-line no-console
-    console.log('DEBUG_HTML', JSON.stringify([...el.querySelectorAll('button')].map((b) => b.getAttribute('title'))));
 
     const bodyRows = Array.from(el.querySelectorAll('tbody tr'));
 
-    expect(bodyRows[0].querySelector('button[title$="members.removeMember"]')).toBeNull();
-    expect(bodyRows[1].querySelector('button[title$="members.removeMember"]')).not.toBeNull();
+    expect(bodyRows[0].querySelector('ng-icon[name="lucideTrash2"]')).toBeNull();
+    expect(bodyRows[1].querySelector('ng-icon[name="lucideTrash2"]')).not.toBeNull();
   });
 
   // ── Edit flow ──────────────────────────────────────────────────
 
-  it('should open the edit dialog and emit roleChange on confirm', () => {
+  it('should open the edit dialog and emit memberChange on confirm', () => {
     create('tenant');
 
     const emitted: unknown[] = [];
 
-    component.roleChange.subscribe((v: unknown) => emitted.push(v));
-    (el.querySelector('button[title$="members.editRole"]') as HTMLButtonElement).click();
+    component.memberChange.subscribe((v: unknown) => emitted.push(v));
+    (actionButton('lucidePencil') as HTMLButtonElement).click();
 
     expect(component.editingRow()?.userId).toBe('u2');
 
     component.editRole.set('ADMIN');
-    component.confirmRoleChange();
+    component.confirmMemberChange();
 
-    expect(emitted).toEqual([{ row: rows[1], role: 'ADMIN' }]);
+    expect(emitted).toEqual([
+      { row: rows[1], role: 'ADMIN', name: 'Member User', email: 'member@example.com', expiresAt: null },
+    ]);
     expect(component.editingRow()).toBeNull();
   });
 
-  it('should not emit roleChange when the role is unchanged', () => {
+  it('should not emit memberChange when nothing changed', () => {
     create('tenant');
 
     const emitted: unknown[] = [];
 
-    component.roleChange.subscribe((v: unknown) => emitted.push(v));
-    (el.querySelector('button[title$="members.editRole"]') as HTMLButtonElement).click();
-    component.confirmRoleChange();
+    component.memberChange.subscribe((v: unknown) => emitted.push(v));
+    (actionButton('lucidePencil') as HTMLButtonElement).click();
+    component.confirmMemberChange();
 
     expect(emitted).toEqual([]);
+  });
+
+  it('should emit a future expiresAt as end-of-day ISO on confirm (DEC-055)', () => {
+    create('tenant');
+
+    const emitted: { expiresAt?: string | null }[] = [];
+
+    component.memberChange.subscribe((v: { expiresAt?: string | null }) => emitted.push(v));
+    (actionButton('lucidePencil') as HTMLButtonElement).click();
+
+    const picked = new Date(2030, 0, 1);
+
+    component.editExpiresAt.set(picked);
+    component.confirmMemberChange();
+
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0].expiresAt).toBe(new Date(2030, 0, 1, 23, 59, 59, 999).toISOString());
+  });
+
+  it('should render the Expiration column only in the tenant variant', () => {
+    create('tenant');
+    expect(el.textContent).toContain('members.expiresAt');
+
+    create('project');
+    expect(el.textContent).not.toContain('members.expiresAt');
+  });
+
+  it('should show the Expired badge for a row whose expiration has passed', () => {
+    const expiredRow: MemberRow = {
+      userId: 'u5',
+      displayName: 'Expired User',
+      email: 'expired@example.com',
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      invitationStatus: null,
+      expiresAt: '2020-01-01T00:00:00.000Z',
+    };
+
+    create('tenant', [...rows, expiredRow]);
+
+    expect(el.textContent).toContain('members.expired');
   });
 
   // ── Remove flow ────────────────────────────────────────────────
@@ -170,7 +246,7 @@ describe('MemberTable', () => {
     const emitted: MemberRow[] = [];
 
     component.remove.subscribe((v: MemberRow) => emitted.push(v));
-    (el.querySelector('button[title$="members.removeMember"]') as HTMLButtonElement).click();
+    (actionButton('lucideTrash2') as HTMLButtonElement).click();
 
     expect(component.rowToRemove()?.userId).toBe('u2');
     expect(emitted).toEqual([]);
@@ -186,24 +262,24 @@ describe('MemberTable', () => {
   it('should show resend/revoke for pending invitations', () => {
     create('tenant', [pendingRow]);
 
-    expect(el.querySelector('button[title$="members.resendInvitation"]')).not.toBeNull();
-    expect(el.querySelector('button[title$="members.revokeAccess"]')).not.toBeNull();
-    expect(el.querySelector('button[title$="members.restoreAccess"]')).toBeNull();
+    expect(actionButton('lucideRefreshCw')).not.toBeNull();
+    expect(actionButton('lucideBan')).not.toBeNull();
+    expect(actionButton('lucideRotateCcw')).toBeNull();
   });
 
   it('should show restore for revoked members without pending invitation', () => {
     create('tenant', [revokedRow]);
 
-    expect(el.querySelector('button[title$="members.restoreAccess"]')).not.toBeNull();
-    expect(el.querySelector('button[title$="members.revokeAccess"]')).toBeNull();
-    expect(el.querySelector('button[title$="members.resendInvitation"]')).toBeNull();
+    expect(actionButton('lucideRotateCcw')).not.toBeNull();
+    expect(actionButton('lucideBan')).toBeNull();
+    expect(actionButton('lucideRefreshCw')).toBeNull();
   });
 
   it('should not render tenant lifecycle actions in the project variant', () => {
     create('project', [{ ...rows[1], status: 'ACCESS_REVOKED' }]);
 
-    expect(el.querySelector('button[title$="members.restoreAccess"]')).toBeNull();
-    expect(el.querySelector('button[title$="members.resendInvitation"]')).toBeNull();
+    expect(actionButton('lucideRotateCcw')).toBeNull();
+    expect(actionButton('lucideRefreshCw')).toBeNull();
   });
 
   // ── Guard / states ─────────────────────────────────────────────
@@ -216,15 +292,104 @@ describe('MemberTable', () => {
     expect(el.querySelector('table')).toBeNull();
   });
 
-  it('should render the empty state when there are no rows', () => {
+  it('should render the empty state when there are no rows (no loading spinner — Q2/F-05)', () => {
     create('tenant', []);
 
     expect(el.textContent).toContain('members.noMembers');
+    expect(el.querySelector('hlm-spinner')).toBeNull();
   });
 
-  it('should render a loading row while loading', () => {
-    create('tenant', [], true, { loading: true });
+  // ── Role label i18n (Q2/F-06) ──────────────────────────────────
 
-    expect(el.textContent).toContain('members.loading');
+  it('maps project roles to their i18n keys (roleProjectAdmin/roleEditor/roleViewer)', () => {
+    create('project');
+
+    // TranslocoTestingModule has empty langs → unresolved keys echo back with the lang prefix
+    expect(component.roleLabel('PROJECT_ADMIN')).toContain('members.roleProjectAdmin');
+    expect(component.roleLabel('EDITOR')).toContain('members.roleEditor');
+    expect(component.roleLabel('VIEWER')).toContain('members.roleViewer');
+    // Tenant roles keep their existing keys
+    expect(component.roleLabel('OWNER')).toContain('members.roleOwner');
+    // Unknown roles fall back to the raw value
+    expect(component.roleLabel('SOMETHING_ELSE')).toBe('SOMETHING_ELSE');
+  });
+
+  // ── Auto page-size (Q2/F-05 — measured wrapper + row height) ───
+
+  describe('auto page-size (Q2/F-05)', () => {
+    /**
+     * Minimal ResizeObserver stub — jsdom has none (same pattern as task-table.spec.ts).
+     */
+    class MockResizeObserver {
+      static instances: MockResizeObserver[] = [];
+      readonly observed: Element[] = [];
+      readonly unobserve = vi.fn();
+      readonly disconnect = vi.fn();
+      private readonly cb: ResizeObserverCallback;
+
+      constructor(cb: ResizeObserverCallback) {
+        this.cb = cb;
+        MockResizeObserver.instances.push(this);
+      }
+
+      observe(target: Element): void {
+        this.observed.push(target);
+      }
+
+      trigger(wrapperHeight: number): void {
+        this.cb(
+          [{ contentRect: { height: wrapperHeight } } as unknown as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+    }
+
+    /** The observer the component attached to the table wrapper */
+    function wrapperObserver(): MockResizeObserver | undefined {
+      const wrapEl = component.tableWrapRef()?.nativeElement as Element | undefined;
+
+      return MockResizeObserver.instances.find((i) => wrapEl !== undefined && i.observed.includes(wrapEl));
+    }
+
+    beforeEach(() => {
+      MockResizeObserver.instances = [];
+      vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    /** Create an Auto-mode table and mock the real body-row height (~44px vs the 48px fallback). */
+    function createAuto(): void {
+      create('tenant', rows, true, { isAuto: true, autoEnabled: true, pageSize: 20 });
+
+      const row: HTMLElement | null = el.querySelector('tbody tr:not([aria-hidden="true"])');
+
+      if (row) vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ height: 44 } as DOMRect);
+    }
+
+    it('should fit MORE rows using the MEASURED row height than the 48px fallback', () => {
+      createAuto();
+
+      const ro = wrapperObserver();
+
+      ro?.trigger(704); // floor(704/48) = 14 with the fallback, floor(704/44) = 16 measured
+
+      expect(component.effectivePageSize()).toBe(16);
+    });
+
+    it('should forward the measured available height to the host page (rowsHeightChange)', () => {
+      createAuto();
+
+      const emitted: number[] = [];
+
+      component.rowsHeightChange.subscribe((v: number) => emitted.push(v));
+
+      wrapperObserver()?.trigger(704);
+      fixture.detectChanges(); // flush the rowsHeightChange effect
+
+      expect(emitted).toContain(704);
+    });
   });
 });

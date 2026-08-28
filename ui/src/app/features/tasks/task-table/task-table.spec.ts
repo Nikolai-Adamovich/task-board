@@ -7,18 +7,15 @@
  * - U3: fixed table layout, stable body height, Auto page-size
  */
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { of, Subject } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
-import {
-  TaskTable,
-  AUTO_PAGE_SIZE_SENTINEL,
-  TASK_ROW_HEIGHT_PX,
-  computeAutoPageSize,
-  safeNumericParam,
-} from './task-table';
+import { TranslocoTestingModule, TranslocoService } from '@jsverse/transloco';
+import { TaskTable, safeNumericParam } from './task-table';
+import { AUTO_PAGE_SIZE_SENTINEL, computeAutoPageSize } from '@app/shared/auto-table/auto-page-size';
 import { TaskClient } from '@services/task-client';
 import { FilterClient } from '@services/filter-client';
 import { ProjectStore } from '@stores/project-store';
@@ -31,7 +28,7 @@ describe('TaskTable — W9 polish', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
   let fixture: ComponentFixture<TaskTable>;
-  let taskClientMock: { list: ReturnType<typeof vi.fn> };
+  let taskClientMock: { list: ReturnType<typeof vi.fn>; bulkUpdate?: ReturnType<typeof vi.fn> };
   let routerMock: { navigate: ReturnType<typeof vi.fn>; events: unknown };
   let routerEvents: Subject<NavigationEnd>;
 
@@ -49,7 +46,12 @@ describe('TaskTable — W9 polish', () => {
     routerMock = { navigate: vi.fn().mockResolvedValue(true), events: routerEvents.asObservable() };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [
+        TranslocoTestingModule.forRoot({
+          langs: { en: {} },
+          translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+        }),
+      ],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -68,6 +70,9 @@ describe('TaskTable — W9 polish', () => {
             pageSize: () => storedPageSize,
             // R3-P8: format token consumed by the Created/Updated columns
             dateTimePipeFormat: () => 'yyyy-MM-dd HH:mm',
+            // P12 (item 28): active language used as the DatePipe locale
+            language: () => 'en',
+            datePipeFormat: () => 'yyyy-MM-dd',
             setPageSize: vi.fn(),
             // R3-P4: per-project visible task-table columns (null = default set)
             getTaskTableColumns: vi.fn(() => storedColumns),
@@ -195,10 +200,11 @@ describe('TaskTable — W9 polish', () => {
       setup();
 
       const headers = fixture.nativeElement.querySelectorAll('thead th');
-      const titleTh = headers[1] as HTMLElement; // second column = Title
+      // Q10: first th is the selection checkbox — Title is the third column
+      const titleTh = headers[2] as HTMLElement;
 
       expect(titleTh.className).toContain('w-[30%]');
-      expect(titleTh.className).toContain('min-w-[200px]');
+      expect(titleTh.className).toContain('min-w-50');
     });
 
     it('should keep the fixed widths of non-title columns well below typical container widths', () => {
@@ -207,14 +213,14 @@ describe('TaskTable — W9 polish', () => {
       // V4-8 (reopened): if these sum ≥ available width, Title collapses to 0px.
       const pxWidths = component.taskColumns
         .filter((c: { field: string }) => c.field !== 'title')
-        .map((c: { width?: string }) => Number.parseInt((c.width ?? '').match(/w-\[(\d+)px\]/)?.[1] ?? '0', 10));
+        .map((c: { width?: string }) => Number.parseInt((c.width ?? '').match(/w-(\d+)/)?.[1] ?? '0', 10) * 4);
       const sum = pxWidths.reduce((a: number, b: number) => a + b, 0);
 
       expect(pxWidths).toHaveLength(10); // every column except Title
       expect(pxWidths.every((w: number) => w > 0)).toBe(true);
       // Trimmed fixed widths (V4-8 reopened) — must stay well below the ~1232px
       // container of a 1280px viewport so Title keeps a usable share.
-      expect(sum).toBe(1120);
+      expect(sum).toBe(1132);
     });
 
     it('should yield a Title column wider than 150px at a common desktop viewport (fixed-layout math)', () => {
@@ -229,7 +235,7 @@ describe('TaskTable — W9 polish', () => {
         .filter((c: { field: string }) => c.field !== 'title')
         .reduce(
           (acc: number, c: { width?: string }) =>
-            acc + Number.parseInt((c.width ?? '').match(/w-\[(\d+)px\]/)?.[1] ?? '0', 10),
+            acc + Number.parseInt((c.width ?? '').match(/w-(\d+)/)?.[1] ?? '0', 10) * 4,
           0,
         );
       const titleSpecified = container * 0.3;
@@ -243,7 +249,8 @@ describe('TaskTable — W9 polish', () => {
       setup();
 
       const headers = fixture.nativeElement.querySelectorAll('thead th');
-      const titleTh = headers[1] as HTMLElement;
+      // Q10: first th is the selection checkbox — Title is the third column
+      const titleTh = headers[2] as HTMLElement;
       const sortButton = titleTh.querySelector('button') as HTMLButtonElement;
 
       expect(sortButton).toBeTruthy();
@@ -275,8 +282,8 @@ describe('TaskTable — W9 polish', () => {
 
       expect(chips).toEqual([
         { param: 'search', labelKey: 'taskTable.filterSearch', value: 'hello' },
-        // R3-P5: priority chips show the title-case display label
-        { param: 'priority', labelKey: 'taskTable.filterPriority', value: 'High' },
+        // P11: priority chips show the translated display label (test dict is empty → the key)
+        { param: 'priority', labelKey: 'taskTable.filterPriority', value: 'priority.high' },
       ]);
     });
 
@@ -322,6 +329,10 @@ describe('TaskTable — W9 polish', () => {
             reporter: null,
             sprint: null,
             label: null,
+            createdFrom: null,
+            createdTo: null,
+            updatedFrom: null,
+            updatedTo: null,
             page: null,
           },
           queryParamsHandling: 'merge',
@@ -347,7 +358,7 @@ describe('TaskTable — W9 polish', () => {
       component.goToNewTask();
 
       // The ActivatedRoute mock resolves every param to 'ABC' — including tenantSlug
-      expect(routerMock.navigate).toHaveBeenCalledWith(['/t', 'ABC', 'projects', 'ABC', 'tasks', 'new']);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 'ABC', 'projects', 'ABC', 'tasks', 'new']);
     });
   });
 
@@ -372,25 +383,23 @@ describe('TaskTable — W9 polish', () => {
         (c: { field: string; width?: string }) => [c.field, c.width],
       );
       const expected: Record<string, string> = {
-        number: 'w-[90px]',
-        typeId: 'w-[90px]',
-        statusId: 'w-[130px]',
-        priority: 'w-[100px]',
-        assigneeId: 'w-[130px]',
-        reporterId: 'w-[130px]',
-        sprintId: 'w-[110px]',
-        labelIds: 'w-[140px]',
-        createdAt: 'w-[100px]',
-        updatedAt: 'w-[100px]',
+        number: 'w-23',
+        typeId: 'w-23',
+        statusId: 'w-33',
+        priority: 'w-25',
+        assigneeId: 'w-33',
+        reporterId: 'w-33',
+        sprintId: 'w-28',
+        labelIds: 'w-35',
+        createdAt: 'w-25',
+        updatedAt: 'w-25',
       };
 
       for (const [field, width] of Object.entries(expected)) {
         expect(widths.find(([f]) => f === field)?.[1]).toBe(width);
       }
       // Title gets an explicit percentage share (V4-8 reopened: no 0px collapse)
-      expect(component.taskColumns.find((c: { field: string }) => c.field === 'title').width).toBe(
-        'w-[30%] min-w-[200px]',
-      );
+      expect(component.taskColumns.find((c: { field: string }) => c.field === 'title').width).toBe('w-[30%] min-w-50');
     });
 
     it('should hard-truncate a 500-char unbreakable title (max-w-0 + truncate + tooltip)', () => {
@@ -420,13 +429,20 @@ describe('TaskTable — W9 polish', () => {
       fixture2.componentRef.setInput('projectKey', 'ABC');
       fixture2.detectChanges();
 
-      const titleCell: HTMLElement = fixture2.nativeElement.querySelector('tbody tr td:nth-child(2)');
+      // Q10: first td is the selection checkbox — Title is the third cell
+      const titleCell: HTMLElement = fixture2.nativeElement.querySelector('tbody tr td:nth-child(3)');
 
       // R3-P3: max-w-0 removes the cell's intrinsic width contribution under table-auto,
       // so an unbreakable title can never widen the column/table (no horizontal scroll)
       expect(titleCell.classList.contains('max-w-0')).toBe(true);
       expect(titleCell.classList.contains('truncate')).toBe(true);
-      expect(titleCell.getAttribute('title')).toBe(longTitle);
+
+      // Q5 (F-07): native `[title]` replaced by the HlmTooltip directive on the cell
+      const titleCellTooltip = fixture2.debugElement
+        .queryAll(By.directive(HlmTooltip))
+        .find((d) => d.nativeElement === titleCell);
+
+      expect(titleCellTooltip).toBeTruthy();
     });
 
     it('should lay out as a fixed-height flex column with a flexing table wrapper (R3-P3)', () => {
@@ -442,25 +458,6 @@ describe('TaskTable — W9 polish', () => {
       expect(wrap).toBeTruthy();
       expect(wrap?.classList.contains('flex-1')).toBe(true);
       expect(wrap?.classList.contains('min-h-0')).toBe(true);
-    });
-  });
-
-  // ── U3: stable body height ─────────────────────────────
-
-  describe('body min-height (U3)', () => {
-    it('should pad short pages up to page-size × row height', () => {
-      setup({}, 30);
-      component.tasks.set([{ id: 't1' } as never]);
-
-      // 30 rows × 48px − 1 rendered row × 48px
-      expect(component.bodySpacerHeight()).toBe(29 * TASK_ROW_HEIGHT_PX);
-    });
-
-    it('should not pad a full page', () => {
-      setup({}, 30);
-      component.tasks.set(Array.from({ length: 30 }, (_, i) => ({ id: `t${i}` }) as never));
-
-      expect(component.bodySpacerHeight()).toBe(0);
     });
   });
 
@@ -578,6 +575,25 @@ describe('TaskTable — W9 polish', () => {
       expect(component.pageSize()).toBe(12); // floor(588/48)
     });
 
+    it('should fit MORE rows using the MEASURED row height than the 48px fallback', () => {
+      setup({}, AUTO_PAGE_SIZE_SENTINEL);
+      component.tasks.set([{ id: 't1' } as never]);
+      fixture.detectChanges();
+
+      // Real rows are ~44px tall vs the 48px fallback constant
+      const row: HTMLElement = fixture.nativeElement.querySelector('tbody tr:not([aria-hidden="true"])');
+
+      expect(row).toBeTruthy();
+      vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ height: 44 } as DOMRect);
+
+      const ro = wrapperObserver();
+
+      ro?.trigger(720); // floor(720/48) = 15 with the fallback, floor(720/44) = 16 measured
+      fixture.detectChanges();
+
+      expect(component.pageSize()).toBe(16);
+    });
+
     it('should persist the Auto sentinel and omit limit from the URL when selected', () => {
       setup();
 
@@ -642,10 +658,17 @@ describe('TaskTable — W9 polish', () => {
 
     it('should render the status badge with the human display name, not the raw id', () => {
       const fx = renderOneTask();
-      const statusCell: HTMLElement = fx.nativeElement.querySelector('tbody tr td:nth-child(4)');
+      // Q10: first td is the selection checkbox — Status is the fifth cell
+      const statusCell: HTMLElement = fx.nativeElement.querySelector('tbody tr td:nth-child(5)');
 
       expect(statusCell.textContent?.trim()).toBe('To Do');
-      expect(statusCell.getAttribute('title')).toBe('To Do');
+
+      // Q5 (F-07): native `[title]` replaced by the HlmTooltip directive on the cell
+      const statusCellTooltip = fx.debugElement
+        .queryAll(By.directive(HlmTooltip))
+        .find((d) => d.nativeElement === statusCell);
+
+      expect(statusCellTooltip).toBeTruthy();
     });
 
     it('should expose named status options to the column filter select', () => {
@@ -660,8 +683,9 @@ describe('TaskTable — W9 polish', () => {
 
     it('should pad the labels cell so chips do not crowd the right edge (DR-4)', () => {
       const fx = renderOneTask();
-      // Columns: 1 Key, 2 Title, 3 Type, 4 Status, 5 Priority, 6 Assignee, 7 Reporter, 8 Sprint, 9 Labels
-      const labelsCell: HTMLElement = fx.nativeElement.querySelector('tbody tr td:nth-child(9)');
+      // Q10 adds a leading selection cell: 1 ✓, 2 Key, 3 Title, 4 Type, 5 Status,
+      // 6 Priority, 7 Assignee, 8 Reporter, 9 Sprint, 10 Labels
+      const labelsCell: HTMLElement = fx.nativeElement.querySelector('tbody tr td:nth-child(10)');
 
       expect(labelsCell.classList.contains('pr-4')).toBe(true);
     });
@@ -748,7 +772,8 @@ describe('TaskTable — W9 polish', () => {
 
       const headers = fixture.nativeElement.querySelectorAll('thead th');
 
-      expect(headers).toHaveLength(11);
+      // Q10: 11 data columns + the selection checkbox column (writer role)
+      expect(headers).toHaveLength(12);
       expect(component.visibleColumnCount()).toBe(11);
     });
 
@@ -760,7 +785,8 @@ describe('TaskTable — W9 polish', () => {
       const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')) as HTMLElement[];
       const headerText = headers.map((h) => h.textContent ?? '').join('|');
 
-      expect(headers).toHaveLength(3);
+      // Q10: 3 visible data columns + the selection checkbox column
+      expect(headers).toHaveLength(4);
       expect(headerText).toContain('taskTable.key');
       expect(headerText).toContain('taskTable.titleCol');
       expect(headerText).toContain('taskTable.priority');
@@ -781,7 +807,8 @@ describe('TaskTable — W9 polish', () => {
       expect(headerText).toContain('taskTable.key');
       expect(headerText).toContain('taskTable.titleCol');
       expect(headerText).toContain('taskTable.status');
-      expect(headers).toHaveLength(3);
+      // Q10: 3 visible data columns (pinned Key/Title + status) + the checkbox column
+      expect(headers).toHaveLength(4);
     });
 
     it('should apply a toggle immediately and persist the canonical payload after ~400 ms', () => {
@@ -897,14 +924,567 @@ describe('TaskTable — W9 polish', () => {
       expect(component.canHideContextColumn()).toBe(false);
     });
 
-    it('should open the chooser from the context menu action', () => {
+    it('should open the cursor-anchored chooser from the context menu action', () => {
+      setup();
+
+      expect(component.showContextColumnChooser()).toBe(false);
+
+      component.openChooserFromContextMenu();
+
+      // Round-5 P9 (item 24): the context menu opens the CURSOR-anchored instance…
+      expect(component.showContextColumnChooser()).toBe(true);
+      // …and never the toolbar one
+      expect(component.showColumnChooser()).toBe(false);
+    });
+
+    it('should keep only one chooser instance open at a time', () => {
+      setup();
+
+      // Opening the cursor instance (context-menu path) closes the toolbar instance
+      component.showColumnChooser.set(true);
+      component.openChooserFromContextMenu();
+
+      expect(component.showColumnChooser()).toBe(false);
+      expect(component.showContextColumnChooser()).toBe(true);
+
+      // …and a toolbar-side open closes the cursor instance
+      component.onChooserStateChange('open');
+
+      expect(component.showContextColumnChooser()).toBe(false);
+    });
+
+    it('should render a dialog-style header with a close button that closes the open instance', () => {
+      setup();
+
+      component.showColumnChooser.set(true);
+      fixture.detectChanges();
+
+      // The chooser content renders into the CDK overlay (document.body)
+      const closeBtn = document.body.querySelector('[data-column-chooser-close]');
+
+      expect(closeBtn).not.toBeNull();
+
+      component.closeColumnChooser();
+
+      expect(component.showColumnChooser()).toBe(false);
+      expect(component.showContextColumnChooser()).toBe(false);
+    });
+
+    // P13b (Fix 3a): the toolbar popover is opened by CLICKING its trigger —
+    // the overlay's internal state goes 'open' while the `[state]` binding
+    // signal stayed false, so the × button's set(false) was a no-op. The
+    // stateChanged handler must mirror 'open' into the signal.
+    it('should sync showColumnChooser when the toolbar instance reports open (× regression)', () => {
       setup();
 
       expect(component.showColumnChooser()).toBe(false);
 
-      component.openChooserFromContextMenu();
+      component.onChooserStateChange('open');
 
       expect(component.showColumnChooser()).toBe(true);
+
+      component.closeColumnChooser();
+
+      expect(component.showColumnChooser()).toBe(false);
+    });
+
+    it('should sync showContextColumnChooser when the cursor instance reports open', () => {
+      setup();
+
+      component.onContextChooserStateChange('open');
+
+      expect(component.showContextColumnChooser()).toBe(true);
+      expect(component.showColumnChooser()).toBe(false);
+
+      component.closeColumnChooser();
+
+      expect(component.showContextColumnChooser()).toBe(false);
+    });
+
+    // P13b (Fix 3c): autoFocus picks the FIRST tabbable element — the × header
+    // row must therefore come LAST in DOM (order-first keeps it visually on
+    // top) so focus lands on the Select-all checkbox, not the × (whose focus
+    // tooltip used to hang over the button).
+    it('should render the select-all checkbox before the × button in DOM order', () => {
+      setup();
+
+      component.showColumnChooser.set(true);
+      fixture.detectChanges();
+
+      const closeBtn = document.body.querySelector('[data-column-chooser-close]');
+
+      expect(closeBtn).not.toBeNull();
+
+      // closeBtn lives in the header row; the row's parent is the popover root
+      const headerRow = closeBtn?.parentElement;
+      const content = headerRow?.parentElement;
+
+      expect(headerRow).not.toBeNull();
+      expect(content).not.toBeNull();
+
+      const anyCheckbox = content?.querySelector('hlm-checkbox, brn-checkbox, [role="checkbox"]');
+
+      expect(anyCheckbox).not.toBeNull();
+
+      // The header row is the LAST child in DOM (order-first keeps it on top)
+      expect(headerRow?.nextElementSibling).toBeNull();
+      expect(headerRow?.classList.contains('order-first')).toBe(true);
+      // …and the checkbox list is the FIRST child, so autoFocus (first tabbable)
+      // lands on the Select-all checkbox, not the × button.
+      expect(content?.firstElementChild).not.toBe(headerRow);
+      expect(content?.firstElementChild?.contains(anyCheckbox as Node)).toBe(true);
+    });
+
+    it('should toggle all non-pinned columns with Select all and persist once', () => {
+      vi.useFakeTimers();
+      setup();
+
+      // Hide all — pinned Key/Title must survive
+      component.toggleAllColumns(false);
+
+      expect(component.visibleFields().has('typeId')).toBe(false);
+      expect(component.visibleFields().has('number')).toBe(true);
+      expect(component.visibleFields().has('title')).toBe(true);
+      expect(component.allColumnsSelected()).toBe(false);
+      expect(component.someColumnsSelected()).toBe(false);
+
+      vi.advanceTimersByTime(400);
+
+      const { setTaskTableColumns } = storeMocks();
+
+      expect(setTaskTableColumns).toHaveBeenCalledWith('p1', ['key', 'title']);
+
+      // Show all — the full canonical set comes back
+      component.toggleAllColumns(true);
+
+      expect(component.allColumnsSelected()).toBe(true);
+      expect(component.someColumnsSelected()).toBe(false);
+
+      vi.advanceTimersByTime(400);
+
+      expect(setTaskTableColumns).toHaveBeenLastCalledWith('p1', [
+        'key',
+        'title',
+        'type',
+        'status',
+        'priority',
+        'assignee',
+        'reporter',
+        'sprint',
+        'labels',
+        'created',
+        'updated',
+      ]);
+
+      vi.useRealTimers();
+    });
+
+    it('should report indeterminate while only some non-pinned columns are visible', () => {
+      setup();
+
+      component.toggleColumn('type', false);
+
+      expect(component.someColumnsSelected()).toBe(true);
+      expect(component.allColumnsSelected()).toBe(false);
+    });
+  });
+
+  // ── Q10 (RQ-04 ③): multi-select + bulk actions ──────────
+
+  describe('bulk actions', () => {
+    function makeTask(id: string) {
+      return {
+        id,
+        projectId: 'p1',
+        number: id === 't1' ? 1 : 2,
+        typeId: 'ty1',
+        title: `Task ${id}`,
+        description: null,
+        statusId: 'st1',
+        priority: 'LOW',
+        reporterId: null,
+        reporterSnapshot: null,
+        assigneeId: null,
+        assigneeSnapshot: null,
+        sprintId: null,
+        labelIds: [],
+        createdById: 'u1',
+        createdBySnapshot: { displayName: 'User One' },
+        version: 1,
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      };
+    }
+
+    function setupWithTasks(tenantRole: string | null = 'OWNER', projectRole: string | null = null) {
+      setup({}, 30, tenantRole, projectRole);
+      component.tasks.set([makeTask('t1'), makeTask('t2')]);
+      fixture.detectChanges();
+    }
+
+    it('should toggle individual row selection', () => {
+      setupWithTasks();
+
+      component.toggleRowSelection('t1', true);
+
+      expect(component.selectedIds().has('t1')).toBe(true);
+      expect(component.selectedCount()).toBe(1);
+      expect(component.allSelected()).toBe(false);
+
+      component.toggleRowSelection('t2', true);
+
+      expect(component.allSelected()).toBe(true);
+
+      component.toggleRowSelection('t1', false);
+
+      expect(component.allSelected()).toBe(false);
+    });
+
+    it('should select all loaded tasks with select-all and clear with clearSelection', () => {
+      setupWithTasks();
+
+      component.toggleSelectAll(true);
+
+      expect(component.selectedCount()).toBe(2);
+      expect(component.allSelected()).toBe(true);
+
+      component.clearSelection();
+
+      expect(component.selectedCount()).toBe(0);
+      expect(component.allSelected()).toBe(false);
+    });
+
+    it('should enforce exactly-one-field by clearing other bulk fields', () => {
+      setupWithTasks();
+
+      component.onBulkStatusChange('st1');
+      component.onBulkAssigneeChange('u9');
+
+      expect(component.bulkStatus()).toBe('');
+      expect(component.bulkAssignee()).toBe('u9');
+      expect(component.canApplyBulk()).toBe(true);
+
+      component.onBulkSprintChange('s1');
+
+      expect(component.bulkAssignee()).toBe('');
+      expect(component.bulkSprint()).toBe('s1');
+      expect(component.canApplyBulk()).toBe(true);
+    });
+
+    it('should not allow apply when no bulk field is chosen', () => {
+      setupWithTasks();
+
+      expect(component.canApplyBulk()).toBe(false);
+    });
+
+    it('should send a single-field payload and clear the selection on success', () => {
+      setupWithTasks();
+      taskClientMock['bulkUpdate'] = vi.fn().mockReturnValue(of({ updated: 2 }));
+
+      component.toggleRowSelection('t1', true);
+      component.toggleRowSelection('t2', true);
+      component.onBulkStatusChange('st1');
+      component.applyBulkUpdate();
+
+      expect(taskClientMock['bulkUpdate']).toHaveBeenCalledWith('p1', {
+        taskIds: ['t1', 't2'],
+        data: { statusId: 'st1' },
+      });
+      expect(component.selectedCount()).toBe(0);
+      expect(component.bulkStatus()).toBe('');
+    });
+
+    it('should map the unassigned sentinel to a null assigneeId', () => {
+      setupWithTasks();
+      taskClientMock['bulkUpdate'] = vi.fn().mockReturnValue(of({ updated: 1 }));
+
+      component.toggleRowSelection('t1', true);
+      component.onBulkAssigneeChange('__unassigned__');
+      component.applyBulkUpdate();
+
+      expect(taskClientMock['bulkUpdate']).toHaveBeenCalledWith('p1', {
+        taskIds: ['t1'],
+        data: { assigneeId: null },
+      });
+    });
+
+    it('should do nothing when apply is triggered without a valid field or selection', () => {
+      setupWithTasks();
+      taskClientMock['bulkUpdate'] = vi.fn();
+
+      component.applyBulkUpdate();
+
+      expect(taskClientMock['bulkUpdate']).not.toHaveBeenCalled();
+    });
+
+    it('should hide checkboxes and the bulk bar from users who cannot write', () => {
+      setupWithTasks(null, 'VIEWER');
+
+      expect(component.canCreateTasks()).toBe(false);
+
+      const checkboxes = fixture.nativeElement.querySelectorAll('hlm-checkbox');
+
+      expect(checkboxes.length).toBe(0);
+    });
+
+    // ── P8-12: checkbox regression ──────────────────────────
+    // Clicking a row checkbox renders the bulk bar, which shrinks the table
+    // wrapper; in Auto page-size mode the ResizeObserver then recomputes the
+    // page size and the fetch effect refetches with a new `limit`. That
+    // limit-only refetch used to clear the fresh selection, so the checkmark
+    // appeared for an instant and unset itself.
+
+    /** Poll until the list client has been called at least `count` times (no fixed timeouts) */
+    async function waitForListCalls(count: number): Promise<void> {
+      for (let i = 0; i < 100 && taskClientMock.list.mock.calls.length < count; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      expect(taskClientMock.list.mock.calls.length).toBeGreaterThanOrEqual(count);
+    }
+
+    it('should KEEP the selection when a limit-only refetch completes (P8-12)', async () => {
+      setupWithTasks();
+      component.toggleRowSelection('t1', true);
+
+      expect(component.selectedCount()).toBe(1);
+
+      const callsBefore = taskClientMock.list.mock.calls.length;
+
+      // Auto page-size re-measure → only `limit` changes, scope is identical
+      fixture.componentRef.setInput('limit', 10);
+      fixture.detectChanges();
+      await waitForListCalls(callsBefore + 1);
+
+      expect(component.selectedIds().has('t1')).toBe(true);
+      expect(component.selectedCount()).toBe(1);
+    });
+
+    it('should CLEAR the selection when the query scope changes (filter change)', async () => {
+      setupWithTasks();
+      component.toggleRowSelection('t1', true);
+
+      const callsBefore = taskClientMock.list.mock.calls.length;
+
+      // Status filter changes WHICH tasks are listed → page-scoped selection resets
+      fixture.componentRef.setInput('status', 'To Do');
+      fixture.detectChanges();
+      await waitForListCalls(callsBefore + 1);
+
+      expect(component.selectedCount()).toBe(0);
+    });
+  });
+
+  // ── Q12: saved-view date-range params ──────────────────
+
+  describe('saved-view date-range params (Q12)', () => {
+    beforeEach(() => setup());
+
+    it('should write the four date params when applying criteria with dates', () => {
+      component.onFilterApplied({
+        filters: {
+          search: 'x',
+          createdFrom: '2026-01-01',
+          createdTo: '2026-01-31',
+          updatedFrom: '2026-02-01',
+          updatedTo: '2026-02-28',
+        },
+        sort: { field: 'createdAt', direction: 'desc' },
+      });
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: expect.objectContaining({
+            createdFrom: '2026-01-01',
+            createdTo: '2026-01-31',
+            updatedFrom: '2026-02-01',
+            updatedTo: '2026-02-28',
+            page: null,
+          }),
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }),
+      );
+    });
+
+    it('should clear the date params when applying criteria without dates', () => {
+      component.onFilterApplied({ filters: {}, sort: { field: 'createdAt', direction: 'desc' } });
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: expect.objectContaining({
+            createdFrom: null,
+            createdTo: null,
+            updatedFrom: null,
+            updatedTo: null,
+          }),
+        }),
+      );
+    });
+
+    it('should capture URL date params into currentFilters for saved views', () => {
+      fixture.componentRef.setInput('createdFrom', '2026-01-01');
+      fixture.componentRef.setInput('updatedTo', '2026-03-31');
+      fixture.detectChanges();
+
+      expect(component.currentFilters()).toEqual(
+        expect.objectContaining({ createdFrom: '2026-01-01', updatedTo: '2026-03-31' }),
+      );
+    });
+  });
+
+  // ── Round 4: date-filter mode handling ─────────────────
+
+  describe('date-filter mode handling (round 4)', () => {
+    beforeEach(() => setup());
+
+    function col(field: string) {
+      return component.taskColumns.find((c: { field: string }) => c.field === field);
+    }
+
+    it('should return the translated label from dateModeToString (F1)', () => {
+      const translate = vi.spyOn(TestBed.inject(TranslocoService), 'translate').mockReturnValue('Between');
+
+      expect(component.dateModeToString('between')).toBe('Between');
+      expect(translate).toHaveBeenCalledWith('taskTable.dateMode.between');
+    });
+
+    // ── P12 (item 28): localized trigger formatting ─────────────────────────
+
+    it('should format the picker trigger via DatePipe with the store format + locale (no weekday)', () => {
+      // Mocked store: language 'en', datePipeFormat 'yyyy-MM-dd' → plain ISO, no weekday
+      const formatted = component.dateFilterTriggerFormat(new Date(2026, 7, 27));
+
+      expect(formatted).toBe('2026-08-27');
+    });
+
+    it('should not write any DATE params when picking between with no existing bounds (F2)', () => {
+      component.onDateModeChange(col('createdAt'), 'between');
+
+      // Clearing to empty bounds is allowed — inventing today's date is not
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { createdFrom: null, createdTo: null },
+          queryParamsHandling: 'merge',
+        }),
+      );
+      // The UI-mode override keeps 'between' selected even without dates
+      expect(component.dateMode(col('createdAt'))).toBe('between');
+    });
+
+    it("should never invent today's date in any mode with no existing bounds (F2)", () => {
+      component.onDateModeChange(col('createdAt'), 'on');
+      component.onDateModeChange(col('createdAt'), 'before');
+      component.onDateModeChange(col('createdAt'), 'after');
+
+      const calls = routerMock.navigate.mock.calls as [unknown[], { queryParams: Record<string, string | null> }][];
+
+      expect(calls.length).toBeGreaterThan(0);
+
+      for (const [, { queryParams }] of calls) {
+        for (const key of ['createdFrom', 'createdTo']) {
+          const value = queryParams[key];
+
+          expect(value === null || value === undefined || value === '').toBe(true);
+        }
+      }
+    });
+
+    it('should keep an existing from bound and clear to when switching to between (F2)', () => {
+      fixture.componentRef.setInput('createdFrom', '2026-01-01');
+      fixture.detectChanges();
+
+      component.onDateModeChange(col('createdAt'), 'between');
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { createdFrom: '2026-01-01', createdTo: null },
+          queryParamsHandling: 'merge',
+        }),
+      );
+    });
+
+    it('should collapse both bounds to a single day when switching to on (F2)', () => {
+      fixture.componentRef.setInput('createdFrom', '2026-01-01');
+      fixture.componentRef.setInput('createdTo', '2026-01-31');
+      fixture.detectChanges();
+
+      component.onDateModeChange(col('createdAt'), 'on');
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { createdFrom: '2026-01-01', createdTo: '2026-01-01' },
+          queryParamsHandling: 'merge',
+        }),
+      );
+    });
+
+    it('should clear the override and bounds when switching to none (F2)', () => {
+      component.onDateModeChange(col('createdAt'), 'between');
+      component.onDateModeChange(col('createdAt'), 'none');
+
+      expect(component.dateMode(col('createdAt'))).toBe('none');
+      expect(routerMock.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { createdFrom: null, createdTo: null },
+          queryParamsHandling: 'merge',
+        }),
+      );
+    });
+
+    it('should drop the override via removeFilter so derived mode takes over again (F2)', () => {
+      component.onDateModeChange(col('createdAt'), 'between');
+      component.removeFilter('createdFrom');
+
+      expect(component.dateMode(col('createdAt'))).toBe('none');
+    });
+
+    it('should drop all overrides via clearFilters (F2)', () => {
+      component.onDateModeChange(col('createdAt'), 'between');
+      component.onDateModeChange(col('updatedAt'), 'after');
+      component.clearFilters();
+
+      expect(component.dateMode(col('createdAt'))).toBe('none');
+      expect(component.dateMode(col('updatedAt'))).toBe('none');
+    });
+
+    it('should align the Created/Updated filter popovers end so they open leftward (F3)', () => {
+      expect(col('createdAt').align).toBe('end');
+      expect(col('updatedAt').align).toBe('end');
+      // Non-date columns keep the default center alignment
+      expect(col('statusId').align).toBeUndefined();
+    });
+
+    it('should swallow exactly one terminating click after opening the context menu (F4)', () => {
+      let reachedBody = false;
+      const bodyListener = (): void => {
+        reachedBody = true;
+      };
+      const target = document.createElement('div');
+
+      document.body.addEventListener('click', bodyListener);
+      document.body.appendChild(target);
+
+      try {
+        component.swallowNextClick();
+
+        // First click after open — swallowed in capture phase before CDK's body listener
+        target.click();
+        expect(reachedBody).toBe(false);
+
+        // One-shot only: later clicks (e.g. selecting a menu item) pass through
+        target.click();
+        expect(reachedBody).toBe(true);
+      } finally {
+        document.body.removeEventListener('click', bodyListener);
+        target.remove();
+      }
     });
   });
 });

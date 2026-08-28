@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-6xl px-6">
+<div class="mx-auto max-w-6xl">
   <!-- Page header -->
   <div class="mb-6 flex items-center justify-between">
     <div>
@@ -70,7 +70,8 @@
                   variant="destructive"
                   size="sm"
                   [disabled]="isDefault(board)"
-                  [title]="isDefault(board) ? ('projectSettings.defaultBoardDeleteHint' | transloco) : ''"
+                  [hlmTooltip]="isDefault(board) ? ('projectSettings.defaultBoardDeleteHint' | transloco) : ''"
+                  [tooltipDisabled]="!isDefault(board)"
                   (click)="requestDelete(board)"
                 >
                   <ng-icon name="lucideTrash2" class="mr-1" />

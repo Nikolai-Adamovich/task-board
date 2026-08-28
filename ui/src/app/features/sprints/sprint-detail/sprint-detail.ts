@@ -2,9 +2,9 @@ import { Component, computed, inject, input, signal, OnInit } from '@angular/cor
 import { getTenantSlug } from '@app/shared/utils/route-utils';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
-import { lucideX } from '@ng-icons/lucide';
+import { lucideX, lucideCalendarDays } from '@ng-icons/lucide';
 import { finalize, forkJoin, of } from 'rxjs';
 import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
@@ -17,7 +17,7 @@ import {
   PriorityDotColorMap,
   NeutralDotColor,
   priorityBadgeVariant,
-  priorityLabel,
+  priorityLabelKey,
   type BadgeVariant,
 } from '@app/constants/priority';
 import { SprintStatus } from '@task-board/shared';
@@ -26,6 +26,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
+import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { NgIcon } from '@ng-icons/core';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -33,6 +34,7 @@ import type { Sprint, Task } from '@task-board/shared';
 import { statusBadgeVariant } from '@app/constants/priority';
 import { isSprintOverdue } from '@app/shared/utils/sprint-utils';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
@@ -51,20 +53,25 @@ import { getErrorMessage } from '@app/shared/utils/error-utils';
     HlmBadgeImports,
     HlmDialogImports,
     HlmFieldImports,
+    HlmInputImports,
     HlmNativeSelectImports,
+    HlmTooltipImports,
   ],
-  providers: [provideIcons({ lucideX })],
+  providers: [provideIcons({ lucideX, lucideCalendarDays })],
   templateUrl: './sprint-detail.html',
 })
 export class SprintDetail implements OnInit {
   /** Shared badge-class helper (see constants/priority.ts) */
   protected readonly statusBadgeVariant = statusBadgeVariant;
+  private readonly i18n = inject(TranslocoService);
   /** Visual-only overdue flag (DEC-029) */
   protected readonly isSprintOverdue = isSprintOverdue;
   private readonly notify = injectToasts();
   private readonly preferencesStore = inject(PreferencesStore);
   /** R3-P8: DatePipe token derived from the user's date format preference */
   protected readonly dateFmt = this.preferencesStore.datePipeFormat;
+  /** P12 (item 28): active language passed as the DatePipe locale for localized month names */
+  protected readonly lang = this.preferencesStore.language;
   private readonly sprintClient = inject(SprintClient);
   private readonly taskClient = inject(TaskClient);
   private readonly authStore = inject(AuthStore);
@@ -83,6 +90,12 @@ export class SprintDetail implements OnInit {
   protected readonly sprintTasks = signal<Task[]>([]);
   protected readonly loading = signal(true);
   protected readonly showDeleteConfirm = signal(false);
+  // ─── V8 gap: dedicated start/end date edit dialog ──────────────────────────
+  protected readonly showEditDates = signal(false);
+  /** `YYYY-MM-DD` buffers for the two date inputs (pre-filled from the sprint) */
+  protected readonly editStartDate = signal('');
+  protected readonly editEndDate = signal('');
+  protected readonly savingDates = signal(false);
   // ─── V1-7: completion disposition ─────────────────────────────────────────
   /** Future sprints offered as "Move to…" targets when completing with unfinished tasks. */
   protected readonly futureSprints = signal<Sprint[]>([]);
@@ -102,9 +115,11 @@ export class SprintDetail implements OnInit {
     return priorityBadgeVariant(priority);
   }
 
-  /** V7-4b: title-case display label instead of the raw enum value */
+  /** P11: translated display label instead of the raw enum value; unknown values render verbatim. */
   protected getPriorityLabel(priority: string): string {
-    return priorityLabel(priority);
+    const key = priorityLabelKey(priority);
+
+    return key ? this.i18n.translate(key) : priority;
   }
 
   /** Get available status transitions for the current sprint */
@@ -222,6 +237,53 @@ export class SprintDetail implements OnInit {
     }
   }
 
+  /** V8: open the date-edit dialog pre-filled with the sprint's current dates */
+  protected openEditDates(): void {
+    const s = this.sprint();
+
+    if (!s) return;
+
+    this.editStartDate.set(s.startDate ? s.startDate.slice(0, 10) : '');
+    this.editEndDate.set(s.endDate ? s.endDate.slice(0, 10) : '');
+    this.showEditDates.set(true);
+  }
+
+  /**
+   * V8: save the edited dates via SprintClient.update. Values are plain
+   * `YYYY-MM-DD` strings (server slices to 10 chars — V7-7); an empty input
+   * sends `null` to clear the date.
+   */
+  protected saveDates(): void {
+    const s = this.sprint();
+
+    if (!s || this.savingDates()) return;
+
+    this.savingDates.set(true);
+    this.sprintClient
+      .update(s.id, {
+        startDate: this.editStartDate() || null,
+        endDate: this.editEndDate() || null,
+      })
+      .subscribe({
+        next: (updated) => {
+          this.savingDates.set(false);
+          this.sprint.set(updated);
+          this.showEditDates.set(false);
+          this.notify.success('toasts.updated');
+        },
+        error: (err) => {
+          this.savingDates.set(false);
+          this.notify.error(getErrorMessage(err));
+        },
+      });
+  }
+
+  protected onEditDatesDialogStateChange(state: BrnDialogState): void {
+    if (state === 'closed') {
+      this.showEditDates.set(false);
+    }
+  }
+
   protected deleteSprint(): void {
     const s = this.sprint();
 
@@ -231,7 +293,7 @@ export class SprintDetail implements OnInit {
       next: () => {
         const projectKey = this.projectStore.activeProject()?.key ?? s.projectId;
 
-        this.router.navigate(['/t', getTenantSlug(this.route), 'projects', projectKey]);
+        this.router.navigate(['/w', getTenantSlug(this.route), 'projects', projectKey]);
       },
       error: (err) => console.error(err),
     });

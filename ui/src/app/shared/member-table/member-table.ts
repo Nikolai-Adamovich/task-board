@@ -1,4 +1,5 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { Component, ElementRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import {
@@ -10,6 +11,7 @@ import {
   lucidePencil,
   lucideRefreshCw,
   lucideRotateCcw,
+  lucideRows3,
   lucideSkull,
   lucideTrash2,
 } from '@ng-icons/lucide';
@@ -17,6 +19,7 @@ import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmDatePickerImports } from '@spartan-ng/helm/date-picker';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
@@ -25,12 +28,17 @@ import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmTableImports } from '@spartan-ng/helm/table';
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 import { InvitationStatus, MemberStatus, TenantRole } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 import { Pagination } from '@app/shared/pagination/pagination';
+import { PreferencesStore } from '@stores/preferences-store';
 import { memberStatusBadgeVariant, roleBadgeVariant } from '@app/constants/priority';
 import { initials } from '@app/shared/utils/error-utils';
+import { computeAutoPageSize, rowHeightForDensity } from '@app/shared/auto-table/auto-page-size';
+import { useAutoRowMeasurement } from '@app/shared/auto-table/use-auto-row-measurement';
+import { useTableDensity } from '@app/shared/auto-table/table-density';
 
 /** Normalized row model consumed by {@link MemberTable} — both member shapes map onto it. */
 export interface MemberRow {
@@ -42,18 +50,26 @@ export interface MemberRow {
   status?: string;
   /** Tenant variant only (`InvitationStatus`). */
   invitationStatus?: string | null;
+  /** DEC-055: membership expiration (ISO 8601, tenant variant only, null = never). */
+  expiresAt?: string | null;
 }
 
-/** Payload of the {@link MemberTable.roleChange} output. */
-export interface MemberRoleChange {
+/** Payload of the {@link MemberTable.memberChange} output. */
+export interface MemberEditChange {
   row: MemberRow;
   role: string;
+  /** Tenant variant only — updates the underlying user's display name. */
+  name?: string;
+  /** Tenant variant only — updates the underlying user's email. */
+  email?: string;
+  /** Tenant variant only — ISO datetime or null (clears the expiration). */
+  expiresAt?: string | null;
 }
 
 interface ColumnDef {
   field: string;
   labelKey: string;
-  filterType: 'text' | 'select';
+  filterType: 'text' | 'select' | 'none';
   popoverWidth: string;
   placeholderKey?: string;
   selectAllLabelKey?: string;
@@ -68,6 +84,21 @@ const ROLE_LABEL_KEYS: Record<string, string> = {
   EDITOR: 'members.roleEditor',
   VIEWER: 'members.roleViewer',
 };
+
+/** Parse an ISO datetime string into a local Date (undefined for null/empty). */
+function isoToDate(value: string | null | undefined): Date | undefined {
+  if (!value) return undefined;
+
+  return new Date(value);
+}
+
+/**
+ * DEC-055: convert the picked expiration date to an end-of-day ISO datetime —
+ * the member keeps access for the whole selected day and is revoked from the next day on.
+ */
+function toEndOfDayIso(date: Date): string {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999).toISOString();
+}
 
 /**
  * Shared member table used by BOTH the tenant members and project members pages (U4).
@@ -85,6 +116,7 @@ const ROLE_LABEL_KEYS: Record<string, string> = {
   selector: 'ui-member-table',
   imports: [
     ConfirmDialog,
+    DatePipe,
     NgIcon,
     Pagination,
     TranslocoPipe,
@@ -92,6 +124,7 @@ const ROLE_LABEL_KEYS: Record<string, string> = {
     HlmAvatarImports,
     HlmBadgeImports,
     HlmButtonImports,
+    HlmDatePickerImports,
     HlmDialogImports,
     HlmFieldImports,
     HlmInputImports,
@@ -100,6 +133,7 @@ const ROLE_LABEL_KEYS: Record<string, string> = {
     HlmSelectImports,
     HlmSpinnerImports,
     HlmTableImports,
+    HlmTooltipImports,
   ],
   providers: [
     provideIcons({
@@ -111,11 +145,15 @@ const ROLE_LABEL_KEYS: Record<string, string> = {
       lucidePencil,
       lucideRefreshCw,
       lucideRotateCcw,
+      lucideRows3,
       lucideSkull,
       lucideTrash2,
     }),
   ],
   templateUrl: './member-table.html',
+  // Q2 (F-05): the host element is a flex item of the page's full-height column —
+  // flexing it lets the inner table wrapper stretch and the pagination pin to the bottom.
+  host: { class: 'flex min-h-0 w-full flex-1 flex-col' },
 })
 export class MemberTable {
   /** `'tenant'` adds the Access/Invitation status column and invitation lifecycle actions. */
@@ -124,8 +162,12 @@ export class MemberTable {
   readonly rows = input.required<MemberRow[]>();
   /** Whether the current user may manage members (shows the Actions column). */
   readonly canManage = input(false);
-  /** Whether the member list is currently loading. */
-  readonly loading = input(false);
+  /**
+   * Q2 (F-05): whether the Auto rows-per-page option is offered (full-height tables only).
+   * When `isAuto` is set, the effective page size is derived from the measured wrapper height.
+   */
+  readonly autoEnabled = input(false);
+  readonly isAuto = input(false);
   /**
    * Guard for V1-10/V2-1: when the tenant/project id could not be resolved from the
    * store context, an error state is shown instead of the table and no requests fire.
@@ -141,6 +183,10 @@ export class MemberTable {
   readonly pageSize = input(20);
   readonly total = input(0);
   readonly totalPages = input(1);
+  /** Q2 (F-05): measured wrapper height forwarded to the host page for Auto pagination. */
+  readonly rowsHeightChange = output<number>();
+  /** Q2 (F-05): the user picked the Auto option in the rows-per-page selector. */
+  readonly autoPageSizeChange = output();
   readonly sortField = input('');
   readonly sortDirection = input<'asc' | 'desc'>('asc');
   /** Current column-filter values keyed by field name. */
@@ -149,8 +195,8 @@ export class MemberTable {
   readonly filterChange = output<{ field: string; value: string }>();
   readonly pageChange = output<number>();
   readonly pageSizeChange = output<number>();
-  /** Confirmed role change from the Edit dialog. */
-  readonly roleChange = output<MemberRoleChange>();
+  /** Confirmed member edit (role + tenant: name/email/expiration) from the Edit dialog. */
+  readonly memberChange = output<MemberEditChange>();
   /** Confirmed removal (after the confirm dialog). */
   readonly remove = output<MemberRow>();
   /** Tenant variant: resend a pending invitation. */
@@ -164,6 +210,30 @@ export class MemberTable {
   /** Tenant variant: permanently delete a revoked/declined member. */
   readonly hardDelete = output<MemberRow>();
   private readonly i18n = inject(TranslocoService);
+  /**
+   * Q9 (RQ-04 ⑤): device-local table density — compact mode shrinks vertical cell
+   * padding via a class on the `<table>`; the Auto math reacts through the
+   * density-aware fallback row height.
+   */
+  private readonly density = useTableDensity();
+  protected readonly isCompact = this.density.compact;
+  protected readonly toggleDensity = this.density.toggle;
+  /** Density-aware fallback row height used by the Auto page-size math */
+  private readonly rowHeightPx = computed(() => rowHeightForDensity(this.density.compact()));
+  /**
+   * Q2 (F-05): measures this table's wrapper so Auto mode can derive its row count;
+   * the height is forwarded to the host page which owns the effective page size.
+   */
+  private readonly measurement = useAutoRowMeasurement();
+  private readonly availableRowsHeight = this.measurement.availableRowsHeight;
+  /**
+   * Effective row height for the Auto math: the REAL measured
+   * body-row height when available (real rows are ~44px vs the 48px fallback —
+   * using the fallback undercounts how many rows fit), otherwise the
+   * density-aware constant.
+   */
+  private readonly effectiveRowHeightPx = computed(() => this.measurement.measuredRowHeight() || this.rowHeightPx());
+  private readonly tableWrapRef = viewChild<ElementRef<HTMLDivElement>>('tableWrap');
   protected readonly initials = initials;
   protected readonly roleBadgeVariant = roleBadgeVariant;
   protected readonly memberStatusBadgeVariant = memberStatusBadgeVariant;
@@ -171,7 +241,16 @@ export class MemberTable {
   protected readonly InvitationStatus = InvitationStatus;
   protected readonly editingRow = signal<MemberRow | null>(null);
   protected readonly editRole = signal('');
+  protected readonly editName = signal('');
+  protected readonly editEmail = signal('');
+  /** Picked expiration date in the Edit dialog (null = no expiration). */
+  protected readonly editExpiresAt = signal<Date | null>(null);
   protected readonly rowToRemove = signal<MemberRow | null>(null);
+  private readonly preferencesStore = inject(PreferencesStore);
+  /** R3-P8: DatePipe token derived from the user's date format preference. */
+  protected readonly dateFmt = this.preferencesStore.datePipeFormat;
+  /** P12 (item 28): active language passed as the DatePipe locale for localized month names */
+  protected readonly lang = this.preferencesStore.language;
   /** Column definitions depend on the variant (tenant adds the status column). */
   protected readonly columns = computed<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [
@@ -206,11 +285,34 @@ export class MemberTable {
         popoverWidth: 'w-48',
         selectAllLabelKey: 'members.allStatuses',
       });
+      // DEC-055: expiration date — display-only column (no filter popover)
+      cols.push({
+        field: 'expiresAt',
+        labelKey: 'members.expiresAt',
+        filterType: 'none',
+        popoverWidth: 'w-48',
+      });
     }
 
     return cols;
   });
   protected readonly colspan = computed(() => this.columns().length + (this.canManage() ? 1 : 0));
+  /** Effective numeric page size — derived from the measured height in Auto mode. */
+  protected readonly effectivePageSize = computed(() =>
+    this.isAuto() ? computeAutoPageSize(this.availableRowsHeight(), this.effectiveRowHeightPx()) : this.pageSize(),
+  );
+
+  constructor() {
+    // Measure the table wrapper so Auto mode derives its row count from real space
+    effect(() => {
+      this.measurement.observe(this.tableWrapRef()?.nativeElement, 'thead');
+    });
+
+    // Forward the measured height whenever it changes (host owns the effective size)
+    effect(() => {
+      if (this.autoEnabled()) this.rowsHeightChange.emit(this.availableRowsHeight());
+    });
+  }
   protected readonly roleOptions = computed(() =>
     this.roles().map((role) => ({ value: role, label: this.roleLabel(role) })),
   );
@@ -230,11 +332,14 @@ export class MemberTable {
     return this.filters()[field] ?? '';
   }
 
-  // ── Edit (role change) ─────────────────────────────────────────
+  // ── Edit (member change) ───────────────────────────────────────
 
   protected openEdit(row: MemberRow): void {
     this.editingRow.set(row);
     this.editRole.set(row.role);
+    this.editName.set(row.displayName ?? '');
+    this.editEmail.set(row.email ?? '');
+    this.editExpiresAt.set(isoToDate(row.expiresAt) ?? null);
   }
 
   protected onEditDialogStateChange(state: BrnDialogState): void {
@@ -243,15 +348,43 @@ export class MemberTable {
     }
   }
 
-  protected confirmRoleChange(): void {
+  protected onEditExpirationChange(value: Date | null): void {
+    this.editExpiresAt.set(value);
+  }
+
+  protected clearEditExpiration(): void {
+    this.editExpiresAt.set(null);
+  }
+
+  protected confirmMemberChange(): void {
     const row = this.editingRow();
-    const role = this.editRole();
 
     this.editingRow.set(null);
 
-    if (!row || !role || role === row.role) return;
+    if (!row) return;
 
-    this.roleChange.emit({ row, role });
+    if (this.variant() === 'tenant') {
+      const role = this.editRole();
+      const name = this.editName().trim();
+      const email = this.editEmail().trim();
+      const picked = this.editExpiresAt();
+      const expiresAt = picked ? toEndOfDayIso(picked) : null;
+      const unchanged =
+        role === row.role &&
+        name === (row.displayName ?? '') &&
+        email === (row.email ?? '') &&
+        expiresAt === (row.expiresAt ?? null);
+
+      if (unchanged) return;
+
+      this.memberChange.emit({ row, role, name, email, expiresAt });
+    } else {
+      const role = this.editRole();
+
+      if (!role || role === row.role) return;
+
+      this.memberChange.emit({ row, role });
+    }
   }
 
   // ── Remove ─────────────────────────────────────────────────────
@@ -280,6 +413,11 @@ export class MemberTable {
 
   protected isOwner(row: MemberRow): boolean {
     return row.role === TenantRole.OWNER;
+  }
+
+  /** DEC-055: the membership expiration date is on/after now (lazy revoke). */
+  protected isExpired(row: MemberRow): boolean {
+    return row.expiresAt !== null && row.expiresAt !== undefined && new Date(row.expiresAt).getTime() <= Date.now();
   }
 
   /** Revoked/expired invitation → Reinvite applies (BR-036: pending ones only via the invitee). */

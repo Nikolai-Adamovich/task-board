@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { getTenantSlug } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideX } from '@ng-icons/lucide';
 import { CdkDragDrop, CdkDrag, CdkDropList } from '@angular/cdk/drag-drop';
@@ -23,10 +23,12 @@ import { NgIcon } from '@ng-icons/core';
 import type { Board, BoardColumn, Sprint, Task } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { priorityLabelKey } from '@app/constants/priority';
 import { TaskCard } from '../task-card/task-card';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 
 @Component({
   selector: 'ui-board-view',
@@ -42,6 +44,7 @@ import { HlmAlertImports } from '@spartan-ng/helm/alert';
     HlmDialogImports,
     HlmSpinnerImports,
     HlmSelectImports,
+    HlmTooltipImports,
   ],
   providers: [provideIcons({ lucidePlus, lucideX })],
   templateUrl: './board-view.html',
@@ -61,7 +64,16 @@ export class BoardView {
   readonly projectKey = input<string>('');
   /** Optional sprint filter from query params (`?sprintId=…`) */
   readonly sprintId = input<string | null>(null);
+  /**
+   * F-08: optional assignee filter from query params (`?assignee=…`).
+   * Values: `me` (symbolic — resolved to the AuthStore user id at query time),
+   * `unassigned` (client-side post-filter), or a concrete member user id.
+   */
+  readonly assignee = input<string | null>(null);
+  /** F-08: optional priority filter from query params (`?priority=…`) */
+  readonly priority = input<string | null>(null);
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
+  private readonly i18n = inject(TranslocoService);
   /** Tasks live under the board's project — fall back to the active project */
   private readonly effectiveProjectId = computed(() => this.board()?.projectId ?? this.projectId());
   // ─── Reads (rxResource — auto refetch/cancel when params change) ──────────
@@ -72,18 +84,74 @@ export class BoardView {
   });
   protected readonly board = computed(() => (this.boardResource.hasValue() ? this.boardResource.value() : null));
   private readonly tasksResource = rxResource({
-    params: () => ({ pid: this.effectiveProjectId(), sprintId: this.sprintId() }),
+    params: () => ({
+      pid: this.effectiveProjectId(),
+      sprintId: this.sprintId(),
+      assignee: this.assignee(),
+      priority: this.priority(),
+    }),
     stream: ({ params }) => {
       const query: TaskQuery = { limit: 200 };
 
       if (params.sprintId) {
         query.sprintId = params.sprintId;
       }
+
+      // F-08: concrete assignee/priority filters go server-side (same as sprintId).
+      // `me` resolves to the current user id at query time; `unassigned` has no
+      // server-side equivalent (exact-id match only) and is post-filtered below.
+      const resolvedAssignee =
+        params.assignee === 'me' ? (this.authStore.currentUser()?.id ?? '') : (params.assignee ?? '');
+
+      if (resolvedAssignee && resolvedAssignee !== 'unassigned') {
+        query.assigneeId = resolvedAssignee;
+      }
+      if (params.priority) {
+        query.priority = params.priority;
+      }
       return this.taskClient.list(params.pid, query).pipe(map((res) => res.data));
     },
     defaultValue: [],
   });
   protected readonly tasks = computed(() => (this.tasksResource.hasValue() ? this.tasksResource.value() : []));
+  /** F-08: client-side post-filter for the `unassigned` pseudo-value */
+  protected readonly filteredTasks = computed(() => {
+    const list = this.tasks();
+
+    if (this.assignee() !== 'unassigned') return list;
+
+    return list.filter((t) => !t.assigneeId);
+  });
+  /** Project members — powers the assignee filter options (shared ref store) */
+  protected readonly memberOptions = computed(() => this.refStore.options(this.effectiveProjectId(), 'members'));
+  /** Display label of the active assignee filter (chip + select trigger) */
+  protected readonly selectedAssigneeLabel = computed(() => {
+    const value = this.assignee();
+
+    if (!value) return '';
+
+    switch (value) {
+      case 'me':
+        return this.i18n.translate('boardView.currentUser');
+
+      case 'unassigned':
+        return this.i18n.translate('boardView.unassigned');
+
+      default:
+        return this.memberOptions().find((o) => o.id === value)?.name ?? value;
+    }
+  });
+
+  /** Translated priority label (P11); unknown values render verbatim. */
+  protected priorityLabel(priority: string): string {
+    const key = priorityLabelKey(priority);
+
+    return key ? this.i18n.translate(key) : priority;
+  }
+  /** Display label of the active priority filter (chip + select trigger) */
+  protected readonly selectedPriorityLabel = computed(() =>
+    this.priority() ? this.priorityLabel(this.priority() as string) : '',
+  );
   /** Sprints of the board's project — powers the sprint selector (DEC-038) */
   private readonly sprintsResource = rxResource<Sprint[], { projectId: string }>({
     params: () => ({ projectId: this.effectiveProjectId() }),
@@ -110,7 +178,7 @@ export class BoardView {
 
   constructor() {
     effect(() => {
-      this.refStore.ensure(this.effectiveProjectId(), ['statuses']);
+      this.refStore.ensure(this.effectiveProjectId(), ['statuses', 'members']);
     });
   }
 
@@ -125,18 +193,46 @@ export class BoardView {
 
     return sprint ? `${sprint.name} (${sprint.status})` : id;
   };
+  /** itemToString helper for the assignee filter — symbolic values resolve to labels */
+  protected readonly assigneeItemToString = (value: string): string => {
+    if (!value) return '';
+
+    return value === this.assignee()
+      ? (this.selectedAssigneeLabel() ?? '')
+      : (this.memberOptions().find((o) => o.id === value)?.name ?? value);
+  };
+  /** itemToString helper for the priority filter */
+  protected readonly priorityItemToString = (value: string): string => (value ? this.priorityLabel(value) : '');
+
+  /**
+   * Write one board filter to the URL query params (replaceUrl, merged with
+   * the other filters). Empty value clears it; the tasks resource refetches.
+   */
+  private setFilterParam(name: 'sprintId' | 'assignee' | 'priority', value: string): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { [name]: value || null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
 
   /**
    * Sprint selector change → write `?sprintId=` to the URL (replaceUrl).
    * Empty value clears the scope; the tasks resource refetches automatically.
    */
   protected onSprintSelect(value: string): void {
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { sprintId: value || null },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
+    this.setFilterParam('sprintId', value);
+  }
+
+  /** Assignee filter change → write `?assignee=` (`me` stays symbolic in the URL) */
+  protected onAssigneeSelect(value: string): void {
+    this.setFilterParam('assignee', value);
+  }
+
+  /** Priority filter change → write `?priority=` */
+  protected onPrioritySelect(value: string): void {
+    this.setFilterParam('priority', value);
   }
   protected readonly showStatusSelect = signal(false);
   protected readonly pendingDrop = signal<{ task: Task; targetColumn: BoardColumn } | null>(null);
@@ -179,7 +275,7 @@ export class BoardView {
   protected getTasksForColumn(column: BoardColumn): Task[] {
     const owner = this.columnOwnerByStatusId();
 
-    return this.tasks()
+    return this.filteredTasks()
       .filter((t) => owner.get(t.statusId) === column)
       .sort((a, b) => a.number - b.number);
   }
@@ -197,7 +293,7 @@ export class BoardView {
   goToNewTask(): void {
     const projectKey = this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? '';
 
-    this.router.navigate(['/t', getTenantSlug(this.route), 'projects', projectKey, 'tasks', 'new']);
+    this.router.navigate(['/w', getTenantSlug(this.route), 'projects', projectKey, 'tasks', 'new']);
   }
 
   /** Handle CDK drag-drop event */
@@ -271,7 +367,7 @@ export class BoardView {
 
     // Canonical task URL uses the project key + task number (DEC-032)
     this.router.navigate([
-      '/t',
+      '/w',
       getTenantSlug(this.route),
       'projects',
       projectKey,

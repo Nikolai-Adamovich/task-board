@@ -42,7 +42,12 @@ export {
   DEFAULT_TASK_TABLE_COLUMNS,
 } from './constants/task-table.js';
 export type { TaskTableColumnKey } from './constants/task-table.js';
-export { DATE_FORMAT_PREFERENCES, TIME_FORMAT_PREFERENCES } from './constants/date-format.js';
+export {
+  DATE_FORMAT_PREFERENCES,
+  DATE_FORMAT_MAX_LENGTH,
+  TIME_FORMAT_PREFERENCES,
+  isValidDateFormat,
+} from './constants/date-format.js';
 export type { DateFormatPreference, TimeFormatPreference } from './constants/date-format.js';
 export { HttpMethod, HttpMethodValues } from './constants/http.js';
 export { API_BASE_PATH, ApiPaths } from './constants/paths.js';
@@ -76,7 +81,14 @@ export type { Project, CreateProject, UpdateProject, ProjectMember } from './typ
 
 export type { Board, BoardColumn, CreateBoard, UpdateBoard } from './types/board.js';
 
-export type { Task, CreateTask, UpdateTask } from './types/task.js';
+export type {
+  Task,
+  CreateTask,
+  UpdateTask,
+  BulkUpdateTasks,
+  BulkUpdateTaskFailure,
+  BulkUpdateTasksResult,
+} from './types/task.js';
 
 export type { Sprint, CreateSprint, UpdateSprint } from './types/sprint.js';
 
@@ -98,6 +110,7 @@ export type { UserProjectBoardPreference, UpdateUserProjectBoardPreference } fro
 
 export type {
   ThemeManifestItem,
+  ThemeMode,
   UserPreferences,
   UpdateUserPreferences,
   PaginatedResponse,

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { ExpandState } from '@task-board/shared';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -13,6 +13,7 @@ import {
   HlmDropdownMenuTrigger,
 } from '@spartan-ng/helm/dropdown-menu';
 import { AuthStore } from '@stores/auth-store';
+import { KeyboardShortcuts } from '../../../shared/keyboard-shortcuts/keyboard-shortcuts';
 import { LanguageSwitcher } from '../language-switcher/language-switcher';
 import { getRoleColor } from '../role-color.util';
 import { UserMenuThemeSheet } from './user-menu-theme-sheet/user-menu-theme-sheet';
@@ -40,6 +41,9 @@ import { UserMenuZoomControls } from './user-menu-zoom-controls/user-menu-zoom-c
 export class UserMenu {
   protected readonly ExpandState = ExpandState;
   private readonly authStore = inject(AuthStore);
+  /** P13 (item 31b): `m` hotkey coordination — see the effect below. */
+  private readonly shortcuts = inject(KeyboardShortcuts);
+  private readonly menuTrigger = viewChild(HlmDropdownMenuTrigger);
   protected readonly user = computed(() => this.authStore.currentUser());
   protected readonly role = computed(() => this.authStore.tenantRole());
   protected readonly roleColor = computed(() => getRoleColor(this.role()));
@@ -61,6 +65,45 @@ export class UserMenu {
       .slice(0, 2);
   });
   protected readonly themeSheetOpen = signal<ExpandState>(ExpandState.Closed);
+
+  constructor() {
+    // P13 (item 31b) / P13b: the global `m` hotkey bumps `userMenuToggle`.
+    // React STATE-AWARE: read the trigger's actual `isOpen()` and call
+    // `openFocused()`/`close()` explicitly — a blind `toggle()` double-fired
+    // (open+close) left the menu stuck, and programmatic open never focused
+    // the menu so Esc/arrow keys were dead. The `lastHandled` guard makes the
+    // effect idempotent even if it re-runs for the same counter bump.
+    // `untracked` keeps the trigger query out of the effect's deps.
+    effect(() => {
+      const bump = this.shortcuts.userMenuToggle();
+
+      if (bump === 0 || bump === this.lastHandledToggle) return;
+
+      this.lastHandledToggle = bump;
+
+      untracked(() => {
+        const trigger = this.menuTrigger();
+
+        if (!trigger) return;
+
+        if (trigger.isOpen()) trigger.close();
+        else trigger.openFocused();
+      });
+    });
+  }
+
+  /** P13b: counter value already consumed — guards against double effect runs. */
+  private lastHandledToggle = 0;
+
+  /** P13b: report open state to KeyboardShortcuts (wired in the template). */
+  protected onMenuOpened(): void {
+    this.shortcuts.userMenuOpen.set(true);
+  }
+
+  /** P13b: report closed state to KeyboardShortcuts (wired in the template). */
+  protected onMenuClosed(): void {
+    this.shortcuts.userMenuOpen.set(false);
+  }
 
   protected logout(): void {
     this.authStore.logout();

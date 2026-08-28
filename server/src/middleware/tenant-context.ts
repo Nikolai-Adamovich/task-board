@@ -11,6 +11,8 @@ interface TenantMemberDocument {
   tenantId: string;
   role: string;
   status: string;
+  /** DEC-055: membership expiration (null/undefined = never expires) */
+  expiresAt?: Date | string | null;
 }
 
 interface ProjectMemberDocument {
@@ -79,6 +81,19 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
 
   if (!membership) {
     throw new ForbiddenError('You are not a member of this tenant');
+  }
+
+  // DEC-055 lazy revoke: an ACTIVE membership past its expiration is treated
+  // as ACCESS_REVOKED at access time (no cron on Workers).
+  const expiresAtMs = membership.expiresAt ? new Date(membership.expiresAt).getTime() : null;
+
+  if (membership.status === MemberStatus.ACTIVE && expiresAtMs !== null && expiresAtMs <= Date.now()) {
+    // Best-effort: flip the stored status so the members list reflects it too
+    await tenantMembers.updateOne(
+      { userId, tenantId: membership.tenantId },
+      { $set: { status: MemberStatus.ACCESS_REVOKED, updatedAt: new Date() } },
+    );
+    throw new ForbiddenError('Your membership has expired');
   }
 
   // Check membership status — only ACTIVE and ACCESS_REVOKED per v5 spec

@@ -42,3 +42,10 @@ npm run typecheck && npm test && npm run lint
 ```
 
 Both suites must stay green.
+
+## E2E / Playwright policy
+
+- Do NOT run Playwright/e2e after every iteration — it is too slow.
+- When e2e or live-browser verification is needed, delegate it to a subagent. The orchestrating/main agent must not run
+  Playwright itself (screenshots/snapshots bloat the main context).
+- Unit tests (`npm test`) are fine to run directly.

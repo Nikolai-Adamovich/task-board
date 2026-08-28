@@ -1,5 +1,8 @@
 import type { DateFormatPreference, TimeFormatPreference } from '../constants/date-format.js';
 
+/** Theme mode: 'auto' follows the browser's prefers-color-scheme. */
+export type ThemeMode = 'auto' | 'light' | 'dark';
+
 /** Describes a single theme entry in the generated manifest. */
 export interface ThemeManifestItem {
   /** Unique theme identifier derived from the CSS filename (e.g., "light", "dark", "light1"). */
@@ -24,8 +27,14 @@ export interface ThemeManifestItem {
 export interface UserPreferences {
   userId: string;
   zoom: number;
-  /** Theme identifier string (e.g., "light", "dark"). */
+  /** Theme identifier string (e.g., "light", "dark"). Legacy single-theme field kept for backward compatibility. */
   theme: string;
+  /** Theme mode (default 'auto'): 'auto' follows the browser's prefers-color-scheme. */
+  themeMode: ThemeMode;
+  /** Theme applied when mode is 'light' (or in 'auto' with a light system scheme). Null = default 'light'. */
+  lightTheme: string | null;
+  /** Theme applied when mode is 'dark' (or in 'auto' with a dark system scheme). Null = default 'dark'. */
+  darkTheme: string | null;
   language: string;
   /** Default page size for paginated tables. */
   pageSize: number;
@@ -39,8 +48,14 @@ export interface UserPreferences {
 /** Update user preferences request body type */
 export interface UpdateUserPreferences {
   zoom?: number;
-  /** Theme identifier string (e.g., "light", "dark"). */
+  /** Theme identifier string (e.g., "light", "dark"). Legacy single-theme field kept for backward compatibility. */
   theme?: string;
+  /** Theme mode: 'auto' follows the browser's prefers-color-scheme. */
+  themeMode?: ThemeMode;
+  /** Theme applied when mode is 'light' (or in 'auto' with a light system scheme). */
+  lightTheme?: string | null;
+  /** Theme applied when mode is 'dark' (or in 'auto' with a dark system scheme). */
+  darkTheme?: string | null;
   language?: string;
   /** Default page size for paginated tables. */
   pageSize?: number;

@@ -19,7 +19,7 @@ type DashboardState = 'visitor' | 'new-user' | 'pending-invitations' | 'redirect
  *
  * - Visitor → landing page.
  * - Authenticated with accessible tenants → redirect to the last-selected
- *   (or first) tenant home `/t/:tenantSlug` (last-selection preference is
+ *   (or first) tenant home `/w/:tenantSlug` (last-selection preference is
  *   persisted by the TenantStore in localStorage).
  * - Authenticated without tenants → welcome view; with only pending
  *   invitations → invitation view. Both behaviors are preserved.
@@ -67,7 +67,7 @@ export class Dashboard implements OnInit {
       const active = this.tenantStore.activeTenant();
 
       if (tenants.length > 0 && active) {
-        await this.router.navigate(['/t', active.slug], { replaceUrl: true });
+        await this.router.navigate(['/w', active.slug], { replaceUrl: true });
         return;
       }
     } catch {
@@ -98,7 +98,7 @@ export class Dashboard implements OnInit {
       const active = this.tenantStore.activeTenant();
 
       if (tenants.length > 0 && active) {
-        await this.router.navigate(['/t', active.slug], { replaceUrl: true });
+        await this.router.navigate(['/w', active.slug], { replaceUrl: true });
         return;
       }
 

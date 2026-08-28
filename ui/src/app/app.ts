@@ -1,12 +1,16 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { HlmToasterImports } from '@spartan-ng/helm/sonner';
 import { Header } from './shell/header/header';
 import { PreferencesStore } from './stores/preferences-store';
+import { AppToaster } from './app-toaster/app-toaster';
 
 @Component({
   selector: 'ui-root',
-  imports: [RouterOutlet, Header, HlmToasterImports],
+  // P14 (item 32): AppToaster is referenced ONLY inside an `@defer (on idle)`
+  // block in the template, so the compiler extracts it — together with the
+  // whole brn-sonner dependency chain — into a lazy chunk (toasts queue in
+  // module state until the block hydrates).
+  imports: [RouterOutlet, Header, AppToaster],
   templateUrl: './app.html',
 })
 export class App {

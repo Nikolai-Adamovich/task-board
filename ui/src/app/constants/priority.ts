@@ -9,13 +9,8 @@
 /** Subset of `hlmBadge` variants used across the app. */
 export type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
-/** Title-case display labels for task priorities (internal enum values unchanged). */
-const PriorityLabelMap: Record<string, string> = {
-  LOW: 'Low',
-  MEDIUM: 'Medium',
-  HIGH: 'High',
-  CRITICAL: 'Critical',
-};
+/** Known task priority values (internal enum values unchanged) — used for i18n key lookup. */
+const PriorityValues: readonly string[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 /** Task priority levels mapped to badge variants (ascending severity). */
 export const PriorityVariantMap = {
@@ -97,11 +92,14 @@ export function priorityBadgeVariant(priority: string): BadgeVariant {
 }
 
 /**
- * Resolve the title-case display label for a task priority (R3-P5).
- * Unknown values fall back to the raw value so nothing renders blank.
+ * Resolve the i18n key for a task priority's display label (R3-P5 → P11).
+ * The key resolves to the `priority.*` section in `assets/i18n/*.json`.
+ * Returns '' for unknown values so callers can fall back to the raw value.
  */
-export function priorityLabel(priority: string): string {
-  return PriorityLabelMap[priority] ?? priority;
+export function priorityLabelKey(priority: string): string {
+  const value = priority?.toUpperCase();
+
+  return value && PriorityValues.includes(value) ? `priority.${value.toLowerCase()}` : '';
 }
 
 /** Resolve the badge variant for a sprint/tenant/project status. Unknown values fall back to {@link NeutralVariant}. */

@@ -1,4 +1,4 @@
-<hlm-sheet [state]="open()" (stateChanged)="open.set($event)" side="bottom">
+<hlm-sheet [state]="open()" (stateChanged)="open.set($event)" side="bottom" [autoFocus]="initialFocusSelector">
   <button
     hlmSheetTrigger
     side="bottom"
@@ -12,10 +12,12 @@
     role="dialog"
     [attr.aria-label]="'userMenu.chooseTheme' | transloco"
   >
-    <hlm-sheet-header class="p-3">
-      <h3 hlm-sheet-title class="text-lg font-semibold text-foreground text-center">
+    <hlm-sheet-header class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 p-3">
+      <h3 hlm-sheet-title class="text-lg font-semibold text-foreground justify-self-start">
         {{ 'userMenu.themes' | transloco }}
       </h3>
+      <ui-theme-mode-switch (navigateDown)="focusThemeGrid()" />
+      <span></span>
     </hlm-sheet-header>
     <div
       #themeGrid
@@ -25,13 +27,15 @@
       [attr.aria-label]="'userMenu.availableThemes' | transloco"
       tabindex="0"
       (keydown)="onThemeKeydown($event)"
+      (focusout)="onGridFocusout($event)"
     >
-      @for (theme of themeRegistry.themes(); track theme.id) {
+      @for (theme of visibleThemes(); track theme.id) {
         <button
           hlmBtn
           variant="outline"
-          class="flex flex-col items-center justify-center gap-1.5 h-40 w-46 p-2 bg-transparent hover:bg-transparent border-0"
+          class="flex flex-col items-center justify-center gap-1.5 h-40 w-46 p-2 bg-transparent hover:bg-transparent border-0 focus-visible:ring-0 focus-visible:border-transparent"
           (click)="selectTheme(theme.id)"
+          (focus)="onThemeFocus(theme.id)"
           [attr.data-theme]="theme.id"
           role="option"
           [attr.aria-selected]="getHighlightedTheme() === theme.id"
@@ -54,7 +58,6 @@
                 [style.background-color]="theme.preview.foreground"
                 [style.opacity]="'0.8'"
               ></div>
-              <div class="border h-2.5 w-9 rounded-sm" [style.border-color]="theme.preview.border"></div>
               <div class="flex gap-1">
                 <div
                   class="h-1.5 w-1.5 rounded-full"
@@ -110,7 +113,14 @@
               </div>
             </div>
           </div>
-          <div class="font-medium text-center leading-tight">{{ theme.name }}</div>
+          <div class="flex items-center justify-center gap-1 leading-tight">
+            <span class="font-medium text-center" [class.theme-name-selected]="isSelected(theme.id)">{{
+              theme.name
+            }}</span>
+            @if (isSelected(theme.id)) {
+              <ng-icon name="lucideCheck" class="font-semibold" aria-hidden="true" />
+            }
+          </div>
         </button>
       }
     </div>

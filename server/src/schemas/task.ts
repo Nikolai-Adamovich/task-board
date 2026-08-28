@@ -33,6 +33,23 @@ export const UpdateTaskSchema = z.object({
 });
 
 /**
+ * Q10 (RQ-04 ③): bulk update payload — exactly ONE field of `data` per request.
+ * Nullable assigneeId/sprintId unassign/clear; absent fields stay untouched.
+ */
+export const BulkUpdateTasksSchema = z.object({
+  taskIds: z.array(uuid()).min(1, 'At least one task id is required').max(100, 'At most 100 tasks per request'),
+  data: z
+    .object({
+      statusId: uuid().optional(),
+      assigneeId: uuid().nullable().optional(),
+      sprintId: uuid().nullable().optional(),
+    })
+    .refine((data) => Object.values(data).filter((v) => v !== undefined).length === 1, {
+      message: 'Exactly one of statusId, assigneeId or sprintId is required',
+    }),
+});
+
+/**
  * Schema for task query parameters.
  */
 export const TaskQuerySchema = z.object({
@@ -47,4 +64,9 @@ export const TaskQuerySchema = z.object({
   reporterId: uuid().optional(),
   sprintId: uuid().optional(),
   labelId: uuid().optional(),
+  /** Q13/F-01: inclusive ISO date-range filters */
+  createdFrom: z.iso.date().optional(),
+  createdTo: z.iso.date().optional(),
+  updatedFrom: z.iso.date().optional(),
+  updatedTo: z.iso.date().optional(),
 });

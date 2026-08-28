@@ -18,12 +18,12 @@ export function injectToasts() {
 
   return {
     /** Show a localized success toast. */
-    success: (key: string): void => {
-      toast.success(transloco.translate(key));
+    success: (key: string, params?: Record<string, unknown>): void => {
+      toast.success(transloco.translate(key, params));
     },
     /** Show a localized error toast. */
-    error: (key: string): void => {
-      toast.error(transloco.translate(key));
+    error: (key: string, params?: Record<string, unknown>): void => {
+      toast.error(transloco.translate(key, params));
     },
   };
 }

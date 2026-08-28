@@ -264,6 +264,9 @@ describe('SprintList', () => {
   });
 
   // ── Backlog group & overdue flag (DEC-029 / DEC-039) ──────
+  // The backlog group header is a plain (non-link) label since the standalone
+  // backlog page was removed — unsprinted tasks are found via the tasks-table
+  // sprint filter instead.
 
   describe('backlog group', () => {
     beforeEach(() => setup('p1'));
@@ -276,7 +279,7 @@ describe('SprintList', () => {
       expect(component.backlogCount()).toBe(5);
     });
 
-    it('should make the group header the backlog link with no nested row (DR-6)', async () => {
+    it('should render a plain non-link group header with the backlog count', async () => {
       for (let i = 0; i < 20 && component.sprints().length === 0; i++) {
         await new Promise((r) => setTimeout(r, 10));
       }
@@ -287,9 +290,9 @@ describe('SprintList', () => {
         (a.getAttribute('href') ?? '').includes('sprints/backlog'),
       );
 
-      expect(backlogLinks).toHaveLength(1);
-      expect(backlogLinks[0].textContent).toContain('sprints.backlog');
-      expect(el.textContent).not.toContain('sprints.viewBacklog');
+      expect(backlogLinks).toHaveLength(0);
+      expect(el.textContent).toContain('sprints.backlog');
+      expect(el.textContent).toContain('sprints.tasks');
     });
   });
 

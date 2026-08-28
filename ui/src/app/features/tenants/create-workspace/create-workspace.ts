@@ -68,6 +68,7 @@ export class CreateWorkspace {
     schema<WorkspaceModel>((field) => {
       required(field.name, { message: 'validation.workspaceNameRequired' });
       maxLength(field.name, 100, { message: 'validation.nameMax' });
+      maxLength(field.description, 120, { message: 'validation.descriptionMax' });
       validate(field.slug, ({ value }) => {
         const slug = value();
 
@@ -121,25 +122,36 @@ export class CreateWorkspace {
 
     // Debounced live availability check against GET /api/tenants/slug-available.
     let lastCheckedSlug = '';
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    effect((onCleanup) => {
+    effect(() => {
       const slug = this.model().slug;
 
       if (!isValidTenantSlug(slug)) {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
         this.slugAvailability.set('idle');
         lastCheckedSlug = '';
         return;
       }
 
       // Skip duplicate checks when unrelated model fields change but the slug stays the same.
+      // The pending timer is intentionally kept running — clearing it here (e.g. via effect
+      // cleanup) would cancel the only scheduled check and leave the state stuck on 'checking'.
       if (slug === lastCheckedSlug) {
         return;
+      }
+      if (timer) {
+        clearTimeout(timer);
       }
       lastCheckedSlug = slug;
 
       this.slugAvailability.set('checking');
 
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
+        timer = null;
         this.tenantClient.isSlugAvailable(slug).subscribe({
           next: (available) => {
             // Ignore stale responses for a slug that has since changed.
@@ -154,8 +166,6 @@ export class CreateWorkspace {
           },
         });
       }, SLUG_CHECK_DEBOUNCE_MS);
-
-      onCleanup(() => clearTimeout(timer));
     });
   }
 

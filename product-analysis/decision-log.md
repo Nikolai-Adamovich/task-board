@@ -177,3 +177,47 @@ sprint-detail retains planning actions (start/complete/disposition) and deep-lin
 
 **DEC-039 — Backlog section on the Sprints page** Decision: sprint-list renders a Backlog group linking to the backlog
 view, matching spec S13.
+
+---
+
+# Round 4 decisions ([34-ui-ux-round4-plan.md](34-ui-ux-round4-plan.md))
+
+# Round 5 decisions ([35-ui-ux-round5-plan.md](35-ui-ux-round5-plan.md))
+
+## DEC-054 — Sidebar rail stays
+
+The invisible minimize/maximize rail on the sidebar's right edge remains (owner initially flagged it, then decided to
+keep it).
+
+## DEC-055 — Member expiration date (full feature)
+
+Membership gains `expiresAt`. On/after that date the member's status becomes ACCESS_REVOKED — the member is NOT removed
+from the tenant or its projects; access can be restored at any time keeping all projects and roles. A revoked member
+cannot enter the tenant. Setting an expiration on the Owner is forbidden. UI: member edit dialog (name, email, role,
+expiration date) + Expiration column in the members table.
+
+## DEC-056 — Free-form date format preference
+
+`dateFormat` becomes a free-form string validated against a token whitelist (Y, M, D, MMM, HH, mm, …) on the server
+(Zod) and in the UI; the previous presets remain as quick-pick options. Rendering uses DatePipe with registered Angular
+locale data so `MMM` month names are localized (e.g. "27 авг 2026"). The date-filter trigger formats dates according to
+this preference without the weekday.
+
+Status: **ADOPTED** — confirmed by the product owner (RQ-01..RQ-04 answered).
+
+**DEC-050 — Date-range filters use the Spartan date-picker** Decision: Created/Updated column filters are implemented
+full-stack (shared query types → Zod → repo `$gte/$lte` → URL params) with a mode select (on/before/after/between) and
+the Spartan `date-picker` Helm component inside the header filter popover.
+
+**DEC-051 — All native titles migrate to `hlmTooltip`** Decision: every `[title]`/`[attr.title]` usage becomes an
+`hlmTooltip`, including truncated data cells in tables (owner accepted the per-row overlay cost).
+
+**DEC-052 — Mobile navigation = hamburger + offcanvas sheet** Decision: below the `md` breakpoint a header hamburger
+opens the sidebar as an offcanvas sheet (canonical shadcn/spartan pattern); shell owns outer padding responsively
+(`px-3 py-4 sm:p-6`) and page-level horizontal scroll is eliminated via wrapping toolbars.
+
+**DEC-053 — Deferred backlog pulled into round 4** Decision: all seven deferred items are implemented now: Saved Views
+(UI-only on the existing filters backend), keyboard shortcuts, bulk actions (server bulk endpoint + multi-select UI),
+undo toasts for destructive actions, table density toggle, WIP counts in board headers, sprint date EDIT control.
+Sidebar restructure (tenant group slim-down, project-switcher dropdown, `/t/:slug/projects` redirect, explicit collapse
+toggle persisted in localStorage) adopted as D-47/D-48 in doc 34.

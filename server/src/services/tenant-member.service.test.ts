@@ -35,6 +35,7 @@ function createMockUserRepo() {
     findById: vi.fn(),
     findByEmail: vi.fn(),
     create: vi.fn(),
+    updateProfile: vi.fn(),
   };
 }
 
@@ -53,6 +54,7 @@ function makeMember(overrides: Record<string, unknown> = {}) {
     tenantId: 'tenant-1',
     role: 'OWNER',
     status: 'ACTIVE',
+    expiresAt: null,
     invitation: null,
     displayName: null,
     email: null,
@@ -197,6 +199,7 @@ describe('TenantMemberService (DEC-018 semantics)', () => {
       expect(memberRepo.update).toHaveBeenCalledWith('member-2', {
         invitation: null,
         status: MemberStatus.ACTIVE,
+        expiresAt: null,
       });
     });
 
@@ -330,7 +333,7 @@ describe('TenantMemberService (DEC-018 semantics)', () => {
 
       await service.restoreMembership('user-1', 'tenant-1', 'user-2');
 
-      expect(memberRepo.update).toHaveBeenCalledWith('member-2', { status: MemberStatus.ACTIVE });
+      expect(memberRepo.update).toHaveBeenCalledWith('member-2', { status: MemberStatus.ACTIVE, expiresAt: null });
     });
 
     it('revoking access then restoring round-trips via userId addressing', async () => {
@@ -378,6 +381,100 @@ describe('TenantMemberService (DEC-018 semantics)', () => {
       expect(result).toHaveLength(1);
       expect(result[0]?.status).toBe(MemberStatus.ACCESS_REVOKED);
       expect(result[0]?.invitation?.status).toBe(InvitationStatus.PENDING);
+    });
+  });
+
+  // ── DEC-055: membership expiration ──────────────────────────────────────
+
+  describe('DEC-055 membership expiration', () => {
+    it('updateMember persists expiresAt on the membership document', async () => {
+      memberRepo.findByUserAndTenant
+        .mockResolvedValueOnce(makeMember()) // requester (owner)
+        .mockResolvedValueOnce(makeMember({ id: 'member-2', userId: 'user-2', role: 'MEMBER' })); // target
+      memberRepo.update.mockResolvedValue(makeMember({ id: 'member-2', userId: 'user-2', role: 'MEMBER' }));
+      userRepo.findById.mockResolvedValue({ id: 'user-2', displayName: 'Member', email: 'm@example.com' });
+
+      const result = await service.updateMember('user-1', 'tenant-1', 'user-2', {
+        expiresAt: '2030-01-01T00:00:00.000Z',
+      });
+
+      expect(memberRepo.update).toHaveBeenCalledWith('member-2', { expiresAt: new Date('2030-01-01T00:00:00.000Z') });
+      expect(result.expiresAt).toBeNull(); // from the mocked repo return
+    });
+
+    it('updateMember forbids setting an expiration on the workspace OWNER', async () => {
+      memberRepo.findByUserAndTenant
+        .mockResolvedValueOnce(makeMember()) // requester
+        .mockResolvedValueOnce(makeMember({ id: 'member-2', userId: 'owner-1', role: 'OWNER' })); // target owner
+
+      await expect(
+        service.updateMember('user-1', 'tenant-1', 'owner-1', { expiresAt: '2030-01-01T00:00:00.000Z' }),
+      ).rejects.toThrow('expiration');
+
+      expect(memberRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('denies access once the expiration date has passed and lazily flips the stored status', async () => {
+      const past = '2020-01-01T00:00:00.000Z';
+
+      memberRepo.findByUserAndTenant.mockResolvedValue(
+        makeMember({ id: 'member-2', userId: 'user-2', role: 'MEMBER', expiresAt: past }),
+      );
+
+      await expect(service.updateMemberRole('user-2', 'tenant-1', 'user-2', 'ADMIN')).rejects.toThrow(
+        'membership has expired',
+      );
+
+      expect(memberRepo.update).toHaveBeenCalledWith('member-2', { status: MemberStatus.ACCESS_REVOKED });
+    });
+
+    it('restores an expired-but-still-ACTIVE membership by clearing expiresAt', async () => {
+      const past = '2020-01-01T00:00:00.000Z';
+
+      memberRepo.findByUserAndTenant
+        .mockResolvedValueOnce(makeMember()) // requester
+        .mockResolvedValueOnce(
+          makeMember({ id: 'member-2', userId: 'user-2', role: 'MEMBER', status: 'ACTIVE', expiresAt: past }),
+        );
+
+      await service.restoreMembership('user-1', 'tenant-1', 'user-2');
+
+      expect(memberRepo.update).toHaveBeenCalledWith('member-2', { status: MemberStatus.ACTIVE, expiresAt: null });
+    });
+
+    it('updateMember applies name/email changes to the underlying USER record', async () => {
+      memberRepo.findByUserAndTenant
+        .mockResolvedValueOnce(makeMember()) // requester
+        .mockResolvedValueOnce(makeMember({ id: 'member-2', userId: 'user-2', role: 'MEMBER' }));
+      userRepo.findById
+        .mockResolvedValueOnce({ id: 'user-2', displayName: 'Old', email: 'old@example.com' }) // profile check
+        .mockResolvedValueOnce({ id: 'user-2', displayName: 'New', email: 'new@example.com' }); // fresh read
+      userRepo.findByEmail.mockResolvedValue(null);
+      userRepo.updateProfile.mockResolvedValue({ id: 'user-2', displayName: 'New', email: 'new@example.com' });
+      memberRepo.update.mockResolvedValue(makeMember({ id: 'member-2', userId: 'user-2', role: 'MEMBER' }));
+
+      const result = await service.updateMember('user-1', 'tenant-1', 'user-2', {
+        name: 'New',
+        email: 'new@example.com',
+      });
+
+      expect(userRepo.updateProfile).toHaveBeenCalledWith('user-2', { displayName: 'New', email: 'new@example.com' });
+      expect(result.displayName).toBe('New');
+      expect(result.email).toBe('new@example.com');
+    });
+
+    it('updateMember rejects an email already used by another user', async () => {
+      memberRepo.findByUserAndTenant
+        .mockResolvedValueOnce(makeMember()) // requester
+        .mockResolvedValueOnce(makeMember({ id: 'member-2', userId: 'user-2', role: 'MEMBER' }));
+      userRepo.findById.mockResolvedValue({ id: 'user-2', displayName: 'Old', email: 'old@example.com' });
+      userRepo.findByEmail.mockResolvedValue({ id: 'user-9', email: 'taken@example.com' });
+
+      await expect(
+        service.updateMember('user-1', 'tenant-1', 'user-2', { email: 'taken@example.com' }),
+      ).rejects.toThrow(ConflictError);
+
+      expect(memberRepo.update).not.toHaveBeenCalled();
     });
   });
 });

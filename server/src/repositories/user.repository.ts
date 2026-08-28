@@ -112,6 +112,25 @@ export class UserRepository {
     return toDomain(doc);
   }
 
+  /**
+   * Update a user's profile fields (display name and/or email).
+   * Email uniqueness is enforced by the caller (pre-check + unique index).
+   */
+  async updateProfile(id: string, input: { displayName?: string; email?: string }): Promise<User | null> {
+    const set: Record<string, unknown> = { updatedAt: new Date() };
+
+    if (input.displayName !== undefined) set.displayName = input.displayName;
+    if (input.email !== undefined) set.email = normalizeEmail(input.email);
+
+    const result = await this.collection.findOneAndUpdate(
+      { id, deletedAt: null },
+      { $set: set },
+      { returnDocument: 'after' },
+    );
+
+    return result ? toDomain(result) : null;
+  }
+
   /** Soft-delete a user by setting deletedAt */
   async softDelete(id: string): Promise<boolean> {
     const result = await this.collection.updateOne({ id, deletedAt: null }, { $set: { deletedAt: new Date() } });

@@ -1,0 +1,16 @@
+<hlm-dialog [state]="pending.open() ? 'open' : 'closed'" (stateChanged)="$event === 'closed' && pending.stay()">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-md">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ 'pendingChanges.title' | transloco }}</h3>
+      <p hlmDialogDescription>{{ 'pendingChanges.message' | transloco }}</p>
+    </hlm-dialog-header>
+    <div class="flex justify-end gap-2">
+      <button hlmBtn variant="outline" (click)="pending.stay()">
+        {{ 'pendingChanges.stay' | transloco }}
+      </button>
+      <button hlmBtn variant="destructive" (click)="pending.leave()">
+        {{ 'pendingChanges.leave' | transloco }}
+      </button>
+    </div>
+  </hlm-dialog-content>
+</hlm-dialog>

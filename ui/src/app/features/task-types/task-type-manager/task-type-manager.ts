@@ -2,7 +2,7 @@ import { Component, computed, inject, input, OnInit, signal } from '@angular/cor
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucidePlus, lucidePencil, lucideTrash2, lucideCheck, lucideX, lucideGripVertical } from '@ng-icons/lucide';
-import { finalize } from 'rxjs';
+import { finalize, tap } from 'rxjs';
 import { TaskTypeClient } from '@services/task-type-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
@@ -18,7 +18,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { TaskType, CreateTaskType } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { injectToasts } from '@app/shared/utils/toast-utils';
+import { injectUndoToasts } from '@app/shared/utils/undo-toast';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
@@ -51,7 +51,7 @@ interface CreateTaskTypeForm {
   templateUrl: './task-type-manager.html',
 })
 export class TaskTypeManager implements OnInit {
-  private readonly notify = injectToasts();
+  private readonly notify = injectUndoToasts();
   private readonly taskTypeClient = inject(TaskTypeClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
@@ -220,7 +220,21 @@ export class TaskTypeManager implements OnInit {
           this.taskTypes.update((list) => list.filter((t) => t.id !== taskType.id));
           this.showDeleteDialog.set(false);
           this.deletingType.set(null);
-          this.notify.success('toasts.deleted');
+          // Q11 (DEC-053): undo recreates the type with the same immutable key,
+          // name and icon. Position caveat: the original position may already be
+          // taken — recreated at the end of the list.
+          this.notify.successWithUndo('toasts.deleted', () => {
+            const maxPosition = this.taskTypes().reduce((max, t) => Math.max(max, t.position), -1);
+
+            return this.taskTypeClient
+              .create(this.projectId(), {
+                key: taskType.key,
+                name: taskType.name,
+                icon: taskType.icon ?? undefined,
+                position: maxPosition + 1,
+              })
+              .pipe(tap((created) => this.taskTypes.update((list) => [...list, created])));
+          });
         },
         error: (err) => {
           this.error.set(getErrorMessage(err));

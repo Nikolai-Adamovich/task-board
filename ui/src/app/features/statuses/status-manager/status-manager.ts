@@ -2,7 +2,7 @@ import { Component, computed, inject, input, OnInit, signal } from '@angular/cor
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import { lucidePlus, lucidePencil, lucideTrash2, lucideCheck, lucideX, lucideGripVertical } from '@ng-icons/lucide';
-import { finalize } from 'rxjs';
+import { finalize, tap } from 'rxjs';
 import { StatusClient } from '@services/status-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
@@ -18,7 +18,7 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { form, FormField, FormRoot, schema, required } from '@angular/forms/signals';
 import type { Status, CreateStatus } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { injectToasts } from '@app/shared/utils/toast-utils';
+import { injectUndoToasts } from '@app/shared/utils/undo-toast';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
@@ -49,7 +49,7 @@ interface CreateStatusForm {
   templateUrl: './status-manager.html',
 })
 export class StatusManager implements OnInit {
-  private readonly notify = injectToasts();
+  private readonly notify = injectUndoToasts();
   private readonly statusClient = inject(StatusClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
@@ -214,7 +214,16 @@ export class StatusManager implements OnInit {
           this.showDeleteDialog.set(false);
           this.deletingStatus.set(null);
           this.error.set('');
-          this.notify.success('toasts.deleted');
+          // Q11 (DEC-053): undo caveat — the original position may already be
+          // taken by other statuses after deletion, so the status is recreated
+          // at the END of the list instead of restoring its exact position.
+          this.notify.successWithUndo('toasts.deleted', () => {
+            const maxPosition = this.statuses().reduce((max, s) => Math.max(max, s.position), -1);
+
+            return this.statusClient
+              .create(this.projectId(), { name: status.name, position: maxPosition + 1 })
+              .pipe(tap((created) => this.statuses.update((list) => [...list, created])));
+          });
         },
         error: (err) => {
           this.error.set(getErrorMessage(err));

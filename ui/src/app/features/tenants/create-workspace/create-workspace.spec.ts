@@ -75,7 +75,12 @@ describe('CreateWorkspace', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [
+        TranslocoTestingModule.forRoot({
+          langs: { en: { common: { charCount: '{{count}}/{{max}}' } } },
+          translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+        }),
+      ],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -138,6 +143,45 @@ describe('CreateWorkspace', () => {
     it('should be valid at 100 characters', () => {
       component.model.update((m: { name: string; description: string }) => ({ ...m, name: 'a'.repeat(100) }));
       expect(component.workspaceForm.name().valid()).toBe(true);
+    });
+  });
+
+  // ── description field (120-char limit, Round 5 P2) ─────────────────────
+
+  describe('description field', () => {
+    beforeEach(() => setup());
+
+    it('should be invalid when exceeding 120 characters', () => {
+      component.model.update((m: { name: string; description: string }) => ({
+        ...m,
+        name: 'NewCo',
+        description: 'a'.repeat(121),
+      }));
+
+      expect(component.workspaceForm.description().invalid()).toBe(true);
+    });
+
+    it('should be valid at 120 characters', () => {
+      component.model.update((m: { name: string; description: string }) => ({
+        ...m,
+        name: 'NewCo',
+        description: 'a'.repeat(120),
+      }));
+
+      expect(component.workspaceForm.description().valid()).toBe(true);
+    });
+
+    it('should render the character counter under the field', () => {
+      component.model.update((m: { name: string; description: string }) => ({
+        ...m,
+        name: 'NewCo',
+        description: 'abc',
+      }));
+      fixture.detectChanges();
+
+      const counter = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="desc-char-count"]');
+
+      expect(counter?.textContent?.trim()).toBe('3/120');
     });
   });
 

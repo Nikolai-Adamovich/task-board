@@ -433,7 +433,7 @@ describe('TenantService', () => {
       memberRepo.findByUserAndTenant
         .mockResolvedValueOnce(makeMember({ role: 'ADMIN' }))
         .mockResolvedValueOnce(makeMember({ userId: 'user-2', role: 'MEMBER' }));
-      memberRepo.updateRole.mockResolvedValue(makeMember({ userId: 'user-2', role: 'ADMIN' }));
+      memberRepo.update.mockResolvedValue(makeMember({ userId: 'user-2', role: 'ADMIN' }));
 
       const result = await memberService.updateMemberRole('user-1', 'tenant-1', 'user-2', 'ADMIN');
 
@@ -477,7 +477,7 @@ describe('TenantService', () => {
 
       await memberService.restoreMembership('user-1', 'tenant-1', 'user-2');
 
-      expect(memberRepo.update).toHaveBeenCalledWith('member-1', { status: 'ACTIVE' });
+      expect(memberRepo.update).toHaveBeenCalledWith('member-1', { status: 'ACTIVE', expiresAt: null });
     });
   });
 

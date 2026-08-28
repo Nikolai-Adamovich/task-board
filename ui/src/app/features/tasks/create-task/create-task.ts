@@ -1,5 +1,5 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
-import { Location } from '@angular/common';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { DOCUMENT, Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -21,6 +21,7 @@ import { getTenantSlug } from '@app/shared/utils/route-utils';
 import { MilkdownEditor } from '@app/shared/milkdown-editor/milkdown-editor';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
+import type { PendingChanges } from '@app/shared/pending-changes/pending-changes.guard';
 import { TaskPriority } from '@task-board/shared';
 import type { CreateTask, Task } from '@task-board/shared';
 
@@ -37,6 +38,11 @@ interface CreateTaskFormModel {
 /**
  * Unified create-task page (U1) — same layout as task detail, rendered in
  * create mode at `…/tasks/new`. Replaces the board and task-table dialogs.
+ *
+ * P13b (Fix 4): implements {@link PendingChanges} — while the form is dirty
+ * (or labels were picked), the `pendingChangesGuard` on the route asks for
+ * confirmation before any in-app navigation, and a `beforeunload` listener
+ * warns before a full page close/reload.
  */
 @Component({
   selector: 'ui-task-create',
@@ -57,8 +63,10 @@ interface CreateTaskFormModel {
   ],
   templateUrl: './create-task.html',
 })
-export class TaskCreate {
+export class TaskCreate implements PendingChanges {
   private readonly notify = injectToasts();
+  private readonly document = inject(DOCUMENT);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly taskClient = inject(TaskClient);
   private readonly labelClient = inject(LabelClient);
   private readonly projectStore = inject(ProjectStore);
@@ -128,6 +136,11 @@ export class TaskCreate {
 
             const task = await firstValueFrom(this.taskClient.create(pid, payload));
 
+            // P13b (Fix 4): clear dirty state BEFORE navigating so the
+            // pending-changes guard lets the navigation through.
+            this.createForm().reset();
+            this.selectedLabels.set([]);
+
             this.notify.success('toasts.created');
             this.goToCreatedTask(task);
           } catch (err) {
@@ -161,9 +174,35 @@ export class TaskCreate {
   protected readonly newLabelOption = computed<SelectOption>(() => ({ id: '', name: this.labelSearch().trim() }));
   protected readonly labelItemToString = (option: SelectOption) => option?.name ?? '';
 
+  /**
+   * P13b (Fix 4): the form is "pending" once the user modified any field
+   * (Signal Forms aggregate `dirty` over all descendant fields) or picked any
+   * labels — both would be silently lost on navigation.
+   */
+  public hasPendingChanges(): boolean {
+    // FieldTree is callable → root FieldState; `dirty` aggregates descendants.
+    return this.createForm().dirty() || this.selectedLabels().length > 0;
+  }
+
   constructor() {
     effect(() => {
       this.refStore.ensure(this.projectId(), ['statuses', 'types', 'sprints', 'labels', 'members']);
+    });
+
+    // P13b (Fix 4): while the form has pending changes, warn on full page
+    // close/reload (standard browser dialog). The listener is added/removed
+    // reactively and always detached on destroy.
+    effect(() => {
+      const win = this.document.defaultView;
+
+      if (!win) return;
+
+      if (this.hasPendingChanges()) win.addEventListener('beforeunload', TaskCreate.warnOnUnload);
+      else win.removeEventListener('beforeunload', TaskCreate.warnOnUnload);
+    });
+
+    this.destroyRef.onDestroy(() => {
+      this.document.defaultView?.removeEventListener('beforeunload', TaskCreate.warnOnUnload);
     });
 
     // V4-5 / R3-P1: preselect by ID — `project.defaultStatusId` when present among
@@ -268,6 +307,13 @@ export class TaskCreate {
     const key =
       this.projectStore.activeProject()?.key ?? this.route.snapshot.paramMap.get('projectKey') ?? task.projectId;
 
-    this.router.navigate(['/t', getTenantSlug(this.route), 'projects', key, 'tasks', `${key}-${task.number}`]);
+    this.router.navigate(['/w', getTenantSlug(this.route), 'projects', key, 'tasks', `${key}-${task.number}`]);
+  }
+
+  /** P13b (Fix 4): static handler so add/removeEventListener refer to ONE fn. */
+  private static warnOnUnload(event: BeforeUnloadEvent): void {
+    // Standard browser dialog; returnValue is the legacy trigger.
+    event.preventDefault();
+    event.returnValue = '';
   }
 }

@@ -26,7 +26,7 @@ const mockTenant: TenantWithRole = {
   id: 't1',
   name: 'Acme',
   slug: 'acme',
-  description: null,
+  description: 'Acme workspace description',
   status: 'ACTIVE',
   deletionScheduledAt: null,
   role: 'OWNER',
@@ -90,6 +90,10 @@ describe('TenantSettings', () => {
       expect(component.model().name).toBe('Acme');
     });
 
+    it('should populate description from active tenant', () => {
+      expect(component.model().description).toBe('Acme workspace description');
+    });
+
     it('should set loading to false', () => {
       expect(component.loading()).toBe(false);
     });
@@ -119,11 +123,28 @@ describe('TenantSettings', () => {
   describe('save', () => {
     beforeEach(() => setup());
 
-    it('should call tenantStore.updateTenant', () => {
-      component.model.update((m: { name: string }) => ({ ...m, name: 'New Name' }));
+    it('should call tenantStore.updateTenant with name and description', () => {
+      component.model.update((m: { name: string; description: string }) => ({
+        ...m,
+        name: 'New Name',
+        description: 'New description',
+      }));
       submit(component.settingsForm);
 
-      expect(tenantStoreMock.updateTenant).toHaveBeenCalledWith('t1', { name: 'New Name' });
+      expect(tenantStoreMock.updateTenant).toHaveBeenCalledWith('t1', {
+        name: 'New Name',
+        description: 'New description',
+      });
+    });
+
+    it('should not save when description exceeds 120 characters', () => {
+      component.model.update((m: { name: string; description: string }) => ({
+        ...m,
+        description: 'x'.repeat(121),
+      }));
+      submit(component.settingsForm);
+
+      expect(tenantStoreMock.updateTenant).not.toHaveBeenCalled();
     });
 
     it('should not save when name is empty', () => {

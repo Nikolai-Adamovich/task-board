@@ -1,3 +1,4 @@
+import { isValidDateFormat } from '@task-board/shared';
 import type { DateFormatPreference, TimeFormatPreference } from '@task-board/shared';
 
 /**
@@ -13,21 +14,18 @@ export const DEFAULT_DATE_FORMAT: DateFormatPreference = 'YYYY-MM-DD';
 /** Fallback when the user has not set a time format preference (null). */
 export const DEFAULT_TIME_FORMAT: TimeFormatPreference = '24h';
 
-/** Preference → DatePipe date tokens (e.g. 'DD/MM/YYYY' → 'dd/MM/yyyy'). */
+/**
+ * Preference → DatePipe date tokens (P12/DEC-056).
+ *
+ * User tokens map 1:1 to DatePipe tokens where they differ — `YYYY`→`yyyy`,
+ * `YY`→`yy`, `DD`→`dd`, `D`→`d` — while `MM`, `M`, `MMM`, `MMMM` and all
+ * separators pass through unchanged. Invalid or empty preferences fall back
+ * to the ISO default.
+ */
 export function toDatePipeDateFormat(pref: DateFormatPreference | null): string {
-  switch (pref) {
-    case 'DD/MM/YYYY':
-      return 'dd/MM/yyyy';
+  if (!pref || !isValidDateFormat(pref)) return 'yyyy-MM-dd';
 
-    case 'MM/DD/YYYY':
-      return 'MM/dd/yyyy';
-
-    case 'YYYY-MM-DD':
-      return 'yyyy-MM-dd';
-
-    default:
-      return toDatePipeDateFormat(DEFAULT_DATE_FORMAT);
-  }
+  return pref.replaceAll('YYYY', 'yyyy').replaceAll('YY', 'yy').replaceAll('DD', 'dd').replaceAll('D', 'd');
 }
 
 /** Preference → DatePipe time tokens ('24h' → 'HH:mm', '12h' → 'h:mm a'). */

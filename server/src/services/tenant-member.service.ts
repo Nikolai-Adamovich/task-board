@@ -22,6 +22,14 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+/**
+ * DEC-055: a membership whose `expiresAt` is on/after now is treated as
+ * ACCESS_REVOKED (lazy evaluation — no cron; the status flips when observed).
+ */
+export function isMembershipExpired(member: { expiresAt: string | null }): boolean {
+  return member.expiresAt !== null && new Date(member.expiresAt).getTime() <= Date.now();
+}
+
 // ─── Tenant Member Service ───────────────────────────────────────────────────
 
 /**
@@ -43,10 +51,20 @@ export class TenantMemberService {
     const enriched: TenantMember[] = [];
 
     for (const member of members) {
-      const user = member.userId ? await this.userRepo.findById(member.userId) : null;
+      // DEC-055 lazy revoke: an ACTIVE membership past its expiration is
+      // flipped to ACCESS_REVOKED when observed (no cron on Workers).
+      let effective = member;
+
+      if (member.status === MemberStatus.ACTIVE && isMembershipExpired(member)) {
+        const flipped = await this.tenantMemberRepo.update(member.id, { status: MemberStatus.ACCESS_REVOKED });
+
+        if (flipped) effective = flipped;
+      }
+
+      const user = effective.userId ? await this.userRepo.findById(effective.userId) : null;
 
       enriched.push({
-        ...member,
+        ...effective,
         displayName: user?.displayName ?? null,
         email: user?.email ?? null,
       });
@@ -165,25 +183,77 @@ export class TenantMemberService {
   }
 
   async updateMemberRole(requesterId: string, tenantId: string, userId: string, role: string): Promise<TenantMember> {
+    return this.updateMember(requesterId, tenantId, userId, { role });
+  }
+
+  /**
+   * DEC-055: full member update — role, expiration date and the underlying
+   * user's profile (display name / email). Only provided fields are applied.
+   * Setting an expiration on (or changing the role of) the workspace OWNER is
+   * forbidden. Returns the enriched member so callers can refresh their rows.
+   */
+  async updateMember(
+    requesterId: string,
+    tenantId: string,
+    userId: string,
+    patch: { role?: string; expiresAt?: string | null; name?: string; email?: string },
+  ): Promise<TenantMember> {
     const requesterMembership = await this.requireMembership(requesterId, tenantId);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
-      throw new ForbiddenError('Only owner or admin can update member roles');
+      throw new ForbiddenError('Only owner or admin can update members');
     }
 
-    const targetMembership = await this.requireMembership(userId, tenantId);
+    const target = await this.requireMembershipByUserId(userId, tenantId);
 
-    if (targetMembership.role === TenantRole.OWNER) {
-      throw new ForbiddenError("Cannot change the owner's role");
+    if (target.role === TenantRole.OWNER) {
+      if (patch.expiresAt !== undefined) {
+        throw new ForbiddenError('Cannot set an expiration date on the workspace owner');
+      }
+
+      if (patch.role !== undefined && patch.role !== target.role) {
+        throw new ForbiddenError("Cannot change the owner's role");
+      }
     }
 
-    const updated = await this.tenantMemberRepo.updateRole(tenantId, userId, role);
+    // Profile updates go to the underlying USER record
+    if (patch.name !== undefined || patch.email !== undefined) {
+      const user = await this.userRepo.findById(target.userId);
 
-    if (!updated) {
-      throw new NotFoundError('Member not found');
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      if (patch.email !== undefined && patch.email !== user.email) {
+        const existing = await this.userRepo.findByEmail(patch.email);
+
+        if (existing && existing.id !== user.id) {
+          throw new ConflictError('A user with this email already exists');
+        }
+      }
+
+      await this.userRepo.updateProfile(user.id, {
+        ...(patch.name !== undefined ? { displayName: patch.name } : {}),
+        ...(patch.email !== undefined ? { email: patch.email } : {}),
+      });
     }
 
-    return updated;
+    const memberPatch: { role?: string; expiresAt?: Date | null } = {};
+
+    if (patch.role !== undefined) memberPatch.role = patch.role;
+    if (patch.expiresAt !== undefined)
+      memberPatch.expiresAt = patch.expiresAt === null ? null : new Date(patch.expiresAt);
+
+    let updated = target;
+
+    if (Object.keys(memberPatch).length > 0) {
+      updated = (await this.tenantMemberRepo.update(target.id, memberPatch)) ?? target;
+    }
+
+    // Return the enriched member (fresh profile after possible name/email change)
+    const freshUser = await this.userRepo.findById(updated.userId);
+
+    return { ...updated, displayName: freshUser?.displayName ?? null, email: freshUser?.email ?? null };
   }
 
   async removeMember(requesterId: string, tenantId: string, userId: string): Promise<void> {
@@ -228,6 +298,7 @@ export class TenantMemberService {
     await this.tenantMemberRepo.update(memberId, {
       invitation: null,
       status: MemberStatus.ACTIVE,
+      expiresAt: null, // DEC-055: a fresh acceptance never starts expired
     });
   }
 
@@ -340,7 +411,8 @@ export class TenantMemberService {
 
     const member = await this.requireMembershipByUserId(userId, tenantId);
 
-    if (member.status !== MemberStatus.ACCESS_REVOKED) {
+    // DEC-055: an ACTIVE membership past its expiration is effectively revoked too
+    if (member.status !== MemberStatus.ACCESS_REVOKED && !isMembershipExpired(member)) {
       throw new ConflictError('Only ACCESS_REVOKED memberships can be restored');
     }
 
@@ -349,7 +421,9 @@ export class TenantMemberService {
       throw new ConflictError('Cannot restore a membership with a pending invitation — the invitee must accept it');
     }
 
-    await this.tenantMemberRepo.update(member.id, { status: MemberStatus.ACTIVE });
+    // DEC-055: restoring clears the expiration — access is regained with all
+    // projects/roles intact (nothing was ever removed).
+    await this.tenantMemberRepo.update(member.id, { status: MemberStatus.ACTIVE, expiresAt: null });
   }
 
   async revokeAccess(requesterId: string, tenantId: string, userId: string): Promise<void> {
@@ -399,6 +473,7 @@ export class TenantMemberService {
         userId: doc.userId,
         role: doc.role as TenantMember['role'],
         status: doc.status as TenantMember['status'],
+        expiresAt: doc.expiresAt ? doc.expiresAt.toISOString() : null,
         invitation: doc.invitation
           ? {
               status: doc.invitation.status as TenantMember['invitation'] extends infer I
@@ -438,7 +513,18 @@ export class TenantMemberService {
   private async requireMembership(userId: string, tenantId: string): Promise<TenantMember> {
     const membership = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
 
-    if (!membership || membership.status !== MemberStatus.ACTIVE) {
+    if (!membership) {
+      throw new ForbiddenError('You are not a member of this tenant');
+    }
+
+    // DEC-055 lazy revoke: an ACTIVE membership past its expiration denies
+    // access; the stored status is flipped when observed (no cron on Workers).
+    if (membership.status === MemberStatus.ACTIVE && isMembershipExpired(membership)) {
+      await this.tenantMemberRepo.update(membership.id, { status: MemberStatus.ACCESS_REVOKED });
+      throw new ForbiddenError('Your membership has expired');
+    }
+
+    if (membership.status !== MemberStatus.ACTIVE) {
       throw new ForbiddenError('You are not a member of this tenant');
     }
     return membership;

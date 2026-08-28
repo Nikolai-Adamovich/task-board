@@ -123,7 +123,7 @@ export class ProjectDangerZone {
         this.deleteConfirmText.set('');
         this.notify.success('toasts.deleted');
         // Navigate back to the overview so the read-only banner is visible
-        this.router.navigate(['/t', this.tenantSlug(), 'projects', this.projectKey()]);
+        this.router.navigate(['/w', this.tenantSlug(), 'projects', this.projectKey()]);
       },
       error: (err) => {
         this.error.set(getErrorMessage(err));

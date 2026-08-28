@@ -1,3 +1,10 @@
 <ui-header />
 <router-outlet />
-<hlm-toaster />
+
+<!-- P14 (item 32): the toaster (brn-sonner) is ~49 kB of the main chunk but is
+     only a render surface — `toast.*` calls queue into module-level state, so
+     toasts fired before hydration appear once the block loads. Deferred on
+     idle to keep it out of the initial bundle. -->
+@defer (on idle) {
+  <ui-app-toaster />
+}

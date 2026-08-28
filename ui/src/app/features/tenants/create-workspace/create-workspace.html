@@ -62,7 +62,7 @@
             <hlm-field>
               <label hlmFieldLabel for="workspace-slug">{{ 'createWorkspace.slug.label' | transloco }}</label>
               <div class="flex items-center gap-2">
-                <span class="shrink-0 text-sm text-muted-foreground">/t/</span>
+                <span class="shrink-0 text-sm text-muted-foreground">/w/</span>
                 <input
                   hlmInput
                   id="workspace-slug"
@@ -86,6 +86,8 @@
             </hlm-field>
             <hlm-field>
               <label hlmFieldLabel for="workspace-desc">{{ 'createWorkspace.descriptionLabel' | transloco }}</label>
+              <!-- maxlength attribute is forbidden by [formField]; the maxLength(120)
+                   schema rule enforces the limit and blocks submit. -->
               <textarea
                 hlmTextarea
                 id="workspace-desc"
@@ -93,6 +95,9 @@
                 rows="3"
                 [placeholder]="'createWorkspace.descriptionPlaceholder' | transloco"
               ></textarea>
+              <p class="text-xs text-muted-foreground" data-testid="desc-char-count">
+                {{ 'common.charCount' | transloco: { count: model().description.length, max: 120 } }}
+              </p>
             </hlm-field>
           </hlm-field-group>
         </form>
@@ -139,7 +144,7 @@
               </div>
               <div class="flex items-center justify-between">
                 <dt class="text-muted-foreground">{{ 'createWorkspace.checkout.urlLabel' | transloco }}</dt>
-                <dd class="font-medium">/t/{{ model().slug }}</dd>
+                <dd class="font-medium">/w/{{ model().slug }}</dd>
               </div>
               <div class="flex items-center justify-between border-t border-border pt-2">
                 <dt class="font-semibold">{{ 'createWorkspace.checkout.totalLabel' | transloco }}</dt>

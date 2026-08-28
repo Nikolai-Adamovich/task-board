@@ -9,6 +9,7 @@ import {
   renameSeedStatusNames,
   backfillTenantSlugs,
   ensureTenantSlugUniqueIndex,
+  backfillMemberExpiresAt,
 } from './db/migrations.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { authMiddleware } from './middleware/auth.js';
@@ -71,6 +72,7 @@ app.use('/api/*', async (c, next) => {
           await renameSeedStatusNames(db); // DR-1 — raw seed-status keys → display names
           await backfillTenantSlugs(db); // DEC-032 — must run before the unique slug index
           await ensureTenantSlugUniqueIndex(db);
+          await backfillMemberExpiresAt(db); // DEC-055 — expiresAt: null on legacy members
           migrationsRun = true;
         }
         await next();

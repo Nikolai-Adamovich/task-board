@@ -1,6 +1,14 @@
 import { ProjectStatus } from '@task-board/shared';
 import { ensurePermission } from './rbac.service.js';
-import type { Task, CreateTask, UpdateTask, IdentitySnapshot, AuditChange } from '@task-board/shared';
+import type {
+  Task,
+  CreateTask,
+  UpdateTask,
+  IdentitySnapshot,
+  AuditChange,
+  BulkUpdateTasksResult,
+  BulkUpdateTaskFailure,
+} from '@task-board/shared';
 import { AppError, ConflictError, NotFoundError } from '../errors/app-error.js';
 import { TaskRepository, type TaskQueryOptions, type PaginatedResult } from '../repositories/task.repository.js';
 import { CounterService } from './counter.service.js';
@@ -296,6 +304,98 @@ export class TaskService {
 
   async searchTasks(projectId: string, searchTerm: string): Promise<Task[]> {
     return this.taskRepo.search(projectId, searchTerm);
+  }
+
+  /**
+   * Q10 (RQ-04 ③): bulk status/assignee/sprint update.
+   * Authorization mirrors single-task `updateTask` (`edit_task` via
+   * `ensurePermission`, project role resolved server-side). Tasks that do not
+   * exist or belong to another project are reported per-id in `failed` —
+   * they never throw. Each task is updated with the same optimistic-concurrency
+   * semantics as the single update (`updateWithVersion`: `$inc version`,
+   * `updatedAt` bump) and gets its own audit event.
+   */
+  async bulkUpdateTasks(
+    projectId: string,
+    taskIds: string[],
+    data: { statusId?: string; assigneeId?: string | null; sprintId?: string | null },
+    userId?: string,
+    userRole?: string,
+  ): Promise<BulkUpdateTasksResult> {
+    // Permission — same action as single-task update
+    if (userId && userRole) {
+      const membership = await this.projectMemberRepo.findByUserAndProject(userId, projectId);
+
+      ensurePermission('edit_task', userRole, membership?.role ?? null);
+    }
+
+    // Build the shared update payload once (single-field contract is enforced by Zod)
+    const update: Record<string, unknown> = {};
+
+    if (data.statusId !== undefined) update.statusId = data.statusId;
+    if (data.sprintId !== undefined) update.sprintId = data.sprintId;
+    if (data.assigneeId !== undefined) {
+      update.assigneeId = data.assigneeId;
+      update.assigneeSnapshot = data.assigneeId ? await this.captureIdentitySnapshot(data.assigneeId) : null;
+    }
+
+    // Resolve all requested tasks in one query; missing/wrong-project ids → failed
+    const found = await this.taskRepo.findByIds(taskIds);
+    const failed: BulkUpdateTaskFailure[] = [];
+    const valid: Task[] = [];
+    const seen = new Set<string>();
+
+    for (const id of taskIds) {
+      const task = found.find((t) => t.id === id);
+
+      if (!task) {
+        failed.push({ taskId: id, reason: 'TASK_NOT_FOUND' });
+      } else if (task.projectId !== projectId) {
+        failed.push({ taskId: id, reason: 'TASK_NOT_IN_PROJECT' });
+      } else if (seen.has(id)) {
+        continue; // duplicate id — apply once
+      } else {
+        seen.add(id);
+        valid.push(task);
+      }
+    }
+
+    let updated = 0;
+
+    for (const task of valid) {
+      const result = await this.taskRepo.updateWithVersion(task.id, task.version, update as never);
+
+      if (!result) {
+        failed.push({ taskId: task.id, reason: 'VERSION_CONFLICT' });
+        continue;
+      }
+      updated++;
+
+      // Audit side effect per updated task (same shape as single updateTask)
+      if (this.auditService && userId) {
+        const project = await this.projectRepo.findById(projectId);
+        const changes: AuditChange[] = [];
+
+        if (data.statusId !== undefined)
+          changes.push({ field: 'statusId', oldValue: task.statusId, newValue: data.statusId });
+        if (data.assigneeId !== undefined)
+          changes.push({ field: 'assigneeId', oldValue: task.assigneeId, newValue: data.assigneeId });
+        if (data.sprintId !== undefined)
+          changes.push({ field: 'sprintId', oldValue: task.sprintId, newValue: data.sprintId });
+
+        await this.auditService.log({
+          tenantId: project?.tenantId ?? '',
+          projectId,
+          entityType: 'TASK',
+          entityId: task.id,
+          action: 'UPDATED',
+          actorId: userId,
+          changes,
+        });
+      }
+    }
+
+    return { updated, ...(failed.length > 0 ? { failed } : {}) };
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
