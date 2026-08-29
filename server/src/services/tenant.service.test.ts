@@ -499,10 +499,10 @@ describe('TenantService', () => {
       const result = await memberService.getTenantMembers('requester-1', 'tenant-1');
 
       expect(result).toHaveLength(2);
-      expect(result[0].displayName).toBe('Alice');
-      expect(result[0].email).toBe('alice@example.com');
-      expect(result[1].displayName).toBe('Bob');
-      expect(result[1].email).toBe('bob@example.com');
+      expect(result[0]?.displayName).toBe('Alice');
+      expect(result[0]?.email).toBe('alice@example.com');
+      expect(result[1]?.displayName).toBe('Bob');
+      expect(result[1]?.email).toBe('bob@example.com');
     });
 
     it('returns null displayName/email when user not found', async () => {
@@ -513,8 +513,8 @@ describe('TenantService', () => {
       const result = await memberService.getTenantMembers('requester-1', 'tenant-1');
 
       expect(result).toHaveLength(1);
-      expect(result[0].displayName).toBeNull();
-      expect(result[0].email).toBeNull();
+      expect(result[0]?.displayName).toBeNull();
+      expect(result[0]?.email).toBeNull();
     });
   });
 

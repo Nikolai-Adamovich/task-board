@@ -137,12 +137,17 @@ function setup(options: { tenantRole?: string; projectStatus?: Project['status']
   statusClientMock = { list: vi.fn().mockReturnValue(of(mockStatuses)) };
   taskClientMock = {
     list: vi.fn((_projectId: string, query: Record<string, unknown> = {}) => {
-      if (query.statusId === 's1') return paginated([], 5);
-      if (query.statusId === 's2') return paginated([], 2);
       if (query.limit === 5) return paginated(mockRecentTasks);
 
       return paginated([]);
     }),
+    // S-05: per-status counts now come from one status-summary request
+    statusSummary: vi.fn().mockReturnValue(
+      of([
+        { statusId: 's1', count: 5 },
+        { statusId: 's2', count: 2 },
+      ]),
+    ),
   };
 
   TestBed.resetTestingModule();
@@ -209,10 +214,11 @@ describe('ProjectDetail (overview)', () => {
     expect(component.activeSprint()?.name).toBe('Sprint 1');
   });
 
-  it('should compute per-status totals from pagination.total', async () => {
+  it('should compute per-status totals from the status-summary endpoint (S-05)', async () => {
     setup();
     await until(() => component.statusCounts().length > 0);
 
+    expect(taskClientMock.statusSummary).toHaveBeenCalledWith(mockProject.id);
     expect(component.statusCounts()).toEqual([
       { status: mockStatuses[0], total: 5 },
       { status: mockStatuses[1], total: 2 },

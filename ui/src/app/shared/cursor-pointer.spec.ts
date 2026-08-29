@@ -37,7 +37,7 @@ describe('R3-P9: cursor-pointer on interactive UI primitives', () => {
   }
 
   it('keeps disabled states non-pointer where a not-allowed cursor is defined', () => {
-    const button = readLib(PRIMITIVES['button']);
+    const button = readLib(PRIMITIVES['button'] ?? '');
 
     expect(button).toContain('data-disabled:pointer-events-none');
   });

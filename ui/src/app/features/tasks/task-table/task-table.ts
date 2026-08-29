@@ -1,7 +1,6 @@
 import { Component, DestroyRef, ElementRef, inject, input, computed, effect, signal, viewChild } from '@angular/core';
-import { numberAttribute } from '@angular/core';
+import { safeNumericParam } from '@app/shared/utils/numeric-param';
 import { NavigationEnd, Router, ActivatedRoute } from '@angular/router';
-import { CdkMenuTrigger } from '@angular/cdk/menu';
 import { filter, of } from 'rxjs';
 import { rxResource, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectStore } from '@stores/project-store';
@@ -10,38 +9,28 @@ import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
 import { getTenantSlug } from '@app/shared/utils/route-utils';
 import { AuthStore } from '@stores/auth-store';
 import { canWrite } from '@app/shared/utils/role-utils';
-import { DatePipe, NgTemplateOutlet } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import {
-  lucideArrowUp,
-  lucideArrowDown,
-  lucideColumns2,
-  lucideEyeOff,
-  lucideFilter,
-  lucideRows3,
-  lucideX,
-} from '@ng-icons/lucide';
+import { lucideArrowUp, lucideArrowDown, lucideFilter } from '@ng-icons/lucide';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
-import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 import { HlmCheckboxImports } from '@spartan-ng/helm/checkbox';
-import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmDatePickerImports } from '@spartan-ng/helm/date-picker';
 import { TaskClient, type PaginatedResponse } from '@services/task-client';
 import { Pagination } from '@app/shared/pagination/pagination';
-import { FilterPanel } from '@features/filters/filter-panel/filter-panel';
 import { AppliedFilterState } from '@features/filters/filter-panel/filter-panel';
-import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-// P13b: BrnPopover is read from the cursor-anchored popover so the programmatic
-// open can call `setOrigin` (a trigger click would do this implicitly).
-import { BrnPopover } from '@spartan-ng/brain/popover';
+import { TaskTableFilters } from './task-table-filters/task-table-filters';
+import { TaskTableBulkBar, BULK_UNASSIGNED, BULK_NO_SPRINT } from './task-table-bulk-bar/task-table-bulk-bar';
+import { TaskTableColumns } from './task-table-columns/task-table-columns';
+import { TaskTableHeader } from './task-table-header/task-table-header';
+import { isPinnedColumn, type TaskColumnDef } from './task-column-def';
 import type {
   Task,
   TaskPriority,
@@ -62,48 +51,7 @@ import {
 import { useAutoRowMeasurement } from '@app/shared/auto-table/use-auto-row-measurement';
 import { useTableDensity } from '@app/shared/auto-table/table-density';
 
-interface TaskColumnDef {
-  field: string;
-  /** R3-P4: stable preference key shared with the server (`taskTableColumns`) */
-  columnKey: TaskTableColumnKey;
-  labelKey: string;
-  filterType: 'none' | 'text' | 'select' | 'date';
-  width?: string;
-  popoverWidth?: string;
-  /**
-   * Round-4 F3: overlay alignment for the header filter popover. The rightmost
-   * columns (Created/Updated) use `'end'` so the popover opens leftward and is
-   * not clipped at the right viewport edge.
-   */
-  align?: 'start' | 'center' | 'end';
-  getFilterValue: () => string;
-  setFilterValue?: (value: string) => void;
-  getOptions?: () => SelectOption[];
-  /** Q13/F-01: date-range accessors for `filterType: 'date'` columns */
-  getDateFrom?: () => string;
-  getDateTo?: () => string;
-  /** Empty string on either side clears that bound */
-  setDateRange?: (from: string, to: string) => void;
-  allLabelKey?: string;
-  placeholder?: string;
-  staticOptions?: { value: string; labelKey: string }[];
-  itemToString?: (value: string) => string;
-}
-
 const COLUMN_COUNT = 11;
-
-/**
- * V1-3: strict numeric query-param transform — `numberAttribute` yields `NaN`
- * for empty/garbage values which previously leaked into the URL as
- * `?limit=NaN`. Non-finite or non-positive values fall back to 0 so callers
- * apply their own defaults.
- */
-export function safeNumericParam(value: unknown): number {
-  const n = numberAttribute(value);
-
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
 /**
  * Empty list envelope — resource `defaultValue` and the fallback stream result
  * while the project context has not resolved yet (keeps the table renderable).
@@ -112,13 +60,9 @@ const EMPTY_TASK_PAGE: PaginatedResponse<Task> = {
   data: [],
   pagination: { page: 1, limit: 0, total: 0, totalPages: 0 },
 };
-/**
- * Q10: sentinels for the nullable bulk-select options — hlm-select values are
- * strings, so "unassign"/"clear sprint" need a non-empty marker that maps to
- * `null` in the request body.
- */
-const BULK_UNASSIGNED = '__unassigned__';
-const BULK_NO_SPRINT = '__no_sprint__';
+// Q10: sentinels for the nullable bulk-select options — owned by TaskTableBulkBar
+// (the select values), mapped to `null` here when building the request body.
+// (BULK_UNASSIGNED / BULK_NO_SPRINT are imported at the top.)
 
 /** Case-insensitive name → id resolution against a loaded option list */
 function resolveNameToId(name: string, options: SelectOption[]): string {
@@ -136,33 +80,29 @@ function resolveNameToId(name: string, options: SelectOption[]): string {
   selector: 'ui-task-table',
   imports: [
     DatePipe,
-    NgTemplateOutlet,
     TranslocoPipe,
     NgIcon,
     HlmButtonImports,
     HlmInputImports,
     HlmBadgeImports,
     HlmSelectImports,
-    HlmDialogImports,
     HlmCardImports,
     HlmTableImports,
     HlmPopoverImports,
     HlmCheckboxImports,
-    HlmDropdownMenuImports,
     HlmTooltipImports,
     HlmDatePickerImports,
     Pagination,
-    FilterPanel,
+    TaskTableFilters,
+    TaskTableBulkBar,
+    TaskTableColumns,
+    TaskTableHeader,
   ],
   providers: [
     provideIcons({
       lucideArrowUp,
       lucideArrowDown,
-      lucideColumns2,
-      lucideEyeOff,
       lucideFilter,
-      lucideRows3,
-      lucideX,
     }),
   ],
   templateUrl: './task-table.html',
@@ -538,22 +478,14 @@ export class TaskTable {
   protected readonly visibleFields = computed(() => new Set(this.visibleTaskColumns().map((col) => col.field)));
   /** colspan for empty/spacer rows — follows the visible column count */
   protected readonly visibleColumnCount = computed(() => this.visibleTaskColumns().length);
-  /** Column-chooser popover visibility (toolbar instance) */
-  protected readonly showColumnChooser = signal(false);
   /**
-   * Round-5 P9 (item 24): cursor-anchored chooser instance — opened from the
-   * header context menu so the chooser appears near the cursor, not at the
-   * toolbar button. Shares state/handlers with the toolbar instance.
+   * M-13 (4.2): the column-chooser popover, cursor-anchored chooser and header
+   * context menu live in the TaskTableColumns UI child. The visibility state
+   * and persistence stay here (the table header/body render from it); the
+   * accessors below delegate to the child for the chooser/context-menu state
+   * the specs and handlers interact with.
    */
-  protected readonly showContextColumnChooser = signal(false);
-  /** Column targeted by the header context menu */
-  protected readonly contextColumn = signal<TaskColumnDef | null>(null);
-  private readonly ctxAnchorRef = viewChild<ElementRef<HTMLSpanElement>>('ctxAnchor');
-  /** Hidden trigger button of the cursor-anchored chooser popover */
-  private readonly ctxChooserAnchorRef = viewChild<ElementRef<HTMLButtonElement>>('ctxChooserAnchor');
-  /** P13b: the BrnPopover hosting the cursor-anchored chooser (for setOrigin). */
-  private readonly ctxChooserPopover = viewChild('ctxChooserAnchor', { read: BrnPopover });
-  private readonly ctxMenuTrigger = viewChild(CdkMenuTrigger);
+  private readonly columnsUi = viewChild.required(TaskTableColumns);
   /** Debounced persistence of column toggles (~400 ms) */
   private static readonly COLUMN_PERSIST_DEBOUNCE_MS = 400;
   private columnPersistHandle: ReturnType<typeof setTimeout> | null = null;
@@ -724,17 +656,12 @@ export class TaskTable {
 
   // ─── Column visibility (R3-P4) ─────────────────────────────────────────────
 
-  /** Identity-anchor columns can never be hidden */
-  protected isPinnedColumn(columnKey: TaskTableColumnKey): boolean {
-    return (TASK_TABLE_PINNED_COLUMNS as readonly string[]).includes(columnKey);
-  }
-
   /**
    * Toggle a column's visibility. Applies immediately via `localColumns`; the
    * persistence call is debounced so rapid toggles coalesce into one request.
    */
   protected toggleColumn(columnKey: TaskTableColumnKey, visible: boolean): void {
-    if (this.isPinnedColumn(columnKey)) return;
+    if (isPinnedColumn(columnKey)) return;
 
     const current = this.visibleColumnKeys();
     const nextKeys = TASK_TABLE_COLUMN_KEYS.filter((key) =>
@@ -773,7 +700,7 @@ export class TaskTable {
 
   /** Round-5 P9 (item 25): Select-all state over the toggleable (non-pinned) columns */
   protected readonly toggleableColumns = computed(() =>
-    this.taskColumns.filter((col) => !this.isPinnedColumn(col.columnKey)),
+    this.taskColumns.filter((col) => !isPinnedColumn(col.columnKey)),
   );
   protected readonly allColumnsSelected = computed(() =>
     this.toggleableColumns().every((col) => this.visibleColumnKeys().has(col.columnKey)),
@@ -784,136 +711,53 @@ export class TaskTable {
     return selected > 0 && selected < this.toggleableColumns().length;
   });
 
+  // ─── Delegations to the TaskTableColumns UI child (M-13) ───────────────────
+  // The chooser/context-menu interaction state lives in the child; these thin
+  // accessors keep the composition-root template and handlers stable.
+
   /** Right-click on a column header → open the context menu at the cursor */
   protected onHeaderContextMenu(event: MouseEvent, col: TaskColumnDef): void {
-    event.preventDefault();
-    // Round-4 F4: Linux fires `contextmenu` on mousedown — when the right button
-    // is released the browser fires `auxclick`/`click` on the `<th>`, which CDK's
-    // overlay outside-click dispatcher treats as an outside click and closes the
-    // menu immediately. Swallow that single terminating event.
-    this.openContextMenuAt(event.clientX, event.clientY, col, true);
+    this.columnsUi().onHeaderContextMenu(event, col);
   }
 
-  /** Position the hidden anchors at (x, y) and open the header context menu */
-  private openContextMenuAt(x: number, y: number, col: TaskColumnDef, swallowTerminatingClick: boolean): void {
-    this.contextColumn.set(col);
-
-    const anchor = this.ctxAnchorRef()?.nativeElement;
-
-    if (!anchor) return;
-
-    anchor.style.left = `${x}px`;
-    anchor.style.top = `${y}px`;
-
-    // Round-5 P9 (item 24): keep the cursor-anchored chooser trigger at the
-    // same coordinates so "Select columns" opens the popover at the cursor.
-    const chooserAnchor = this.ctxChooserAnchorRef()?.nativeElement;
-
-    if (chooserAnchor) {
-      chooserAnchor.style.left = `${x}px`;
-      chooserAnchor.style.top = `${y}px`;
-    }
-
-    // Open once the anchor position is committed to the DOM
-    setTimeout(() => {
-      this.ctxMenuTrigger()?.open();
-
-      if (swallowTerminatingClick) this.swallowNextClick();
-
-      // Move focus into the menu. CDK only focuses the first item when the menu
-      // was opened via the keyboard — a programmatic `.open()` (right-click or
-      // the context-menu key) leaves focus outside, making the items
-      // unreachable by keyboard. Target the most recently attached overlay menu.
-      setTimeout(() => {
-        const menus = document.querySelectorAll<HTMLElement>('[data-slot="dropdown-menu"]');
-        const menu = menus[menus.length - 1];
-
-        menu?.querySelector<HTMLButtonElement>('[data-slot="dropdown-menu-item"]:not([data-disabled])')?.focus();
-      });
-    });
+  protected get showColumnChooser() {
+    return this.columnsUi().showColumnChooser;
   }
 
-  /**
-   * Round-4 F4: swallow exactly ONE terminating click after a programmatic menu
-   * open. One-shot capture-phase listeners on `document` stop the event before it
-   * reaches CDK's body-level outside-click dispatcher; they remove themselves after
-   * the first event (or after ~500 ms as a safety), so a later click that selects a
-   * menu item is never eaten.
-   */
-  private swallowNextClick(): void {
-    let handle: ReturnType<typeof setTimeout> | null = null;
-    const cleanup = (): void => {
-      document.removeEventListener('auxclick', swallow, true);
-      document.removeEventListener('click', swallow, true);
+  protected get showContextColumnChooser() {
+    return this.columnsUi().showContextColumnChooser;
+  }
 
-      if (handle !== null) clearTimeout(handle);
-
-      handle = null;
-    };
-    const swallow = (event: Event): void => {
-      event.stopPropagation();
-      cleanup();
-    };
-
-    handle = setTimeout(cleanup, 500);
-    document.addEventListener('auxclick', swallow, true);
-    document.addEventListener('click', swallow, true);
+  protected get contextColumn() {
+    return this.columnsUi().contextColumn;
   }
 
   protected canHideContextColumn(): boolean {
-    const col = this.contextColumn();
-
-    return !!col && !this.isPinnedColumn(col.columnKey) && this.visibleColumnKeys().has(col.columnKey);
+    return this.columnsUi().canHideContextColumn();
   }
 
   protected hideContextColumn(): void {
-    const col = this.contextColumn();
-
-    if (col) this.toggleColumn(col.columnKey, false);
+    this.columnsUi().hideContextColumn();
   }
 
-  /** Round-5 P9 (item 24): open the CURSOR-anchored instance, never the toolbar one */
   protected openChooserFromContextMenu(): void {
-    // P13b: the popover is opened via the `[state]` binding (not a trigger
-    // click), so BrnPopoverTrigger never runs `setOrigin` — without an origin
-    // the overlay fell back to its default (mid-table) position. Point it at
-    // the hidden cursor-anchored trigger button first.
-    const anchor = this.ctxChooserAnchorRef()?.nativeElement;
-
-    if (anchor) this.ctxChooserPopover()?.setOrigin(anchor);
-
-    this.showColumnChooser.set(false);
-    this.showContextColumnChooser.set(true);
+    this.columnsUi().openChooserFromContextMenu();
   }
 
   protected onChooserStateChange(state: 'open' | 'closed'): void {
-    // P13b: when the toolbar popover is opened by CLICKING its trigger, the
-    // overlay's internal state goes 'open' but the `[state]` binding signal
-    // stayed false — so the × button's `showColumnChooser.set(false)` was a
-    // no-op (same value → input never changes → BrnOverlay's effect never
-    // closes). Mirror the overlay state into the signal so the binding is the
-    // single source of truth. Round-5 P9: only one instance open at a time.
-    if (state === 'open') {
-      this.showColumnChooser.set(true);
-      this.showContextColumnChooser.set(false);
-    } else {
-      this.showColumnChooser.set(false);
-    }
+    this.columnsUi().onChooserStateChange(state);
   }
 
   protected onContextChooserStateChange(state: 'open' | 'closed'): void {
-    if (state === 'open') {
-      this.showContextColumnChooser.set(true);
-      this.showColumnChooser.set(false);
-    } else {
-      this.showContextColumnChooser.set(false);
-    }
+    this.columnsUi().onContextChooserStateChange(state);
   }
 
-  /** Round-5 P9 (item 25): × button in the shared chooser header — closes whichever instance is open */
   protected closeColumnChooser(): void {
-    this.showColumnChooser.set(false);
-    this.showContextColumnChooser.set(false);
+    this.columnsUi().closeColumnChooser();
+  }
+
+  protected swallowNextClick(): void {
+    this.columnsUi().swallowNextClick();
   }
 
   // ─── URL sync ──────────────────────────────────────────────────────────────
@@ -1200,6 +1044,8 @@ export class TaskTable {
 
     const [y, m, d] = value.split('-').map(Number);
 
+    if (y === undefined || m === undefined || d === undefined) return undefined;
+
     return new Date(y, m - 1, d);
   }
 
@@ -1432,12 +1278,6 @@ export class TaskTable {
   }
 
   // ─── Filter Panel Dialog ──────────────────────────────────────────────────
-
-  protected onFilterDialogStateChange(state: BrnDialogState): void {
-    if (state === 'closed') {
-      this.showFilterDialog.set(false);
-    }
-  }
 
   protected onFilterApplied(state: AppliedFilterState): void {
     this.showFilterDialog.set(false);

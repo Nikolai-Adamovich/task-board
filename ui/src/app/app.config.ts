@@ -35,13 +35,23 @@ function registerLocale(lang: string): Promise<void> {
   return loader().then((module) => registerLocaleData(module.default, lang));
 }
 
+/** N-09: keep `<html lang>` in sync with the active language (a11y — screen readers). */
+function syncDocumentLang(lang: string): void {
+  document.documentElement.lang = lang;
+}
+
 /** Registers the active locale before first render, then follows language changes. */
 function initLocales(): Promise<void> {
   const transloco = inject(TranslocoService);
 
+  syncDocumentLang(transloco.getActiveLang());
+
   // App-lifetime subscription: TranslocoService is a root service, so the
   // subscription lives exactly as long as the application.
-  transloco.langChanges$.subscribe((lang) => void registerLocale(lang));
+  transloco.langChanges$.subscribe((lang) => {
+    syncDocumentLang(lang);
+    void registerLocale(lang);
+  });
 
   return registerLocale(transloco.getActiveLang());
 }

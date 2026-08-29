@@ -6,6 +6,9 @@
  */
 import type { Db } from 'mongodb';
 import { MemberStatus, InvitationStatus, generateSlugFromName, TENANT_SLUG_MAX_LENGTH } from '@task-board/shared';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger({ scope: 'migrations' });
 
 // ─── DEC-018 Migration ───────────────────────────────────────────────────────
 
@@ -29,7 +32,7 @@ export async function migrateInvitedMembershipsToRevoked(db: Db): Promise<number
     );
 
   if (result.modifiedCount > 0) {
-    console.warn(`[migrations] DEC-018: rewrote ${result.modifiedCount} invited member(s) to ACCESS_REVOKED`);
+    log.warn('DEC-018: rewrote invited member(s) to ACCESS_REVOKED', { count: result.modifiedCount });
   }
 
   return result.modifiedCount;
@@ -84,7 +87,7 @@ export async function backfillTenantSlugs(db: Db): Promise<number> {
   }
 
   if (updated > 0) {
-    console.warn(`[migrations] DEC-032: backfilled slug for ${updated} tenant(s)`);
+    log.warn('DEC-032: backfilled slug for tenant(s)', { count: updated });
   }
 
   return updated;
@@ -99,6 +102,17 @@ export async function backfillTenantSlugs(db: Db): Promise<number> {
  */
 export async function ensureTenantSlugUniqueIndex(db: Db): Promise<void> {
   await db.collection('tenants').createIndex({ slug: 1 }, { unique: true });
+}
+
+/**
+ * M-04: run the slug backfill and the unique index creation back-to-back as a
+ * single migration step. Invoking them as two separate steps in the startup
+ * sequence left a window where a concurrent isolate could insert a duplicate
+ * slug between the backfill and the index build.
+ */
+export async function ensureTenantSlugIntegrity(db: Db): Promise<void> {
+  await backfillTenantSlugs(db);
+  await ensureTenantSlugUniqueIndex(db);
 }
 
 // ─── DEC-055 Migration ───────────────────────────────────────────────────────
@@ -117,7 +131,7 @@ export async function backfillMemberExpiresAt(db: Db): Promise<number> {
     .updateMany({ expiresAt: { $exists: false } }, { $set: { expiresAt: null } });
 
   if (result.modifiedCount > 0) {
-    console.warn(`[migrations] DEC-055: backfilled expiresAt on ${result.modifiedCount} member document(s)`);
+    log.warn('DEC-055: backfilled expiresAt on member document(s)', { count: result.modifiedCount });
   }
 
   return result.modifiedCount;
@@ -160,7 +174,7 @@ export async function renameSeedStatusNames(db: Db): Promise<number> {
   }
 
   if (updated > 0) {
-    console.warn(`[migrations] DR-1: renamed ${updated} seed status(es) to human-readable names`);
+    log.warn('DR-1: renamed seed status(es) to human-readable names', { count: updated });
   }
 
   return updated;
@@ -208,6 +222,8 @@ const CORE_INDEXES: IndexDefinition[] = [
   { collection: 'tasks', spec: { projectId: 1, statusId: 1 } },
   { collection: 'tasks', spec: { projectId: 1, sprintId: 1 } },
   { collection: 'tasks', spec: { projectId: 1, assigneeId: 1 } },
+  // S-15: label filter queries (`labelIds` array) — multikey index
+  { collection: 'tasks', spec: { projectId: 1, labelIds: 1 } },
   // comments
   { collection: 'comments', spec: { taskId: 1 } },
   // task_relationships
@@ -217,6 +233,9 @@ const CORE_INDEXES: IndexDefinition[] = [
   // audit_events
   { collection: 'audit_events', spec: { tenantId: 1, createdAt: -1 } },
   { collection: 'audit_events', spec: { projectId: 1, createdAt: -1 } },
+  // S-15: entity/action drill-down filters on the audit log
+  { collection: 'audit_events', spec: { projectId: 1, entityType: 1, createdAt: -1 } },
+  { collection: 'audit_events', spec: { projectId: 1, action: 1, createdAt: -1 } },
   // filters
   { collection: 'filters', spec: { userId: 1, projectId: 1 } },
   // labels
@@ -252,7 +271,7 @@ export async function ensureCoreIndexes(db: Db): Promise<void> {
       try {
         await db.collection(collection).createIndex(spec, options);
       } catch (err) {
-        console.error(`[migrations] Failed to create index ${collection} ${JSON.stringify(spec)}:`, err);
+        log.error('Failed to create index', { collection, spec, err });
       }
     }),
   );

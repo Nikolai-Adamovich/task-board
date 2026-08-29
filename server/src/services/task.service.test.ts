@@ -85,10 +85,12 @@ describe('TaskService', () => {
 
     statusRepo = createMock<StatusRepository>({
       findById: vi.fn().mockResolvedValue({ id: 'status-1', projectId: 'project-1' }),
+      findByIds: vi.fn().mockResolvedValue([{ id: 'status-1', projectId: 'project-1' }]),
     });
 
     taskTypeRepo = createMock<TaskTypeRepository>({
       findById: vi.fn().mockResolvedValue({ id: 'type-1', projectId: 'project-1' }),
+      findByIds: vi.fn().mockResolvedValue([{ id: 'type-1', projectId: 'project-1' }]),
     });
 
     userRepo = {
@@ -97,6 +99,7 @@ describe('TaskService', () => {
 
     sprintRepo = {
       findById: vi.fn().mockResolvedValue({ id: 'sprint-1', projectId: 'project-1' }),
+      findByIds: vi.fn().mockResolvedValue([{ id: 'sprint-1', projectId: 'project-1' }]),
     };
 
     commentRepo = {
@@ -145,7 +148,7 @@ describe('TaskService', () => {
     it('returns task when found', async () => {
       taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
 
-      const result = await service.getTask('task-1');
+      const result = await service.getTask('task-1', 'tenant-1');
 
       expect(result.title).toBe('Test Task');
     });
@@ -153,7 +156,47 @@ describe('TaskService', () => {
     it('throws NOT_FOUND when not found', async () => {
       taskRepo.findById = vi.fn().mockResolvedValue(null);
 
-      await expect(service.getTask('missing')).rejects.toThrow('Task not found');
+      await expect(service.getTask('missing', 'tenant-1')).rejects.toThrow('Task not found');
+    });
+
+    it('throws NOT_FOUND (not 403) when the task belongs to another tenant (M-02)', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(makeTask());
+      projectRepo.findById = vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-OTHER' });
+
+      await expect(service.getTask('task-1', 'tenant-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
+    });
+  });
+
+  describe('getTaskByKey (S-04)', () => {
+    it('resolves the project within the caller tenant and returns the task', async () => {
+      projectRepo.findByTenantAndKey = vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-1' });
+      taskRepo.findByProjectAndNumber = vi.fn().mockResolvedValue(makeTask({ number: 7 }));
+
+      const result = await service.getTaskByKey('tenant-1', 'PRO', 7);
+
+      expect(projectRepo.findByTenantAndKey).toHaveBeenCalledWith('tenant-1', 'PRO');
+      expect(result.number).toBe(7);
+    });
+
+    it('throws NOT_FOUND when the key belongs to a project of another tenant (S-04)', async () => {
+      projectRepo.findByTenantAndKey = vi.fn().mockResolvedValue(null);
+      taskRepo.findByProjectAndNumber = vi.fn();
+
+      await expect(service.getTaskByKey('tenant-1', 'OTHER', 1)).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
+      expect(taskRepo.findByProjectAndNumber).not.toHaveBeenCalled();
+    });
+
+    it('throws NOT_FOUND when no task matches the number', async () => {
+      projectRepo.findByTenantAndKey = vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-1' });
+      taskRepo.findByProjectAndNumber = vi.fn().mockResolvedValue(null);
+
+      await expect(service.getTaskByKey('tenant-1', 'PRO', 999)).rejects.toThrow('Task not found');
     });
   });
 
@@ -188,6 +231,28 @@ describe('TaskService', () => {
 
       expect(result.title).toBe('Test Task');
       expect(counterService.getNextTaskNumber).toHaveBeenCalledWith('project-1');
+    });
+
+    it('M-14: resolves refs with ONE batched findByIds per repo (no sequential findById)', async () => {
+      taskRepo.create = vi.fn().mockResolvedValue(makeTask());
+
+      await service.createTask('project-1', 'user-1', 'OWNER', undefined, {
+        typeId: 'type-1',
+        title: 'New Task',
+        statusId: 'status-1',
+        priority: 'MEDIUM',
+        sprintId: 'sprint-1',
+      });
+
+      expect(taskTypeRepo.findByIds).toHaveBeenCalledTimes(1);
+      expect(taskTypeRepo.findByIds).toHaveBeenCalledWith(['type-1']);
+      expect(statusRepo.findByIds).toHaveBeenCalledTimes(1);
+      expect(statusRepo.findByIds).toHaveBeenCalledWith(['status-1']);
+      expect(sprintRepo.findByIds).toHaveBeenCalledTimes(1);
+      expect(sprintRepo.findByIds).toHaveBeenCalledWith(['sprint-1']);
+      expect(taskTypeRepo.findById).not.toHaveBeenCalled();
+      expect(statusRepo.findById).not.toHaveBeenCalled();
+      expect(sprintRepo.findById).not.toHaveBeenCalled();
     });
 
     it('creates audit event on task creation', async () => {
@@ -276,7 +341,7 @@ describe('TaskService', () => {
 
       // Audit should be called before delete
       const auditCallOrder = (auditService.log as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
-      const deleteCallOrder = (taskRepo.delete as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+      const deleteCallOrder = (taskRepo.delete as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0] ?? Number.NaN;
 
       expect(auditCallOrder).toBeLessThan(deleteCallOrder);
     });

@@ -92,10 +92,13 @@ describe('UserSettingsRepository', () => {
       collection.findOne.mockResolvedValue(makeDoc({ dateFormat: 'DD/MM/YYYY', timeFormat: '24h' }));
 
       const result = await repo.upsert('user-1', { dateFormat: 'DD/MM/YYYY', timeFormat: '24h' });
-      const update = collection.updateOne.mock.calls[0][1] as Record<string, Record<string, unknown>>;
+      const update = collection.updateOne.mock.calls[0]?.[1] as {
+        $set?: Record<string, unknown>;
+        $setOnInsert?: Record<string, unknown>;
+      };
 
-      expect(update.$set.dateFormat).toBe('DD/MM/YYYY');
-      expect(update.$set.timeFormat).toBe('24h');
+      expect(update.$set?.dateFormat).toBe('DD/MM/YYYY');
+      expect(update.$set?.timeFormat).toBe('24h');
       expect(result.dateFormat).toBe('DD/MM/YYYY');
       expect(result.timeFormat).toBe('24h');
     });
@@ -105,14 +108,17 @@ describe('UserSettingsRepository', () => {
 
       await repo.upsert('user-1', { zoom: 125 });
 
-      const update = collection.updateOne.mock.calls[0][1] as Record<string, Record<string, unknown>>;
+      const update = collection.updateOne.mock.calls[0]?.[1] as {
+        $set?: Record<string, unknown>;
+        $setOnInsert?: Record<string, unknown>;
+      };
 
-      expect(update.$set.zoom).toBe(125);
-      expect(update.$setOnInsert.dateFormat).toBeNull();
-      expect(update.$setOnInsert.timeFormat).toBeNull();
-      expect(update.$setOnInsert.themeMode).toBe('auto');
-      expect(update.$setOnInsert.lightTheme).toBeNull();
-      expect(update.$setOnInsert.darkTheme).toBeNull();
+      expect(update.$set?.zoom).toBe(125);
+      expect(update.$setOnInsert?.dateFormat).toBeNull();
+      expect(update.$setOnInsert?.timeFormat).toBeNull();
+      expect(update.$setOnInsert?.themeMode).toBe('auto');
+      expect(update.$setOnInsert?.lightTheme).toBeNull();
+      expect(update.$setOnInsert?.darkTheme).toBeNull();
     });
 
     it('persists themeMode/lightTheme/darkTheme when provided', async () => {
@@ -120,10 +126,13 @@ describe('UserSettingsRepository', () => {
       collection.findOne.mockResolvedValue(makeDoc({ themeMode: 'light', lightTheme: 'github-light' }));
 
       const result = await repo.upsert('user-1', { themeMode: 'light', lightTheme: 'github-light' });
-      const update = collection.updateOne.mock.calls[0][1] as Record<string, Record<string, unknown>>;
+      const update = collection.updateOne.mock.calls[0]?.[1] as {
+        $set?: Record<string, unknown>;
+        $setOnInsert?: Record<string, unknown>;
+      };
 
-      expect(update.$set.themeMode).toBe('light');
-      expect(update.$set.lightTheme).toBe('github-light');
+      expect(update.$set?.themeMode).toBe('light');
+      expect(update.$set?.lightTheme).toBe('github-light');
       expect(result.themeMode).toBe('light');
       expect(result.lightTheme).toBe('github-light');
     });

@@ -232,8 +232,8 @@ describe('StatusManager', () => {
       component.moveUp(mockStatuses[1]);
       expect(statusClientMock.reorder).toHaveBeenCalledTimes(1);
       expect(statusClientMock.reorder).toHaveBeenCalledWith('p1', [
-        { id: mockStatuses[1].id, position: mockStatuses[0].position },
-        { id: mockStatuses[0].id, position: mockStatuses[1].position },
+        { id: mockStatuses[1]?.id, position: mockStatuses[0]?.position },
+        { id: mockStatuses[0]?.id, position: mockStatuses[1]?.position },
       ]);
     });
 

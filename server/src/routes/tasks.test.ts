@@ -34,10 +34,14 @@ const TEST_ENV = { JWT_SECRET: 'test-secret', MONGODB_URI: '', ALLOWED_ORIGINS: 
 const USER_ID = '550e8400-e29b-41d4-a716-446655440002';
 const PROJECT_ID = '550e8400-e29b-41d4-a716-446655440010';
 
-function createTestApp(tenantRole = 'MEMBER', bulkImpl?: (...args: unknown[]) => unknown) {
+function createTestApp(
+  tenantRole = 'MEMBER',
+  bulkImpl?: (...args: unknown[]) => unknown,
+  tasksOverride?: Record<string, unknown>,
+) {
   const bulkUpdateTasks = vi.fn(bulkImpl ?? (() => Promise.resolve({ updated: 1 })));
 
-  (TaskService as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({ bulkUpdateTasks }));
+  (TaskService as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => tasksOverride ?? { bulkUpdateTasks });
 
   const app = new Hono<AppEnv>();
 
@@ -209,5 +213,39 @@ describe('PATCH /api/projects/:projectId/tasks/bulk', () => {
     const body = (await res.json()) as { error: { code: string } };
 
     expect(body.error.code).toBe('NOT_FOUND');
+  });
+});
+
+// ─── GET /api/projects/:projectId/tasks/status-summary (S-05) ────────────────
+
+describe('GET /api/projects/:projectId/tasks/status-summary', () => {
+  it('returns { data: [{ statusId, count }] } from a single service call', async () => {
+    const getStatusSummary = vi.fn().mockResolvedValue([
+      { statusId: 's1', count: 5 },
+      { statusId: 's2', count: 2 },
+    ]);
+    const { app } = createTestApp('MEMBER', undefined, { getStatusSummary });
+    const res = await app.request(`/api/projects/${PROJECT_ID}/tasks/status-summary`, {}, TEST_ENV);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      data: [
+        { statusId: 's1', count: 5 },
+        { statusId: 's2', count: 2 },
+      ],
+    });
+    expect(getStatusSummary).toHaveBeenCalledWith(PROJECT_ID);
+  });
+
+  it('maps a service-level error to the error envelope', async () => {
+    const getStatusSummary = vi.fn().mockRejectedValue(new NotFoundError('Project not found'));
+    const { app } = createTestApp('MEMBER', undefined, { getStatusSummary });
+    const res = await app.request(`/api/projects/${PROJECT_ID}/tasks/status-summary`, {}, TEST_ENV);
+
+    expect(res.status).toBe(404);
+
+    const json = (await res.json()) as { error: { code: string } };
+
+    expect(json.error.code).toBe('NOT_FOUND');
   });
 });

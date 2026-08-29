@@ -10,6 +10,7 @@ import {
   ConflictError,
   AppError,
 } from './error-handler.js';
+import { requestIdMiddleware } from './request-id.js';
 
 /** Helper to extract the `error` object from a JSON response. */
 async function errorBody(res: Response) {
@@ -148,6 +149,13 @@ describe('errorHandler', () => {
     expect(err.code).toBe('TASK_VERSION_CONFLICT');
   });
 
+  it('omits requestId when the request-id middleware is not mounted', async () => {
+    const res = await app.request('/not-found');
+    const err = (await errorBody(res)) as { requestId?: string };
+
+    expect(err.requestId).toBeUndefined();
+  });
+
   it('returns custom status code and code for AppError', async () => {
     const res = await app.request('/custom');
 
@@ -209,5 +217,43 @@ describe('errorHandler', () => {
     } finally {
       consoleSpy.mockRestore();
     }
+  });
+});
+
+describe('errorHandler request-id correlation (M-10)', () => {
+  const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const REQUEST_ID = '123e4567-e89b-12d3-a456-426614174000';
+
+  function createAppWithRequestId() {
+    const app = new Hono();
+
+    app.use('*', requestIdMiddleware);
+    app.onError(errorHandler);
+    app.get('/boom', () => {
+      throw new NotFoundError('User not found');
+    });
+
+    return app;
+  }
+
+  it('includes the incoming X-Request-Id at error level and echoes the header', async () => {
+    const res = await createAppWithRequestId().request('/boom', {
+      headers: { 'X-Request-Id': REQUEST_ID },
+    });
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get('X-Request-Id')).toBe(REQUEST_ID);
+
+    const err = (await errorBody(res)) as { requestId?: string };
+
+    expect(err.requestId).toBe(REQUEST_ID);
+  });
+
+  it('generates a request id when the header is absent', async () => {
+    const res = await createAppWithRequestId().request('/boom');
+    const err = (await errorBody(res)) as { requestId?: string };
+
+    expect(err.requestId).toMatch(UUID_PATTERN);
+    expect(res.headers.get('X-Request-Id')).toBe(err.requestId);
   });
 });

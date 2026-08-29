@@ -115,16 +115,45 @@ describe('tenantContextMiddleware', () => {
   it('does not query tenants by slug when the id path matches a membership (backward compatible)', async () => {
     mockMemberFindOne.mockResolvedValue({
       userId: 'user-1',
-      tenantId: 'tenant-1',
+      tenantId: '550e8400-e29b-41d4-a716-446655440000',
       role: 'OWNER',
       status: 'ACTIVE',
     });
 
     const app = createTestApp();
-    const res = await app.request('/tenant-protected/resource', { headers: { 'X-Tenant-Id': 'tenant-1' } }, TEST_ENV);
+    const res = await app.request(
+      '/tenant-protected/resource',
+      { headers: { 'X-Tenant-Id': '550e8400-e29b-41d4-a716-446655440000' } },
+      TEST_ENV,
+    );
 
     expect(res.status).toBe(200);
     expect(mockTenantFindOne).not.toHaveBeenCalled();
+  });
+
+  it('S-14: probes the raw value and resolves the slug concurrently on the slug path', async () => {
+    mockMemberFindOne
+      .mockResolvedValueOnce(null) // raw-value probe misses
+      .mockResolvedValueOnce({ userId: 'user-1', tenantId: 'tenant-1', role: 'MEMBER', status: 'ACTIVE' });
+    mockTenantFindOne.mockResolvedValue({ id: 'tenant-1', slug: 'my-workspace' });
+
+    const app = createTestApp();
+    const res = await app.request(
+      '/tenant-protected/resource',
+      { headers: { 'X-Tenant-Id': 'my-workspace' } },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { tenantId: string };
+
+    expect(body.tenantId).toBe('tenant-1');
+    // both the raw-value membership probe and the slug lookup fired (in parallel)
+    expect(mockMemberFindOne).toHaveBeenCalledWith({ userId: 'user-1', tenantId: 'my-workspace' });
+    expect(mockTenantFindOne).toHaveBeenCalledWith({ slug: 'my-workspace' });
+    // membership is still verified against the resolved tenant id
+    expect(mockMemberFindOne).toHaveBeenCalledWith({ userId: 'user-1', tenantId: 'tenant-1' });
   });
 
   it('returns 403 when neither an id nor a slug matches', async () => {

@@ -1,11 +1,23 @@
 import type { Filter, CreateFilter, UpdateFilter } from '@task-board/shared';
 import { ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { FilterRepository } from '../repositories/filter.repository.js';
+import { assertTenantEntity } from './tenant-assert.js';
+
+/** Minimal project repository interface to verify the project's tenant (M-02) */
+export interface FilterServiceProjectRepo {
+  findById(id: string): Promise<{ tenantId: string } | null>;
+}
 
 export class FilterService {
-  constructor(private readonly filterRepo: FilterRepository) {}
+  constructor(
+    private readonly filterRepo: FilterRepository,
+    private readonly projectRepo?: FilterServiceProjectRepo,
+  ) {}
 
-  async getFiltersByUserAndProject(userId: string, projectId: string): Promise<Filter[]> {
+  async getFiltersByUserAndProject(userId: string, projectId: string, tenantId: string): Promise<Filter[]> {
+    // M-02: a project id from another tenant must resolve to 404 (not 403)
+    await assertTenantEntity(this.projectRepo, projectId, tenantId, 'Project');
+
     return this.filterRepo.findByUserAndProject(userId, projectId);
   }
 

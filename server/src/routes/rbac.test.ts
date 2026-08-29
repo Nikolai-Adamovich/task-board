@@ -201,6 +201,6 @@ describe('Project RBAC enforcement (V2-4)', () => {
     });
 
     expect(res.status).toBe(201);
-    expect(mockCollections['project_members'].findOne).not.toHaveBeenCalled();
+    expect(mockCollections['project_members']?.findOne).not.toHaveBeenCalled();
   });
 });

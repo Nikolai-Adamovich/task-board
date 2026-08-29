@@ -26,7 +26,7 @@
               placeholder="you&#64;example.com"
             />
             @if (loginForm.email().touched() && loginForm.email().errors().length) {
-              <p hlm-field-error>{{ loginForm.email().errors()[0].message | transloco }}</p>
+              <p hlm-field-error>{{ loginForm.email().errors()[0]?.message | transloco }}</p>
             }
           </hlm-field>
 
@@ -41,7 +41,7 @@
               placeholder="••••••••"
             />
             @if (loginForm.password().touched() && loginForm.password().errors().length) {
-              <p hlm-field-error>{{ loginForm.password().errors()[0].message | transloco }}</p>
+              <p hlm-field-error>{{ loginForm.password().errors()[0]?.message | transloco }}</p>
             }
           </hlm-field>
         </hlm-field-group>

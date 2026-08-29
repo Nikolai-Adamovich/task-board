@@ -54,7 +54,7 @@ describe('injectUndoToasts', () => {
 
       expect(toast.success).toHaveBeenCalledTimes(1);
 
-      const [message, options] = vi.mocked(toast.success).mock.calls[0];
+      const [message, options] = vi.mocked(toast.success).mock.calls[0] ?? [];
 
       expect(message).toBe('Deleted successfully');
       expect(options?.duration).toBe(UNDO_TOAST_DURATION_MS);
@@ -69,7 +69,7 @@ describe('injectUndoToasts', () => {
 
       notify.successWithUndo('toasts.deleted', undo);
 
-      const action = vi.mocked(toast.success).mock.calls[0][1]?.action;
+      const action = vi.mocked(toast.success).mock.calls[0]?.[1]?.action;
 
       action?.onClick?.(new MouseEvent('click'));
 
@@ -81,7 +81,7 @@ describe('injectUndoToasts', () => {
     it('should show the undoFailed fallback when the compensating operation fails', () => {
       notify.successWithUndo('toasts.deleted', () => throwError(() => new Error('')));
 
-      const action = vi.mocked(toast.success).mock.calls[0][1]?.action;
+      const action = vi.mocked(toast.success).mock.calls[0]?.[1]?.action;
 
       action?.onClick?.(new MouseEvent('click'));
 
@@ -105,7 +105,7 @@ describe('injectUndoToasts', () => {
 
       expect(toast.success).toHaveBeenCalledWith('Deleted successfully');
 
-      const options = vi.mocked(toast.success).mock.calls[0][1];
+      const options = vi.mocked(toast.success).mock.calls[0]?.[1];
 
       expect(options?.action).toBeUndefined();
     });

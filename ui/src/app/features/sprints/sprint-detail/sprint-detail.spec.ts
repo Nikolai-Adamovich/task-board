@@ -394,7 +394,7 @@ describe('SprintDetail', () => {
       component.completeSprint();
 
       for (const task of mockSprintTasks) {
-        expect(taskClientMock.update).toHaveBeenCalledWith(task.id, { sprintId: null, version: task.version });
+        expect(taskClientMock.update).toHaveBeenCalledWith(task?.id, { sprintId: null, version: task?.version });
       }
       expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'COMPLETED' });
       expect(component.showDispositionDialog()).toBe(false);
@@ -447,7 +447,7 @@ describe('SprintDetail', () => {
 
       component.removeTaskFromSprint(task);
 
-      expect(taskClientMock.update).toHaveBeenCalledWith(task.id, { sprintId: null, version: task.version });
+      expect(taskClientMock.update).toHaveBeenCalledWith(task?.id, { sprintId: null, version: task?.version });
     });
 
     it('should remove task from sprintTasks signal', () => {

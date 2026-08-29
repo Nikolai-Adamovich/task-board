@@ -133,14 +133,18 @@ describe('AuthService', () => {
       expect(userRepo.findActiveByEmail).toHaveBeenCalledWith('user@example.com');
       expect(userRepo.setPasswordReset).toHaveBeenCalledTimes(1);
 
-      const [, tokenHash] = userRepo.setPasswordReset.mock.calls[0];
+      const [, tokenHash] = userRepo.setPasswordReset.mock.calls[0] ?? [];
 
       // SHA-256 hex digest of the raw token — 64 chars, never the raw token itself
       expect(tokenHash).toMatch(/^[0-9a-f]{64}$/);
 
       expect(mailer.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
 
-      const mailParams = mailer.sendPasswordResetEmail.mock.calls[0][0];
+      const mailParams = mailer.sendPasswordResetEmail.mock.calls[0]?.[0] ?? {
+        to: '',
+        resetUrl: '',
+        expiresInMinutes: 0,
+      };
 
       expect(mailParams.to).toBe('test@example.com');
       expect(mailParams.resetUrl).toMatch(/^https:\/\/app\.example\.com\/auth\/reset-password\?token=[0-9a-f]{64}$/);
@@ -212,13 +216,13 @@ describe('AuthService', () => {
 
       expect(userRepo.findByPasswordResetToken).toHaveBeenCalledTimes(1);
 
-      const [lookupHash] = userRepo.findByPasswordResetToken.mock.calls[0];
+      const [lookupHash] = userRepo.findByPasswordResetToken.mock.calls[0] ?? [];
 
       expect(lookupHash).toMatch(/^[0-9a-f]{64}$/); // token stored/looked up as SHA-256 hash
 
       expect(userRepo.updatePasswordAndClearReset).toHaveBeenCalledTimes(1);
 
-      const [userId, passwordHash] = userRepo.updatePasswordAndClearReset.mock.calls[0];
+      const [userId, passwordHash] = userRepo.updatePasswordAndClearReset.mock.calls[0] ?? [];
 
       expect(userId).toBe('user-1');
       expect(passwordHash).not.toBe('newSecurePass123');
@@ -486,7 +490,7 @@ describe('AuthService', () => {
       // Account created: real bcrypt hash + chosen display name persisted
       expect(userRepo.setPasswordAndDisplayName).toHaveBeenCalledTimes(1);
 
-      const [, storedHash, storedName] = userRepo.setPasswordAndDisplayName.mock.calls[0];
+      const [, storedHash, storedName] = userRepo.setPasswordAndDisplayName.mock.calls[0] ?? [];
       const bcrypt = await import('bcryptjs');
 
       await expect(bcrypt.compare('securepass123', storedHash as string)).resolves.toBe(true);

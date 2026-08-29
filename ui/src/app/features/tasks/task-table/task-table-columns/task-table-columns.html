@@ -1,0 +1,104 @@
+<!-- R3-P4: column-chooser popover (toolbar instance) -->
+<hlm-popover [state]="showColumnChooser() ? 'open' : 'closed'" (stateChanged)="onChooserStateChange($event)">
+  <button
+    hlmPopoverTrigger
+    hlmBtn
+    variant="outline"
+    [hlmTooltip]="'taskTable.columns' | transloco"
+    [attr.aria-label]="'taskTable.columns' | transloco"
+  >
+    <ng-icon name="lucideColumns2" />
+  </button>
+  <hlm-popover-content *hlmPopoverPortal class="w-56" align="end">
+    <!-- Round-5 P9: shared chooser content (header + Select all + rows) -->
+    <ng-container [ngTemplateOutlet]="columnChooserContent" />
+  </hlm-popover-content>
+</hlm-popover>
+
+<!-- R3-P4: header context menu — an invisible 0×0 anchor positioned at the
+     cursor on `contextmenu`; the Helm dropdown-menu opens from it. -->
+<span #ctxAnchor class="pointer-events-none fixed z-50 block size-0" [hlmDropdownMenuTrigger]="headerContextMenu">
+</span>
+<ng-template #headerContextMenu>
+  <hlm-dropdown-menu class="w-48">
+    <hlm-dropdown-menu-group>
+      <button hlmDropdownMenuItem (triggered)="openChooserFromContextMenu()">
+        {{ 'taskTable.selectColumns' | transloco }}
+      </button>
+      <button hlmDropdownMenuItem [disabled]="!canHideContextColumn()" (triggered)="hideContextColumn()">
+        <ng-icon name="lucideEyeOff" />
+        {{ 'taskTable.hideColumn' | transloco }}
+      </button>
+    </hlm-dropdown-menu-group>
+  </hlm-dropdown-menu>
+</ng-template>
+
+<!-- Round-5 P9 (item 24): cursor-anchored column chooser — same hidden-anchor
+     pattern as the context menu. `onHeaderContextMenu` positions this trigger
+     button at the contextmenu coordinates; the context-menu "Select columns"
+     item flips `showContextColumnChooser`, opening the popover at the cursor
+     instead of at the toolbar button. -->
+<hlm-popover
+  [state]="showContextColumnChooser() ? 'open' : 'closed'"
+  (stateChanged)="onContextChooserStateChange($event)"
+>
+  <button
+    #ctxChooserAnchor
+    hlmPopoverTrigger
+    type="button"
+    tabindex="-1"
+    aria-hidden="true"
+    class="pointer-events-none fixed z-50 size-0 cursor-default border-0 bg-transparent p-0"
+  ></button>
+  <hlm-popover-content *hlmPopoverPortal class="w-56" align="start">
+    <ng-container [ngTemplateOutlet]="columnChooserContent" />
+  </hlm-popover-content>
+</hlm-popover>
+
+<!-- Round-5 P9 (item 25): shared column-chooser content, rendered by BOTH the
+     toolbar popover and the cursor-anchored popover. Dialog-style header
+     (left-aligned title + × close) and a Select-all row over the non-pinned
+     columns; pinned Key/Title stay always visible. -->
+<!-- P13b: the × header row is LAST in DOM (with `order-first` keeping it
+     visually on top) so the popover's autoFocus — first tabbable element —
+     lands on the Select-all checkbox, not the × (whose focus-tooltip used to
+     hang over the button). -->
+<ng-template #columnChooserContent>
+  <div class="flex flex-col">
+    <div class="flex items-center gap-2 rounded px-1 py-1 text-sm">
+      <hlm-checkbox
+        [checked]="allColumnsSelected()"
+        [indeterminate]="someColumnsSelected()"
+        [aria-label]="'taskTable.selectAll' | transloco"
+        (checkedChange)="toggleAll.emit($event)"
+      />
+      <span class="font-medium">{{ 'taskTable.selectAll' | transloco }}</span>
+    </div>
+    @for (col of taskColumns(); track col.columnKey) {
+      <div class="flex items-center gap-2 rounded px-1 py-1 text-sm">
+        <hlm-checkbox
+          [checked]="visibleKeys().has(col.columnKey)"
+          [disabled]="isPinnedColumn(col.columnKey)"
+          [aria-label]="col.labelKey | transloco"
+          (checkedChange)="toggleColumn.emit({ columnKey: col.columnKey, visible: $event })"
+        />
+        <span>{{ col.labelKey | transloco }}</span>
+      </div>
+    }
+  </div>
+  <div class="order-first flex items-center justify-between gap-2 px-1 pb-2">
+    <h3 class="text-base leading-none font-medium">{{ 'taskTable.selectColumns' | transloco }}</h3>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="icon-xs"
+      class="size-6"
+      data-column-chooser-close
+      [attr.aria-label]="'taskTable.close' | transloco"
+      [hlmTooltip]="'taskTable.close' | transloco"
+      (click)="closeColumnChooser()"
+    >
+      <ng-icon name="lucideX" />
+    </button>
+  </div>
+</ng-template>

@@ -4,6 +4,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideAlertTriangle, lucidePencil, lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
 import { rxResource } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import { BoardClient } from '@services/board-client';
 import { StatusClient } from '@services/status-client';
 import { AuthStore } from '@stores/auth-store';
@@ -147,25 +148,22 @@ export class BoardManager {
             ],
           };
 
-          return new Promise<void>((resolve) => {
-            this.boardClient.create(this.projectId(), boardData).subscribe({
-              next: (board) => {
-                if (this.boardsResource.hasValue()) {
-                  this.boardsResource.value.update((list) => [...list, board]);
-                } else {
-                  this.boardsResource.reload();
-                }
-                this.showCreateDialog.set(false);
-                f().reset({ name: '', type: BoardType.KANBAN });
-                this.notify.success('toasts.created');
-                resolve();
-              },
-              error: (err) => {
-                this.actionError.set(getErrorMessage(err));
-                resolve();
-              },
-            });
-          });
+          // S-16: firstValueFrom propagates errors to the catch — no
+          // resolve-only Promise wrapper around subscribe().
+          try {
+            const board = await firstValueFrom(this.boardClient.create(this.projectId(), boardData));
+
+            if (this.boardsResource.hasValue()) {
+              this.boardsResource.value.update((list) => [...list, board]);
+            } else {
+              this.boardsResource.reload();
+            }
+            this.showCreateDialog.set(false);
+            f().reset({ name: '', type: BoardType.KANBAN });
+            this.notify.success('toasts.created');
+          } catch (err) {
+            this.actionError.set(getErrorMessage(err));
+          }
         },
       },
     },
@@ -186,23 +184,18 @@ export class BoardManager {
 
           if (!board) return;
 
-          return new Promise<void>((resolve) => {
-            this.boardClient.update(board.id, { name: this.renameModel().name }).subscribe({
-              next: (updated) => {
-                if (this.boardsResource.hasValue()) {
-                  this.boardsResource.value.update((list) => list.map((b) => (b.id === updated.id ? updated : b)));
-                }
-                this.renamingBoard.set(null);
-                f().reset({ name: '', type: BoardType.KANBAN });
-                this.notify.success('toasts.updated');
-                resolve();
-              },
-              error: (err) => {
-                this.actionError.set(getErrorMessage(err));
-                resolve();
-              },
-            });
-          });
+          try {
+            const updated = await firstValueFrom(this.boardClient.update(board.id, { name: this.renameModel().name }));
+
+            if (this.boardsResource.hasValue()) {
+              this.boardsResource.value.update((list) => list.map((b) => (b.id === updated.id ? updated : b)));
+            }
+            this.renamingBoard.set(null);
+            f().reset({ name: '', type: BoardType.KANBAN });
+            this.notify.success('toasts.updated');
+          } catch (err) {
+            this.actionError.set(getErrorMessage(err));
+          }
         },
       },
     },

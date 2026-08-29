@@ -2,17 +2,21 @@ import { Hono } from 'hono';
 import { HttpMethod } from '@task-board/shared';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import type { Db } from 'mongodb';
 import type { AppEnv } from './types/context.js';
 import { connectMongo, runWithDb } from './db/mongo.js';
 import {
   migrateInvitedMembershipsToRevoked,
   renameSeedStatusNames,
-  backfillTenantSlugs,
-  ensureTenantSlugUniqueIndex,
+  ensureTenantSlugIntegrity,
   backfillMemberExpiresAt,
   ensureCoreIndexes,
 } from './db/migrations.js';
+import { redactAuthorization } from './utils/redact.js';
+import { createLogger } from './utils/logger.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { createReadyzRoutes } from './routes/readyz.js';
 import { authMiddleware } from './middleware/auth.js';
 import { tenantContextMiddleware } from './middleware/tenant-context.js';
 import { provideServices } from './middleware/services.js';
@@ -26,7 +30,19 @@ import { createUserPreferencesRoutes } from './routes/user-preferences.js';
 const app = new Hono<AppEnv>();
 
 // ── Global middleware (order matters) ──────────────────────────────────────────
-app.use('*', logger());
+// M-10: request ids come FIRST so every log line and error envelope can be
+// correlated. A well-formed incoming X-Request-Id is trusted; anything else
+// gets a fresh UUID. The id is echoed on every response as X-Request-Id.
+app.use('*', requestIdMiddleware);
+
+// M-05: redact Bearer credentials from every log line. hono/logger's argument
+// is a print function (void return), so redact then forward to console.log.
+
+app.use(
+  '*',
+  // eslint-disable-next-line no-console -- request logging intentionally uses stdout (hono/logger's default sink)
+  logger((str) => console.log(redactAuthorization(str))),
+);
 
 // CORS middleware memoized per config value: `c.env` only exists per request,
 // but ALLOWED_ORIGINS is immutable for a deployment, so we rebuild the
@@ -36,11 +52,33 @@ app.use('*', logger());
 // the authenticated API).
 let corsConfigCache: string | null = null;
 let corsMiddleware: ReturnType<typeof cors> | null = null;
+let corsWildcardWarned = false;
+const corsLog = createLogger({ scope: 'cors' });
 
 app.use('*', async (c, next) => {
   const allowedOrigins = c.env?.ALLOWED_ORIGINS ?? 'http://localhost:4200';
+  const environment = c.env?.ENVIRONMENT ?? 'development';
 
   if (!corsMiddleware || corsConfigCache !== allowedOrigins) {
+    // M-09: an explicitly configured wildcard must never reach production
+    // silently. Workers have no boot phase, so the check runs when the CORS
+    // config is first materialized for the deployment.
+    if (allowedOrigins === '*') {
+      if (environment === 'production') {
+        throw new Error(
+          'CORS misconfiguration: ALLOWED_ORIGINS="*" is not allowed in production — set an explicit origin list.',
+        );
+      }
+
+      if (!corsWildcardWarned) {
+        corsWildcardWarned = true;
+        corsLog.warn(
+          'ALLOWED_ORIGINS="*" — any origin can call the authenticated API. ' +
+            'Set an explicit origin list before deploying to production.',
+        );
+      }
+    }
+
     corsConfigCache = allowedOrigins;
     corsMiddleware = cors({
       origin: allowedOrigins === '*' ? '*' : allowedOrigins.split(',').map((o: string) => o.trim()),
@@ -59,37 +97,65 @@ app.use('*', async (c, next) => {
 // `runWithDb` makes the Db available to `getDb()` / `getCollection()`
 // via AsyncLocalStorage.
 
-// Idempotent data migrations run once per isolate on the first DB-backed
-// request (the flag is deployment-scoped, not request-scoped state).
-let migrationsRun = false;
+/**
+ * Idempotent data migrations, run once per isolate. M-04: the slug backfill
+ * and the unique slug index are a single step — splitting them left a window
+ * where a concurrent isolate could insert a duplicate slug in between.
+ */
+async function runMigrations(db: Db): Promise<void> {
+  await migrateInvitedMembershipsToRevoked(db);
+  await renameSeedStatusNames(db); // DR-1 — raw seed-status keys → display names
+  await ensureTenantSlugIntegrity(db); // DEC-032 — backfill + unique index back-to-back
+  await backfillMemberExpiresAt(db); // DEC-055 — expiresAt: null on legacy members
+  await ensureCoreIndexes(db); // create every repository-documented index (idempotent)
+}
+
+// ── Readiness probe (N-20) ────────────────────────────────────────────────────
+// Mounted BEFORE the DB middleware on purpose: readiness must not depend on
+// migrations having succeeded, and the probe verifies that a *fresh* Mongo
+// connection works (Workers kill sockets between requests). It manages its
+// own short-lived client and never touches the request-scoped Db context.
+app.route('/api', createReadyzRoutes());
+
+// M-03: migrations run once per isolate via a shared promise (deployment-scoped,
+// not request-scoped state) so concurrent cold requests coalesce onto a single
+// run instead of racing through a check-then-set flag.
+let migrationsPromise: Promise<void> | null = null;
 
 app.use('/api/*', async (c, next) => {
   const uri = c.env.MONGODB_URI;
 
-  if (uri) {
-    const { client, db } = await connectMongo(uri);
-
-    try {
-      await runWithDb(db, async () => {
-        if (!migrationsRun) {
-          await migrateInvitedMembershipsToRevoked(db);
-          await renameSeedStatusNames(db); // DR-1 — raw seed-status keys → display names
-          await backfillTenantSlugs(db); // DEC-032 — must run before the unique slug index
-          await ensureTenantSlugUniqueIndex(db);
-          await backfillMemberExpiresAt(db); // DEC-055 — expiresAt: null on legacy members
-          await ensureCoreIndexes(db); // create every repository-documented index (idempotent)
-          migrationsRun = true;
-        }
-        await next();
-      });
-    } finally {
-      client.close().catch(() => {
-        /* swallow — socket may already be dead */
-      });
-    }
-  } else {
-    await next();
+  if (!uri) {
+    // M-03: fail fast with the standard error envelope instead of letting the
+    // request proceed and fail later with confusing driver errors.
+    return c.json(
+      { error: { code: 'DB_UNAVAILABLE', message: 'Database is not configured (MONGODB_URI is empty)' } },
+      503,
+    );
   }
+
+  const { client, db } = await connectMongo(uri);
+
+  try {
+    await runWithDb(db, async () => {
+      if (!migrationsPromise) {
+        migrationsPromise = runMigrations(db).catch((error) => {
+          migrationsPromise = null; // allow a later cold request to retry
+          throw error;
+        });
+      }
+      await migrationsPromise;
+      await next();
+    });
+  } finally {
+    client.close().catch(() => {
+      /* swallow — socket may already be dead */
+    });
+  }
+
+  // noImplicitReturns: the early DB_UNAVAILABLE path returns a Response; this
+  // path falls through to the router, so it ends with an explicit bare return.
+  return;
 });
 
 // Error handler

@@ -12,10 +12,16 @@ export interface AppEnv {
     MONGODB_URI: string;
     JWT_SECRET: string;
     ALLOWED_ORIGINS?: string;
+    /** Deployment environment — 'production' enables strict boot-time checks (M-09) */
+    ENVIRONMENT?: string;
+    /** Minimum log level for the structured logger (S-19): debug | info | warn | error */
+    LOG_LEVEL?: string;
     RESEND_API_KEY?: string;
     FRONTEND_URL?: string;
   };
   Variables: {
+    /** Correlation id for this request (set by requestIdMiddleware, M-10) */
+    requestId: string;
     /** Authenticated user's ID (from JWT `sub` claim) */
     userId: string;
     /** Full authenticated user object */

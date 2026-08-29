@@ -160,7 +160,7 @@ describe('ProjectDangerZone', () => {
     it('should surface an error when delete fails', async () => {
       setup();
       vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-      projectClientMock.delete.mockReturnValueOnce(throwError(() => new Error('boom')));
+      projectClientMock.delete?.mockReturnValueOnce(throwError(() => new Error('boom')));
 
       component.requestDeleteProject();
       component.deleteConfirmText.set('TP');

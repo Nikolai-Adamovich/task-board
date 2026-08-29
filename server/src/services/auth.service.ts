@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { sign } from 'hono/jwt';
-import { MemberStatus, InvitationStatus } from '@task-board/shared';
+import { MemberStatus, InvitationStatus, JWT_TTL_SECONDS, PASSWORD_RESET_TTL_MINUTES } from '@task-board/shared';
 import type {
   User,
   AuthResponse,
@@ -32,11 +32,6 @@ export interface JwtPayload {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const BCRYPT_SALT_ROUNDS = 10;
-const TOKEN_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
-
-/** Password-reset token TTL (1 hour) */
-export const PASSWORD_RESET_TTL_MINUTES = 60;
-
 /** Forgot-password rate limit: max requests per email+IP within the window */
 const FORGOT_PASSWORD_MAX_REQUESTS = 5;
 const FORGOT_PASSWORD_WINDOW_MS = 15 * 60 * 1000;
@@ -382,7 +377,7 @@ export class AuthService {
       tenantId,
       tenantRole,
       iat: now,
-      exp: now + TOKEN_EXPIRY_SECONDS,
+      exp: now + JWT_TTL_SECONDS,
     };
 
     return sign(payload, this.jwtSecret, 'HS256');

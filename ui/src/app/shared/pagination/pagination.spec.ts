@@ -39,26 +39,26 @@ describe('Pagination', () => {
     const { items } = setup();
 
     expect(items.length).toBe(7); // Previous + 5 pages + Next
-    expect(items[0].querySelector('ng-icon')).toBeTruthy(); // chevron-only edge buttons
-    expect(items[0].classList.contains('pointer-events-none')).toBe(true);
-    expect(items[0].classList.contains('opacity-50')).toBe(true);
-    expect(items[items.length - 1].classList.contains('pointer-events-none')).toBe(false);
-    expect(items[items.length - 1].classList.contains('opacity-50')).toBe(false);
+    expect(items[0]?.querySelector('ng-icon')).toBeTruthy(); // chevron-only edge buttons
+    expect(items[0]?.classList.contains('pointer-events-none')).toBe(true);
+    expect(items[0]?.classList.contains('opacity-50')).toBe(true);
+    expect(items[items.length - 1]?.classList.contains('pointer-events-none')).toBe(false);
+    expect(items[items.length - 1]?.classList.contains('opacity-50')).toBe(false);
   });
 
   it('disables Next on the last page while Previous stays enabled', () => {
     const { items } = setup({ page: 5 });
 
-    expect(items[0].classList.contains('pointer-events-none')).toBe(false);
-    expect(items[items.length - 1].classList.contains('pointer-events-none')).toBe(true);
-    expect(items[items.length - 1].classList.contains('opacity-50')).toBe(true);
+    expect(items[0]?.classList.contains('pointer-events-none')).toBe(false);
+    expect(items[items.length - 1]?.classList.contains('pointer-events-none')).toBe(true);
+    expect(items[items.length - 1]?.classList.contains('opacity-50')).toBe(true);
   });
 
   it('enables both edges on a middle page', () => {
     const { items } = setup({ page: 3 });
 
-    expect(items[0].classList.contains('pointer-events-none')).toBe(false);
-    expect(items[items.length - 1].classList.contains('pointer-events-none')).toBe(false);
+    expect(items[0]?.classList.contains('pointer-events-none')).toBe(false);
+    expect(items[items.length - 1]?.classList.contains('pointer-events-none')).toBe(false);
   });
 
   it('does not emit pageChange when clicking a disabled edge, and emits when clicking an enabled one', () => {
@@ -75,7 +75,7 @@ describe('Pagination', () => {
     const { items } = setup({ showEdges: false });
 
     expect(items.length).toBe(5); // page numbers only
-    expect(items[0].querySelector('ng-icon')).toBeNull();
-    expect(items[items.length - 1].querySelector('ng-icon')).toBeNull();
+    expect(items[0]?.querySelector('ng-icon')).toBeNull();
+    expect(items[items.length - 1]?.querySelector('ng-icon')).toBeNull();
   });
 });

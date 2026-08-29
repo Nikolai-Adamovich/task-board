@@ -80,7 +80,7 @@ describe('TaskTypeService', () => {
       const result = await service.getTaskTypesByProject('project-1');
 
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Task');
+      expect(result[0]?.name).toBe('Task');
     });
   });
 

@@ -163,7 +163,12 @@ export class TaskTypeManager implements OnInit {
     const idx = sorted.findIndex((t) => t.id === taskType.id);
 
     if (idx <= 0) return;
-    this.swapPositions(taskType, sorted[idx - 1]);
+
+    const target = sorted[idx - 1];
+
+    if (!target) return;
+
+    this.swapPositions(taskType, target);
   }
 
   protected moveDown(taskType: TaskType): void {
@@ -171,7 +176,12 @@ export class TaskTypeManager implements OnInit {
     const idx = sorted.findIndex((t) => t.id === taskType.id);
 
     if (idx < 0 || idx >= sorted.length - 1) return;
-    this.swapPositions(taskType, sorted[idx + 1]);
+
+    const target = sorted[idx + 1];
+
+    if (!target) return;
+
+    this.swapPositions(taskType, target);
   }
 
   private swapPositions(a: TaskType, b: TaskType): void {

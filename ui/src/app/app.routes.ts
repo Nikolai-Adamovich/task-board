@@ -16,7 +16,7 @@ import { pendingChangesGuard } from '@app/shared/pending-changes/pending-changes
  * `/t` alone redirects to `/w`, which falls through to the `**` fallback (root).
  */
 export const legacyTenantRedirectRoute: Route = {
-  matcher: (segments) => (segments.length > 0 && segments[0].path === 't' ? { consumed: segments } : null),
+  matcher: (segments) => (segments.length > 0 && segments[0]?.path === 't' ? { consumed: segments } : null),
   redirectTo: (redirectData) => {
     const router = inject(Router);
     const rest = redirectData.url.slice(1).map((segment) => segment.path);

@@ -236,8 +236,8 @@ describe('TaskTypeManager', () => {
       component.moveUp(mockTaskTypes[1]);
       expect(taskTypeClientMock.reorder).toHaveBeenCalledTimes(1);
       expect(taskTypeClientMock.reorder).toHaveBeenCalledWith('p1', [
-        { id: mockTaskTypes[1].id, position: mockTaskTypes[0].position },
-        { id: mockTaskTypes[0].id, position: mockTaskTypes[1].position },
+        { id: mockTaskTypes[1]?.id, position: mockTaskTypes[0]?.position },
+        { id: mockTaskTypes[0]?.id, position: mockTaskTypes[1]?.position },
       ]);
     });
 

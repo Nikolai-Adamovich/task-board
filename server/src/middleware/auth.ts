@@ -1,18 +1,23 @@
 import { createMiddleware } from 'hono/factory';
 import { verify } from 'hono/jwt';
+import type { JWTPayload } from 'hono/utils/jwt/types';
 import { UnauthorizedError } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';
 
 // ─── JWT Verification (hono/jwt — Workers compatible) ────────────────────────
 
-/** Claims carried by the access token (see AuthService#generateToken) */
-interface JwtPayload {
+/**
+ * Claims carried by the access token (see AuthService#generateToken), derived
+ * from hono's `JWTPayload` with the required claims narrowed to `string`.
+ * `verify()` returns the wide `JWTPayload`, so `authMiddleware` validates the
+ * required claims at runtime before using the payload.
+ */
+type JwtPayload = JWTPayload & {
   sub: string;
   email: string;
   displayName?: string;
   avatarUrl?: string | null;
-  exp?: number;
-}
+};
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
 
@@ -50,7 +55,13 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 
   try {
     // hono/jwt verifies the algorithm, the signature and `exp` in one call
-    payload = (await verify(token, jwtSecret, 'HS256')) as unknown as JwtPayload;
+    const verified = await verify(token, jwtSecret, 'HS256');
+
+    if (typeof verified.sub !== 'string' || typeof verified.email !== 'string') {
+      throw new Error('Token is missing required claims');
+    }
+
+    payload = verified as JwtPayload;
   } catch {
     throw new UnauthorizedError('Invalid or expired token');
   }

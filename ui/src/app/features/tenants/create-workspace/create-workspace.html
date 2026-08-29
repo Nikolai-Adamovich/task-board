@@ -56,7 +56,7 @@
                 placeholder="My Workspace"
               />
               @if (workspaceForm.name().touched() && workspaceForm.name().errors().length) {
-                <p hlm-field-error>{{ workspaceForm.name().errors()[0].message | transloco }}</p>
+                <p hlm-field-error>{{ workspaceForm.name().errors()[0]?.message | transloco }}</p>
               }
             </hlm-field>
             <hlm-field>
@@ -73,7 +73,7 @@
                 />
               </div>
               @if (workspaceForm.slug().touched() && workspaceForm.slug().errors().length) {
-                <p hlm-field-error>{{ workspaceForm.slug().errors()[0].message | transloco }}</p>
+                <p hlm-field-error>{{ workspaceForm.slug().errors()[0]?.message | transloco }}</p>
               } @else if (slugAvailability() === 'checking') {
                 <p class="text-xs text-muted-foreground">{{ 'createWorkspace.slug.checking' | transloco }}</p>
               } @else if (slugAvailability() === 'taken') {

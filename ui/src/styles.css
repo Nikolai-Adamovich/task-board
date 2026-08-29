@@ -69,3 +69,18 @@ table.table-density-compact td,
 table.table-density-compact th {
   padding: 0.15rem;
 }
+
+/* N-19: honor prefers-reduced-motion — collapse all animations and transitions
+   globally (Tailwind v4 does not apply this automatically). Near-zero durations
+   keep `animationend`/`transitionend` listeners firing so Spartan Helm dialogs,
+   dropdowns and toasts still settle into their final state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

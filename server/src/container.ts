@@ -140,8 +140,10 @@ export function buildServices(env: ContainerEnv): Services {
     ),
     audit: auditService,
     boards: new BoardService(boardRepo, statusRepo, projectRepo, auditService, projectMemberRepo),
-    comments: new CommentService(commentRepo, userRepo, taskRepo, projectMemberRepo),
-    filters: new FilterService(filterRepo),
+    // M-06: auditService + projectRepo let comment actions audit-log with the
+    // tenant/project context and tenant-assert bare task ids (M-02).
+    comments: new CommentService(commentRepo, userRepo, taskRepo, projectMemberRepo, auditService, projectRepo),
+    filters: new FilterService(filterRepo, projectRepo),
     labels: new LabelService(labelRepo, taskRepo, projectRepo, auditService, projectMemberRepo),
     preferences: new UserPreferencesService(
       new UserPreferencesRepository(getCollection<UserPreferencesDocument>('user_preferences')),

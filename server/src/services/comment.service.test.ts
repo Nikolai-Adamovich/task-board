@@ -55,6 +55,7 @@ describe('CommentService (DEC-020 ownership/moderation)', () => {
   let userRepo: ReturnType<typeof createMockUserRepo>;
   let taskRepo: CommentServiceTaskRepo;
   let projectMemberRepo: CommentServiceProjectMemberRepo;
+  let projectRepo: { findById: ReturnType<typeof vi.fn> };
   let auditService: AuditService;
   let service: CommentService;
 
@@ -63,8 +64,70 @@ describe('CommentService (DEC-020 ownership/moderation)', () => {
     userRepo = createMockUserRepo();
     taskRepo = createMockTaskRepo();
     projectMemberRepo = createMockProjectMemberRepo();
+    projectRepo = { findById: vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-1' }) };
     auditService = { log: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
-    service = new CommentService(commentRepo, userRepo as never, taskRepo, projectMemberRepo, auditService);
+    service = new CommentService(
+      commentRepo,
+      userRepo as never,
+      taskRepo,
+      projectMemberRepo,
+      auditService,
+      projectRepo as never,
+    );
+  });
+
+  describe('getCommentsByTask (M-02)', () => {
+    it('returns comments for a task within the caller tenant', async () => {
+      commentRepo.findByTask = vi.fn().mockResolvedValue([makeComment()]);
+
+      const result = await service.getCommentsByTask('task-1', 'tenant-1');
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('throws NOT_FOUND when the task does not exist', async () => {
+      taskRepo.findById = vi.fn().mockResolvedValue(null);
+
+      await expect(service.getCommentsByTask('missing', 'tenant-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('throws NOT_FOUND (not 403) when the task belongs to another tenant (M-02)', async () => {
+      projectRepo.findById = vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-OTHER' });
+
+      await expect(service.getCommentsByTask('task-1', 'tenant-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
+      expect(commentRepo.findByTask).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolveTask / resolveTaskForComment (M-06)', () => {
+    it('resolves a task by id for the create-route audit context', async () => {
+      const task = await service.resolveTask('task-1');
+
+      expect(task).toEqual({ id: 'task-1', projectId: 'project-1' });
+    });
+
+    it('resolves the owning task of a comment for update/delete audit contexts', async () => {
+      commentRepo.findById = vi.fn().mockResolvedValue(makeComment());
+
+      const task = await service.resolveTaskForComment('comment-1');
+
+      expect(task).toEqual({ id: 'task-1', projectId: 'project-1' });
+    });
+
+    it('throws NOT_FOUND when the comment does not exist', async () => {
+      commentRepo.findById = vi.fn().mockResolvedValue(null);
+
+      await expect(service.resolveTaskForComment('missing')).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
+    });
   });
 
   describe('updateComment', () => {

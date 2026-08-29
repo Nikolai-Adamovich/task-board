@@ -30,6 +30,8 @@ interface ProjectMemberDocument {
  * service layer after resolving the owning project (see task/status/sprint services).
  */
 const PROJECT_PATH_PATTERN = /^\/api\/projects\/([^/]+)(?:\/|$)/;
+/** Matches a canonical tenant id (UUID) — anything else is treated as a slug. */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ─── Tenant Context Middleware ────────────────────────────────────────────────
 
@@ -68,14 +70,28 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
   // First try the raw value as a tenant id (backward compatible); if no
   // membership matches, treat the value as a slug and resolve the tenant id.
   const tenantMembers = getCollection<TenantMemberDocument>('tenant_members');
-  let membership = await tenantMembers.findOne({ userId, tenantId: tenantRef });
+  let membership: TenantMemberDocument | null;
 
-  if (!membership) {
+  if (UUID_PATTERN.test(tenantRef)) {
+    // Id path — a UUID can never be a slug, so a single lookup suffices.
+    membership = await tenantMembers.findOne({ userId, tenantId: tenantRef });
+  } else {
+    // S-14 slug path: probe the raw value as an id (backward compatible with
+    // legacy non-UUID ids) and resolve the slug CONCURRENTLY — one parallel
+    // round-trip instead of two sequential ones. The membership query for the
+    // resolved tenant id is inherently dependent and stays sequential.
     const tenants = getCollection<{ id: string; slug: string }>('tenants');
-    const tenant = await tenants.findOne({ slug: tenantRef });
+    const [byRef, tenant] = await Promise.all([
+      tenantMembers.findOne({ userId, tenantId: tenantRef }),
+      tenants.findOne({ slug: tenantRef }),
+    ]);
 
-    if (tenant) {
+    if (byRef) {
+      membership = byRef;
+    } else if (tenant) {
       membership = await tenantMembers.findOne({ userId, tenantId: tenant.id });
+    } else {
+      membership = null;
     }
   }
 

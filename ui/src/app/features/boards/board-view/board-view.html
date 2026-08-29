@@ -140,18 +140,18 @@
         <div class="flex min-w-70 flex-1 flex-col rounded-lg border border-border bg-muted/30">
           <!-- Q9 (RQ-04 ⑥): WIP count next to the column title — reflects the
                active assignee/priority filters because it derives from
-               `filteredTasks` via `getTasksForColumn`. -->
+               `filteredTasks` via `tasksByColumnId` (S-08: computed map). -->
           <div class="border-b border-border px-3 py-2">
             <h3 class="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <span class="truncate">{{ getColumnName(column) }}</span>
+              <span class="truncate">{{ columnNames().get(column.id) }}</span>
               <span class="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                {{ getTasksForColumn(column).length }}
+                {{ tasksByColumnId().get(column.id)?.length ?? 0 }}
               </span>
             </h3>
           </div>
           <div
             cdkDropList
-            [cdkDropListData]="getTasksForColumn(column)"
+            [cdkDropListData]="tasksByColumnId().get(column.id) ?? []"
             [id]="getColumnDropId(column)"
             [cdkDropListConnectedTo]="b.columns.map((c) => getColumnDropId(c))"
             (cdkDropListDropped)="onTaskDrop($event, column)"
@@ -160,7 +160,7 @@
             <!-- Empty columns have no placeholder: the cdkDropList itself is the
                  drop target (it keeps flex-1 height), so drops into an empty
                  column still work and the preview lands at the top (index 0). -->
-            @for (task of getTasksForColumn(column); track task.id) {
+            @for (task of tasksByColumnId().get(column.id) ?? []; track task.id) {
               <div cdkDrag [cdkDragData]="task">
                 <ui-task-card [task]="task" [projectKey]="projectKey()" (click)="goToTask(task)" />
               </div>

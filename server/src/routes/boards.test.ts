@@ -164,7 +164,7 @@ describe('GET /api/projects/:projectId/boards', () => {
 
     expect(body).toHaveProperty('data');
     expect(Array.isArray(body.data)).toBe(true);
-    expect((body.data as { name: string }[])[0].name).toBe('Main Board');
+    expect((body.data as { name: string }[])[0]?.name).toBe('Main Board');
   });
 });
 

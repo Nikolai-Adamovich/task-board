@@ -5,6 +5,7 @@ import { TaskTypeClient } from '@services/task-type-client';
 import { SprintClient } from '@services/sprint-client';
 import { LabelClient } from '@services/label-client';
 import { ProjectClient } from '@services/project-client';
+import { ProjectStore } from '@stores/project-store';
 
 /** Reference-data kinds every project view needs for id⇄name resolution */
 export type RefKind = 'statuses' | 'types' | 'sprints' | 'labels' | 'members';
@@ -40,6 +41,8 @@ export class ProjectRefStore {
   private readonly sprintClient = inject(SprintClient);
   private readonly labelClient = inject(LabelClient);
   private readonly projectClient = inject(ProjectClient);
+  /** M-12: members of the active project come from the ProjectStore cache */
+  private readonly projectStore = inject(ProjectStore);
   /** key `${projectId}:${kind}` → option list */
   private readonly state = signal<Record<string, SelectOption[]>>({});
   /** keys currently being fetched (dedupe guard) */
@@ -126,10 +129,22 @@ export class ProjectRefStore {
           items.map((l) => ({ id: l.id, name: l.name })),
         );
 
-      case 'members':
+      case 'members': {
+        // M-12: for the active project, derive options from the ProjectStore
+        // members cache instead of re-fetching the same list. Other project
+        // ids (not held by the store) still go through the client.
+        const activeProjectId = this.projectStore.activeProject()?.id;
+
+        if (activeProjectId === projectId) {
+          return Promise.resolve(
+            this.projectStore.members().map((m) => ({ id: m.userId, name: m.displayName ?? m.userId })),
+          );
+        }
+
         return firstValueFrom(this.projectClient.listMembers(projectId)).then((items) =>
           items.map((m) => ({ id: m.userId, name: m.displayName ?? m.userId })),
         );
+      }
     }
   }
 }

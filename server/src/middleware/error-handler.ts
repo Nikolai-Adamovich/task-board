@@ -31,9 +31,17 @@ import { AppError } from '../errors/app-error.js';
  * - `HTTPException` (Hono built-in) → mapped to its status
  * - Unknown errors → 500 INTERNAL_ERROR (no stack leak)
  *
+ * M-10: when the request-id middleware is mounted, the correlation id is
+ * included as `error.requestId` — at error level, NOT top-level, so the top
+ * level stays reserved for the `{ data }` success envelope. Omitted when no
+ * request id is on the context (e.g. apps that don't mount the middleware).
+ *
  * Use with `app.onError(errorHandler)` in the Hono app bootstrap.
  */
 export const errorHandler: ErrorHandler = (err, c) => {
+  const requestId = c.get('requestId') as string | undefined;
+  const withRequestId = requestId === undefined ? {} : { requestId };
+
   // ── Known application errors ──────────────────────────────────────────────
   if (err instanceof AppError) {
     return c.json(
@@ -42,6 +50,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
           code: err.code,
           message: err.message,
           ...(err.details !== undefined ? { details: err.details } : {}),
+          ...withRequestId,
         },
       },
       err.statusCode as 400,
@@ -62,6 +71,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
           code: 'VALIDATION_ERROR',
           message: 'Request validation failed',
           details,
+          ...withRequestId,
         },
       },
       400,
@@ -77,6 +87,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
         error: {
           code: 'VALIDATION_ERROR',
           message: 'Invalid JSON in request body',
+          ...withRequestId,
         },
       },
       400,
@@ -90,6 +101,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
         error: {
           code: 'HTTP_ERROR',
           message: err.message,
+          ...withRequestId,
         },
       },
       err.status as 400,
@@ -104,6 +116,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
       error: {
         code: 'INTERNAL_ERROR',
         message: 'An unexpected error occurred',
+        ...withRequestId,
       },
     },
     500,

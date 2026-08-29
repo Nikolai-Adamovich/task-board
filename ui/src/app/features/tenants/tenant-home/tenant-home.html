@@ -189,14 +189,14 @@
         <label hlmFieldLabel for="project-name">{{ 'projects.name' | transloco }}</label>
         <input hlmInput id="project-name" type="text" [formField]="newProjectForm.name" placeholder="Project name" />
         @if (newProjectForm.name().touched() && newProjectForm.name().errors().length) {
-          <p hlm-field-error>{{ newProjectForm.name().errors()[0].message | transloco }}</p>
+          <p hlm-field-error>{{ newProjectForm.name().errors()[0]?.message | transloco }}</p>
         }
       </hlm-field>
       <hlm-field>
         <label hlmFieldLabel for="project-key">{{ 'projects.key' | transloco }}</label>
         <input hlmInput id="project-key" type="text" [formField]="newProjectForm.key" placeholder="PROJ" />
         @if (newProjectForm.key().touched() && newProjectForm.key().errors().length) {
-          <p hlm-field-error>{{ newProjectForm.key().errors()[0].message | transloco }}</p>
+          <p hlm-field-error>{{ newProjectForm.key().errors()[0]?.message | transloco }}</p>
         }
       </hlm-field>
       <hlm-field>

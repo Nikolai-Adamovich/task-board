@@ -69,6 +69,44 @@ describe('EmailService', () => {
       expect(html).toContain('My Workspace');
       expect(html).toContain('member');
     });
+
+    it('HTML-escapes interpolated values (N-13)', async () => {
+      await service.sendInvitationEmail({
+        to: 'user@example.com',
+        inviterName: '<script>alert("x")</script>',
+        tenantName: 'Acme & Co <b>',
+        role: 'member"><img src=x onerror=alert(1)>',
+        token: 'tok',
+      });
+
+      const html = mockSend.mock.calls[0]?.[0]?.html as string;
+
+      // Raw markup must not survive into the HTML body
+      expect(html).not.toContain('<script>');
+      expect(html).not.toContain('<b>');
+      expect(html).not.toContain('<img');
+      // Escaped forms are present instead (entities built via concatenation so
+      // this source file never contains a raw HTML entity)
+      expect(html).toContain('&' + 'lt;script' + '&' + 'gt;');
+      expect(html).toContain('Acme &' + 'amp; Co &' + 'lt;b' + '&' + 'gt;');
+      expect(html).toContain('&' + 'quot;');
+    });
+
+    it('escapes the tenant name in the subject as plain text (no HTML context)', async () => {
+      await service.sendInvitationEmail({
+        to: 'user@example.com',
+        inviterName: 'Jane',
+        tenantName: 'A<B>',
+        role: 'member',
+        token: 'tok',
+      });
+
+      const call = mockSend.mock.calls[0]?.[0] as { subject: string; html: string };
+
+      // Subject is plain text — raw value is fine there; the HTML body must be escaped
+      expect(call.subject).toBe("You're invited to join A<B>");
+      expect(call.html).not.toContain('<B>');
+    });
   });
 
   describe('sendPasswordResetEmail', () => {
@@ -125,7 +163,7 @@ describe('ConsoleEmailService', () => {
   });
 
   describe('sendInvitationEmail', () => {
-    it('logs the invitation details', async () => {
+    it('logs the invitation details as a single structured line', async () => {
       await service.sendInvitationEmail({
         to: 'user@example.com',
         inviterName: 'John',
@@ -134,47 +172,44 @@ describe('ConsoleEmailService', () => {
         token: 'tok-123',
       });
 
-      // ConsoleEmailService logs 4 times: to, tenant, role, accept URL
-      expect(consoleSpy).toHaveBeenCalledTimes(4);
+      // S-19: one single-line JSON entry per email
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
 
-      const invitationLog = consoleSpy.mock.calls[0]?.[0] as string;
-      const tenantLog = consoleSpy.mock.calls[1]?.[0] as string;
-      const roleLog = consoleSpy.mock.calls[2]?.[0] as string;
-      const urlLog = consoleSpy.mock.calls[3]?.[0] as string;
+      const entry = JSON.parse(consoleSpy.mock.calls[0]?.[0] as string) as Record<string, unknown>;
 
-      expect(invitationLog).toContain('user@example.com');
-      expect(tenantLog).toContain('Acme');
-      expect(roleLog).toContain('member');
+      expect(entry.level).toBe('info');
+      expect(entry.scope).toBe('email');
+      expect(entry.to).toBe('user@example.com');
+      expect(entry.tenantName).toBe('Acme');
+      expect(entry.role).toBe('member');
       // token is masked in logs — raw tokens must never leak via the console stub
-      expect(urlLog).toContain('accept-invitation?token=<redacted>');
-      expect(urlLog).not.toContain('tok-123');
+      expect(entry.acceptUrl).toContain('accept-invitation?token=<redacted>');
+      expect(JSON.stringify(entry)).not.toContain('tok-123');
     });
   });
 
   describe('sendPasswordResetEmail', () => {
-    it('logs the reset details without leaking the token separately', async () => {
+    it('logs the reset details as a single structured line without leaking the token', async () => {
       await service.sendPasswordResetEmail({
         to: 'user@example.com',
         resetUrl: 'http://localhost:4200/auth/reset-password?token=tok-123',
         expiresInMinutes: 60,
       });
 
-      expect(consoleSpy).toHaveBeenCalledTimes(3);
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
 
-      const toLog = consoleSpy.mock.calls[0]?.[0] as string;
-      const urlLog = consoleSpy.mock.calls[1]?.[0] as string;
-      const expiryLog = consoleSpy.mock.calls[2]?.[0] as string;
+      const entry = JSON.parse(consoleSpy.mock.calls[0]?.[0] as string) as Record<string, unknown>;
 
-      expect(toLog).toContain('user@example.com');
+      expect(entry.to).toBe('user@example.com');
       // token is masked in logs — raw tokens must never leak via the console stub
-      expect(urlLog).toContain('/auth/reset-password?token=<redacted>');
-      expect(urlLog).not.toContain('tok-123');
-      expect(expiryLog).toContain('60 minutes');
+      expect(entry.resetUrl).toContain('/auth/reset-password?token=<redacted>');
+      expect(entry.expiresInMinutes).toBe(60);
+      expect(JSON.stringify(entry)).not.toContain('tok-123');
     });
   });
 
   describe('sendEmail', () => {
-    it('logs the email details', async () => {
+    it('logs the email details as a single structured line', async () => {
       await service.sendEmail({
         to: 'test@example.com',
         subject: 'Test',
@@ -182,8 +217,11 @@ describe('ConsoleEmailService', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledTimes(1);
-      expect(consoleSpy.mock.calls[0]?.[0]).toContain('test@example.com');
-      expect(consoleSpy.mock.calls[0]?.[0]).toContain('Test');
+
+      const entry = JSON.parse(consoleSpy.mock.calls[0]?.[0] as string) as Record<string, unknown>;
+
+      expect(entry.to).toBe('test@example.com');
+      expect(entry.subject).toBe('Test');
     });
   });
 });

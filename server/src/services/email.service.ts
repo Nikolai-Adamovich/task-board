@@ -1,4 +1,6 @@
 import { Resend } from 'resend';
+import { createLogger } from '../utils/logger.js';
+import { escapeHtml } from '../utils/escape-html.js';
 
 export interface EmailOptions {
   to: string;
@@ -21,8 +23,8 @@ export class EmailService {
     const html = `
       <h2>Password reset request</h2>
       <p>We received a request to reset your password.</p>
-      <p><a href="${params.resetUrl}">Reset your password</a></p>
-      <p>This link is valid for ${params.expiresInMinutes} minutes and can only be used once. If you didn't request a password reset, you can safely ignore this email.</p>
+      <p><a href="${escapeHtml(params.resetUrl)}">Reset your password</a></p>
+      <p>This link is valid for ${escapeHtml(String(params.expiresInMinutes))} minutes and can only be used once. If you didn't request a password reset, you can safely ignore this email.</p>
     `;
 
     await this.resend.emails.send({
@@ -42,9 +44,9 @@ export class EmailService {
   }): Promise<void> {
     const acceptUrl = `${this.frontendUrl}/auth/accept-invitation?token=${params.token}`;
     const html = `
-      <h2>You've been invited to ${params.tenantName}</h2>
-      <p>${params.inviterName} has invited you to join <strong>${params.tenantName}</strong> as a <strong>${params.role}</strong>.</p>
-      <p><a href="${acceptUrl}">Accept Invitation</a></p>
+      <h2>You've been invited to ${escapeHtml(params.tenantName)}</h2>
+      <p>${escapeHtml(params.inviterName)} has invited you to join <strong>${escapeHtml(params.tenantName)}</strong> as a <strong>${escapeHtml(params.role)}</strong>.</p>
+      <p><a href="${escapeHtml(acceptUrl)}">Accept Invitation</a></p>
       <p>If you don't have an account yet, you'll be able to create one when accepting the invitation.</p>
     `;
 
@@ -66,7 +68,6 @@ export class EmailService {
   }
 }
 
-/* eslint-disable no-console -- ConsoleEmailService is a dev/test stub that intentionally logs instead of sending emails */
 /** Mask the `token` query parameter of a URL before logging it — if the
  * console mailer ever runs in production (missing RESEND_API_KEY), raw
  * invitation/reset tokens must not leak into logs. */
@@ -74,14 +75,18 @@ function maskTokenInUrl(url: string): string {
   return url.replace(/(token=)[^&]+/, '$1<redacted>');
 }
 
+const log = createLogger({ scope: 'email' });
+
 export class ConsoleEmailService implements Pick<
   EmailService,
   'sendEmail' | 'sendInvitationEmail' | 'sendPasswordResetEmail'
 > {
   async sendPasswordResetEmail(params: { to: string; resetUrl: string; expiresInMinutes: number }): Promise<void> {
-    console.log(`[EMAIL] Password reset to ${params.to}`);
-    console.log(`  Reset URL: ${maskTokenInUrl(params.resetUrl)} (token masked — dev stub does not deliver email)`);
-    console.log(`  Expires in: ${params.expiresInMinutes} minutes`);
+    log.info('Password reset email (dev stub — not delivered)', {
+      to: params.to,
+      resetUrl: maskTokenInUrl(params.resetUrl),
+      expiresInMinutes: params.expiresInMinutes,
+    });
   }
 
   async sendInvitationEmail(params: {
@@ -93,14 +98,15 @@ export class ConsoleEmailService implements Pick<
   }): Promise<void> {
     const acceptUrl = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/auth/accept-invitation?token=${params.token}`;
 
-    console.log(`[EMAIL] Invitation to ${params.to}`);
-    console.log(`  Tenant: ${params.tenantName}`);
-    console.log(`  Role: ${params.role}`);
-    console.log(`  Accept URL: ${maskTokenInUrl(acceptUrl)} (token masked — dev stub does not deliver email)`);
+    log.info('Invitation email (dev stub — not delivered)', {
+      to: params.to,
+      tenantName: params.tenantName,
+      role: params.role,
+      acceptUrl: maskTokenInUrl(acceptUrl),
+    });
   }
 
   async sendEmail(options: EmailOptions): Promise<void> {
-    console.log(`[EMAIL] To: ${options.to}, Subject: ${options.subject}`);
+    log.info('Email (dev stub — not delivered)', { to: options.to, subject: options.subject });
   }
 }
-/* eslint-enable no-console */

@@ -6,7 +6,7 @@ describe('ThemeLoader', () => {
   const lastLink = (): HTMLLinkElement => {
     const links = document.head.querySelectorAll<HTMLLinkElement>('link[data-theme]');
 
-    return links[links.length - 1];
+    return links[links.length - 1] as HTMLLinkElement;
   };
 
   beforeEach(() => {
@@ -44,7 +44,7 @@ describe('ThemeLoader', () => {
     const remaining = document.head.querySelectorAll<HTMLLinkElement>('link[data-theme]');
 
     expect(remaining.length).toBe(1);
-    expect(remaining[0].dataset['theme']).toBe('nord');
+    expect(remaining[0]?.dataset['theme']).toBe('nord');
   });
 
   it('rejects when the stylesheet fails to load', async () => {

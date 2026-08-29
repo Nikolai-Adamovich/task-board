@@ -108,7 +108,7 @@ describe('BoardRepository', () => {
       expect(result.name).toBe('New Board');
       expect(result.type).toBe('KANBAN');
       expect(result.columns).toHaveLength(2);
-      expect(result.columns[0].id).toBe('col-1');
+      expect(result.columns[0]?.id).toBe('col-1');
     });
   });
 

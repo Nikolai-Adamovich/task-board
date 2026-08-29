@@ -143,10 +143,10 @@ export function useAutoRowMeasurement(): {
     if (sortedHeights.length === 0) return 0;
 
     const mid = Math.floor(sortedHeights.length / 2);
+    const midHeight = sortedHeights[mid] ?? 0;
+    const prevHeight = sortedHeights[mid - 1] ?? 0;
 
-    return sortedHeights.length % 2 === 1
-      ? sortedHeights[mid]
-      : Math.round((sortedHeights[mid - 1] + sortedHeights[mid]) / 2);
+    return sortedHeights.length % 2 === 1 ? midHeight : Math.round((prevHeight + midHeight) / 2);
   }
 
   destroyRef.onDestroy(() => observer?.disconnect());

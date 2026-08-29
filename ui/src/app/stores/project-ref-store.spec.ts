@@ -12,11 +12,13 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { ProjectRefStore } from './project-ref-store';
+import { ProjectStore } from './project-store';
 import { StatusClient } from '@services/status-client';
 import { TaskTypeClient } from '@services/task-type-client';
 import { SprintClient } from '@services/sprint-client';
 import { LabelClient } from '@services/label-client';
 import { ProjectClient } from '@services/project-client';
+import type { Project, ProjectMember } from '@task-board/shared';
 
 describe('ProjectRefStore', () => {
   let statusList: ReturnType<typeof vi.fn>;
@@ -134,6 +136,37 @@ describe('ProjectRefStore', () => {
       await flush();
 
       expect(store.options('p1', 'members')).toEqual([{ id: 'u1', name: 'u1' }]);
+    });
+
+    it('M-12: derives members from the ProjectStore cache for the active project', async () => {
+      const projectStore = TestBed.inject(ProjectStore);
+
+      projectStore.activeProject.set({ id: 'p-active' } as Project);
+      projectStore.members.set([{ userId: 'u1', displayName: 'Alice' } as ProjectMember]);
+
+      const store = createStore();
+
+      store.ensure('p-active', ['members']);
+      await flush();
+
+      expect(store.options('p-active', 'members')).toEqual([{ id: 'u1', name: 'Alice' }]);
+      expect(listMembers).not.toHaveBeenCalled();
+    });
+
+    it('M-12: still fetches members via the client for a non-active project', async () => {
+      const projectStore = TestBed.inject(ProjectStore);
+
+      projectStore.activeProject.set({ id: 'p-active' } as Project);
+      projectStore.members.set([{ userId: 'u1', displayName: 'Alice' } as ProjectMember]);
+      listMembers.mockReturnValue(of([{ userId: 'u9', displayName: 'Zoe' }]));
+
+      const store = createStore();
+
+      store.ensure('p-other', ['members']);
+      await flush();
+
+      expect(listMembers).toHaveBeenCalledWith('p-other');
+      expect(store.options('p-other', 'members')).toEqual([{ id: 'u9', name: 'Zoe' }]);
     });
 
     it('does not refetch already-cached kinds', async () => {

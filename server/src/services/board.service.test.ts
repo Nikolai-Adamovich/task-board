@@ -20,6 +20,7 @@ function createMockBoardRepo() {
 function createMockStatusRepo() {
   return {
     findById: vi.fn(),
+    findByIds: vi.fn(),
     findByProject: vi.fn(),
     findByProjectAndNormalizedName: vi.fn(),
     create: vi.fn(),
@@ -61,12 +62,14 @@ function makeStatus(overrides: Partial<Status> = {}): Status {
 describe('BoardService', () => {
   let boardRepo: ReturnType<typeof createMockBoardRepo>;
   let statusRepo: ReturnType<typeof createMockStatusRepo>;
+  let projectRepo: { findById: ReturnType<typeof vi.fn> };
   let service: BoardService;
 
   beforeEach(() => {
     boardRepo = createMockBoardRepo();
     statusRepo = createMockStatusRepo();
-    service = new BoardService(boardRepo, statusRepo);
+    projectRepo = { findById: vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-1' }) };
+    service = new BoardService(boardRepo, statusRepo, projectRepo as never);
   });
 
   describe('getBoardsByProject', () => {
@@ -83,7 +86,7 @@ describe('BoardService', () => {
     it('returns the board when found', async () => {
       boardRepo.findById = vi.fn().mockResolvedValue(makeBoard());
 
-      const result = await service.getBoard('board-1');
+      const result = await service.getBoard('board-1', 'tenant-1');
 
       expect(result.name).toBe('Main Board');
     });
@@ -91,13 +94,23 @@ describe('BoardService', () => {
     it('throws NOT_FOUND when board does not exist', async () => {
       boardRepo.findById = vi.fn().mockResolvedValue(null);
 
-      await expect(service.getBoard('missing')).rejects.toThrow('Board not found');
+      await expect(service.getBoard('missing', 'tenant-1')).rejects.toThrow('Board not found');
+    });
+
+    it('throws NOT_FOUND (not 403) when the board belongs to another tenant (M-02)', async () => {
+      boardRepo.findById = vi.fn().mockResolvedValue(makeBoard());
+      projectRepo.findById = vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-OTHER' });
+
+      await expect(service.getBoard('board-1', 'tenant-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
     });
   });
 
   describe('createBoard', () => {
     it('creates a board with UUID columns after validating statuses', async () => {
-      statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
+      statusRepo.findByIds = vi.fn().mockResolvedValue([makeStatus()]);
       boardRepo.create = vi
         .fn()
         .mockImplementation((_projectId, input) =>
@@ -125,7 +138,7 @@ describe('BoardService', () => {
     });
 
     it('throws NOT_FOUND when a status does not belong to the project', async () => {
-      statusRepo.findById = vi.fn().mockResolvedValue(null);
+      statusRepo.findByIds = vi.fn().mockResolvedValue([]);
 
       await expect(
         service.createBoard('project-1', {
@@ -135,15 +148,34 @@ describe('BoardService', () => {
         }),
       ).rejects.toThrow('not found in project');
     });
+
+    it('M-14: validates all status ids with ONE batched findByIds call', async () => {
+      statusRepo.findByIds = vi.fn().mockResolvedValue([makeStatus(), makeStatus({ id: 'status-2' })]);
+      boardRepo.create = vi.fn().mockResolvedValue(makeBoard());
+
+      await service.createBoard('project-1', {
+        name: 'New Board',
+        type: 'KANBAN',
+        columns: [
+          { statusIds: ['status-1'], position: 0 },
+          { statusIds: ['status-2', 'status-1'], position: 1 },
+        ],
+      });
+
+      // one batched lookup for the deduped id set — not one findById per status
+      expect(statusRepo.findByIds).toHaveBeenCalledTimes(1);
+      expect(statusRepo.findByIds).toHaveBeenCalledWith(['status-1', 'status-2']);
+      expect(statusRepo.findById).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateBoard', () => {
     it('updates name and columns', async () => {
       boardRepo.findById = vi.fn().mockResolvedValue(makeBoard());
-      statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
+      statusRepo.findByIds = vi.fn().mockResolvedValue([makeStatus()]);
       boardRepo.update = vi.fn().mockResolvedValue(makeBoard({ name: 'Updated' }));
 
-      const result = await service.updateBoard('board-1', {
+      const result = await service.updateBoard('board-1', 'tenant-1', {
         name: 'Updated',
         columns: [{ statusIds: ['status-1'], position: 0 }],
       });
@@ -154,7 +186,7 @@ describe('BoardService', () => {
     it('throws NOT_FOUND when board does not exist', async () => {
       boardRepo.findById = vi.fn().mockResolvedValue(null);
 
-      await expect(service.updateBoard('missing', { name: 'X' })).rejects.toThrow('Board not found');
+      await expect(service.updateBoard('missing', 'tenant-1', { name: 'X' })).rejects.toThrow('Board not found');
     });
   });
 
@@ -182,7 +214,7 @@ describe('BoardService', () => {
 
     beforeEach(() => {
       projectMemberRepo = { findByUserAndProject: vi.fn().mockResolvedValue(null) };
-      service = new BoardService(boardRepo, statusRepo, undefined, undefined, projectMemberRepo);
+      service = new BoardService(boardRepo, statusRepo, projectRepo as never, undefined, projectMemberRepo);
     });
 
     it('denies createBoard for a VIEWER', async () => {
@@ -203,14 +235,14 @@ describe('BoardService', () => {
       boardRepo.findById = vi.fn().mockResolvedValue(makeBoard());
       projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'EDITOR' });
 
-      await expect(service.updateBoard('board-1', { name: 'X' }, 'user-1', 'EDITOR')).rejects.toThrow(
+      await expect(service.updateBoard('board-1', 'tenant-1', { name: 'X' }, 'user-1', 'EDITOR')).rejects.toThrow(
         "Insufficient permissions. Requires 'manage_boards'.",
       );
       expect(boardRepo.update).not.toHaveBeenCalled();
     });
 
     it('allows createBoard for a PROJECT_ADMIN', async () => {
-      statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
+      statusRepo.findByIds = vi.fn().mockResolvedValue([makeStatus()]);
       boardRepo.create = vi.fn().mockResolvedValue(makeBoard({ name: 'New Board' }));
       projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'PROJECT_ADMIN' });
 

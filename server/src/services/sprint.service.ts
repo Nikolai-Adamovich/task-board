@@ -1,6 +1,7 @@
 import { ProjectStatus, SprintStatus } from '@task-board/shared';
 import type { Sprint, CreateSprint, UpdateSprint } from '@task-board/shared';
 import { AppError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
+import { assertTenantEntity } from './tenant-assert.js';
 import { SprintRepository } from '../repositories/sprint.repository.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
 import { ensurePermission } from './rbac.service.js';
@@ -57,12 +58,16 @@ export class SprintService {
     return this.sprintRepo.findByProject(projectId);
   }
 
-  async getSprint(id: string): Promise<Sprint> {
+  async getSprint(id: string, tenantId: string): Promise<Sprint> {
     const sprint = await this.sprintRepo.findById(id);
 
     if (!sprint) {
       throw new NotFoundError('Sprint not found');
     }
+
+    // M-02: a bare sprint id must never cross tenant boundaries (404, not 403)
+    await assertTenantEntity(this.projectRepo, sprint.projectId, tenantId, 'Sprint');
+
     return sprint;
   }
 

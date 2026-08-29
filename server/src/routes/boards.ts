@@ -42,7 +42,8 @@ export function createBoardRoutes(): Hono<AppEnv> {
    */
   router.get('/boards/:boardId', async (c) => {
     const boardId = c.req.param('boardId');
-    const board = await c.get('svc').boards.getBoard(boardId);
+    // M-02: bare board ids are tenant-asserted inside the service
+    const board = await c.get('svc').boards.getBoard(boardId, c.get('tenantId'));
 
     return c.json({ data: board });
   });
@@ -55,9 +56,10 @@ export function createBoardRoutes(): Hono<AppEnv> {
   router.patch('/boards/:boardId', validateBody(UpdateBoardSchema), async (c) => {
     const boardId = c.req.param('boardId');
     const userId = c.get('userId');
+    const tenantId = c.get('tenantId');
     const tenantRole = c.get('tenantRole');
     const body = c.req.valid('json');
-    const board = await c.get('svc').boards.updateBoard(boardId, body, userId, tenantRole);
+    const board = await c.get('svc').boards.updateBoard(boardId, tenantId, body, userId, tenantRole);
 
     return c.json({ data: board });
   });

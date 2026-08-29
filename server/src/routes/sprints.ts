@@ -44,7 +44,8 @@ export function createSprintRoutes(): Hono<AppEnv> {
    */
   router.get('/sprints/:sprintId', async (c) => {
     const sprintId = c.req.param('sprintId');
-    const sprint = await c.get('svc').sprints.getSprint(sprintId);
+    // M-02: bare sprint ids are tenant-asserted inside the service
+    const sprint = await c.get('svc').sprints.getSprint(sprintId, c.get('tenantId'));
 
     return c.json({ data: sprint });
   });

@@ -134,8 +134,8 @@ describe('StatusRepository', () => {
 
       expect(collection.insertMany).toHaveBeenCalledTimes(1);
       expect(result).toHaveLength(2);
-      expect(result[0].normalizedName).toBe('todo');
-      expect(result[1].normalizedName).toBe('done');
+      expect(result[0]?.normalizedName).toBe('todo');
+      expect(result[1]?.normalizedName).toBe('done');
     });
 
     it('does not call insertMany for empty array', async () => {

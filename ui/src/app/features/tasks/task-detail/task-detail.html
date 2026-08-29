@@ -44,6 +44,7 @@
           </button>
         </div>
       } @else if (canEdit()) {
+        <!-- N-10: keyboard-operable — Enter and Space both activate -->
         <div
           class="group relative mt-1 w-fit max-w-full cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-muted/50"
           role="button"
@@ -51,6 +52,7 @@
           [attr.aria-label]="'taskDetail.editTitle' | transloco"
           (click)="startTitleEdit()"
           (keydown.enter)="startTitleEdit()"
+          (keydown.space)="$event.preventDefault(); startTitleEdit()"
         >
           <h2 class="break-words pr-5 text-lg font-bold text-foreground line-clamp-2">{{ t.title }}</h2>
           <ng-icon
@@ -101,6 +103,7 @@
               </div>
             } @else if (canEdit()) {
               <!-- Read view with hover pencil affordance (Editor+ only) -->
+              <!-- N-10: keyboard-operable — Enter and Space both activate -->
               <div
                 class="group -m-2 cursor-pointer rounded-md border border-transparent p-2 transition-colors hover:border-border hover:bg-muted/40"
                 role="button"
@@ -108,6 +111,7 @@
                 [attr.aria-label]="'taskDetail.editDescription' | transloco"
                 (click)="startDescriptionEdit()"
                 (keydown.enter)="startDescriptionEdit()"
+                (keydown.space)="$event.preventDefault(); startDescriptionEdit()"
               >
                 <h3 class="flex items-center gap-2 text-sm font-medium text-foreground">
                   {{ 'taskDetail.description' | transloco }}

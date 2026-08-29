@@ -35,11 +35,13 @@ function makeFilter(overrides: Partial<Filter> = {}): Filter {
 
 describe('FilterService', () => {
   let filterRepo: ReturnType<typeof createMockFilterRepo>;
+  let projectRepo: { findById: ReturnType<typeof vi.fn> };
   let service: FilterService;
 
   beforeEach(() => {
     filterRepo = createMockFilterRepo();
-    service = new FilterService(filterRepo);
+    projectRepo = { findById: vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-1' }) };
+    service = new FilterService(filterRepo, projectRepo as never);
   });
 
   describe('getFiltersByUserAndProject', () => {
@@ -48,10 +50,20 @@ describe('FilterService', () => {
 
       filterRepo.findByUserAndProject = vi.fn().mockResolvedValue(filters);
 
-      const result = await service.getFiltersByUserAndProject('user-1', 'project-1');
+      const result = await service.getFiltersByUserAndProject('user-1', 'project-1', 'tenant-1');
 
       expect(result).toHaveLength(2);
       expect(filterRepo.findByUserAndProject).toHaveBeenCalledWith('user-1', 'project-1');
+    });
+
+    it('throws NOT_FOUND (not 403) when the project belongs to another tenant (M-02)', async () => {
+      projectRepo.findById = vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-OTHER' });
+
+      await expect(service.getFiltersByUserAndProject('user-1', 'project-1', 'tenant-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
+      expect(filterRepo.findByUserAndProject).not.toHaveBeenCalled();
     });
   });
 

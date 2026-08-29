@@ -169,7 +169,7 @@ describe('useAutoRowMeasurement', () => {
 
     rectHeight(wrapper, 900);
     rectHeight(row, 40);
-    ro.trigger({ height: 900 });
+    ro?.trigger({ height: 900 });
 
     expect(measurement.availableRowsHeight()).toBe(844); // 900 − 56
     expect(measurement.measuredRowHeight()).toBe(41); // 40px rect + 1px border pitch
@@ -181,9 +181,9 @@ describe('useAutoRowMeasurement', () => {
     const ro = MockResizeObserver.instances[0];
 
     // The observer also tracks the row element; its tick carries the ROW's rect
-    expect(ro.observed).toContain(row);
+    expect(ro?.observed).toContain(row);
 
-    ro.trigger({ target: row, height: 44 });
+    ro?.trigger({ target: row, height: 44 });
 
     // Wrapper height is re-read directly — unchanged at 800
     expect(measurement.availableRowsHeight()).toBe(744);

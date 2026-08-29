@@ -10,7 +10,13 @@ import type {
   BulkUpdateTaskFailure,
 } from '@task-board/shared';
 import { AppError, ConflictError, NotFoundError } from '../errors/app-error.js';
-import { TaskRepository, type TaskQueryOptions, type PaginatedResult } from '../repositories/task.repository.js';
+import { assertTenantEntity } from './tenant-assert.js';
+import {
+  TaskRepository,
+  type TaskQueryOptions,
+  type PaginatedResult,
+  type TaskUpdatePayload,
+} from '../repositories/task.repository.js';
 import { CounterService } from './counter.service.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
 import { ProjectMemberRepository } from '../repositories/project-member.repository.js';
@@ -26,6 +32,8 @@ export interface TaskServiceUserRepo {
 
 export interface TaskServiceSprintRepo {
   findById(id: string): Promise<{ id: string; projectId: string } | null>;
+  /** M-14: batched lookup used by validateCrossProjectRefs */
+  findByIds(ids: string[]): Promise<{ id: string; projectId: string }[]>;
 }
 
 export interface TaskServiceCommentRepo {
@@ -59,22 +67,41 @@ export class TaskService {
     return this.taskRepo.findByProject(projectId, options);
   }
 
+  /**
+   * S-05: per-status task counts for the project overview — a single
+   * `$match` + `$group` aggregation instead of one count per status.
+   */
+  async getStatusSummary(projectId: string): Promise<{ statusId: string; count: number }[]> {
+    return this.taskRepo.countByStatusGrouped(projectId);
+  }
+
   /** Tasks assigned to the user across all tenants ("My Tasks"). */
   async getMyTasks(userId: string, limit = 50): Promise<Task[]> {
     return this.taskRepo.findAssignedTo(userId, limit);
   }
 
-  async getTask(id: string): Promise<Task> {
+  async getTask(id: string, tenantId: string): Promise<Task> {
     const task = await this.taskRepo.findById(id);
 
     if (!task) {
       throw new NotFoundError('Task not found');
     }
+
+    // M-02: resolve the owning project's tenant — a bare task id must never
+    // cross tenant boundaries (404, not 403, to avoid existence leaks).
+    await assertTenantEntity(this.projectRepo, task.projectId, tenantId, 'Task');
+
     return task;
   }
 
-  async getTaskByKey(projectKey: string, number: number): Promise<Task> {
-    const project = await this.projectRepo.findByKey(projectKey);
+  /**
+   * S-04: tenant-scoped KEY-NUMBER lookup. The project key is only unique
+   * within a tenant, so the project MUST be resolved through
+   * `findByTenantAndKey` — a global key lookup let callers read tasks of
+   * another tenant that happened to use the same project key.
+   */
+  async getTaskByKey(tenantId: string, projectKey: string, number: number): Promise<Task> {
+    const project = await this.projectRepo.findByTenantAndKey(tenantId, projectKey);
 
     if (!project) {
       throw new NotFoundError('Project not found');
@@ -330,7 +357,7 @@ export class TaskService {
     }
 
     // Build the shared update payload once (single-field contract is enforced by Zod)
-    const update: Record<string, unknown> = {};
+    const update: TaskUpdatePayload = {};
 
     if (data.statusId !== undefined) update.statusId = data.statusId;
     if (data.sprintId !== undefined) update.sprintId = data.sprintId;
@@ -363,7 +390,7 @@ export class TaskService {
     let updated = 0;
 
     for (const task of valid) {
-      const result = await this.taskRepo.updateWithVersion(task.id, task.version, update as never);
+      const result = await this.taskRepo.updateWithVersion(task.id, task.version, update);
 
       if (!result) {
         failed.push({ taskId: task.id, reason: 'VERSION_CONFLICT' });
@@ -413,6 +440,11 @@ export class TaskService {
 
   /**
    * Validate that all referenced entities belong to the same project.
+   *
+   * M-14: each reference kind is resolved with ONE batched `findByIds` query
+   * and the three lookups run concurrently — the previous implementation
+   * awaited a sequential `findById` per ref (up to 4 round-trips per
+   * create/update). `projectId` ownership is validated in code afterwards.
    */
   private async validateCrossProjectRefs(
     projectId: string,
@@ -424,8 +456,14 @@ export class TaskService {
       labelIds?: string[];
     },
   ): Promise<void> {
+    const [taskTypes, statuses, sprints] = await Promise.all([
+      refs.typeId ? this.taskTypeRepo.findByIds([refs.typeId]) : Promise.resolve([]),
+      refs.statusId ? this.statusRepo.findByIds([refs.statusId]) : Promise.resolve([]),
+      refs.sprintId ? this.sprintRepo.findByIds([refs.sprintId]) : Promise.resolve([]),
+    ]);
+
     if (refs.typeId) {
-      const taskType = await this.taskTypeRepo.findById(refs.typeId);
+      const taskType = taskTypes.find((t) => t.id === refs.typeId);
 
       if (!taskType || taskType.projectId !== projectId) {
         throw new NotFoundError(`Task type ${refs.typeId} not found in project ${projectId}`);
@@ -433,7 +471,7 @@ export class TaskService {
     }
 
     if (refs.statusId) {
-      const status = await this.statusRepo.findById(refs.statusId);
+      const status = statuses.find((s) => s.id === refs.statusId);
 
       if (!status || status.projectId !== projectId) {
         throw new NotFoundError(`Status ${refs.statusId} not found in project ${projectId}`);
@@ -441,7 +479,7 @@ export class TaskService {
     }
 
     if (refs.sprintId) {
-      const sprint = await this.sprintRepo.findById(refs.sprintId);
+      const sprint = sprints.find((s) => s.id === refs.sprintId);
 
       if (!sprint || sprint.projectId !== projectId) {
         throw new NotFoundError(`Sprint ${refs.sprintId} not found in project ${projectId}`);

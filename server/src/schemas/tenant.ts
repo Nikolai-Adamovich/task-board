@@ -3,6 +3,7 @@ import {
   TenantRoleValues,
   MemberStatusValues,
   TenantStatusValues,
+  InvitationStatusValues,
   TENANT_SLUG_MAX_LENGTH,
   TENANT_SLUG_PATTERN,
 } from '@task-board/shared';
@@ -112,6 +113,47 @@ export const UpdateMemberSchema = z.object({
   name: nonEmptyString(200, 'Member name').optional(),
   /** Updates the underlying USER record's email (uniqueness enforced in the service) */
   email: email().optional(),
+});
+
+/**
+ * Invitation embedded in a TenantMember (mirrors `shared/src/types/tenant.ts` `Invitation`).
+ */
+export const InvitationSchema = z.object({
+  status: z.enum(InvitationStatusValues),
+  tokenHash: z.string(),
+  invitedBy: z.string(),
+  invitedOn: isoDateTime(),
+});
+
+/**
+ * Pending invitation for the authenticated user, enriched with the tenant name
+ * (GET /invitations/my). Single source of truth for the shared `MyInvitation`
+ * type — parity is enforced by a compile-time equality test in
+ * `schemas/tenant.test.ts` (shared/ is runtime-library-free, so the Zod schema
+ * lives server-side and the shared interface mirrors it).
+ *
+ * This is a read-boundary mapping schema, not a request validator: id fields are
+ * plain strings (exactly like the shared type) and only the enum fields that the
+ * former `as` casts papered over are validated. `tenantName` deliberately allows
+ * `''` (the service falls back to it when the tenant lookup misses).
+ */
+export const MyInvitationSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  userId: z.string(),
+  role: z.enum(TenantRoleValues),
+  status: z.enum(MemberStatusValues),
+  /** DEC-055: membership expiration (null = never expires) */
+  expiresAt: nullableIsoDateTime(),
+  invitation: InvitationSchema.nullable(),
+  /** Resolved user display name (null if user deleted/not found) */
+  displayName: z.string().nullable(),
+  /** Resolved user email (null if user deleted/not found) */
+  email: z.string().nullable(),
+  /** Display name of the tenant the invitation belongs to */
+  tenantName: z.string(),
+  createdAt: isoDateTime(),
+  updatedAt: isoDateTime(),
 });
 
 /**

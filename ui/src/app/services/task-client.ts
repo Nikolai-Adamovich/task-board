@@ -65,6 +65,15 @@ export class TaskClient {
     return this.http.get<PaginatedResponse<Task>>(`${this.baseUrl}/projects/${projectId}/tasks`, { params });
   }
 
+  /** S-05: per-status task counts for the project overview (one aggregation) */
+  statusSummary(projectId: string): Observable<{ statusId: string; count: number }[]> {
+    return this.http
+      .get<{ data: { statusId: string; count: number }[] }>(
+        `${this.baseUrl}/projects/${projectId}/tasks/status-summary`,
+      )
+      .pipe(map((res) => res.data));
+  }
+
   /** Get a single task by ID */
   getById(id: string): Observable<Task> {
     return this.http.get<{ data: Task }>(`${this.baseUrl}/tasks/${id}`).pipe(map((res) => res.data));

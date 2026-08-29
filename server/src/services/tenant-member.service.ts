@@ -1,7 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { MemberStatus, TenantRole, TenantStatus, InvitationStatus } from '@task-board/shared';
+import { MemberStatus, TenantRole, TenantStatus, InvitationStatus, INVITATION_TTL_MS } from '@task-board/shared';
 import type { Tenant, TenantMember, MyInvitation } from '@task-board/shared';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
+import { MyInvitationSchema } from '../schemas/tenant.js';
 import { TenantRepository } from '../repositories/tenant.repository.js';
 import { TenantMemberRepository } from '../repositories/tenant-member.repository.js';
 import { UserRepository } from '../repositories/user.repository.js';
@@ -12,9 +13,6 @@ import type { EmailService } from './email.service.js';
 type EmailSender = Pick<EmailService, 'sendInvitationEmail'>;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-/** Invitation TTL (7 days) */
-const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -281,7 +279,7 @@ export class TenantMemberService {
 
   // ─── Invitation Lifecycle ──────────────────────────────────────────────────
 
-  async acceptInvitation(memberId: string): Promise<void> {
+  async acceptInvitation(memberId: string, userId: string): Promise<void> {
     const member = await this.tenantMemberRepo.findById(memberId);
 
     if (!member) {
@@ -290,6 +288,11 @@ export class TenantMemberService {
 
     if (!member.invitation || member.invitation.status !== InvitationStatus.PENDING) {
       throw new NotFoundError('Invitation is no longer pending');
+    }
+
+    // M-01 (IDOR guard, mirrors declineInvitation): only the invitee may accept
+    if (member.userId !== userId) {
+      throw new ForbiddenError('You can only accept your own invitations');
     }
 
     // Check TTL expiration — membership stays ACCESS_REVOKED (DEC-018); only the invitation flips to EXPIRED
@@ -483,31 +486,32 @@ export class TenantMemberService {
       const user = doc.userId ? (userById.get(doc.userId) ?? null) : null;
       const tenant = tenantById.get(doc.tenantId);
 
-      enriched.push({
-        tenantName: tenant?.name ?? '',
-        id: doc.id,
-        tenantId: doc.tenantId,
-        userId: doc.userId,
-        role: doc.role as TenantMember['role'],
-        status: doc.status as TenantMember['status'],
-        expiresAt: doc.expiresAt ? doc.expiresAt.toISOString() : null,
-        invitation: doc.invitation
-          ? {
-              status: doc.invitation.status as TenantMember['invitation'] extends infer I
-                ? I extends { status: infer S }
-                  ? S
-                  : never
-                : never,
-              tokenHash: doc.invitation.tokenHash,
-              invitedBy: doc.invitation.invitedBy,
-              invitedOn: doc.invitation.invitedOn.toISOString(),
-            }
-          : null,
-        displayName: user?.displayName ?? null,
-        email: user?.email ?? null,
-        createdAt: doc.createdAt.toISOString(),
-        updatedAt: doc.updatedAt.toISOString(),
-      });
+      // MyInvitationSchema is the single source of truth (N-03): parsing the
+      // raw document both validates the enum fields coming out of MongoDB and
+      // yields the schema-inferred domain type — no casts needed.
+      enriched.push(
+        MyInvitationSchema.parse({
+          tenantName: tenant?.name ?? '',
+          id: doc.id,
+          tenantId: doc.tenantId,
+          userId: doc.userId,
+          role: doc.role,
+          status: doc.status,
+          expiresAt: doc.expiresAt ? doc.expiresAt.toISOString() : null,
+          invitation: doc.invitation
+            ? {
+                status: doc.invitation.status,
+                tokenHash: doc.invitation.tokenHash,
+                invitedBy: doc.invitation.invitedBy,
+                invitedOn: doc.invitation.invitedOn.toISOString(),
+              }
+            : null,
+          displayName: user?.displayName ?? null,
+          email: user?.email ?? null,
+          createdAt: doc.createdAt.toISOString(),
+          updatedAt: doc.updatedAt.toISOString(),
+        }),
+      );
     }
     return enriched;
   }

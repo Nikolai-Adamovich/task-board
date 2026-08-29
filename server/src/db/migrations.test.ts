@@ -7,6 +7,7 @@ import {
   renameSeedStatusNames,
   backfillTenantSlugs,
   ensureTenantSlugUniqueIndex,
+  ensureTenantSlugIntegrity,
   backfillMemberExpiresAt,
 } from './migrations.js';
 
@@ -90,6 +91,30 @@ describe('ensureTenantSlugUniqueIndex (DEC-032)', () => {
     await ensureTenantSlugUniqueIndex(db);
 
     expect(createIndex).toHaveBeenCalledWith({ slug: 1 }, { unique: true });
+  });
+});
+
+describe('ensureTenantSlugIntegrity (M-04)', () => {
+  it('runs the backfill and the unique index creation back-to-back, in that order', async () => {
+    const updateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
+    const createIndex = vi.fn().mockResolvedValue('slug_1');
+    const db = {
+      collection: vi.fn().mockReturnValue({
+        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([{ _id: 'oid-1', name: 'My Workspace' }]) }),
+        findOne: vi.fn().mockResolvedValue(null),
+        updateOne,
+        createIndex,
+      }),
+    } as never;
+
+    await ensureTenantSlugIntegrity(db);
+
+    expect(updateOne).toHaveBeenCalled();
+    expect(createIndex).toHaveBeenCalledWith({ slug: 1 }, { unique: true });
+    // the index must be created only after the backfill completed
+    expect(updateOne.mock.invocationCallOrder[0] ?? Number.NaN).toBeLessThan(
+      createIndex.mock.invocationCallOrder[0] ?? Number.NaN,
+    );
   });
 });
 

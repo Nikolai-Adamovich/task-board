@@ -93,6 +93,17 @@ export class TransactionsUnsupportedError extends Error {
 }
 
 /**
+ * Minimal view of the driver-internal topology surface used by
+ * {@link topologySupportsTransactions}. `client.topology` is not part of the
+ * public `MongoClient` type in driver 7.x, so the introspection shape is
+ * declared explicitly here; every field is optional and the check degrades to
+ * `true` (see below) if the driver removes or reshapes it.
+ */
+interface TopologyIntrospection {
+  topology?: { description?: { type?: string } };
+}
+
+/**
  * Best-effort topology check using the driver's public-ish surface.
  *
  * Transactions require a replica set (`ReplicaSetWithPrimary` /
@@ -103,8 +114,7 @@ export class TransactionsUnsupportedError extends Error {
  * instead of blocking a potentially capable deployment.
  */
 function topologySupportsTransactions(client: MongoClient): boolean {
-  const topologyType = (client as unknown as { topology?: { description?: { type?: string } } }).topology?.description
-    ?.type;
+  const topologyType = (client as TopologyIntrospection).topology?.description?.type;
 
   if (!topologyType) {
     return true;

@@ -26,8 +26,9 @@ export class ProjectStore {
       const project = await firstValueFrom(this.projectClient.getById(projectId));
 
       this.activeProject.set(project);
-      // Load members to resolve role (if available)
-      this.loadMembers(project.id);
+      // Load members to resolve role (if available) — awaited so consumers
+      // (e.g. projectGuard) can resolve the user's project role synchronously.
+      await this.loadMembers(project.id);
       return project;
     } finally {
       this.loading.set(false);
@@ -41,8 +42,9 @@ export class ProjectStore {
       const project = await firstValueFrom(this.projectClient.getByKey(tenantId, key));
 
       this.activeProject.set(project);
-      // Load members to resolve role (if available)
-      this.loadMembers(project.id);
+      // Load members to resolve role (if available) — awaited so consumers
+      // (e.g. projectGuard) can resolve the user's project role synchronously.
+      await this.loadMembers(project.id);
       return project;
     } finally {
       this.loading.set(false);

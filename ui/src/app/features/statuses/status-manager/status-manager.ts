@@ -149,6 +149,8 @@ export class StatusManager implements OnInit {
 
     const target = sorted[idx - 1];
 
+    if (!target) return;
+
     this.swapPositions(status, target);
   }
 
@@ -159,6 +161,8 @@ export class StatusManager implements OnInit {
     if (idx < 0 || idx >= sorted.length - 1) return;
 
     const target = sorted[idx + 1];
+
+    if (!target) return;
 
     this.swapPositions(status, target);
   }

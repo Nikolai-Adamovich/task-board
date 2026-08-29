@@ -92,7 +92,7 @@
             placeholder="user@example.com"
           />
           @if (inviteForm.email().touched() && inviteForm.email().errors().length) {
-            <p hlm-field-error>{{ inviteForm.email().errors()[0].message | transloco }}</p>
+            <p hlm-field-error>{{ inviteForm.email().errors()[0]?.message | transloco }}</p>
           }
         </hlm-field>
         <hlm-field>
@@ -103,7 +103,7 @@
             }
           </hlm-native-select>
           @if (inviteForm.role().touched() && inviteForm.role().errors().length) {
-            <p hlm-field-error>{{ inviteForm.role().errors()[0].message | transloco }}</p>
+            <p hlm-field-error>{{ inviteForm.role().errors()[0]?.message | transloco }}</p>
           }
         </hlm-field>
       </form>

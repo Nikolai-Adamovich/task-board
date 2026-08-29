@@ -165,7 +165,7 @@ describe('GET /api/projects/:projectId/statuses', () => {
 
     expect(body).toHaveProperty('data');
     expect(Array.isArray(body.data)).toBe(true);
-    expect((body.data as { name: string }[])[0].name).toBe('TODO');
+    expect((body.data as { name: string }[])[0]?.name).toBe('TODO');
   });
 });
 

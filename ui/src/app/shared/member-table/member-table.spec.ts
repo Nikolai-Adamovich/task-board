@@ -160,8 +160,8 @@ describe('MemberTable', () => {
 
     const bodyRows = Array.from(el.querySelectorAll('tbody tr'));
 
-    expect(bodyRows[0].querySelector('ng-icon[name="lucideTrash2"]')).toBeNull();
-    expect(bodyRows[1].querySelector('ng-icon[name="lucideTrash2"]')).not.toBeNull();
+    expect(bodyRows[0]?.querySelector('ng-icon[name="lucideTrash2"]')).toBeNull();
+    expect(bodyRows[1]?.querySelector('ng-icon[name="lucideTrash2"]')).not.toBeNull();
   });
 
   // ── Edit flow ──────────────────────────────────────────────────
@@ -211,7 +211,7 @@ describe('MemberTable', () => {
     component.confirmMemberChange();
 
     expect(emitted).toHaveLength(1);
-    expect(emitted[0].expiresAt).toBe(new Date(2030, 0, 1, 23, 59, 59, 999).toISOString());
+    expect(emitted[0]?.expiresAt).toBe(new Date(2030, 0, 1, 23, 59, 59, 999).toISOString());
   });
 
   it('should render the Expiration column only in the tenant variant', () => {
@@ -276,7 +276,7 @@ describe('MemberTable', () => {
   });
 
   it('should not render tenant lifecycle actions in the project variant', () => {
-    create('project', [{ ...rows[1], status: 'ACCESS_REVOKED' }]);
+    create('project', [{ ...(rows[1] as MemberRow), status: 'ACCESS_REVOKED' }]);
 
     expect(actionButton('lucideRotateCcw')).toBeNull();
     expect(actionButton('lucideRefreshCw')).toBeNull();

@@ -26,7 +26,7 @@
               placeholder="John Doe"
             />
             @if (registerForm.displayName().touched() && registerForm.displayName().errors().length) {
-              <p hlm-field-error>{{ registerForm.displayName().errors()[0].message | transloco }}</p>
+              <p hlm-field-error>{{ registerForm.displayName().errors()[0]?.message | transloco }}</p>
             }
           </hlm-field>
 
@@ -41,7 +41,7 @@
               placeholder="you&#64;example.com"
             />
             @if (registerForm.email().touched() && registerForm.email().errors().length) {
-              <p hlm-field-error>{{ registerForm.email().errors()[0].message | transloco }}</p>
+              <p hlm-field-error>{{ registerForm.email().errors()[0]?.message | transloco }}</p>
             }
           </hlm-field>
 
@@ -56,7 +56,7 @@
               placeholder="••••••••"
             />
             @if (registerForm.password().touched() && registerForm.password().errors().length) {
-              <p hlm-field-error>{{ registerForm.password().errors()[0].message | transloco }}</p>
+              <p hlm-field-error>{{ registerForm.password().errors()[0]?.message | transloco }}</p>
             }
           </hlm-field>
 
@@ -71,7 +71,7 @@
               placeholder="••••••••"
             />
             @if (registerForm.confirmPassword().touched() && registerForm.confirmPassword().errors().length) {
-              <p hlm-field-error>{{ registerForm.confirmPassword().errors()[0].message | transloco }}</p>
+              <p hlm-field-error>{{ registerForm.confirmPassword().errors()[0]?.message | transloco }}</p>
             }
           </hlm-field>
         </hlm-field-group>

@@ -8,11 +8,12 @@
        area and the pagination footer stays at the bottom (no page scroll, no dead space). -->
   <div class="flex min-h-0 w-full flex-1 flex-col">
     <div hlmTableContainer #tableWrap class="min-h-0 w-full flex-1">
-      <table hlmTable [class.table-density-compact]="isCompact()">
+      <!-- S-09: accessible table name for screen readers -->
+      <table hlmTable [class.table-density-compact]="isCompact()" [attr.aria-label]="'members.title' | transloco">
         <thead hlmTableHeader>
           <tr hlmTableRow>
             @for (col of columns(); track col.field) {
-              <th hlmTableHead>
+              <th hlmTableHead scope="col">
                 <div class="flex items-center gap-1">
                   <button class="flex items-center gap-1 hover:text-foreground" (click)="sortToggle.emit(col.field)">
                     <span>{{ col.labelKey | transloco }}</span>
@@ -77,7 +78,7 @@
               </th>
             }
             @if (canManage()) {
-              <th hlmTableHead class="text-right">{{ 'members.actions' | transloco }}</th>
+              <th hlmTableHead scope="col" class="text-right">{{ 'members.actions' | transloco }}</th>
             }
           </tr>
         </thead>

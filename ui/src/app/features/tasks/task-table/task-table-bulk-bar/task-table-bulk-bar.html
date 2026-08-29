@@ -1,0 +1,55 @@
+<!-- Q10 (RQ-04 ③): bulk-action bar — shown while a selection exists and the
+     user can write. Exactly one target field is applied per request. -->
+<div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2">
+  <span class="text-sm font-medium">
+    {{ 'taskTable.bulk.selected' | transloco: { count: selectedCount() } }}
+  </span>
+  <hlm-select
+    [value]="statusValue()"
+    (valueChange)="statusChange.emit($any($event))"
+    [itemToString]="statusItemToString()"
+  >
+    <hlm-select-trigger class="w-40" size="sm">
+      <hlm-select-value [placeholder]="'taskTable.bulk.selectStatus' | transloco" />
+    </hlm-select-trigger>
+    <hlm-select-content *hlmSelectPortal>
+      <hlm-select-group>
+        @for (opt of statusOptions(); track opt.id) {
+          <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+        }
+      </hlm-select-group>
+    </hlm-select-content>
+  </hlm-select>
+  <hlm-select [value]="assigneeValue()" (valueChange)="assigneeChange.emit($any($event))">
+    <hlm-select-trigger class="w-40" size="sm">
+      <hlm-select-value [placeholder]="'taskTable.bulk.selectAssignee' | transloco" />
+    </hlm-select-trigger>
+    <hlm-select-content *hlmSelectPortal>
+      <hlm-select-group>
+        <hlm-select-item [value]="'__unassigned__'">{{ 'taskTable.unassigned' | transloco }}</hlm-select-item>
+        @for (opt of memberOptions(); track opt.id) {
+          <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+        }
+      </hlm-select-group>
+    </hlm-select-content>
+  </hlm-select>
+  <hlm-select [value]="sprintValue()" (valueChange)="sprintChange.emit($any($event))">
+    <hlm-select-trigger class="w-40" size="sm">
+      <hlm-select-value [placeholder]="'taskTable.bulk.selectSprint' | transloco" />
+    </hlm-select-trigger>
+    <hlm-select-content *hlmSelectPortal>
+      <hlm-select-group>
+        <hlm-select-item [value]="'__no_sprint__'">{{ 'taskTable.backlog' | transloco }}</hlm-select-item>
+        @for (opt of sprintOptions(); track opt.id) {
+          <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
+        }
+      </hlm-select-group>
+    </hlm-select-content>
+  </hlm-select>
+  <button hlmBtn size="sm" [disabled]="!canApply() || applying()" (click)="apply.emit()">
+    {{ 'taskTable.bulk.apply' | transloco }}
+  </button>
+  <button hlmBtn variant="ghost" size="sm" (click)="clear.emit()">
+    {{ 'taskTable.bulk.clear' | transloco }}
+  </button>
+</div>

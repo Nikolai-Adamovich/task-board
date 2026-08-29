@@ -82,11 +82,17 @@
        empty state renders directly; `#tableWrap` is measured by a ResizeObserver to
        derive the Auto page size; `min-h-0 flex-1` lets it fill the fixed-height column. -->
   <div hlmTableContainer #tableWrap class="min-h-0 w-full flex-1">
-    <table hlmTable class="w-full" [class.table-density-compact]="isCompact()">
+    <!-- S-09: accessible table name for screen readers -->
+    <table
+      hlmTable
+      class="w-full"
+      [class.table-density-compact]="isCompact()"
+      [attr.aria-label]="'auditLog.title' | transloco"
+    >
       <thead hlmTableHeader>
         <tr hlmTableRow>
           <!-- Time — sortable asc/desc toggle, default desc -->
-          <th hlmTableHead class="w-45 whitespace-nowrap">
+          <th hlmTableHead scope="col" class="w-45 whitespace-nowrap">
             <button class="flex items-center gap-1 hover:text-foreground" (click)="toggleSort()">
               <span>{{ 'auditLog.time' | transloco }}</span>
               <span class="inline-flex size-3 shrink-0">
@@ -98,10 +104,10 @@
               </span>
             </button>
           </th>
-          <th hlmTableHead class="w-50 whitespace-nowrap">{{ 'auditLog.actor' | transloco }}</th>
-          <th hlmTableHead class="w-28 whitespace-nowrap">{{ 'auditLog.actionCol' | transloco }}</th>
-          <th hlmTableHead class="w-60 whitespace-nowrap">{{ 'auditLog.entity' | transloco }}</th>
-          <th hlmTableHead class="whitespace-nowrap">{{ 'auditLog.changes' | transloco }}</th>
+          <th hlmTableHead scope="col" class="w-50 whitespace-nowrap">{{ 'auditLog.actor' | transloco }}</th>
+          <th hlmTableHead scope="col" class="w-28 whitespace-nowrap">{{ 'auditLog.actionCol' | transloco }}</th>
+          <th hlmTableHead scope="col" class="w-60 whitespace-nowrap">{{ 'auditLog.entity' | transloco }}</th>
+          <th hlmTableHead scope="col" class="whitespace-nowrap">{{ 'auditLog.changes' | transloco }}</th>
         </tr>
       </thead>
       <tbody hlmTableBody>

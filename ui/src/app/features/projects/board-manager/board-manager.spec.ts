@@ -194,7 +194,7 @@ describe('BoardManager', () => {
     setup();
     await until(() => component.boards().length > 0);
 
-    boardClientMock.delete.mockReturnValueOnce(throwError(() => new Error('boom')));
+    boardClientMock.delete?.mockReturnValueOnce(throwError(() => new Error('boom')));
     component.requestDelete(component.boards()[1]);
     component.confirmDelete();
     await new Promise((resolve) => setTimeout(resolve, 10));

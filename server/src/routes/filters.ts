@@ -9,7 +9,8 @@ export function createFilterRoutes(): Hono<AppEnv> {
   router.get('/projects/:projectId/filters', async (c) => {
     const projectId = c.req.param('projectId');
     const userId = c.get('userId');
-    const filters = await c.get('svc').filters.getFiltersByUserAndProject(userId, projectId);
+    // M-02: the project is tenant-asserted inside the service
+    const filters = await c.get('svc').filters.getFiltersByUserAndProject(userId, projectId, c.get('tenantId'));
 
     return c.json({ data: filters });
   });

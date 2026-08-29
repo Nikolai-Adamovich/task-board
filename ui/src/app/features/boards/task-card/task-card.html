@@ -1,8 +1,11 @@
+<!-- N-10: keyboard-operable card — Enter and Space both activate (Space also
+     prevents the page scroll that a bare Space keydown would trigger). -->
 <div
   class="cursor-pointer rounded-md border border-border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
   role="button"
   tabindex="0"
   (keydown.enter)="taskClick.emit(task())"
+  (keydown.space)="$event.preventDefault(); taskClick.emit(task())"
 >
   <div class="flex items-start justify-between gap-2">
     <div class="flex items-center gap-2 min-w-0">

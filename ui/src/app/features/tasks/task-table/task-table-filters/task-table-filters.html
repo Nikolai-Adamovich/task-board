@@ -1,0 +1,38 @@
+<!-- Filters Dialog -->
+<hlm-dialog [state]="dialogOpen() ? 'open' : 'closed'" (stateChanged)="dialogOpenChange.emit($event === 'open')">
+  <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ 'taskTable.filters' | transloco }}</h3>
+      <p hlmDialogDescription>{{ 'taskTable.filtersDesc' | transloco }}</p>
+    </hlm-dialog-header>
+    <ui-filter-panel
+      [projectId]="projectId()"
+      [currentFilters]="currentFilters()"
+      [currentSort]="currentSort()"
+      (filterApplied)="filterApplied.emit($event)"
+    />
+  </hlm-dialog-content>
+</hlm-dialog>
+
+<!-- Active filter chips with per-chip remove -->
+@if (chips().length > 0) {
+  <div class="mb-3 flex flex-wrap items-center gap-2">
+    <span class="text-xs font-medium text-muted-foreground">{{ 'taskTable.activeFilters' | transloco }}</span>
+    @for (chip of chips(); track chip.param) {
+      <span hlmBadge variant="secondary" class="gap-1 py-1 pl-2">
+        {{ chip.labelKey | transloco: { value: chip.value } }}
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-xs"
+          class="size-4"
+          [attr.aria-label]="'taskTable.removeFilterAria' | transloco: { value: chip.value }"
+          [hlmTooltip]="'taskTable.removeFilterAria' | transloco: { value: chip.value }"
+          (click)="removeFilter.emit(chip.param)"
+        >
+          <ng-icon name="lucideX" />
+        </button>
+      </span>
+    }
+  </div>
+}

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ClientSession, Collection } from 'mongodb';
-import { TenantRole, ProjectRole, ProjectStatus, ArchiveReason } from '@task-board/shared';
+import { TenantRole, ProjectRole, ProjectStatus, ArchiveReason, DELETION_GRACE_PERIOD_MS } from '@task-board/shared';
 import type { Project, ProjectMember, CreateProject, UpdateProject } from '@task-board/shared';
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { TransactionsUnsupportedError, withTransaction } from '../db/mongo.js';
@@ -10,7 +10,6 @@ import type { AuditService } from './audit.service.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 // DR-1: `name` is the human-readable display name shown in boards/tables;
 // `key` is the stable seed identifier used for board-column wiring and
 // defaultStatusId (keys/positions/normalizedNames are unchanged).

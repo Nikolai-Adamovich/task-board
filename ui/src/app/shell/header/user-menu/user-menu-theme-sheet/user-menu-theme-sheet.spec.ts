@@ -213,7 +213,7 @@ describe('UserMenuThemeSheet', () => {
 
         const match = selector.match(/\[data-theme="(.+)"\]/);
 
-        return match ? buttons[match[1]] : null;
+        return match && match[1] ? buttons[match[1]] : null;
       }),
     };
 
@@ -257,8 +257,8 @@ describe('UserMenuThemeSheet', () => {
 
     expect(component.focusedTheme()).toBe('light');
     // Scrolling is driven by an explicit smooth scrollIntoView (focus() jumps).
-    expect(buttons['light'].focus).not.toHaveBeenCalled();
-    expect(buttons['light'].scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
+    expect(buttons['light']?.focus).not.toHaveBeenCalled();
+    expect(buttons['light']?.scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
   });
 
   it('should move the highlight on horizontal arrows and smooth-scroll it into view', () => {
@@ -271,8 +271,8 @@ describe('UserMenuThemeSheet', () => {
     component.onThemeKeydown(makeGridEvent('ArrowRight', grid));
 
     expect(component.focusedTheme()).toBe('ocean');
-    expect(buttons['ocean'].focus).not.toHaveBeenCalled();
-    expect(buttons['ocean'].scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
+    expect(buttons['ocean']?.focus).not.toHaveBeenCalled();
+    expect(buttons['ocean']?.scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
   });
 
   it('should focus the FIRST theme item on focusThemeGrid when nothing was highlighted before', () => {
@@ -285,10 +285,10 @@ describe('UserMenuThemeSheet', () => {
 
     component.focusThemeGrid();
 
-    expect(buttons['light'].focus).toHaveBeenCalledTimes(1);
+    expect(buttons['light']?.focus).toHaveBeenCalledTimes(1);
     expect(component.focusedTheme()).toBe('light');
     // Native focus() scrolling only — no explicit scrollIntoView.
-    expect(buttons['light'].scrollIntoView).not.toHaveBeenCalled();
+    expect(buttons['light']?.scrollIntoView).not.toHaveBeenCalled();
   });
 
   it('should RESTORE the last highlighted theme on focusThemeGrid (Down handoff after focus-out)', () => {
@@ -308,10 +308,10 @@ describe('UserMenuThemeSheet', () => {
     expect(component.focusedTheme()).toBeNull();
 
     // …and the Down handoff restores the LAST highlighted theme.
-    (buttons['ocean'].focus as ReturnType<typeof vi.fn>).mockClear();
+    (buttons['ocean']?.focus as ReturnType<typeof vi.fn>).mockClear();
     component.focusThemeGrid();
 
-    expect(buttons['ocean'].focus).toHaveBeenCalledTimes(1);
+    expect(buttons['ocean']?.focus).toHaveBeenCalledTimes(1);
     expect(component.focusedTheme()).toBe('ocean');
   });
 
@@ -408,10 +408,10 @@ describe('UserMenuThemeSheet', () => {
     expect(component.focusedTheme()).toBeNull();
 
     // Down from the mode switch restores the last highlighted theme.
-    (buttons['ocean'].focus as ReturnType<typeof vi.fn>).mockClear();
+    (buttons['ocean']?.focus as ReturnType<typeof vi.fn>).mockClear();
     component.focusThemeGrid();
 
-    expect(buttons['ocean'].focus).toHaveBeenCalledTimes(1);
+    expect(buttons['ocean']?.focus).toHaveBeenCalledTimes(1);
     expect(component.focusedTheme()).toBe('ocean');
   });
 
@@ -427,9 +427,9 @@ describe('UserMenuThemeSheet', () => {
     component.onThemeKeydown(makeGridEvent('ArrowRight', grid));
 
     expect(component.focusedTheme()).toBe('ocean');
-    expect(buttons['ocean'].scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(buttons['ocean'].scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
-    expect(buttons['ocean'].focus).not.toHaveBeenCalled();
+    expect(buttons['ocean']?.scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(buttons['ocean']?.scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
+    expect(buttons['ocean']?.focus).not.toHaveBeenCalled();
   });
 
   // ── No focus-visible ring on theme buttons ───────────────────────────────

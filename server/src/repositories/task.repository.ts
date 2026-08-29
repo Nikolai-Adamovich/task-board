@@ -44,6 +44,24 @@ export interface TaskDocument {
   updatedAt: Date;
 }
 
+/** Fields of a task document that may be set by an update. */
+export type TaskUpdatePayload = Partial<
+  Pick<
+    TaskDocument,
+    | 'title'
+    | 'description'
+    | 'statusId'
+    | 'priority'
+    | 'reporterId'
+    | 'reporterSnapshot'
+    | 'assigneeId'
+    | 'assigneeSnapshot'
+    | 'typeId'
+    | 'sprintId'
+    | 'labelIds'
+  >
+>;
+
 // ─── Filter Types ────────────────────────────────────────────────────────────
 
 export interface TaskQueryOptions {
@@ -188,12 +206,12 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     if (sort && SEMANTIC_SORT_FIELDS.has(sort.field)) {
       const pipeline = this.buildSemanticSortPipeline(query, sort.field, sortDir, skip, limit);
       const [docs, total] = await Promise.all([
-        this.collection.aggregate(pipeline).toArray(),
+        this.collection.aggregate<TaskDocument>(pipeline).toArray(),
         this.collection.countDocuments(query),
       ]);
 
       return {
-        data: docs.map((doc) => toDomain(doc as unknown as TaskDocument)),
+        data: docs.map(toDomain),
         pagination: {
           page,
           limit,
@@ -354,26 +372,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
    * Uses findOneAndUpdate with version check + $inc.
    * Returns null if version mismatch (concurrent modification).
    */
-  async updateWithVersion(
-    id: string,
-    currentVersion: number,
-    update: Partial<
-      Pick<
-        TaskDocument,
-        | 'title'
-        | 'description'
-        | 'statusId'
-        | 'priority'
-        | 'reporterId'
-        | 'reporterSnapshot'
-        | 'assigneeId'
-        | 'assigneeSnapshot'
-        | 'typeId'
-        | 'sprintId'
-        | 'labelIds'
-      >
-    >,
-  ): Promise<Task | null> {
+  async updateWithVersion(id: string, currentVersion: number, update: TaskUpdatePayload): Promise<Task | null> {
     const result = await this.collection.findOneAndUpdate(
       { id, version: currentVersion },
       {
@@ -391,6 +390,22 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
    */
   async countByStatus(projectId: string, statusId: string): Promise<number> {
     return this.collection.countDocuments({ projectId, statusId });
+  }
+
+  /**
+   * S-05: per-status task counts in ONE `$match` + `$group` aggregation
+   * (used by the project-overview status summary — replaces one
+   * `countDocuments` per status).
+   */
+  async countByStatusGrouped(projectId: string): Promise<{ statusId: string; count: number }[]> {
+    const rows = await this.collection
+      .aggregate<{ _id: string; count: number }>([
+        { $match: { projectId } },
+        { $group: { _id: '$statusId', count: { $sum: 1 } } },
+      ])
+      .toArray();
+
+    return rows.map((row) => ({ statusId: row._id, count: row.count }));
   }
 
   /**

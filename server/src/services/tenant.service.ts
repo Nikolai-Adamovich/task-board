@@ -6,6 +6,7 @@ import {
   ArchiveReason,
   generateSlugFromName,
   isValidTenantSlug,
+  DELETION_GRACE_PERIOD_MS,
 } from '@task-board/shared';
 import type { Tenant, TenantMember, CreateTenant, UpdateTenant } from '@task-board/shared';
 import { AppError, ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../errors/app-error.js';
@@ -25,10 +26,6 @@ export interface TenantServiceProjectMemberRepo {
   deleteByUserId(userId: string): Promise<void>;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-/** Grace period before permanent deletion (30 days) */
-const DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 // ─── Tenant Service ──────────────────────────────────────────────────────────
 
 export class TenantService {

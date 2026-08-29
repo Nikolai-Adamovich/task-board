@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../types/context.js';
+import { validateQuery } from '../middleware/validation.js';
 import { AuditQuerySchema } from '../schemas/audit.js';
 import type { AuditQueryOptions } from '../repositories/audit-event.repository.js';
 
@@ -12,7 +12,9 @@ export function createAuditRoutes(): Hono<AppEnv> {
    * R3-P7: events are enriched with human-readable labels (entityLabel +
    * per-change oldLabel/newLabel) so the UI never renders raw UUIDs.
    */
-  router.get('/projects/:projectId/audit', zValidator('query', AuditQuerySchema), async (c) => {
+  // M-07: validateQuery throws ValidationError → the standard
+  // `{ error: { code, message } }` envelope (raw zValidator returned a plain 400).
+  router.get('/projects/:projectId/audit', validateQuery(AuditQuerySchema), async (c) => {
     const projectId = c.req.param('projectId');
     const query = c.req.valid('query');
     const options: AuditQueryOptions = {
@@ -32,7 +34,7 @@ export function createAuditRoutes(): Hono<AppEnv> {
   /**
    * GET /tenants/:tenantId/audit — List audit events for a tenant.
    */
-  router.get('/tenants/:tenantId/audit', zValidator('query', AuditQuerySchema), async (c) => {
+  router.get('/tenants/:tenantId/audit', validateQuery(AuditQuerySchema), async (c) => {
     const tenantId = c.req.param('tenantId');
     const query = c.req.valid('query');
     const options: AuditQueryOptions = {

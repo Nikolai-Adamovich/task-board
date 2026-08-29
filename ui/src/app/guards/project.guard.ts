@@ -56,11 +56,17 @@ export const projectGuard: CanActivateFn = async (route) => {
     return true;
   }
 
-  // For tenant MEMBERS, the project role is resolved from membership
-  // The API will return 403 if the user has no access
+  // For tenant MEMBERS, the project role is resolved from the members list
+  // already loaded by loadProjectByKey(). If the user has no project
+  // membership, allow through — the API will return 403.
   if (tenantRole === TenantRole.MEMBER) {
-    // Project role is loaded from members list inside loadProject()
-    // If user has no membership, API calls will return 403
+    const userId = authStore.currentUser()?.id;
+    const membership = userId ? projectStore.members().find((member) => member.userId === userId) : undefined;
+
+    if (membership) {
+      projectStore.setProjectRole(membership.role);
+    }
+
     return true;
   }
 

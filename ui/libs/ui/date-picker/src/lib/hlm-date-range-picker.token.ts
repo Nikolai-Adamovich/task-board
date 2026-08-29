@@ -60,10 +60,14 @@ function getDefaultConfig<T>(): HlmDateRangePickerConfig<T> {
       const parts = value.split(' - ').map((part) => part.trim());
       if (parts.length === 0 || parts.length > 2) return null;
 
-      const start = new Date(parts[0]);
+      const startRaw = parts[0];
+      if (startRaw === undefined) return null;
+
+      const start = new Date(startRaw);
       if (isNaN(start.getTime())) return null;
 
-      const end = parts.length === 2 ? new Date(parts[1]) : start;
+      const endRaw = parts[1];
+      const end = parts.length === 2 && endRaw !== undefined ? new Date(endRaw) : start;
 
       return [start, isNaN(end.getTime()) ? start : end] as [T, T];
     },

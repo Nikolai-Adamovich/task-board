@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { createInvitationRoutes } from './invitations.js';
 import { errorHandler } from '../middleware/error-handler.js';
+import { ForbiddenError } from '../errors/app-error.js';
 import { TenantService } from '../services/tenant.service.js';
 import { TenantMemberService } from '../services/tenant-member.service.js';
 import { AuthService } from '../services/auth.service.js';
@@ -159,12 +160,26 @@ describe('Invitation Routes', () => {
       expect(body.data.success).toBe(true);
     });
 
-    it('calls TenantService.acceptInvitation', async () => {
+    it('calls TenantMemberService.acceptInvitation with the authenticated userId (M-01)', async () => {
       const app = createTestApp();
 
       await app.request('/api/invitations/inv-123/accept', { method: 'POST' }, TEST_ENV);
 
-      expect(mockAcceptInvitation).toHaveBeenCalledWith('inv-123');
+      expect(mockAcceptInvitation).toHaveBeenCalledWith('inv-123', 'user-1');
+    });
+
+    it('returns 403 when the invitation belongs to another user (M-01)', async () => {
+      mockAcceptInvitation.mockRejectedValueOnce(new ForbiddenError('You can only accept your own invitations'));
+
+      const app = createTestApp();
+      const res = await app.request('/api/invitations/inv-123/accept', { method: 'POST' }, TEST_ENV);
+
+      expect(res.status).toBe(403);
+
+      const body = (await res.json()) as { error: { code: string; message: string } };
+
+      expect(body.error.code).toBe('FORBIDDEN');
+      expect(body.error.message).toBe('You can only accept your own invitations');
     });
   });
 

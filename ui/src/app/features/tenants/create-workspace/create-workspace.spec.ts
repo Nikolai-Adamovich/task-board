@@ -298,7 +298,7 @@ describe('CreateWorkspace', () => {
         description: undefined,
       });
       expect(billingMock.completeMockCheckout.mock.invocationCallOrder[0]).toBeLessThan(
-        tenantStoreMock.createTenant.mock.invocationCallOrder[0],
+        tenantStoreMock.createTenant.mock.invocationCallOrder[0] ?? Number.NaN,
       );
       expect(authStoreMock.setTenantContext).toHaveBeenCalledWith(mockTenant.id, 'OWNER');
       expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/');

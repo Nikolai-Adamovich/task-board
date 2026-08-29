@@ -146,8 +146,8 @@ describe('AuditEnrichmentService (R3-P7)', () => {
       makeEvent({ entityType: 'SPRINT', entityId: 'sprint-1' }),
     ]);
 
-    expect(events[0].entityLabel).toBe('PROJ-123');
-    expect(events[1].entityLabel).toBe('Sprint 1');
+    expect(events[0]?.entityLabel).toBe('PROJ-123');
+    expect(events[1]?.entityLabel).toBe('Sprint 1');
   });
 
   it('resolves TASK keys via the task row projectId even without a PROJECT event (V7-4)', async () => {
@@ -157,7 +157,7 @@ describe('AuditEnrichmentService (R3-P7)', () => {
     // project id, so the key must be resolved through the fetched task row.
     const events = await service.enrichEvents([makeEvent({ entityType: 'TASK', entityId: 'task-1' })]);
 
-    expect(events[0].entityLabel).toBe('PROJ-123');
+    expect(events[0]?.entityLabel).toBe('PROJ-123');
     // the project lookup must have been fed the task row's projectId
     expect(repos.projects.findByIds).toHaveBeenCalledWith(['proj-1']);
   });
@@ -167,7 +167,7 @@ describe('AuditEnrichmentService (R3-P7)', () => {
     const service = new AuditEnrichmentService(repos);
     const events = await service.enrichEvents([makeEvent({ entityType: 'COMMENT', entityId: 'comment-1' })]);
 
-    expect(events[0].entityLabel).toBe('comment on PROJ-123');
+    expect(events[0]?.entityLabel).toBe('comment on PROJ-123');
   });
 
   it('enriches change values with oldLabel/newLabel while preserving raw values', async () => {
@@ -183,13 +183,13 @@ describe('AuditEnrichmentService (R3-P7)', () => {
         ],
       }),
     ]);
-    const [statusChange, assigneeChange, labelsChange] = events[0].changes;
+    const [statusChange, assigneeChange, labelsChange] = events[0]?.changes ?? [];
 
-    expect(statusChange.oldLabel).toBe('To Do');
-    expect(statusChange.newLabel).toBe('In Progress');
-    expect(statusChange.rawOldValue).toBe('status-todo');
-    expect(assigneeChange.newLabel).toBe('Carol');
-    expect(labelsChange.newLabel).toBe('bug');
+    expect(statusChange?.oldLabel).toBe('To Do');
+    expect(statusChange?.newLabel).toBe('In Progress');
+    expect(statusChange?.rawOldValue).toBe('status-todo');
+    expect(assigneeChange?.newLabel).toBe('Carol');
+    expect(labelsChange?.newLabel).toBe('bug');
   });
 
   it('batch-resolves per page — one $in query per collection regardless of event count', async () => {
@@ -226,10 +226,10 @@ describe('AuditEnrichmentService (R3-P7)', () => {
       }),
     ]);
 
-    expect(events[0].entityLabel).toBe(UNKNOWN_LABEL);
+    expect(events[0]?.entityLabel).toBe(UNKNOWN_LABEL);
     // Unresolvable refs produce no labels — raw values stay untouched.
-    expect(events[1].changes[0].oldLabel).toBeUndefined();
-    expect(events[1].changes[0].rawOldValue).toBeUndefined();
+    expect(events[1]?.changes[0]?.oldLabel).toBeUndefined();
+    expect(events[1]?.changes[0]?.rawOldValue).toBeUndefined();
   });
 
   it('leaves non-reference changes untouched', async () => {
@@ -239,7 +239,7 @@ describe('AuditEnrichmentService (R3-P7)', () => {
       makeEvent({ changes: [{ field: 'title', oldValue: 'a', newValue: 'b' }] }),
     ]);
 
-    expect(events[0].changes[0]).toEqual({ field: 'title', oldValue: 'a', newValue: 'b' });
+    expect(events[0]?.changes[0]).toEqual({ field: 'title', oldValue: 'a', newValue: 'b' });
   });
 });
 
@@ -257,7 +257,7 @@ describe('AuditService queries enrich pages (R3-P7)', () => {
     const service = new AuditService(auditRepo, createMockUserRepo(), new AuditEnrichmentService(repos));
     const result = await service.queryByProject('p1');
 
-    expect(result.data[0].entityLabel).toBe('Sprint 1');
+    expect(result.data[0]?.entityLabel).toBe('Sprint 1');
   });
 });
 

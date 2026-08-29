@@ -93,9 +93,9 @@ describe('UserPreferencesRepository', () => {
 
       await repo.upsert('user-1', 'project-1', { taskTableColumns: ['key', 'title'] });
 
-      const call = collection.findOneAndUpdate.mock.calls[0][1] as { $set: Record<string, unknown> };
+      const call = collection.findOneAndUpdate.mock.calls[0]?.[1] as { $set?: Record<string, unknown> };
 
-      expect(call.$set).not.toHaveProperty('defaultBoardId');
+      expect(call?.$set).not.toHaveProperty('defaultBoardId');
     });
 
     it('does not $set taskTableColumns when only defaultBoardId is sent', async () => {
@@ -103,9 +103,9 @@ describe('UserPreferencesRepository', () => {
 
       await repo.upsert('user-1', 'project-1', { defaultBoardId: 'board-2' });
 
-      const call = collection.findOneAndUpdate.mock.calls[0][1] as { $set: Record<string, unknown> };
+      const call = collection.findOneAndUpdate.mock.calls[0]?.[1] as { $set?: Record<string, unknown> };
 
-      expect(call.$set).not.toHaveProperty('taskTableColumns');
+      expect(call?.$set).not.toHaveProperty('taskTableColumns');
     });
 
     it('maps missing document fields to null in the domain object', async () => {

@@ -14,7 +14,8 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import { TranslocoTestingModule, TranslocoService } from '@jsverse/transloco';
-import { TaskTable, safeNumericParam } from './task-table';
+import { TaskTable } from './task-table';
+import { safeNumericParam } from '@app/shared/utils/numeric-param';
 import { AUTO_PAGE_SIZE_SENTINEL, computeAutoPageSize } from '@app/shared/auto-table/auto-page-size';
 import { TaskClient } from '@services/task-client';
 import { FilterClient } from '@services/filter-client';
@@ -551,7 +552,7 @@ describe('TaskTable — W9 polish', () => {
       expect(component.pageSize()).toBe(16);
       expect(afterFirst).toBeGreaterThan(initialCalls);
 
-      const lastQuery = taskClientMock.list.mock.calls[afterFirst - 1][1];
+      const lastQuery = taskClientMock.list.mock.calls[afterFirst - 1]?.[1];
 
       expect(lastQuery).toEqual(expect.objectContaining({ limit: 16 }));
 

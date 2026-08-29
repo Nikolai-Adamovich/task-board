@@ -217,7 +217,7 @@ describe('TenantHome', () => {
     expect(component.projects()).toEqual(mockProjects);
 
     const tenantB = { ...mockTenant, id: 't2', slug: 'globex', name: 'Globex' };
-    const projectsB: Project[] = [{ ...mockProjects[0], id: 'p2', tenantId: 't2', name: 'Beta' }];
+    const projectsB: Project[] = [{ ...(mockProjects[0] as Project), id: 'p2', tenantId: 't2', name: 'Beta' }];
 
     projectClientMock.list.mockReturnValue(of(projectsB));
     taskClientMock.getMyTasks.mockReturnValue(of([]));

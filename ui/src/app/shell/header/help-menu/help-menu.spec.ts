@@ -89,6 +89,6 @@ describe('HelpMenu', () => {
     const items = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'));
 
     expect(items.length).toBeGreaterThan(1);
-    expect(items[0].textContent?.toLowerCase()).toContain('hotkeys');
+    expect(items[0]?.textContent?.toLowerCase()).toContain('hotkeys');
   });
 });

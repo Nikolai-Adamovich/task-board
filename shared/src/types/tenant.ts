@@ -82,7 +82,13 @@ export interface TenantMember {
   updatedAt: string;
 }
 
-/** Pending invitation for the authenticated user, enriched with the tenant name (GET /invitations/my) */
+/**
+ * Pending invitation for the authenticated user, enriched with the tenant name (GET /invitations/my)
+ *
+ * Source of truth: `MyInvitationSchema` in `server/src/schemas/tenant.ts` — shared/ is
+ * runtime-library-free, so the Zod schema lives server-side and this interface mirrors it.
+ * Parity is enforced by a compile-time equality test in `server/src/schemas/tenant.test.ts`.
+ */
 export interface MyInvitation extends TenantMember {
   /** Display name of the tenant the invitation belongs to */
   tenantName: string;

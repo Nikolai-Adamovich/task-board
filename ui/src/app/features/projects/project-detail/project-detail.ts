@@ -14,7 +14,7 @@ import {
   lucideUsers,
 } from '@ng-icons/lucide';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { forkJoin, map, of } from 'rxjs';
+import { map } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
 import { SprintClient } from '@services/sprint-client';
@@ -129,25 +129,22 @@ export class ProjectDetail {
     stream: ({ params }) => this.statusClient.list(params.projectId),
     defaultValue: [] as Status[],
   });
-  /** One lightweight request per status (limit=1) reads pagination.total as the count */
-  private readonly statusCountsResource = rxResource({
-    params: () => ({ projectId: this.projectId(), statuses: this.statusesResource.value() }),
-    stream: ({ params }) => {
-      if (!params.projectId || params.statuses.length === 0) return of([] as StatusCount[]);
-
-      return forkJoin(
-        params.statuses.map((status) =>
-          this.taskClient
-            .list(params.projectId, { statusId: status.id, limit: 1 })
-            .pipe(map((res) => ({ status, total: res.pagination.total }))),
-        ),
-      );
-    },
-    defaultValue: [] as StatusCount[],
+  /**
+   * S-05: one status-summary request (server-side $group aggregation) instead
+   * of one list request per status; counts are joined with the statuses in code.
+   */
+  private readonly statusSummaryResource = rxResource({
+    params: () => ({ projectId: this.projectId() }),
+    stream: ({ params }) => this.taskClient.statusSummary(params.projectId),
+    defaultValue: [] as { statusId: string; count: number }[],
   });
-  protected readonly statusCounts = computed(() =>
-    this.statusCountsResource.hasValue() ? this.statusCountsResource.value() : [],
-  );
+  protected readonly statusCounts = computed<StatusCount[]>(() => {
+    if (!this.statusSummaryResource.hasValue() || !this.statusesResource.hasValue()) return [];
+
+    const counts = new Map(this.statusSummaryResource.value().map((row) => [row.statusId, row.count]));
+
+    return this.statusesResource.value().map((status) => ({ status, total: counts.get(status.id) ?? 0 }));
+  });
   protected readonly totalTasks = computed(() => this.statusCounts().reduce((sum, entry) => sum + entry.total, 0));
   private readonly recentTasksResource = rxResource({
     params: () => ({ projectId: this.projectId() }),
@@ -191,7 +188,7 @@ export class ProjectDetail {
     const parts = source.trim().split(/\s+/);
 
     return parts.length > 1
-      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      ? ((parts[0]?.[0] ?? '') + (parts[parts.length - 1]?.[0] ?? '')).toUpperCase()
       : source.slice(0, 2).toUpperCase();
   }
 }

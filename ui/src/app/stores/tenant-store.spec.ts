@@ -216,7 +216,7 @@ describe('TenantStore', () => {
       await deletePromise;
 
       expect(store.tenants()).toHaveLength(1);
-      expect(store.tenants()[0].id).toBe('t2');
+      expect(store.tenants()[0]?.id).toBe('t2');
       expect(store.activeTenant()?.id).toBe('t2');
     });
 
@@ -326,7 +326,7 @@ describe('TenantStore', () => {
 
       const store = TestBed.inject(TenantStore);
 
-      store.setActiveTenant(mockTenants[1]);
+      store.setActiveTenant(mockTenants[1] as TenantWithRole);
 
       expect(store.activeTenant()?.id).toBe('t2');
       expect(localStorage.getItem(TENANT_KEY)).toBe('t2');

@@ -7,5 +7,5 @@ export function getNextZoom(current: number, direction: 'in' | 'out'): number {
 
   const next = direction === 'in' ? idx + 1 : idx - 1;
 
-  return ZOOM_VALUES[Math.max(0, Math.min(ZOOM_VALUES.length - 1, next))];
+  return ZOOM_VALUES[Math.max(0, Math.min(ZOOM_VALUES.length - 1, next))] ?? 100;
 }

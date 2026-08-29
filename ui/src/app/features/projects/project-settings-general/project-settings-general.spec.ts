@@ -129,7 +129,7 @@ describe('ProjectSettingsGeneral', () => {
 
   it('should surface an error message when the update fails', async () => {
     setup();
-    projectClientMock.update.mockReturnValueOnce(throwError(() => new Error('boom')));
+    projectClientMock.update?.mockReturnValueOnce(throwError(() => new Error('boom')));
     component.model.update((m: { name: string; description: string }) => ({ ...m, name: 'Nope' }));
     submit(component.generalForm);
     await new Promise((resolve) => setTimeout(resolve, 10));

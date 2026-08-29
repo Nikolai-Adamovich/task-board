@@ -70,7 +70,7 @@
                   placeholder="John Doe"
                 />
                 @if (invitationForm.displayName().touched() && invitationForm.displayName().errors().length) {
-                  <p hlm-field-error>{{ invitationForm.displayName().errors()[0].message | transloco }}</p>
+                  <p hlm-field-error>{{ invitationForm.displayName().errors()[0]?.message | transloco }}</p>
                 }
               </hlm-field>
 
@@ -85,7 +85,7 @@
                   placeholder="••••••••"
                 />
                 @if (invitationForm.password().touched() && invitationForm.password().errors().length) {
-                  <p hlm-field-error>{{ invitationForm.password().errors()[0].message | transloco }}</p>
+                  <p hlm-field-error>{{ invitationForm.password().errors()[0]?.message | transloco }}</p>
                 }
               </hlm-field>
 
@@ -100,7 +100,7 @@
                   placeholder="••••••••"
                 />
                 @if (invitationForm.confirmPassword().touched() && invitationForm.confirmPassword().errors().length) {
-                  <p hlm-field-error>{{ invitationForm.confirmPassword().errors()[0].message | transloco }}</p>
+                  <p hlm-field-error>{{ invitationForm.confirmPassword().errors()[0]?.message | transloco }}</p>
                 }
               </hlm-field>
             </hlm-field-group>

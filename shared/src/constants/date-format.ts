@@ -44,7 +44,9 @@ export function isValidDateFormat(format: string): boolean {
       continue;
     }
 
-    if (DATE_FORMAT_SEPARATOR.test(format[i])) {
+    const char = format[i];
+
+    if (char !== undefined && DATE_FORMAT_SEPARATOR.test(char)) {
       i += 1;
       continue;
     }

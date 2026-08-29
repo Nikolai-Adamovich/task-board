@@ -89,7 +89,7 @@ describe('tenantGuard', () => {
     const authStore = TestBed.inject(AuthStore);
 
     tenantStore.tenants.set(mockTenants);
-    tenantStore.setActiveTenant(mockTenants[0]);
+    tenantStore.setActiveTenant(mockTenants[0] as TenantWithRole);
 
     const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('acme'), mockState));
 
@@ -121,7 +121,7 @@ describe('tenantGuard', () => {
     const projectStore = TestBed.inject(ProjectStore);
 
     tenantStore.tenants.set(mockTenants);
-    tenantStore.setActiveTenant(mockTenants[0]);
+    tenantStore.setActiveTenant(mockTenants[0] as TenantWithRole);
     authStore.setTenantRole('OWNER');
 
     const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('beta'), mockState));

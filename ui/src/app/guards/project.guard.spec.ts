@@ -19,6 +19,7 @@ import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { TenantWithRole } from '@app/types/frontend';
+import type { User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockTenant: TenantWithRole = {
@@ -50,6 +51,7 @@ describe('projectGuard', () => {
     loadProjectByKey: ReturnType<typeof vi.fn>;
     clearProject: ReturnType<typeof vi.fn>;
     setProjectRole: ReturnType<typeof vi.fn>;
+    members: ReturnType<typeof vi.fn>;
   };
 
   function setup() {
@@ -57,6 +59,7 @@ describe('projectGuard', () => {
       loadProjectByKey: vi.fn().mockResolvedValue({}),
       clearProject: vi.fn(),
       setProjectRole: vi.fn(),
+      members: vi.fn(() => []),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -160,6 +163,49 @@ describe('projectGuard', () => {
     );
 
     expect(result).toBe(true);
+  });
+
+  it('should set the real project role for a tenant MEMBER with project membership', async () => {
+    setup();
+
+    const tenantStore = TestBed.inject(TenantStore);
+    const authStore = TestBed.inject(AuthStore);
+
+    tenantStore.setActiveTenant({ ...mockTenant, role: 'MEMBER' });
+    authStore.setTenantRole('MEMBER');
+    authStore.currentUser.set({ id: 'user-1' } as User);
+
+    projectStoreMock.members.mockReturnValue([
+      { id: 'm-1', projectId: 'p-1', userId: 'user-other', role: 'VIEWER' },
+      { id: 'm-2', projectId: 'p-1', userId: 'user-1', role: 'EDITOR' },
+    ]);
+
+    const result = await TestBed.runInInjectionContext(() =>
+      projectGuard(createRoute('acme', 'proj-1'), {} as RouterStateSnapshot),
+    );
+
+    expect(result).toBe(true);
+    expect(projectStoreMock.setProjectRole).toHaveBeenCalledWith('EDITOR');
+  });
+
+  it('should allow a tenant MEMBER without project membership through without setting a role', async () => {
+    setup();
+
+    const tenantStore = TestBed.inject(TenantStore);
+    const authStore = TestBed.inject(AuthStore);
+
+    tenantStore.setActiveTenant({ ...mockTenant, role: 'MEMBER' });
+    authStore.setTenantRole('MEMBER');
+    authStore.currentUser.set({ id: 'user-1' } as User);
+
+    projectStoreMock.members.mockReturnValue([{ id: 'm-1', projectId: 'p-1', userId: 'user-other', role: 'VIEWER' }]);
+
+    const result = await TestBed.runInInjectionContext(() =>
+      projectGuard(createRoute('acme', 'proj-1'), {} as RouterStateSnapshot),
+    );
+
+    expect(result).toBe(true);
+    expect(projectStoreMock.setProjectRole).not.toHaveBeenCalled();
   });
 
   it('should redirect to / when no valid tenant role', async () => {

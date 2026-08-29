@@ -174,7 +174,7 @@ describe('ProjectService', () => {
       for (const call of collections.taskTypes.insertOne.mock.calls) {
         expect(call[1]).toEqual({ session: txSession });
       }
-      expect(collections.boards.insertOne.mock.calls[0][1]).toEqual({ session: txSession });
+      expect(collections.boards.insertOne.mock.calls[0]?.[1]).toEqual({ session: txSession });
       expect(projectRepo.update).toHaveBeenCalledWith(
         'proj-1',
         { defaultStatusId: expect.any(String), defaultBoardId: expect.any(String) },

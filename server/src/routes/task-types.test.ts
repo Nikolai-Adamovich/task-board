@@ -168,7 +168,7 @@ describe('GET /api/projects/:projectId/task-types', () => {
 
     expect(body).toHaveProperty('data');
     expect(Array.isArray(body.data)).toBe(true);
-    expect((body.data as { key: string }[])[0].key).toBe('BUG');
+    expect((body.data as { key: string }[])[0]?.key).toBe('BUG');
   });
 });
 

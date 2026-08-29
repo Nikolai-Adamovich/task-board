@@ -122,8 +122,9 @@ describe('SprintService', () => {
   describe('getSprint', () => {
     it('returns sprint when found', async () => {
       sprintRepo.findById = vi.fn().mockResolvedValue(makeSprint());
+      projectRepo.findById = vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-1' });
 
-      const result = await service.getSprint('sprint-1');
+      const result = await service.getSprint('sprint-1', 'tenant-1');
 
       expect(result.name).toBe('Sprint 1');
     });
@@ -131,7 +132,17 @@ describe('SprintService', () => {
     it('throws NOT_FOUND when not found', async () => {
       sprintRepo.findById = vi.fn().mockResolvedValue(null);
 
-      await expect(service.getSprint('missing')).rejects.toThrow('Sprint not found');
+      await expect(service.getSprint('missing', 'tenant-1')).rejects.toThrow('Sprint not found');
+    });
+
+    it('throws NOT_FOUND (not 403) when the sprint belongs to another tenant (M-02)', async () => {
+      sprintRepo.findById = vi.fn().mockResolvedValue(makeSprint());
+      projectRepo.findById = vi.fn().mockResolvedValue({ id: 'project-1', tenantId: 'tenant-OTHER' });
+
+      await expect(service.getSprint('sprint-1', 'tenant-1')).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
     });
   });
 

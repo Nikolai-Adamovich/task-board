@@ -132,7 +132,7 @@ describe('StatusService', () => {
       const result = await service.getStatusesByProject('project-1');
 
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('TODO');
+      expect(result[0]?.name).toBe('TODO');
     });
   });
 

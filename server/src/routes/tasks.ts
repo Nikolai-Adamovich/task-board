@@ -42,6 +42,19 @@ export function createTaskRoutes(): Hono<AppEnv> {
   });
 
   /**
+   * S-05: GET /projects/:projectId/tasks/status-summary — per-status task
+   * counts in one server-side aggregation (the project overview previously
+   * issued one list request per status). Same read pattern as the list route:
+   * tenant context resolves the project role, no coarse route gate.
+   */
+  router.get('/projects/:projectId/tasks/status-summary', async (c) => {
+    const projectId = c.req.param('projectId');
+    const summary = await c.get('svc').tasks.getStatusSummary(projectId);
+
+    return c.json({ data: summary });
+  });
+
+  /**
    * POST /projects/:projectId/tasks — Create a task.
    * Coarse gate at the route (projectRole resolved by tenantContextMiddleware),
    * fine-grained re-check inside the service.
@@ -67,16 +80,21 @@ export function createTaskRoutes(): Hono<AppEnv> {
    */
   router.get('/tasks/:taskId', async (c) => {
     const taskId = c.req.param('taskId');
+    const tenantId = c.get('tenantId');
     // Support KEY-NUMBER format (e.g. PRO-1)
     const keyMatch = taskId.match(/^([A-Z][A-Z0-9]*)-(\d+)$/);
+    const projectKey = keyMatch?.[1];
+    const taskNumber = keyMatch?.[2];
 
-    if (keyMatch) {
-      const task = await c.get('svc').tasks.getTaskByKey(keyMatch[1], parseInt(keyMatch[2], 10));
+    if (projectKey && taskNumber) {
+      // S-04: the key is resolved within the caller's tenant only
+      const task = await c.get('svc').tasks.getTaskByKey(tenantId, projectKey, parseInt(taskNumber, 10));
 
       return c.json({ data: task });
     }
 
-    const task = await c.get('svc').tasks.getTask(taskId);
+    // M-02: bare task ids are tenant-asserted inside the service
+    const task = await c.get('svc').tasks.getTask(taskId, tenantId);
 
     return c.json({ data: task });
   });

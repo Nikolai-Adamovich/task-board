@@ -214,7 +214,9 @@ export class TaskCreate implements PendingChanges {
 
       const defaultStatusId = this.projectStore.activeProject()?.defaultStatusId;
       const preselect =
-        defaultStatusId && statuses.some((s) => s.id === defaultStatusId) ? defaultStatusId : statuses[0].id;
+        defaultStatusId && statuses.some((s) => s.id === defaultStatusId) ? defaultStatusId : statuses[0]?.id;
+
+      if (!preselect) return;
 
       this.model.update((m) => ({ ...m, statusId: preselect }));
     });
@@ -223,9 +225,13 @@ export class TaskCreate implements PendingChanges {
     effect(() => {
       const types = this.typeOptions();
 
-      if (types.length === 0 || this.model().typeId) return;
+      if (this.model().typeId) return;
 
-      this.model.update((m) => ({ ...m, typeId: types[0].id }));
+      const firstType = types[0];
+
+      if (!firstType) return;
+
+      this.model.update((m) => ({ ...m, typeId: firstType.id }));
     });
   }
 

@@ -1,0 +1,41 @@
+<div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+  <h2 class="text-2xl font-bold text-foreground">{{ 'taskTable.title' | transloco }}</h2>
+  <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+    <!-- Q9: `data-task-table-search` is the `/` keyboard-shortcut focus target -->
+    <input
+      hlmInput
+      type="text"
+      data-task-table-search
+      class="order-first w-full sm:order-none sm:w-64"
+      [placeholder]="'taskTable.searchPlaceholder' | transloco"
+      [value]="searchValue()"
+      (input)="searchInput.emit($event)"
+    />
+    <button
+      hlmBtn
+      variant="outline"
+      [hlmTooltip]="'taskTable.filters' | transloco"
+      [attr.aria-label]="'taskTable.filters' | transloco"
+      (click)="openFilters.emit()"
+    >
+      <ng-icon name="lucideFilter" />
+    </button>
+    <!-- Q9 (RQ-04 ⑤): compact/comfortable density toggle (device-local preference) -->
+    <button
+      hlmBtn
+      variant="outline"
+      [hlmTooltip]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
+      [attr.aria-label]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
+      (click)="toggleDensity.emit()"
+    >
+      <ng-icon name="lucideRows3" />
+    </button>
+    <!-- Projected: the column-chooser child (keeps the toolbar flex layout) -->
+    <ng-content />
+    @if (canCreateTasks()) {
+      <button hlmBtn (click)="createTask.emit()">
+        {{ 'taskTable.newTask' | transloco }}
+      </button>
+    }
+  </div>
+</div>

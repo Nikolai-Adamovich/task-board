@@ -236,15 +236,22 @@ export class BoardView {
   }
   protected readonly showStatusSelect = signal(false);
   protected readonly pendingDrop = signal<{ task: Task; targetColumn: BoardColumn } | null>(null);
+  /**
+   * S-08: display name per column id — computed once per change instead of
+   * re-running per column on every CD cycle.
+   */
+  protected readonly columnNames = computed(() => {
+    const map = new Map<string, string>();
+    const statusNames = this.statusMap();
 
-  /** Get display name for a board column */
-  protected getColumnName(column: BoardColumn): string {
-    const map = this.statusMap();
-    const names = column.statusIds.map((id) => map[id]).filter(Boolean);
+    for (const col of this.board()?.columns ?? []) {
+      const names = col.statusIds.map((id) => statusNames[id]).filter(Boolean);
 
-    return names.length > 0 ? names.join(' / ') : `Column ${column.position + 1}`;
-  }
+      map.set(col.id, names.length > 0 ? names.join(' / ') : `Column ${col.position + 1}`);
+    }
 
+    return map;
+  });
   /**
    * V4-12: statusId → the single column that owns it. Board documents may contain
    * overlapping statusIds across columns (e.g. an "In Progress / Reopened" column
@@ -270,15 +277,28 @@ export class BoardView {
 
     return owner;
   });
-
-  /** Get tasks for a specific column — only tasks whose status this column owns (V4-12) */
-  protected getTasksForColumn(column: BoardColumn): Task[] {
+  /**
+   * S-08: tasks per owned column (V4-12 ownership semantics preserved via
+   * `columnOwnerByStatusId`), sorted by number — computed once per change
+   * instead of filter+sort per column on every CD cycle.
+   */
+  protected readonly tasksByColumnId = computed(() => {
     const owner = this.columnOwnerByStatusId();
+    const map = new Map<string, Task[]>();
 
-    return this.filteredTasks()
-      .filter((t) => owner.get(t.statusId) === column)
-      .sort((a, b) => a.number - b.number);
-  }
+    for (const col of this.board()?.columns ?? []) map.set(col.id, []);
+
+    for (const task of this.filteredTasks()) {
+      const column = owner.get(task.statusId);
+      const list = column ? map.get(column.id) : undefined;
+
+      if (list) list.push(task);
+    }
+
+    for (const list of map.values()) list.sort((a, b) => a.number - b.number);
+
+    return map;
+  });
 
   /** Get all unique statusIds from board columns */
   protected get allStatusIds(): string[] {

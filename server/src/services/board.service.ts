@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Board, CreateBoard, UpdateBoard } from '@task-board/shared';
 import { ForbiddenError, NotFoundError } from '../errors/app-error.js';
+import { assertTenantEntity } from './tenant-assert.js';
 import { BoardRepository } from '../repositories/board.repository.js';
 import { StatusRepository } from '../repositories/status.repository.js';
 import { ensurePermission } from './rbac.service.js';
@@ -50,12 +51,16 @@ export class BoardService {
     return this.boardRepo.findByProject(projectId);
   }
 
-  async getBoard(id: string): Promise<Board> {
+  async getBoard(id: string, tenantId: string): Promise<Board> {
     const board = await this.boardRepo.findById(id);
 
     if (!board) {
       throw new NotFoundError('Board not found');
     }
+
+    // M-02: a bare board id must never cross tenant boundaries (404, not 403)
+    await assertTenantEntity(this.projectRepo, board.projectId, tenantId, 'Board');
+
     return board;
   }
 
@@ -97,8 +102,14 @@ export class BoardService {
     return board;
   }
 
-  async updateBoard(id: string, input: UpdateBoard, userId?: string, userRole?: string): Promise<Board> {
-    const board = await this.getBoard(id);
+  async updateBoard(
+    id: string,
+    tenantId: string,
+    input: UpdateBoard,
+    userId?: string,
+    userRole?: string,
+  ): Promise<Board> {
+    const board = await this.getBoard(id, tenantId);
 
     await this.ensureManageBoards(board.projectId, userId, userRole);
 
@@ -178,12 +189,20 @@ export class BoardService {
 
   /**
    * Validate that all status IDs exist and belong to the given project.
+   *
+   * M-14: ONE batched `findByIds` query instead of a sequential `findById`
+   * per status id; ownership is validated in code afterwards.
    */
   private async validateStatusIds(projectId: string, statusIds: string[]): Promise<void> {
     const uniqueStatusIds = [...new Set(statusIds)];
 
+    if (uniqueStatusIds.length === 0) return;
+
+    const statuses = await this.statusRepo.findByIds(uniqueStatusIds);
+    const byId = new Map(statuses.map((status) => [status.id, status]));
+
     for (const statusId of uniqueStatusIds) {
-      const status = await this.statusRepo.findById(statusId);
+      const status = byId.get(statusId);
 
       if (!status || status.projectId !== projectId) {
         throw new NotFoundError(`Status ${statusId} not found in project ${projectId}`);

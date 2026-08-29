@@ -8,157 +8,61 @@
 <div
   class="flex h-[calc(100dvh-var(--header-height)-1.5rem)] lg:h-[calc(100dvh-var(--header-height)-3rem)] w-full min-w-0 flex-col"
 >
-  <div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-    <h2 class="text-2xl font-bold text-foreground">{{ 'taskTable.title' | transloco }}</h2>
-    <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto">
-      <!-- Q9: `data-task-table-search` is the `/` keyboard-shortcut focus target -->
-      <input
-        hlmInput
-        type="text"
-        data-task-table-search
-        class="order-first w-full sm:order-none sm:w-64"
-        [placeholder]="'taskTable.searchPlaceholder' | transloco"
-        [value]="searchInput()"
-        (input)="onSearch($event)"
-      />
-      <button
-        hlmBtn
-        variant="outline"
-        [hlmTooltip]="'taskTable.filters' | transloco"
-        [attr.aria-label]="'taskTable.filters' | transloco"
-        (click)="showFilterDialog.set(true)"
-      >
-        <ng-icon name="lucideFilter" />
-      </button>
-      <!-- Q9 (RQ-04 ⑤): compact/comfortable density toggle (device-local preference) -->
-      <button
-        hlmBtn
-        variant="outline"
-        [hlmTooltip]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
-        [attr.aria-label]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
-        (click)="toggleDensity()"
-      >
-        <ng-icon name="lucideRows3" />
-      </button>
-      <!-- R3-P4: column-chooser popover -->
-      <hlm-popover [state]="showColumnChooser() ? 'open' : 'closed'" (stateChanged)="onChooserStateChange($event)">
-        <button
-          hlmPopoverTrigger
-          hlmBtn
-          variant="outline"
-          [hlmTooltip]="'taskTable.columns' | transloco"
-          [attr.aria-label]="'taskTable.columns' | transloco"
-        >
-          <ng-icon name="lucideColumns2" />
-        </button>
-        <hlm-popover-content *hlmPopoverPortal class="w-56" align="end">
-          <!-- Round-5 P9: shared chooser content (header + Select all + rows) -->
-          <ng-container [ngTemplateOutlet]="columnChooserContent" />
-        </hlm-popover-content>
-      </hlm-popover>
-      @if (canCreateTasks()) {
-        <button hlmBtn (click)="goToNewTask()">
-          {{ 'taskTable.newTask' | transloco }}
-        </button>
-      }
-    </div>
-  </div>
+  <!-- M-13 (4.2): toolbar extracted to TaskTableHeader; the column-chooser child
+       is projected through <ng-content /> so the flex layout is unchanged. -->
+  <ui-task-table-header
+    [searchValue]="searchInput()"
+    [isCompact]="isCompact()"
+    [canCreateTasks]="canCreateTasks()"
+    (searchInput)="onSearch($event)"
+    (openFilters)="showFilterDialog.set(true)"
+    (toggleDensity)="toggleDensity()"
+    (createTask)="goToNewTask()"
+  >
+    <!-- Column-chooser popover, cursor-anchored chooser and header context menu
+         (TaskTableColumns; host renders as `contents` for the flex layout). -->
+    <ui-task-table-columns
+      [taskColumns]="taskColumns"
+      [visibleKeys]="visibleColumnKeys()"
+      [allColumnsSelected]="allColumnsSelected()"
+      [someColumnsSelected]="someColumnsSelected()"
+      (toggleColumn)="toggleColumn($event.columnKey, $event.visible)"
+      (toggleAll)="toggleAllColumns($event)"
+      (hideColumn)="toggleColumn($event, false)"
+    />
+  </ui-task-table-header>
 
-  <!-- Filters Dialog -->
-  <hlm-dialog [state]="showFilterDialog() ? 'open' : 'closed'" (stateChanged)="onFilterDialogStateChange($event)">
-    <hlm-dialog-content *hlmDialogPortal class="sm:max-w-lg">
-      <hlm-dialog-header>
-        <h3 hlmDialogTitle>{{ 'taskTable.filters' | transloco }}</h3>
-        <p hlmDialogDescription>{{ 'taskTable.filtersDesc' | transloco }}</p>
-      </hlm-dialog-header>
-      <ui-filter-panel
-        [projectId]="projectId()"
-        [currentFilters]="currentFilters()"
-        [currentSort]="currentSort()"
-        (filterApplied)="onFilterApplied($event)"
-      />
-    </hlm-dialog-content>
-  </hlm-dialog>
+  <!-- M-13 (4.2): filters dialog + active-filter chips extracted to TaskTableFilters -->
+  <ui-task-table-filters
+    [dialogOpen]="showFilterDialog()"
+    [projectId]="projectId()"
+    [currentFilters]="currentFilters()"
+    [currentSort]="currentSort()"
+    [chips]="activeFilterChips()"
+    (dialogOpenChange)="showFilterDialog.set($event)"
+    (removeFilter)="removeFilter($event)"
+    (filterApplied)="onFilterApplied($event)"
+  />
 
-  <!-- Active filter chips with per-chip remove -->
-  @if (activeFilterChips().length > 0) {
-    <div class="mb-3 flex flex-wrap items-center gap-2">
-      <span class="text-xs font-medium text-muted-foreground">{{ 'taskTable.activeFilters' | transloco }}</span>
-      @for (chip of activeFilterChips(); track chip.param) {
-        <span hlmBadge variant="secondary" class="gap-1 py-1 pl-2">
-          {{ chip.labelKey | transloco: { value: chip.value } }}
-          <button
-            hlmBtn
-            variant="ghost"
-            size="icon-xs"
-            class="size-4"
-            [attr.aria-label]="'taskTable.removeFilterAria' | transloco: { value: chip.value }"
-            [hlmTooltip]="'taskTable.removeFilterAria' | transloco: { value: chip.value }"
-            (click)="removeFilter(chip.param)"
-          >
-            <ng-icon name="lucideX" />
-          </button>
-        </span>
-      }
-    </div>
-  }
-
-  <!-- Q10 (RQ-04 ③): bulk-action bar — shown while a selection exists and the
-       user can write. Exactly one target field is applied per request. -->
+  <!-- M-13 (4.2): bulk-action bar extracted to TaskBulkBar (presentational) -->
   @if (canCreateTasks() && selectedCount() > 0) {
-    <div class="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2">
-      <span class="text-sm font-medium">
-        {{ 'taskTable.bulk.selected' | transloco: { count: selectedCount() } }}
-      </span>
-      <hlm-select
-        [value]="bulkStatus()"
-        (valueChange)="onBulkStatusChange($any($event))"
-        [itemToString]="statusItemToString"
-      >
-        <hlm-select-trigger class="w-40" size="sm">
-          <hlm-select-value [placeholder]="'taskTable.bulk.selectStatus' | transloco" />
-        </hlm-select-trigger>
-        <hlm-select-content *hlmSelectPortal>
-          <hlm-select-group>
-            @for (opt of statusOptions(); track opt.id) {
-              <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
-            }
-          </hlm-select-group>
-        </hlm-select-content>
-      </hlm-select>
-      <hlm-select [value]="bulkAssignee()" (valueChange)="onBulkAssigneeChange($any($event))">
-        <hlm-select-trigger class="w-40" size="sm">
-          <hlm-select-value [placeholder]="'taskTable.bulk.selectAssignee' | transloco" />
-        </hlm-select-trigger>
-        <hlm-select-content *hlmSelectPortal>
-          <hlm-select-group>
-            <hlm-select-item [value]="'__unassigned__'">{{ 'taskTable.unassigned' | transloco }}</hlm-select-item>
-            @for (opt of memberOptions(); track opt.id) {
-              <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
-            }
-          </hlm-select-group>
-        </hlm-select-content>
-      </hlm-select>
-      <hlm-select [value]="bulkSprint()" (valueChange)="onBulkSprintChange($any($event))">
-        <hlm-select-trigger class="w-40" size="sm">
-          <hlm-select-value [placeholder]="'taskTable.bulk.selectSprint' | transloco" />
-        </hlm-select-trigger>
-        <hlm-select-content *hlmSelectPortal>
-          <hlm-select-group>
-            <hlm-select-item [value]="'__no_sprint__'">{{ 'taskTable.backlog' | transloco }}</hlm-select-item>
-            @for (opt of sprintOptions(); track opt.id) {
-              <hlm-select-item [value]="opt.id">{{ opt.name }}</hlm-select-item>
-            }
-          </hlm-select-group>
-        </hlm-select-content>
-      </hlm-select>
-      <button hlmBtn size="sm" [disabled]="!canApplyBulk() || applyingBulk()" (click)="applyBulkUpdate()">
-        {{ 'taskTable.bulk.apply' | transloco }}
-      </button>
-      <button hlmBtn variant="ghost" size="sm" (click)="clearSelection()">
-        {{ 'taskTable.bulk.clear' | transloco }}
-      </button>
-    </div>
+    <ui-task-table-bulk-bar
+      [selectedCount]="selectedCount()"
+      [canApply]="canApplyBulk()"
+      [applying]="applyingBulk()"
+      [statusValue]="bulkStatus()"
+      [assigneeValue]="bulkAssignee()"
+      [sprintValue]="bulkSprint()"
+      [statusOptions]="statusOptions()"
+      [memberOptions]="memberOptions()"
+      [sprintOptions]="sprintOptions()"
+      [statusItemToString]="statusItemToString"
+      (statusChange)="onBulkStatusChange($event)"
+      (assigneeChange)="onBulkAssigneeChange($event)"
+      (sprintChange)="onBulkSprintChange($event)"
+      (apply)="applyBulkUpdate()"
+      (clear)="clearSelection()"
+    />
   }
 
   <!-- V4-8: NO `table-fixed` — it ignores `min-width`, so the Title column collapsed
@@ -168,11 +72,17 @@
   <!-- R3-P3: `#tableWrap` is measured by a ResizeObserver to derive the Auto page size;
        `min-h-0 flex-1` lets it shrink/grow inside the fixed-height page column. -->
   <div hlmTableContainer #tableWrap class="min-h-0 flex-1">
-    <table hlmTable class="w-full" [class.table-density-compact]="isCompact()">
+    <!-- S-09: accessible table name for screen readers -->
+    <table
+      hlmTable
+      class="w-full"
+      [class.table-density-compact]="isCompact()"
+      [attr.aria-label]="'taskTable.title' | transloco"
+    >
       <thead hlmTableHeader>
         <tr hlmTableRow>
           @if (canCreateTasks()) {
-            <th hlmTableHead class="w-10 pr-0">
+            <th hlmTableHead scope="col" class="w-10 pr-0">
               <hlm-checkbox
                 [checked]="allSelected()"
                 [aria-label]="'taskTable.bulk.selectAll' | transloco"
@@ -181,7 +91,7 @@
             </th>
           }
           @for (col of visibleTaskColumns(); track col.field) {
-            <th hlmTableHead [class]="col.width" (contextmenu)="onHeaderContextMenu($event, col)">
+            <th hlmTableHead scope="col" [class]="col.width" (contextmenu)="onHeaderContextMenu($event, col)">
               <div class="flex items-center gap-1 whitespace-nowrap">
                 <button
                   class="cursor-pointer flex items-center gap-1 hover:text-foreground"
@@ -536,92 +446,4 @@
     (pageSizeChange)="onPageSizeChange($event)"
     (autoPageSizeChange)="onAutoPageSize()"
   />
-
-  <!-- R3-P4: header context menu — an invisible 0×0 anchor positioned at the
-       cursor on `contextmenu`; the Helm dropdown-menu opens from it. -->
-  <span #ctxAnchor class="pointer-events-none fixed z-50 block size-0" [hlmDropdownMenuTrigger]="headerContextMenu">
-  </span>
-  <ng-template #headerContextMenu>
-    <hlm-dropdown-menu class="w-48">
-      <hlm-dropdown-menu-group>
-        <button hlmDropdownMenuItem (triggered)="openChooserFromContextMenu()">
-          {{ 'taskTable.selectColumns' | transloco }}
-        </button>
-        <button hlmDropdownMenuItem [disabled]="!canHideContextColumn()" (triggered)="hideContextColumn()">
-          <ng-icon name="lucideEyeOff" />
-          {{ 'taskTable.hideColumn' | transloco }}
-        </button>
-      </hlm-dropdown-menu-group>
-    </hlm-dropdown-menu>
-  </ng-template>
-
-  <!-- Round-5 P9 (item 24): cursor-anchored column chooser — same hidden-anchor
-       pattern as the context menu. `onHeaderContextMenu` positions this trigger
-       button at the contextmenu coordinates; the context-menu "Select columns"
-       item flips `showContextColumnChooser`, opening the popover at the cursor
-       instead of at the toolbar button. -->
-  <hlm-popover
-    [state]="showContextColumnChooser() ? 'open' : 'closed'"
-    (stateChanged)="onContextChooserStateChange($event)"
-  >
-    <button
-      #ctxChooserAnchor
-      hlmPopoverTrigger
-      type="button"
-      tabindex="-1"
-      aria-hidden="true"
-      class="pointer-events-none fixed z-50 size-0 cursor-default border-0 bg-transparent p-0"
-    ></button>
-    <hlm-popover-content *hlmPopoverPortal class="w-56" align="start">
-      <ng-container [ngTemplateOutlet]="columnChooserContent" />
-    </hlm-popover-content>
-  </hlm-popover>
-
-  <!-- Round-5 P9 (item 25): shared column-chooser content, rendered by BOTH the
-       toolbar popover and the cursor-anchored popover. Dialog-style header
-       (left-aligned title + × close) and a Select-all row over the non-pinned
-       columns; pinned Key/Title stay always visible. -->
-  <!-- P13b: the × header row is LAST in DOM (with `order-first` keeping it
-       visually on top) so the popover's autoFocus — first tabbable element —
-       lands on the Select-all checkbox, not the × (whose focus-tooltip used to
-       hang over the button). -->
-  <ng-template #columnChooserContent>
-    <div class="flex flex-col">
-      <div class="flex items-center gap-2 rounded px-1 py-1 text-sm">
-        <hlm-checkbox
-          [checked]="allColumnsSelected()"
-          [indeterminate]="someColumnsSelected()"
-          [aria-label]="'taskTable.selectAll' | transloco"
-          (checkedChange)="toggleAllColumns($event)"
-        />
-        <span class="font-medium">{{ 'taskTable.selectAll' | transloco }}</span>
-      </div>
-      @for (col of taskColumns; track col.columnKey) {
-        <div class="flex items-center gap-2 rounded px-1 py-1 text-sm">
-          <hlm-checkbox
-            [checked]="visibleColumnKeys().has(col.columnKey)"
-            [disabled]="isPinnedColumn(col.columnKey)"
-            [aria-label]="col.labelKey | transloco"
-            (checkedChange)="toggleColumn(col.columnKey, $event)"
-          />
-          <span>{{ col.labelKey | transloco }}</span>
-        </div>
-      }
-    </div>
-    <div class="order-first flex items-center justify-between gap-2 px-1 pb-2">
-      <h3 class="text-base leading-none font-medium">{{ 'taskTable.selectColumns' | transloco }}</h3>
-      <button
-        hlmBtn
-        variant="ghost"
-        size="icon-xs"
-        class="size-6"
-        data-column-chooser-close
-        [attr.aria-label]="'taskTable.close' | transloco"
-        [hlmTooltip]="'taskTable.close' | transloco"
-        (click)="closeColumnChooser()"
-      >
-        <ng-icon name="lucideX" />
-      </button>
-    </div>
-  </ng-template>
 </div>

@@ -196,13 +196,31 @@ describe('TenantMemberService (DEC-018 semantics)', () => {
         }),
       );
 
-      await service.acceptInvitation('member-2');
+      await service.acceptInvitation('member-2', 'user-2');
 
       expect(memberRepo.update).toHaveBeenCalledWith('member-2', {
         invitation: null,
         status: MemberStatus.ACTIVE,
         expiresAt: null,
       });
+    });
+
+    it('rejects a user trying to accept someone else’s invitation (M-01)', async () => {
+      memberRepo.findById.mockResolvedValue(
+        makeMember({
+          id: 'member-2',
+          userId: 'user-2',
+          role: 'MEMBER',
+          status: MemberStatus.ACCESS_REVOKED,
+          invitation: makePendingInvitation({ invitedOn: new Date().toISOString() }),
+        }),
+      );
+
+      await expect(service.acceptInvitation('member-2', 'user-OTHER')).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'FORBIDDEN',
+      });
+      expect(memberRepo.update).not.toHaveBeenCalled();
     });
 
     it('on expiry keeps the membership ACCESS_REVOKED and marks the invitation EXPIRED', async () => {
@@ -216,7 +234,9 @@ describe('TenantMemberService (DEC-018 semantics)', () => {
         }),
       );
 
-      await expect(service.acceptInvitation('member-2')).rejects.toMatchObject({ code: 'INVITATION_EXPIRED' });
+      await expect(service.acceptInvitation('member-2', 'user-2')).rejects.toMatchObject({
+        code: 'INVITATION_EXPIRED',
+      });
 
       expect(memberRepo.update).toHaveBeenCalledWith('member-2', {
         invitation: expect.objectContaining({ status: InvitationStatus.EXPIRED }),

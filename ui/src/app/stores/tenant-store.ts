@@ -36,7 +36,9 @@ export class TenantStore {
     }
     // Default to first tenant if none selected
     if (!this.activeTenant() && tenants.length > 0) {
-      this.setActiveTenant(tenants[0]);
+      const first = tenants[0];
+
+      if (first) this.setActiveTenant(first);
     }
 
     return tenants;
@@ -74,9 +76,10 @@ export class TenantStore {
 
     if (this.activeTenant()?.id === tenantId) {
       const remaining = this.tenants();
+      const next = remaining[0];
 
-      if (remaining.length > 0) {
-        this.setActiveTenant(remaining[0]);
+      if (next) {
+        this.setActiveTenant(next);
       } else {
         this.activeTenant.set(null);
         localStorage.removeItem(TENANT_KEY);

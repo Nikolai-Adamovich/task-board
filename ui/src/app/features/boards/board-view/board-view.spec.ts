@@ -4,7 +4,7 @@
  * Covers:
  * - Initial loading state
  * - Board / tasks data fetching on init
- * - getTasksForColumn filtering
+ * - tasksByColumnId filtering (S-08 computed map)
  * - goToTask navigation
  * - goToNewTask navigation (U1 — create dialog replaced by tasks/new page)
  */
@@ -172,7 +172,11 @@ describe('BoardView', () => {
         },
         {
           provide: ProjectStore,
-          useValue: { activeProject: () => ({ id: 'p0000000-0000-0000-0000-000000000001' }), projectRole: () => null },
+          useValue: {
+            activeProject: () => ({ id: 'p0000000-0000-0000-0000-000000000001' }),
+            projectRole: () => null,
+            members: () => [],
+          },
         },
       ],
     });
@@ -243,6 +247,7 @@ describe('BoardView', () => {
             useValue: {
               activeProject: () => ({ id: 'p0000000-0000-0000-0000-000000000001' }),
               projectRole: () => null,
+              members: () => [],
             },
           },
         ],
@@ -304,6 +309,7 @@ describe('BoardView', () => {
             useValue: {
               activeProject: () => ({ id: 'p0000000-0000-0000-0000-000000000001' }),
               projectRole: () => null,
+              members: () => [],
             },
           },
         ],
@@ -341,28 +347,28 @@ describe('BoardView', () => {
     });
   });
 
-  // ── getTasksForColumn ──────────────────────────────────────────
+  // ── tasksByColumnId (S-08 computed map, V4-12 ownership) ───────
 
-  describe('getTasksForColumn', () => {
+  describe('tasksByColumnId', () => {
     beforeEach(() => setup());
 
     it('should return tasks filtered by column statusIds', () => {
       const col = mockBoard.columns[0]; // statusIds: ['s1', 's2']
-      const tasks = component.getTasksForColumn(col);
+      const tasks = component.tasksByColumnId().get(col?.id) ?? [];
 
-      expect(tasks.every((t: Task) => col.statusIds.includes(t.statusId))).toBe(true);
+      expect(tasks.every((t: Task) => col?.statusIds.includes(t.statusId))).toBe(true);
     });
 
     it('should return tasks sorted by number ascending', () => {
       const col = mockBoard.columns[0];
-      const tasks = component.getTasksForColumn(col) as Task[];
+      const tasks = (component.tasksByColumnId().get(col?.id) ?? []) as Task[];
 
-      expect(tasks[0].number).toBeLessThanOrEqual(tasks[1].number);
+      expect(tasks[0]?.number).toBeLessThanOrEqual(tasks[1]?.number ?? Number.NaN);
     });
 
     it('should return empty array when no tasks match the column', () => {
       const col = mockBoard.columns[2]; // statusIds: ['s4']
-      const tasks = component.getTasksForColumn(col);
+      const tasks = component.tasksByColumnId().get(col?.id) ?? [];
 
       expect(tasks).toHaveLength(0);
     });
@@ -378,7 +384,7 @@ describe('BoardView', () => {
 
       component.goToTask(task);
 
-      expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 't1', 'projects', 't1', 'tasks', `t1-${task.number}`]);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 't1', 'projects', 't1', 'tasks', `t1-${task?.number}`]);
     });
   });
 
@@ -485,7 +491,7 @@ describe('BoardView', () => {
 
       setup({ assignee: 'unassigned' }, [], mockBoard, [...mockTasks, assigned]);
 
-      const call = taskClientMock.list.mock.calls[0][1] as Record<string, unknown>;
+      const call = taskClientMock.list.mock.calls[0]?.[1] as Record<string, unknown>;
 
       expect(call.assigneeId).toBeUndefined();
       expect(component.filteredTasks().map((t: Task) => t.id)).not.toContain('tk-assigned');
@@ -651,9 +657,9 @@ describe('BoardView', () => {
       const combined = component.board().columns.find((c: { id: string }) => c.id === 'col-combined');
       const others = component.board().columns.filter((c: { id: string }) => c.id !== 'col-combined');
 
-      expect(component.getTasksForColumn(combined).map((t: Task) => t.id)).toContain(reopened.id);
+      expect((component.tasksByColumnId().get(combined.id) ?? []).map((t: Task) => t.id)).toContain(reopened?.id);
       for (const other of others) {
-        expect(component.getTasksForColumn(other).map((t: Task) => t.id)).not.toContain(reopened.id);
+        expect((component.tasksByColumnId().get(other.id) ?? []).map((t: Task) => t.id)).not.toContain(reopened?.id);
       }
     });
 
@@ -665,8 +671,8 @@ describe('BoardView', () => {
       const pure = component.board().columns.find((c: { id: string }) => c.id === 'col-inprogress');
 
       // Most-specific (single-status) column wins ownership of the shared status
-      expect(component.getTasksForColumn(pure).map((t: Task) => t.id)).toContain(inProgress.id);
-      expect(component.getTasksForColumn(combined).map((t: Task) => t.id)).not.toContain(inProgress.id);
+      expect((component.tasksByColumnId().get(pure.id) ?? []).map((t: Task) => t.id)).toContain(inProgress?.id);
+      expect((component.tasksByColumnId().get(combined.id) ?? []).map((t: Task) => t.id)).not.toContain(inProgress?.id);
     });
 
     it('should render every task in exactly one column (no card duplication)', () => {
@@ -674,8 +680,8 @@ describe('BoardView', () => {
 
       const columns = component.board().columns;
       const assignments = overlapTasks.map((task) =>
-        columns.filter((c: { statusIds: string[] }) =>
-          component.getTasksForColumn(c).some((t: Task) => t.id === task.id),
+        columns.filter((c: { id: string }) =>
+          (component.tasksByColumnId().get(c.id) ?? []).some((t: Task) => t.id === task.id),
         ),
       );
 

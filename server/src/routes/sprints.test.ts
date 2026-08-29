@@ -161,7 +161,7 @@ describe('GET /api/projects/:projectId/sprints', () => {
 
     expect(body).toHaveProperty('data');
     expect(Array.isArray(body.data)).toBe(true);
-    expect((body.data as { name: string }[])[0].name).toBe('Sprint 1');
+    expect((body.data as { name: string }[])[0]?.name).toBe('Sprint 1');
   });
 });
 

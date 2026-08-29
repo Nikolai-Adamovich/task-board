@@ -30,9 +30,10 @@ export function createInvitationRoutes(): Hono<AppEnv> {
    * POST /invitations/:invitationId/accept — accept an invitation.
    */
   router.post('/:invitationId/accept', async (c) => {
+    const userId = c.get('userId');
     const invitationId = c.req.param('invitationId');
 
-    await c.get('svc').tenantMembers.acceptInvitation(invitationId);
+    await c.get('svc').tenantMembers.acceptInvitation(invitationId, userId);
 
     return c.json({ data: { success: true } });
   });

@@ -85,6 +85,11 @@ describe('requirePermission middleware', () => {
       const tenantRole = (c.req.header('X-Tenant-Role') ?? 'MEMBER') as TenantRole;
       const projectRole = c.req.header('X-Project-Role') ?? undefined;
 
+      // Simulate authMiddleware: it always sets userId before role checks.
+      // X-Test-No-User simulates a misconfigured chain where auth never ran.
+      if (!c.req.header('X-Test-No-User')) {
+        c.set('userId', c.req.header('X-Test-User-Id') ?? 'user-1');
+      }
       c.set('tenantRole', tenantRole);
       if (projectRole) {
         c.set('projectRole', projectRole as 'PROJECT_ADMIN' | 'EDITOR' | 'VIEWER');
@@ -142,5 +147,20 @@ describe('requirePermission middleware', () => {
     });
 
     expect(res.status).toBe(200);
+  });
+
+  it('returns 403 when userId is not set (S-18 defense-in-depth)', async () => {
+    const app = createPermissionTestApp('manage_tenant');
+    const res = await app.request('/test/resource', {
+      // Role present, but authMiddleware never ran → no userId in context
+      headers: { 'X-Tenant-Role': 'OWNER', 'X-Test-No-User': '1' },
+    });
+
+    expect(res.status).toBe(403);
+
+    const json = (await res.json()) as { error: { code: string; message: string } };
+
+    expect(json.error.code).toBe('FORBIDDEN');
+    expect(json.error.message).toBe('Authentication required');
   });
 });
