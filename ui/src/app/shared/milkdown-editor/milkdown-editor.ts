@@ -55,6 +55,22 @@ interface EditorBundle {
   destroy: () => Promise<void>;
 }
 
+/** highlight.js grammars registered for code-block highlighting (order matches the imports in `initMilkdown`) */
+const HIGHLIGHT_LANGUAGES = [
+  'javascript',
+  'typescript',
+  'json',
+  'bash',
+  'python',
+  'xml',
+  'css',
+  'sql',
+  'yaml',
+  'diff',
+  'markdown',
+  'plaintext',
+] as const;
+
 /**
  * Reusable WYSIWYG Markdown editor powered by Milkdown.
  *
@@ -265,11 +281,40 @@ export class MilkdownEditor implements OnInit, OnDestroy {
 
       if (isStale()) return;
 
-      // Lazy-load lowlight for syntax highlighting
-      const { common, createLowlight } = await import('lowlight');
+      // Lazy-load lowlight with a curated grammar set. The `common` preset bundles
+      // all 37 highlight.js grammars (~900 kB raw); this dozen covers real usage
+      // in task descriptions and comments at a fraction of the size.
+      const [{ createLowlight }, ...grammarImports] = await Promise.all([
+        import('lowlight'),
+        import('highlight.js/lib/languages/javascript'),
+        import('highlight.js/lib/languages/typescript'),
+        import('highlight.js/lib/languages/json'),
+        import('highlight.js/lib/languages/bash'),
+        import('highlight.js/lib/languages/python'),
+        import('highlight.js/lib/languages/xml'),
+        import('highlight.js/lib/languages/css'),
+        import('highlight.js/lib/languages/sql'),
+        import('highlight.js/lib/languages/yaml'),
+        import('highlight.js/lib/languages/diff'),
+        import('highlight.js/lib/languages/markdown'),
+        import('highlight.js/lib/languages/plaintext'),
+      ]);
+      const lowlight = createLowlight(
+        Object.fromEntries(grammarImports.map((m, i) => [HIGHLIGHT_LANGUAGES[i], m.default])),
+      );
       const { createParser } = await import('@milkdown/plugin-highlight/lowlight');
-      const lowlight = createLowlight(common);
-      const highlightParser = createParser(lowlight);
+      // A fence with an unregistered language (e.g. ```rust) must degrade to
+      // plain text instead of throwing inside the highlighter.
+      const highlightParser = createParser({
+        highlight: (language, code) => {
+          try {
+            return lowlight.highlight(language, code);
+          } catch {
+            return lowlight.highlight('plaintext', code);
+          }
+        },
+        highlightAuto: (code) => lowlight.highlightAuto(code),
+      });
       const { replaceAll } = await import('@milkdown/kit/utils');
 
       if (isStale()) return;
