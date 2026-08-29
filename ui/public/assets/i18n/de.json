@@ -288,6 +288,9 @@
     "roleOwner": "Eigentümer",
     "roleAdmin": "Administrator",
     "roleMember": "Mitglied",
+    "roleProjectAdmin": "Projekt-Admin",
+    "roleEditor": "Bearbeiter",
+    "roleViewer": "Betrachter",
     "name": "Name",
     "status": "Status",
     "actions": "Aktionen",
@@ -668,7 +671,6 @@
     "filtersDesc": "Filtere Aufgaben nach Status, Priorität, Zuweisung und mehr.",
     "title": "Aufgaben",
     "searchPlaceholder": "Aufgaben suchen",
-    "loading": "Aufgaben werden geladen",
     "noTasks": "Keine Aufgaben gefunden. Erstellen Sie eine Aufgabe oder ändern Sie Ihre Filter.",
     "key": "Schlüssel",
     "titleCol": "Titel",
@@ -820,8 +822,6 @@
     "strikethrough": "Durchgestrichen"
   },
   "pagination": {
-    "previous": "Zurück",
-    "next": "Weiter",
     "totalItems": "Einträge",
     "pages": "Seiten",
     "auto": "Auto"

@@ -1,5 +1,16 @@
 import { DatePipe } from '@angular/common';
-import { Component, ElementRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  booleanAttribute,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
 import {
@@ -38,7 +49,6 @@ import { memberStatusBadgeVariant, roleBadgeVariant } from '@app/constants/prior
 import { initials } from '@app/shared/utils/error-utils';
 import { computeAutoPageSize, rowHeightForDensity } from '@app/shared/auto-table/auto-page-size';
 import { useAutoRowMeasurement } from '@app/shared/auto-table/use-auto-row-measurement';
-import { useTableDensity } from '@app/shared/auto-table/table-density';
 
 /** Normalized row model consumed by {@link MemberTable} — both member shapes map onto it. */
 export interface MemberRow {
@@ -185,6 +195,8 @@ export class MemberTable {
   readonly totalPages = input(1);
   /** Q2 (F-05): measured wrapper height forwarded to the host page for Auto pagination. */
   readonly rowsHeightChange = output<number>();
+  /** Measured row pitch forwarded to the host page for an exact Auto page size. */
+  readonly rowHeightChange = output<number>();
   /** Q2 (F-05): the user picked the Auto option in the rows-per-page selector. */
   readonly autoPageSizeChange = output();
   readonly sortField = input('');
@@ -211,15 +223,14 @@ export class MemberTable {
   readonly hardDelete = output<MemberRow>();
   private readonly i18n = inject(TranslocoService);
   /**
-   * Q9 (RQ-04 ⑤): device-local table density — compact mode shrinks vertical cell
-   * padding via a class on the `<table>`; the Auto math reacts through the
+   * Q9 (RQ-04 ⑤): device-local table density — owned by the HOST page (the toggle
+   * lives in the page header) and passed down; compact mode shrinks vertical cell
+   * padding via a class on the `<table>`, and the Auto math reacts through the
    * density-aware fallback row height.
    */
-  private readonly density = useTableDensity();
-  protected readonly isCompact = this.density.compact;
-  protected readonly toggleDensity = this.density.toggle;
+  readonly isCompact = input(false, { transform: booleanAttribute });
   /** Density-aware fallback row height used by the Auto page-size math */
-  private readonly rowHeightPx = computed(() => rowHeightForDensity(this.density.compact()));
+  private readonly rowHeightPx = computed(() => rowHeightForDensity(this.isCompact()));
   /**
    * Q2 (F-05): measures this table's wrapper so Auto mode can derive its row count;
    * the height is forwarded to the host page which owns the effective page size.
@@ -308,9 +319,13 @@ export class MemberTable {
       this.measurement.observe(this.tableWrapRef()?.nativeElement, 'thead');
     });
 
-    // Forward the measured height whenever it changes (host owns the effective size)
+    // Forward the measured height and row pitch whenever they change
+    // (the host page owns the effective page size)
     effect(() => {
-      if (this.autoEnabled()) this.rowsHeightChange.emit(this.availableRowsHeight());
+      if (!this.autoEnabled()) return;
+
+      this.rowsHeightChange.emit(this.availableRowsHeight());
+      this.rowHeightChange.emit(this.measurement.measuredRowHeight());
     });
   }
   protected readonly roleOptions = computed(() =>

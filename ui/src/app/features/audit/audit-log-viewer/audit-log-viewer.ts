@@ -109,13 +109,25 @@ export class AuditLogViewer {
   private readonly tableWrapRef = viewChild<ElementRef<HTMLDivElement>>('tableWrap');
   /** Effective numeric page size used for fetching/rendering. */
   protected readonly effectiveLimit = computed(() =>
-    this.isAutoMode() ? computeAutoPageSize(this.availableRowsHeight(), this.rowHeightPx()) : this.safeLimit(),
+    this.isAutoMode()
+      ? computeAutoPageSize(this.availableRowsHeight(), this.measurement.measuredRowHeight() || this.rowHeightPx())
+      : this.safeLimit(),
   );
 
   constructor() {
     // Measure the table wrapper so Auto mode derives its row count from real space
     effect(() => {
       this.measurement.observe(this.tableWrapRef()?.nativeElement, 'thead');
+    });
+
+    // Remember the last non-empty pagination totals so the pagination stays
+    // stable while a refetch is in flight (see lastKnownPagination).
+    effect(() => {
+      if (this.auditResource.isLoading() || !this.auditResource.hasValue()) return;
+
+      const { total, totalPages } = this.auditResource.value().pagination;
+
+      if (total > 0) this.lastKnownPagination.set({ total, totalPages });
     });
   }
   /** All available entity types for the filter dropdown */
@@ -149,12 +161,26 @@ export class AuditLogViewer {
   });
   // hasValue() guards are mandatory — reading .value() in the error state throws.
   protected readonly events = computed(() => (this.auditResource.hasValue() ? this.auditResource.value().data : []));
-  protected readonly total = computed(() =>
-    this.auditResource.hasValue() ? this.auditResource.value().pagination.total : 0,
-  );
-  protected readonly totalPages = computed(() =>
-    this.auditResource.hasValue() ? this.auditResource.value().pagination.totalPages : 0,
-  );
+  /**
+   * Last non-empty pagination totals — during a refetch the resource resets to
+   * the empty default (total 0), which would collapse the pagination to a single
+   * page and flicker; the last known values keep it stable until data arrives.
+   */
+  private readonly lastKnownPagination = signal({ total: 0, totalPages: 1 });
+  protected readonly total = computed(() => {
+    if (!this.auditResource.isLoading()) {
+      return this.auditResource.hasValue() ? this.auditResource.value().pagination.total : 0;
+    }
+
+    return this.lastKnownPagination().total;
+  });
+  protected readonly totalPages = computed(() => {
+    if (!this.auditResource.isLoading()) {
+      return this.auditResource.hasValue() ? this.auditResource.value().pagination.totalPages : 0;
+    }
+
+    return this.lastKnownPagination().totalPages;
+  });
   protected readonly loading = computed(() => this.auditResource.isLoading());
   protected readonly error = computed(() => {
     // The resource may hand us the raw thrown value or an Error wrapper (with `cause`)

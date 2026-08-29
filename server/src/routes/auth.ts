@@ -27,7 +27,8 @@ export function createAuthRoutes(): Hono<AppEnv> {
    */
   router.post('/register', validateBody(RegisterRequestSchema), async (c) => {
     const body = c.req.valid('json');
-    const result = await c.get('svc').auth.register(body);
+    const clientIp = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
+    const result = await c.get('svc').auth.register(body, clientIp);
 
     return c.json({ data: result }, 201);
   });
@@ -38,7 +39,8 @@ export function createAuthRoutes(): Hono<AppEnv> {
    */
   router.post('/login', validateBody(LoginRequestSchema), async (c) => {
     const body = c.req.valid('json');
-    const result = await c.get('svc').auth.login(body);
+    const clientIp = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
+    const result = await c.get('svc').auth.login(body, clientIp);
 
     return c.json({ data: result }, 200);
   });

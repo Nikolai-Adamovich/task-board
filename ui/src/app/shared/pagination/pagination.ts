@@ -14,6 +14,8 @@ export class Pagination {
   readonly total = input<number>(0);
   /** Available page-size options offered by the selector. */
   readonly pageSizes = input<number[]>([10, 20, 30, 50, 70, 100]);
+  /** Max number of page links shown before ellipsis kicks in. */
+  readonly maxSize = input<number>(5);
   /** Whether first/last edge buttons are shown. */
   readonly showEdges = input<boolean>(true, { transform: booleanAttribute });
   /** Whether an "Auto" entry (viewport-derived size) is offered in the selector. */

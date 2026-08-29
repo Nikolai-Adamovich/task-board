@@ -7,19 +7,6 @@
   <!-- Q2 (F-05): flex column so the table wrapper fills the host page's fixed-height
        area and the pagination footer stays at the bottom (no page scroll, no dead space). -->
   <div class="flex min-h-0 w-full flex-1 flex-col">
-    <!-- Q9 (RQ-04 ⑤): compact/comfortable density toggle (device-local preference) -->
-    <div class="mb-2 flex justify-end">
-      <button
-        hlmBtn
-        variant="outline"
-        size="sm"
-        [hlmTooltip]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
-        [attr.aria-label]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
-        (click)="toggleDensity()"
-      >
-        <ng-icon name="lucideRows3" />
-      </button>
-    </div>
     <div hlmTableContainer #tableWrap class="min-h-0 w-full flex-1">
       <table hlmTable [class.table-density-compact]="isCompact()">
         <thead hlmTableHeader>
@@ -297,8 +284,10 @@
               }
             </tr>
           } @empty {
-            <!-- Q2 (F-05): no loading row/spinner — the empty state renders directly -->
-            <tr hlmTableRow>
+            <!-- Q2 (F-05): no loading row/spinner — the empty state renders directly.
+                 data-table-empty-row: excluded from the Auto page-size row
+                 measurement (much taller than a data row). -->
+            <tr hlmTableRow data-table-empty-row>
               <td hlmTableCell [attr.colspan]="colspan()" class="py-12 text-center">
                 <p class="text-sm text-muted-foreground">{{ 'members.noMembers' | transloco }}</p>
               </td>

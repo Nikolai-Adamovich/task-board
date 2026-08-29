@@ -288,6 +288,9 @@
     "roleOwner": "所有者",
     "roleAdmin": "管理员",
     "roleMember": "成员",
+    "roleProjectAdmin": "项目管理员",
+    "roleEditor": "编辑者",
+    "roleViewer": "查看者",
     "name": "姓名",
     "status": "状态",
     "actions": "操作",
@@ -668,7 +671,6 @@
     "filtersDesc": "按状态、优先级、负责人等筛选任务。",
     "title": "任务",
     "searchPlaceholder": "搜索任务",
-    "loading": "正在加载任务",
     "noTasks": "未找到任务。创建任务或更改筛选器。",
     "key": "键",
     "titleCol": "标题",
@@ -820,8 +822,6 @@
     "strikethrough": "删除线"
   },
   "pagination": {
-    "previous": "上一页",
-    "next": "下一页",
     "totalItems": "条目",
     "pages": "页",
     "auto": "Auto"

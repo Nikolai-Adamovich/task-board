@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { provideIcons, NgIcon } from '@ng-icons/core';
-import { lucideShield, lucideUserPlus } from '@ng-icons/lucide';
+import { lucideRows3, lucideShield, lucideUserPlus } from '@ng-icons/lucide';
 import { finalize, tap } from 'rxjs';
 import { form, FormRoot, FormField, schema, required } from '@angular/forms/signals';
 import { TenantClient } from '@services/tenant-client';
@@ -27,6 +27,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { InvitationStatus, MemberStatus, TenantRole } from '@task-board/shared';
 import type { TenantMember } from '@task-board/shared';
 import { AUTO_PAGE_SIZE_SENTINEL } from '@app/shared/auto-table/auto-page-size';
+import { useTableDensity } from '@app/shared/auto-table/table-density';
 
 interface InviteFormModel {
   email: string;
@@ -49,7 +50,7 @@ interface InviteFormModel {
     HlmNativeSelectImports,
     HlmSpinnerImports,
   ],
-  providers: [provideIcons({ lucideUserPlus, lucideShield })],
+  providers: [provideIcons({ lucideUserPlus, lucideShield, lucideRows3 })],
   templateUrl: './tenant-member-list.html',
 })
 export class TenantMemberList implements OnInit, OnDestroy {
@@ -69,8 +70,14 @@ export class TenantMemberList implements OnInit, OnDestroy {
   /** Q2 (F-05): Auto page-size preference (sentinel 0) shared with the tasks table. */
   protected readonly preferencesStore = inject(PreferencesStore);
   protected readonly isAutoMode = computed(() => this.preferencesStore.pageSize() === AUTO_PAGE_SIZE_SENTINEL);
+  /** Q9 (RQ-04 ⑤): device-local table density toggle for the member table. */
+  private readonly density = useTableDensity();
+  protected readonly isCompact = this.density.compact;
+  protected readonly toggleDensity = this.density.toggle;
   /** Measured member-table wrapper height feeding the Auto page size. */
   protected readonly autoHeight = signal(0);
+  /** Measured row pitch feeding the Auto page size. */
+  protected readonly autoRowHeight = signal(0);
   protected readonly members = signal<TenantMember[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
@@ -134,6 +141,7 @@ export class TenantMemberList implements OnInit, OnDestroy {
     },
     load: () => this.loadMembers(),
     autoAvailableHeight: this.autoHeight,
+    autoRowHeight: this.autoRowHeight,
   });
   protected readonly page = this.table.page;
   protected readonly pageSize = this.table.pageSize;

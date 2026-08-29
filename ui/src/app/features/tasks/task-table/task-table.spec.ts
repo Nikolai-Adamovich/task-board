@@ -450,7 +450,8 @@ describe('TaskTable — W9 polish', () => {
       const root: HTMLElement = fixture.nativeElement.children[0];
 
       // Exactly viewport minus app header (--header-height: 4rem) minus main p-6 (2×1.5rem)
-      expect(root.classList.contains('h-[calc(100dvh-var(--header-height)-3rem)]')).toBe(true);
+      expect(root.classList.contains('h-[calc(100dvh-var(--header-height)-1.5rem)]')).toBe(true);
+      expect(root.classList.contains('lg:h-[calc(100dvh-var(--header-height)-3rem)]')).toBe(true);
       expect(root.classList.contains('flex-col')).toBe(true);
 
       const wrap = component.tableWrapRef()?.nativeElement as HTMLElement | undefined;
@@ -511,7 +512,7 @@ describe('TaskTable — W9 polish', () => {
 
     it('should compute clamped rows from the measured available height', () => {
       expect(computeAutoPageSize(714)).toBe(14); // floor(714/48)
-      expect(computeAutoPageSize(239)).toBe(5); // clamped to minimum
+      expect(computeAutoPageSize(239)).toBe(4); // floor(239/48), above the minimum clamp
       expect(computeAutoPageSize(100000)).toBe(100); // clamped to maximum
     });
 
@@ -533,29 +534,35 @@ describe('TaskTable — W9 polish', () => {
     it('should recompute on wrapper resize and refetch only when the row count changes', () => {
       setup({}, AUTO_PAGE_SIZE_SENTINEL);
 
+      // The probe row renders with a real height in the browser; mock it for jsdom
+      const probe: HTMLElement = fixture.nativeElement.querySelector('tbody tr[data-row-probe]');
+
+      expect(probe).toBeTruthy();
+      vi.spyOn(probe, 'getBoundingClientRect').mockReturnValue({ height: 44 } as DOMRect);
+
       const ro = wrapperObserver();
       const initialCalls = taskClientMock.list.mock.calls.length;
 
-      ro?.trigger(720); // 15 rows
+      ro?.trigger(720); // floor(720/44) = 16 rows
       fixture.detectChanges();
 
       const afterFirst = taskClientMock.list.mock.calls.length;
 
-      expect(component.pageSize()).toBe(15);
+      expect(component.pageSize()).toBe(16);
       expect(afterFirst).toBeGreaterThan(initialCalls);
 
       const lastQuery = taskClientMock.list.mock.calls[afterFirst - 1][1];
 
-      expect(lastQuery).toEqual(expect.objectContaining({ limit: 15 }));
+      expect(lastQuery).toEqual(expect.objectContaining({ limit: 16 }));
 
-      ro?.trigger(730); // still 15 rows → no refetch
+      ro?.trigger(730); // still 16 rows → no refetch
       fixture.detectChanges();
       expect(taskClientMock.list.mock.calls.length).toBe(afterFirst);
 
-      ro?.trigger(2000); // floor(2000/48) = 41 rows → one refetch
+      ro?.trigger(2000); // floor(2000/45) = 44 rows (incl. the 1px row-border pitch) → one refetch
       fixture.detectChanges();
 
-      expect(component.pageSize()).toBe(41);
+      expect(component.pageSize()).toBe(44);
       expect(taskClientMock.list.mock.calls.length).toBe(afterFirst + 1);
     });
 
@@ -577,7 +584,11 @@ describe('TaskTable — W9 polish', () => {
 
     it('should fit MORE rows using the MEASURED row height than the 48px fallback', () => {
       setup({}, AUTO_PAGE_SIZE_SENTINEL);
-      component.tasks.set([{ id: 't1' } as never]);
+      // tasks is now a resource-backed computed — seed the resource value instead
+      component.tasksResource.value.set({
+        data: [{ id: 't1' } as never],
+        pagination: { page: 1, limit: 30, total: 1, totalPages: 1 },
+      });
       fixture.detectChanges();
 
       // Real rows are ~44px tall vs the 48px fallback constant
@@ -1118,7 +1129,11 @@ describe('TaskTable — W9 polish', () => {
 
     function setupWithTasks(tenantRole: string | null = 'OWNER', projectRole: string | null = null) {
       setup({}, 30, tenantRole, projectRole);
-      component.tasks.set([makeTask('t1'), makeTask('t2')]);
+      // tasks is now a resource-backed computed — seed the resource value instead
+      component.tasksResource.value.set({
+        data: [makeTask('t1'), makeTask('t2')],
+        pagination: { page: 1, limit: 30, total: 2, totalPages: 1 },
+      });
       fixture.detectChanges();
     }
 

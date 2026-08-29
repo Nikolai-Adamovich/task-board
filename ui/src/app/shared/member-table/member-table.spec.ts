@@ -374,9 +374,10 @@ describe('MemberTable', () => {
 
       const ro = wrapperObserver();
 
-      ro?.trigger(704); // floor(704/48) = 14 with the fallback, floor(704/44) = 16 measured
+      // floor(704/45) = 15 measured (44px row + 1px border pitch) vs floor(704/48) = 14 fallback
+      ro?.trigger(704);
 
-      expect(component.effectivePageSize()).toBe(16);
+      expect(component.effectivePageSize()).toBe(15);
     });
 
     it('should forward the measured available height to the host page (rowsHeightChange)', () => {

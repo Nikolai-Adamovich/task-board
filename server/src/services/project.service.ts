@@ -37,6 +37,7 @@ const SEED_BOARD_COLUMNS = [
 // ─── Interfaces for cascade delete ───────────────────────────────────────────
 
 export interface ProjectCascadeTaskRepo {
+  findIdsByProject(projectId: string): Promise<string[]>;
   deleteByProject(projectId: string): Promise<void>;
 }
 
@@ -65,7 +66,7 @@ export interface ProjectCascadeRelationshipRepo {
 }
 
 export interface ProjectCascadeCommentRepo {
-  deleteByProject(projectId: string): Promise<void>;
+  deleteByTaskIds(taskIds: string[]): Promise<void>;
 }
 
 export interface ProjectCascadeFilterRepo {
@@ -322,9 +323,13 @@ export class ProjectService {
       throw new AppError(400, 'CONFLICT', 'Project must be in DELETION_PENDING status');
     }
 
-    // Full cascade delete if cascade repos are available
+    // Full cascade delete if cascade repos are available.
+    // Comments are keyed by `taskId` (no `projectId` field) — collect the
+    // project's task ids and delete their comments BEFORE removing the tasks.
     if (this.cascadeRepos) {
-      await this.cascadeRepos.commentRepo.deleteByProject(id);
+      const taskIds = await this.cascadeRepos.taskRepo.findIdsByProject(id);
+
+      await this.cascadeRepos.commentRepo.deleteByTaskIds(taskIds);
       await this.cascadeRepos.relationshipRepo.deleteByProject(id);
       await this.cascadeRepos.taskRepo.deleteByProject(id);
       await this.cascadeRepos.sprintRepo.deleteByProject(id);

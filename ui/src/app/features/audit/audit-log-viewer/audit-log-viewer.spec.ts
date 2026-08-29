@@ -311,8 +311,8 @@ describe('AuditLogViewer (R3-P7 table)', () => {
       await setup(undefined, 0); // AUTO_PAGE_SIZE_SENTINEL
       await settle();
 
-      // jsdom wrapper has no height → clamped to the minimum of 5 rows
-      expect(auditClientMock.listByProject).toHaveBeenCalledWith('p1', expect.objectContaining({ limit: 5 }));
+      // jsdom wrapper has no height → clamped to the minimum of 3 rows
+      expect(auditClientMock.listByProject).toHaveBeenCalledWith('p1', expect.objectContaining({ limit: 3 }));
     });
   });
 });

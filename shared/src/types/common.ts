@@ -110,6 +110,7 @@ export type ErrorCode =
   | 'STATUS_IN_USE'
   | 'SLUG_TAKEN'
   | 'INVALID_RESET_TOKEN'
+  | 'RATE_LIMITED'
   | 'INTERNAL_ERROR';
 
 /** Standard error response returned by API endpoints on failure */

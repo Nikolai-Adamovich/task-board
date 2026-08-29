@@ -1,7 +1,11 @@
 import { inject, signal, computed, type Signal, type WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PreferencesStore } from '@stores/preferences-store';
-import { AUTO_PAGE_SIZE_SENTINEL, computeAutoPageSize } from '@app/shared/auto-table/auto-page-size';
+import {
+  AUTO_PAGE_SIZE_SENTINEL,
+  computeAutoPageSize,
+  TABLE_ROW_HEIGHT_PX,
+} from '@app/shared/auto-table/auto-page-size';
 
 /** Definition of a per-column text/select filter. */
 export interface MemberColumnFilter<T> {
@@ -25,6 +29,12 @@ export interface MemberTableConfig<T> {
    * from this signal via `computeAutoPageSize`.
    */
   autoAvailableHeight?: Signal<number>;
+  /**
+   * Measured row PITCH (bounding rect + shared border, from
+   * {@link useAutoRowMeasurement}) — makes the Auto math exact; falls back to
+   * `TABLE_ROW_HEIGHT_PX` until the first measurement arrives.
+   */
+  autoRowHeight?: Signal<number>;
 }
 
 /** Shared sort / column-filter / pagination state for member tables. */
@@ -65,7 +75,9 @@ export function useMemberTable<T>(config: MemberTableConfig<T>): MemberTableStat
   const isAutoMode = computed(() => pageSize() === AUTO_PAGE_SIZE_SENTINEL);
   /** Effective numeric page size — derived from the measured height in Auto mode. */
   const effectivePageSize = computed(() =>
-    isAutoMode() ? computeAutoPageSize(config.autoAvailableHeight?.() ?? 0) : pageSize(),
+    isAutoMode()
+      ? computeAutoPageSize(config.autoAvailableHeight?.() ?? 0, config.autoRowHeight?.() || TABLE_ROW_HEIGHT_PX)
+      : pageSize(),
   );
   const sortField = signal('');
   const sortDirection = signal<'asc' | 'desc'>('asc');

@@ -34,6 +34,8 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
 
 /** Commands invocable from the toolbar */
 type ToolbarCommand =
@@ -90,6 +92,7 @@ interface EditorBundle {
 export class MilkdownEditor implements OnInit, OnDestroy {
   private readonly elRef = inject(ElementRef<HTMLElement>);
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly notify = injectToasts();
   /** Markdown content input */
   readonly content = input<string>('');
   /** Whether the editor is read-only (hides toolbar, disables editing) */
@@ -332,8 +335,8 @@ export class MilkdownEditor implements OnInit, OnDestroy {
       this.editorReady.set(true);
       this.readyChange.emit(true);
     } catch (err) {
-      // Milkdown failed to load — fall back to textarea
-      console.error('Milkdown init failed:', err);
+      // Milkdown failed to load — surface a toast and fall back to the textarea
+      this.notify.error(getErrorMessage(err));
       this.enterFallbackMode();
     }
   }

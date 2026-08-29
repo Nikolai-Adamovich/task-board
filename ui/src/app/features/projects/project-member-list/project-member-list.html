@@ -1,18 +1,30 @@
 <!-- Q2 (F-05): full-height flex column — exactly viewport minus the app header
-     (--header-height: 4rem) and the shell <main> vertical padding (p-6 → 2×1.5rem);
-     the member table fills the rest so its pagination stays at the page bottom. -->
+     (--header-height: 2.5rem below lg, 4rem from lg) and the shell <main> vertical
+     padding (p-3 → 1.5rem below lg, p-6 → 3rem from lg); the member table fills the
+     rest so its pagination stays at the page bottom. -->
 <div
-  class="flex h-[calc(100dvh-var(--header-height)-3rem)] max-sm:h-[calc(100dvh-var(--header-height)-2rem)] w-full min-w-0 flex-col"
+  class="flex h-[calc(100dvh-var(--header-height)-1.5rem)] lg:h-[calc(100dvh-var(--header-height)-3rem)] w-full min-w-0 flex-col"
 >
   <!-- Page header -->
   <div class="mb-6 flex items-center justify-between">
     <h2 class="text-2xl font-bold text-foreground">{{ 'projectMembers.title' | transloco }}</h2>
-    @if (canManage() && hasContext()) {
-      <button hlmBtn (click)="showAddMember.set(true)">
-        <ng-icon name="lucideUserPlus" class="mr-1" />
-        {{ 'projectMembers.addMember' | transloco }}
+    <div class="flex items-center gap-2">
+      <!-- Q9 (RQ-04 ⑤): compact/comfortable density toggle (device-local preference) -->
+      <button
+        hlmBtn
+        variant="outline"
+        [attr.aria-label]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
+        (click)="toggleDensity()"
+      >
+        <ng-icon name="lucideRows3" />
       </button>
-    }
+      @if (canManage() && hasContext()) {
+        <button hlmBtn (click)="showAddMember.set(true)">
+          <ng-icon name="lucideUserPlus" class="mr-1" />
+          {{ 'projectMembers.addMember' | transloco }}
+        </button>
+      }
+    </div>
   </div>
 
   <!-- Shared member table (U4) — full-height + Auto rows-per-page (Q2/F-05) -->
@@ -33,7 +45,9 @@
       [filters]="filterValues()"
       [autoEnabled]="true"
       [isAuto]="isAutoMode()"
+      [isCompact]="isCompact()"
       (rowsHeightChange)="autoHeight.set($event)"
+      (rowHeightChange)="autoRowHeight.set($event)"
       (autoPageSizeChange)="preferencesStore.setPageSize(0)"
       (sortToggle)="table.toggleSort($event)"
       (filterChange)="table.onColumnFilterChange($event.field, $event.value)"

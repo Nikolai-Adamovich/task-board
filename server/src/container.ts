@@ -114,9 +114,20 @@ export function buildServices(env: ContainerEnv): Services {
     tenantMembers: tenantMemberRepo,
   });
   const auditService = new AuditService(auditRepo, userRepo, auditEnrichment);
-  const emailService = env.RESEND_API_KEY
-    ? new EmailService(env.RESEND_API_KEY, 'noreply@taskboard.app', env.FRONTEND_URL || '')
-    : new ConsoleEmailService();
+  let emailService: EmailService | ConsoleEmailService;
+
+  if (env.RESEND_API_KEY) {
+    emailService = new EmailService(env.RESEND_API_KEY, 'noreply@taskboard.app', env.FRONTEND_URL || '');
+  } else {
+    // Loud, per-request warning: without an API key emails are never delivered
+    // and the console stub only logs masked tokens — invitation/reset flows
+    // cannot complete. This must never silently "work" in production.
+    console.warn(
+      '[container] RESEND_API_KEY is not configured — falling back to ConsoleEmailService. ' +
+        'Emails are NOT delivered; invitation/reset tokens are logged masked only.',
+    );
+    emailService = new ConsoleEmailService();
+  }
 
   return {
     auth: new AuthService(
@@ -128,10 +139,10 @@ export function buildServices(env: ContainerEnv): Services {
       env.FRONTEND_URL || 'http://localhost:4200',
     ),
     audit: auditService,
-    boards: new BoardService(boardRepo, statusRepo),
+    boards: new BoardService(boardRepo, statusRepo, projectRepo, auditService, projectMemberRepo),
     comments: new CommentService(commentRepo, userRepo, taskRepo, projectMemberRepo),
     filters: new FilterService(filterRepo),
-    labels: new LabelService(labelRepo, taskRepo),
+    labels: new LabelService(labelRepo, taskRepo, projectRepo, auditService, projectMemberRepo),
     preferences: new UserPreferencesService(
       new UserPreferencesRepository(getCollection<UserPreferencesDocument>('user_preferences')),
       boardRepo,
@@ -142,7 +153,13 @@ export function buildServices(env: ContainerEnv): Services {
       statuses: getCollection<Document>('statuses'),
       boards: getCollection<Document>('boards'),
     }),
-    relationships: new TaskRelationshipService(relationshipRepo, taskRepo),
+    relationships: new TaskRelationshipService(
+      relationshipRepo,
+      taskRepo,
+      projectRepo,
+      auditService,
+      projectMemberRepo,
+    ),
     sprints: new SprintService(sprintRepo, projectRepo, taskRepo, auditService, projectMemberRepo),
     statuses: new StatusService(statusRepo, taskRepo, boardRepo, projectRepo, auditService, projectMemberRepo),
     tasks: new TaskService(
@@ -158,7 +175,7 @@ export function buildServices(env: ContainerEnv): Services {
       relationshipRepo,
       auditService,
     ),
-    taskTypes: new TaskTypeService(taskTypeRepo, taskRepo, projectRepo, auditService),
+    taskTypes: new TaskTypeService(taskTypeRepo, taskRepo, projectRepo, auditService, projectMemberRepo),
     tenantMembers: new TenantMemberService(tenantRepo, tenantMemberRepo, userRepo, emailService),
     tenants: new TenantService(tenantRepo, tenantMemberRepo, userRepo, undefined, undefined, projectMemberRepo),
   };

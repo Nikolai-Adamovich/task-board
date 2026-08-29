@@ -49,13 +49,37 @@ export const BulkUpdateTasksSchema = z.object({
     }),
 });
 
+/** Whitelisted sort fields — must match TaskRepository's supported sorts
+ * (plain fields + SEMANTIC_SORT_FIELDS). Prevents sorting on arbitrary /
+ * unindexed / nested fields from user input. */
+const SORT_FIELDS = [
+  'number',
+  'createdAt',
+  'updatedAt',
+  'title',
+  'typeId',
+  'priority',
+  'statusId',
+  'sprintId',
+  'assigneeId',
+  'reporterId',
+  'labelIds',
+] as const;
+
 /**
  * Schema for task query parameters.
  */
 export const TaskQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
-  sort: z.string().optional(),
+  // 200: the board view fetches a project's full task list in one request
+  limit: z.coerce.number().int().min(1).max(200).optional().default(20),
+  sort: z
+    .string()
+    .regex(
+      new RegExp(`^(${SORT_FIELDS.join('|')}):(asc|desc)$`),
+      `sort must be "<field>:<asc|desc>" with field one of: ${SORT_FIELDS.join(', ')}`,
+    )
+    .optional(),
   search: z.string().optional(),
   statusId: uuid().optional(),
   priority: z.enum(TaskPriorityValues).optional(),

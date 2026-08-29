@@ -13,6 +13,14 @@
   --role-member: oklch(0.65 0.15 80);
 }
 
+/* Compact app header on small resolutions (landscape phones / short windows);
+   the full 4rem header returns from lg up. */
+@media (max-width: 1023.98px) {
+  :root {
+    --header-height: 2.5rem;
+  }
+}
+
 /* P6/9b: sidebar palette fallbacks. The vendored sidebar menu button styles use
    bg-sidebar-accent / text-sidebar-accent-foreground for hover + active states,
    but not every theme sheet defines the --sidebar-* tokens (light, light2 don't).

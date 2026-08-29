@@ -39,7 +39,7 @@ describe('Pagination', () => {
     const { items } = setup();
 
     expect(items.length).toBe(7); // Previous + 5 pages + Next
-    expect(items[0].textContent).toContain('pagination.previous');
+    expect(items[0].querySelector('ng-icon')).toBeTruthy(); // chevron-only edge buttons
     expect(items[0].classList.contains('pointer-events-none')).toBe(true);
     expect(items[0].classList.contains('opacity-50')).toBe(true);
     expect(items[items.length - 1].classList.contains('pointer-events-none')).toBe(false);
@@ -75,7 +75,7 @@ describe('Pagination', () => {
     const { items } = setup({ showEdges: false });
 
     expect(items.length).toBe(5); // page numbers only
-    expect(items[0].textContent).not.toContain('pagination.previous');
-    expect(items[items.length - 1].textContent).not.toContain('pagination.next');
+    expect(items[0].querySelector('ng-icon')).toBeNull();
+    expect(items[items.length - 1].querySelector('ng-icon')).toBeNull();
   });
 });

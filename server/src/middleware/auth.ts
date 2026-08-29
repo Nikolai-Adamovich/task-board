@@ -2,7 +2,6 @@ import { createMiddleware } from 'hono/factory';
 import { verify } from 'hono/jwt';
 import { UnauthorizedError } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';
-import type { User } from '@task-board/shared';
 
 // ─── JWT Verification (hono/jwt — Workers compatible) ────────────────────────
 
@@ -56,20 +55,14 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
     throw new UnauthorizedError('Invalid or expired token');
   }
 
-  // Build the User object from JWT claims.
-  // Note: The full user object (including deletedAt check) should be populated
-  // by looking up the user in the database. The JWT carries basic identity.
-  // For now, we construct a minimal User from the JWT payload.
-  // Routes that need full user data (e.g., deletedAt check) should query the DB.
-  const user: User = {
-    id: payload.sub,
-    email: payload.email,
-    displayName: payload.displayName ?? '',
-    avatarUrl: payload.avatarUrl ?? null,
-    createdAt: '',
-    updatedAt: '',
-    deletedAt: null,
-  };
+  // Verify the user still exists and is not soft-deleted. The JWT alone cannot
+  // be trusted for this: a deleted user's token would otherwise stay valid
+  // until expiry (24h). The lookup is cheap — unique index on `users.id`.
+  const user = await c.get('svc').auth.findActiveUser(payload.sub);
+
+  if (!user) {
+    throw new UnauthorizedError('User account no longer exists');
+  }
 
   // Set context variables for downstream middleware and handlers
   c.set('userId', payload.sub);

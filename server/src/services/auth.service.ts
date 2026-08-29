@@ -40,6 +40,12 @@ export const PASSWORD_RESET_TTL_MINUTES = 60;
 /** Forgot-password rate limit: max requests per email+IP within the window */
 const FORGOT_PASSWORD_MAX_REQUESTS = 5;
 const FORGOT_PASSWORD_WINDOW_MS = 15 * 60 * 1000;
+/** Login rate limit: max attempts per email+IP within the window (brute-force mitigation) */
+const LOGIN_MAX_REQUESTS = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+/** Registration rate limit: max accounts per IP within the window (mass-creation mitigation) */
+const REGISTER_MAX_REQUESTS = 20;
+const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 
 /**
  * Minimal mailer contract needed by AuthService for password-reset emails.
@@ -50,37 +56,43 @@ export interface PasswordResetMailer {
 }
 
 /**
- * Best-effort in-memory rate limiter for forgot-password (per email+IP).
+ * Best-effort in-memory sliding-window rate limiter factory.
  *
- * Intentionally module-level: it must survive across requests to be effective.
- * On Cloudflare Workers it is per-isolate and resets on eviction — acceptable
- * for MVP abuse mitigation (DEC-023 / security notes §21).
+ * Intentionally module-level: limiters must survive across requests to be
+ * effective. On Cloudflare Workers they are per-isolate and reset on eviction
+ * — acceptable for MVP abuse mitigation (DEC-023 / security notes §21).
  */
-const forgotPasswordAttempts = new Map<string, number[]>();
+function createRateLimiter(maxRequests: number, windowMs: number): (key: string) => boolean {
+  const attempts = new Map<string, number[]>();
 
-function isRateLimited(key: string): boolean {
-  const now = Date.now();
-  const attempts = (forgotPasswordAttempts.get(key) ?? []).filter((ts) => now - ts < FORGOT_PASSWORD_WINDOW_MS);
+  return (key: string): boolean => {
+    const now = Date.now();
+    const timestamps = (attempts.get(key) ?? []).filter((ts) => now - ts < windowMs);
 
-  if (attempts.length >= FORGOT_PASSWORD_MAX_REQUESTS) {
-    forgotPasswordAttempts.set(key, attempts);
-    return true;
-  }
+    if (timestamps.length >= maxRequests) {
+      attempts.set(key, timestamps);
+      return true;
+    }
 
-  attempts.push(now);
-  forgotPasswordAttempts.set(key, attempts);
+    timestamps.push(now);
+    attempts.set(key, timestamps);
 
-  // Opportunistic cleanup of stale keys to bound memory growth
-  if (forgotPasswordAttempts.size > 1000) {
-    for (const [k, timestamps] of forgotPasswordAttempts) {
-      if (timestamps.every((ts) => now - ts >= FORGOT_PASSWORD_WINDOW_MS)) {
-        forgotPasswordAttempts.delete(k);
+    // Opportunistic cleanup of stale keys to bound memory growth
+    if (attempts.size > 1000) {
+      for (const [k, ts] of attempts) {
+        if (ts.every((t) => now - t >= windowMs)) {
+          attempts.delete(k);
+        }
       }
     }
-  }
 
-  return false;
+    return false;
+  };
 }
+
+const isForgotPasswordRateLimited = createRateLimiter(FORGOT_PASSWORD_MAX_REQUESTS, FORGOT_PASSWORD_WINDOW_MS);
+const isLoginRateLimited = createRateLimiter(LOGIN_MAX_REQUESTS, LOGIN_WINDOW_MS);
+const isRegisterRateLimited = createRateLimiter(REGISTER_MAX_REQUESTS, REGISTER_WINDOW_MS);
 
 /** Create a deterministic SHA-256 hash of a token for storage/lookup (Web Crypto — Workers compatible) */
 async function hashToken(token: string): Promise<string> {
@@ -104,10 +116,23 @@ export class AuthService {
   ) {}
 
   /**
+   * Find an active (non-deleted) user by id.
+   * Used by authMiddleware to reject tokens of soft-deleted users.
+   */
+  findActiveUser(id: string): Promise<User | null> {
+    return this.userRepo.findById(id);
+  }
+
+  /**
    * Register a new user.
    * Creates the user and activates any pending invitations for the email.
+   * Rate-limited per client IP (mass account creation mitigation).
    */
-  async register(input: RegisterRequest): Promise<AuthResponse> {
+  async register(input: RegisterRequest, clientIp?: string): Promise<AuthResponse> {
+    if (isRegisterRateLimited(clientIp ?? 'unknown')) {
+      throw new AppError(429, 'RATE_LIMITED', 'Too many registration attempts. Try again later.');
+    }
+
     const normalizedEmail = input.email.toLowerCase().trim();
     const existingUser = await this.userRepo.findByEmail(normalizedEmail);
 
@@ -145,9 +170,15 @@ export class AuthService {
 
   /**
    * Log in with email and password.
+   * Rate-limited per email+IP (brute-force mitigation).
    */
-  async login(input: LoginRequest): Promise<AuthResponse> {
+  async login(input: LoginRequest, clientIp?: string): Promise<AuthResponse> {
     const normalizedEmail = input.email.toLowerCase().trim();
+
+    if (isLoginRateLimited(`${normalizedEmail}:${clientIp ?? 'unknown'}`)) {
+      throw new AppError(429, 'RATE_LIMITED', 'Too many login attempts. Try again later.');
+    }
+
     const userDoc = await this.userRepo.findByEmail(normalizedEmail);
 
     // V1-8: wrong credentials must return a distinct INVALID_CREDENTIALS code so
@@ -291,7 +322,7 @@ export class AuthService {
   async requestPasswordReset(input: { email: string }, clientIp?: string): Promise<ForgotPasswordResponse> {
     const normalizedEmail = input.email.toLowerCase().trim();
 
-    if (!isRateLimited(`${normalizedEmail}:${clientIp ?? 'unknown'}`)) {
+    if (!isForgotPasswordRateLimited(`${normalizedEmail}:${clientIp ?? 'unknown'}`)) {
       const user = await this.userRepo.findActiveByEmail(normalizedEmail);
 
       if (user) {

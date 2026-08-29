@@ -92,7 +92,7 @@ describe('useAutoRowMeasurement', () => {
     init();
 
     expect(measurement.availableRowsHeight()).toBe(744); // 800 − 56
-    expect(measurement.measuredRowHeight()).toBe(44);
+    expect(measurement.measuredRowHeight()).toBe(45); // 44px rect + 1px border pitch
   });
 
   it('should report 0 when no real body row exists', () => {
@@ -117,6 +117,51 @@ describe('useAutoRowMeasurement', () => {
     expect(measurement.measuredRowHeight()).toBe(0);
   });
 
+  it('should use the MEDIAN of multiple body rows (an unrepresentative first row must not skew the count)', () => {
+    rectHeight(row, 60); // e.g. wrapped title on the first row
+
+    const row2 = document.createElement('tr');
+    const row3 = document.createElement('tr');
+
+    rectHeight(row2, 44);
+    rectHeight(row3, 44);
+    tbody.append(row2, row3);
+    init();
+
+    expect(measurement.measuredRowHeight()).toBe(45); // median 44 + 1px border pitch
+  });
+
+  it('should prefer the data-row probe height when a probe row is present', () => {
+    const probeTable = document.createElement('table');
+    const probeBody = document.createElement('tbody');
+    const probe = document.createElement('tr');
+
+    probe.setAttribute('data-row-probe', '');
+    rectHeight(probe, 41);
+    probeBody.appendChild(probe);
+    probeTable.appendChild(probeBody);
+    wrapper.appendChild(probeTable);
+    init();
+
+    // The probe (41 + 1px border pitch) wins over the data-row median (44 + 1)
+    expect(measurement.measuredRowHeight()).toBe(42);
+  });
+
+  it('should ignore a probe row below the sanity threshold and fall back to the median', () => {
+    const probeTable = document.createElement('table');
+    const probeBody = document.createElement('tbody');
+    const probe = document.createElement('tr');
+
+    probe.setAttribute('data-row-probe', '');
+    rectHeight(probe, MIN_MEASURED_ROW_HEIGHT_PX - 1);
+    probeBody.appendChild(probe);
+    probeTable.appendChild(probeBody);
+    wrapper.appendChild(probeTable);
+    init();
+
+    expect(measurement.measuredRowHeight()).toBe(45); // data-row median 44 + 1px border pitch
+  });
+
   it('should re-measure on a wrapper tick', () => {
     init();
 
@@ -127,7 +172,7 @@ describe('useAutoRowMeasurement', () => {
     ro.trigger({ height: 900 });
 
     expect(measurement.availableRowsHeight()).toBe(844); // 900 − 56
-    expect(measurement.measuredRowHeight()).toBe(40);
+    expect(measurement.measuredRowHeight()).toBe(41); // 40px rect + 1px border pitch
   });
 
   it('should not misread a row-element tick as the wrapper height', () => {
@@ -142,6 +187,6 @@ describe('useAutoRowMeasurement', () => {
 
     // Wrapper height is re-read directly — unchanged at 800
     expect(measurement.availableRowsHeight()).toBe(744);
-    expect(measurement.measuredRowHeight()).toBe(44);
+    expect(measurement.measuredRowHeight()).toBe(45); // 44px rect + 1px border pitch
   });
 });

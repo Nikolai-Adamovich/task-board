@@ -72,9 +72,16 @@ export class CommentRepository extends BaseRepository<CommentDocument, Comment> 
   }
 
   /**
-   * Delete all entities belonging to a project. Used for cascade delete.
+   * Delete all comments belonging to a set of tasks. Used for cascade delete.
+   *
+   * Comments are linked to tasks via `taskId` and have no `projectId` field —
+   * a `{ projectId }` filter never matched anything. The project cascade
+   * collects task ids first (see ProjectService.permanentDelete) and deletes
+   * comments through them BEFORE the tasks themselves are removed.
    */
-  async deleteByProject(projectId: string): Promise<void> {
-    await this.collection.deleteMany({ projectId });
+  async deleteByTaskIds(taskIds: string[]): Promise<void> {
+    if (taskIds.length === 0) return;
+
+    await this.collection.deleteMany({ taskId: { $in: taskIds } });
   }
 }

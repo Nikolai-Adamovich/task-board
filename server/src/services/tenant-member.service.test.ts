@@ -13,6 +13,7 @@ import { ConflictError } from '../errors/app-error.js';
 function createMockTenantRepo() {
   return {
     findById: vi.fn(),
+    findByIds: vi.fn().mockResolvedValue([]),
   };
 }
 
@@ -33,6 +34,7 @@ function createMockTenantMemberRepo() {
 function createMockUserRepo() {
   return {
     findById: vi.fn(),
+    findByIds: vi.fn().mockResolvedValue([]),
     findByEmail: vi.fn(),
     create: vi.fn(),
     updateProfile: vi.fn(),
@@ -373,7 +375,8 @@ describe('TenantMemberService (DEC-018 semantics)', () => {
           updatedAt: new Date(NOW),
         },
       ]);
-      userRepo.findById.mockResolvedValue({ id: 'user-2', displayName: 'Invitee', email: 'invitee@example.com' });
+      userRepo.findByIds.mockResolvedValue([{ id: 'user-2', displayName: 'Invitee', email: 'invitee@example.com' }]);
+      tenantRepo.findByIds.mockResolvedValue([{ id: 'tenant-1', name: 'Tenant 1' }]);
 
       const result = await service.getMyInvitations('invitee@example.com');
 

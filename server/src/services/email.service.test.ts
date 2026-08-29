@@ -145,7 +145,9 @@ describe('ConsoleEmailService', () => {
       expect(invitationLog).toContain('user@example.com');
       expect(tenantLog).toContain('Acme');
       expect(roleLog).toContain('member');
-      expect(urlLog).toContain('accept-invitation?token=tok-123');
+      // token is masked in logs — raw tokens must never leak via the console stub
+      expect(urlLog).toContain('accept-invitation?token=<redacted>');
+      expect(urlLog).not.toContain('tok-123');
     });
   });
 
@@ -164,7 +166,9 @@ describe('ConsoleEmailService', () => {
       const expiryLog = consoleSpy.mock.calls[2]?.[0] as string;
 
       expect(toLog).toContain('user@example.com');
-      expect(urlLog).toContain('/auth/reset-password?token=tok-123');
+      // token is masked in logs — raw tokens must never leak via the console stub
+      expect(urlLog).toContain('/auth/reset-password?token=<redacted>');
+      expect(urlLog).not.toContain('tok-123');
       expect(expiryLog).toContain('60 minutes');
     });
   });

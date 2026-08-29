@@ -1,4 +1,5 @@
 import type { Collection } from 'mongodb';
+import { escapeRegExp } from '../utils/regex.js';
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
@@ -40,9 +41,14 @@ export class CounterRepository {
   }
 
   /**
-   * Delete all entities belonging to a project. Used for cascade delete.
+   * Delete all counters belonging to a project. Used for cascade delete.
+   *
+   * Counter documents are keyed `_id: "taskNumber:<projectId>"` and carry no
+   * `projectId` field — filtering on `{ projectId }` never matched anything,
+   * so the cascade silently leaked counter documents. Filter on the key
+   * prefix instead (escaped — projectId is a UUID but never trust it raw).
    */
   async deleteByProject(projectId: string): Promise<void> {
-    await this.collection.deleteMany({ projectId });
+    await this.collection.deleteMany({ _id: { $regex: `^taskNumber:${escapeRegExp(projectId)}$` } });
   }
 }

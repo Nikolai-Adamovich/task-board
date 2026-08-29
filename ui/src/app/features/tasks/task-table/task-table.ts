@@ -2,8 +2,8 @@ import { Component, DestroyRef, ElementRef, inject, input, computed, effect, sig
 import { numberAttribute } from '@angular/core';
 import { NavigationEnd, Router, ActivatedRoute } from '@angular/router';
 import { CdkMenuTrigger } from '@angular/cdk/menu';
-import { filter } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter, of } from 'rxjs';
+import { rxResource, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectStore } from '@stores/project-store';
 import { PreferencesStore } from '@stores/preferences-store';
 import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
@@ -23,7 +23,6 @@ import {
   lucideX,
 } from '@ng-icons/lucide';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
@@ -35,7 +34,7 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 import { HlmCheckboxImports } from '@spartan-ng/helm/checkbox';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmDatePickerImports } from '@spartan-ng/helm/date-picker';
-import { TaskClient } from '@services/task-client';
+import { TaskClient, type PaginatedResponse } from '@services/task-client';
 import { Pagination } from '@app/shared/pagination/pagination';
 import { FilterPanel } from '@features/filters/filter-panel/filter-panel';
 import { AppliedFilterState } from '@features/filters/filter-panel/filter-panel';
@@ -106,6 +105,14 @@ export function safeNumericParam(value: unknown): number {
 }
 
 /**
+ * Empty list envelope — resource `defaultValue` and the fallback stream result
+ * while the project context has not resolved yet (keeps the table renderable).
+ */
+const EMPTY_TASK_PAGE: PaginatedResponse<Task> = {
+  data: [],
+  pagination: { page: 1, limit: 0, total: 0, totalPages: 0 },
+};
+/**
  * Q10: sentinels for the nullable bulk-select options — hlm-select values are
  * strings, so "unassign"/"clear sprint" need a non-empty marker that maps to
  * `null` in the request body.
@@ -133,7 +140,6 @@ function resolveNameToId(name: string, options: SelectOption[]): string {
     TranslocoPipe,
     NgIcon,
     HlmButtonImports,
-    HlmSpinnerImports,
     HlmInputImports,
     HlmBadgeImports,
     HlmSelectImports,
@@ -219,14 +225,15 @@ export class TaskTable {
    * R3-P3: height available for table ROWS, measured from the table wrapper via a
    * shared ResizeObserver (wrapper height minus its header row). No window/chrome
    * constants — the table bottom aligns with the page bottom at any viewport height.
+   * The row height comes from the invisible probe row in the template (same cell
+   * structure as a data row), so the FIRST fetch already uses an accurate Auto
+   * page size.
    */
   private readonly measurement = useAutoRowMeasurement();
   protected readonly availableRowsHeight = this.measurement.availableRowsHeight;
   /**
-   * Effective row height for the Auto math: the REAL measured
-   * body-row height when available (real rows are ~44px vs the 48px fallback —
-   * using the fallback undercounts how many rows fit), otherwise the
-   * density-aware constant.
+   * Effective row height for the Auto math: the probe-row height when available,
+   * otherwise the density-aware constant.
    */
   private readonly effectiveRowHeightPx = computed(() => this.measurement.measuredRowHeight() || this.rowHeightPx());
   private readonly tableWrapRef = viewChild<ElementRef<HTMLDivElement>>('tableWrap');
@@ -289,10 +296,60 @@ export class TaskTable {
     return key ? this.transloco.translate(key) : priority;
   }
   // ─── Data ──────────────────────────────────────────────────────────────────
-  protected readonly tasks = signal<Task[]>([]);
-  protected readonly total = signal(0);
-  protected readonly totalPages = signal(0);
-  protected readonly loading = signal(true);
+  /**
+   * Auto mode: the fetch waits until the table STRUCTURE is rendered and
+   * measured — the header columns and the probe row depend on async per-project
+   * preferences, so before they resolve the measured row height is 0 and any
+   * page-size math would be wrong (wrong limit + a refinement request).
+   */
+  private readonly autoReady = computed(() => !this.isAutoMode() || this.measurement.measuredRowHeight() > 0);
+  /**
+   * Task list fetch — `rxResource` over `TaskClient.list` with reactive params
+   * derived from the URL-bound query signals. Switching filters/page/sort
+   * cancels the in-flight request automatically (no race), errors surface as a
+   * toast (see the error effect below), and all reads are `hasValue()`-guarded
+   * with a `defaultValue` so the table stays renderable while loading.
+   */
+  private readonly tasksResource = rxResource({
+    params: () => ({
+      pid: this.projectId(),
+      query: this.taskQuery(),
+      reloadTick: this.reloadTick(),
+      ready: this.autoReady(),
+    }),
+    stream: ({ params }) => {
+      // Auto mode: skip the fetch until the table structure (header + probe row)
+      // has rendered and been measured — otherwise the page-size math runs on
+      // placeholder geometry and produces a wrong limit.
+      if (!params.pid || !params.ready) {
+        return of(EMPTY_TASK_PAGE);
+      }
+
+      return this.taskClient.list(params.pid, params.query);
+    },
+    defaultValue: EMPTY_TASK_PAGE,
+  });
+  protected readonly tasks = computed(() => (this.tasksResource.hasValue() ? this.tasksResource.value().data : []));
+  /**
+   * Last non-empty pagination totals. During a refetch the resource resets to the
+   * empty default (total 0), which would collapse the pagination to a single page
+   * and flicker — the last known values keep it stable until fresh data arrives.
+   */
+  private readonly lastKnownPagination = signal({ total: 0, totalPages: 1 });
+  protected readonly total = computed(() => {
+    if (!this.tasksResource.isLoading()) {
+      return this.tasksResource.hasValue() ? this.tasksResource.value().pagination.total : 0;
+    }
+
+    return this.lastKnownPagination().total;
+  });
+  protected readonly totalPages = computed(() => {
+    if (!this.tasksResource.isLoading()) {
+      return this.tasksResource.hasValue() ? this.tasksResource.value().pagination.totalPages : 0;
+    }
+
+    return this.lastKnownPagination().totalPages;
+  });
   // ─── Q10 (RQ-04 ③): multi-select + bulk actions ─────────────────────────────
   /** Page-scoped selection set — cleared whenever the table data reloads */
   protected readonly selectedIds = signal<Set<string>>(new Set());
@@ -541,6 +598,18 @@ export class TaskTable {
     page: this.safePage(),
     limit: this.pageSize(),
   }));
+  /**
+   * P8-12: identity of the current query scope — everything that changes WHICH
+   * tasks are listed (project, filters, page, sort) but NOT the page size.
+   * The page-scoped selection clears when this changes; limit-only refetches
+   * (e.g. the Auto page-size re-measure) keep it.
+   */
+  private readonly taskScopeKey = computed(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { limit: _limit, ...scope } = this.taskQuery();
+
+    return JSON.stringify({ pid: this.projectId(), scope });
+  });
   /** Free-text search is debounced (~300 ms) so typing doesn't fire a request per keystroke */
   private static readonly SEARCH_DEBOUNCE_MS = 300;
   private searchDebounceHandle: ReturnType<typeof setTimeout> | null = null;
@@ -548,13 +617,16 @@ export class TaskTable {
   protected readonly searchInput = signal('');
   /**
    * V1-3: bumped when a router navigation completes while this table is alive
-   * (e.g. browser-back from `tasks/new`). Read by the fetch effect so returning
-   * to the table always re-runs the query — the list can never go stale.
+   * (e.g. browser-back from `tasks/new`). Included in the `tasksResource`
+   * params so returning to the table always re-runs the query — the list can
+   * never go stale. DOCUMENTED EXCEPTION: a pure `rxResource` would not refetch
+   * here because identical URL params produce identical `params`; this minimal
+   * trigger is kept deliberately for the navigation-back refresh.
    */
   private readonly reloadTick = signal(0);
   /**
-   * P8-12: scope key of the last completed fetch (see the fetch effect).
-   * Null until the first response lands — the initial load must not "clear"
+   * P8-12: scope key of the last seen query (see the selection effect).
+   * Null until the first pass — the initial load must not "clear"
    * an already-empty selection.
    */
   private lastScopeKey: string | null = null;
@@ -566,6 +638,16 @@ export class TaskTable {
       this.refStore.ensure(this.projectId(), ['statuses', 'types', 'sprints', 'labels', 'members']);
     });
 
+    // Remember the last non-empty pagination totals so the pagination stays
+    // stable while a refetch is in flight (see lastKnownPagination).
+    effect(() => {
+      if (this.tasksResource.isLoading() || !this.tasksResource.hasValue()) return;
+
+      const { total, totalPages } = this.tasksResource.value().pagination;
+
+      if (total > 0) this.lastKnownPagination.set({ total, totalPages });
+    });
+
     // R3-P4: load the per-project preferences (incl. taskTableColumns) for this table
     effect(() => {
       const pid = this.projectId();
@@ -573,50 +655,34 @@ export class TaskTable {
       if (pid) this.preferencesStore.loadProjectPreferences(pid);
     });
 
-    // Reload tasks whenever the query changes (initial load included)
+    // Q10/P8-12: selection is page-scoped — cleared when the query scope
+    // (filters/page/sort/project) changes, but NOT on limit-only refetches.
+    // Clicking a row checkbox renders the bulk bar, which shrinks the table
+    // wrapper; in Auto page-size mode the ResizeObserver then recomputes the
+    // size and refetches — that refetch must not wipe the fresh selection.
+    // Also handles the invalid-page redirect once a response is available.
     effect(() => {
-      const query = this.taskQuery();
-      const pid = this.projectId();
+      if (!this.tasksResource.hasValue()) return;
 
-      this.reloadTick(); // V1-3: re-run the fetch when navigation back completes
+      const res = this.tasksResource.value();
+      const scopeKey = this.taskScopeKey();
 
-      if (!pid) return;
+      if (this.lastScopeKey !== null && scopeKey !== this.lastScopeKey) {
+        this.selectedIds.set(new Set());
+      }
+      this.lastScopeKey = scopeKey;
 
-      // P8-12: identity of THIS request's query scope — everything that changes
-      // WHICH tasks are listed (project, filters, page, sort) but NOT the page
-      // size. Captured synchronously so the response handler can tell a scope
-      // change (clear selection) from a limit-only refetch (keep it).
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { limit: _limit, ...scope } = query;
-      const scopeKey = JSON.stringify({ pid, scope });
+      // Handle invalid page — move to nearest valid page
+      if (res.pagination.totalPages > 0 && this.page() > res.pagination.totalPages) {
+        this.patchParams({ page: res.pagination.totalPages });
+      }
+    });
 
-      this.loading.set(true);
-      this.taskClient.list(pid, query).subscribe({
-        next: (res) => {
-          this.tasks.set(res.data);
-          this.total.set(res.pagination.total);
-          this.totalPages.set(res.pagination.totalPages);
-          this.loading.set(false);
-          // Q10/P8-12: selection is page-scoped — cleared when the query scope
-          // (filters/page/sort/project) changes, but NOT on limit-only refetches.
-          // Clicking a row checkbox renders the bulk bar, which shrinks the table
-          // wrapper; in Auto page-size mode the ResizeObserver then recomputes the
-          // size and refetches — that refetch must not wipe the fresh selection.
-          if (this.lastScopeKey !== null && scopeKey !== this.lastScopeKey) {
-            this.selectedIds.set(new Set());
-          }
-          this.lastScopeKey = scopeKey;
+    // Convention: a failed list load surfaces as a toast — never console-only.
+    effect(() => {
+      const err = this.tasksResource.error();
 
-          // Handle invalid page — move to nearest valid page
-          if (res.pagination.totalPages > 0 && this.page() > res.pagination.totalPages) {
-            this.patchParams({ page: res.pagination.totalPages });
-          }
-        },
-        error: (err) => {
-          console.error('Failed to load tasks:', err);
-          this.loading.set(false);
-        },
-      });
+      if (err) this.notify.error(getErrorMessage(err));
     });
 
     // Keep the buffered search text in sync with external URL changes (back/forward, chip removal).
@@ -639,6 +705,7 @@ export class TaskTable {
           firstNavigation = false;
           return;
         }
+        // V1-3: re-run the tasksResource query when navigation back completes
         this.reloadTick.update((tick) => tick + 1);
       });
 
@@ -720,32 +787,49 @@ export class TaskTable {
   /** Right-click on a column header → open the context menu at the cursor */
   protected onHeaderContextMenu(event: MouseEvent, col: TaskColumnDef): void {
     event.preventDefault();
+    // Round-4 F4: Linux fires `contextmenu` on mousedown — when the right button
+    // is released the browser fires `auxclick`/`click` on the `<th>`, which CDK's
+    // overlay outside-click dispatcher treats as an outside click and closes the
+    // menu immediately. Swallow that single terminating event.
+    this.openContextMenuAt(event.clientX, event.clientY, col, true);
+  }
+
+  /** Position the hidden anchors at (x, y) and open the header context menu */
+  private openContextMenuAt(x: number, y: number, col: TaskColumnDef, swallowTerminatingClick: boolean): void {
     this.contextColumn.set(col);
 
     const anchor = this.ctxAnchorRef()?.nativeElement;
 
     if (!anchor) return;
 
-    anchor.style.left = `${event.clientX}px`;
-    anchor.style.top = `${event.clientY}px`;
+    anchor.style.left = `${x}px`;
+    anchor.style.top = `${y}px`;
 
     // Round-5 P9 (item 24): keep the cursor-anchored chooser trigger at the
     // same coordinates so "Select columns" opens the popover at the cursor.
     const chooserAnchor = this.ctxChooserAnchorRef()?.nativeElement;
 
     if (chooserAnchor) {
-      chooserAnchor.style.left = `${event.clientX}px`;
-      chooserAnchor.style.top = `${event.clientY}px`;
+      chooserAnchor.style.left = `${x}px`;
+      chooserAnchor.style.top = `${y}px`;
     }
 
     // Open once the anchor position is committed to the DOM
     setTimeout(() => {
       this.ctxMenuTrigger()?.open();
-      // Round-4 F4: Linux fires `contextmenu` on mousedown — when the right button
-      // is released the browser fires `auxclick`/`click` on the `<th>`, which CDK's
-      // overlay outside-click dispatcher treats as an outside click and closes the
-      // menu immediately. Swallow that single terminating event.
-      this.swallowNextClick();
+
+      if (swallowTerminatingClick) this.swallowNextClick();
+
+      // Move focus into the menu. CDK only focuses the first item when the menu
+      // was opened via the keyboard — a programmatic `.open()` (right-click or
+      // the context-menu key) leaves focus outside, making the items
+      // unreachable by keyboard. Target the most recently attached overlay menu.
+      setTimeout(() => {
+        const menus = document.querySelectorAll<HTMLElement>('[data-slot="dropdown-menu"]');
+        const menu = menus[menus.length - 1];
+
+        menu?.querySelector<HTMLButtonElement>('[data-slot="dropdown-menu-item"]:not([data-disabled])')?.focus();
+      });
     });
   }
 
@@ -1338,7 +1422,7 @@ export class TaskTable {
         this.clearSelection();
         this.resetBulkFields();
         // Re-fetch the current page so updated rows are reflected
-        this.reloadTick.update((tick) => tick + 1);
+        this.tasksResource.reload();
       },
       error: (err) => {
         this.applyingBulk.set(false);

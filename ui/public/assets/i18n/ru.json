@@ -288,6 +288,9 @@
     "roleOwner": "Владелец",
     "roleAdmin": "Администратор",
     "roleMember": "Участник",
+    "roleProjectAdmin": "Администратор проекта",
+    "roleEditor": "Редактор",
+    "roleViewer": "Наблюдатель",
     "name": "Имя",
     "status": "Статус",
     "actions": "Действия",
@@ -668,7 +671,6 @@
     "filtersDesc": "Фильтруйте задачи по статусу, приоритету, исполнителю и др.",
     "title": "Задачи",
     "searchPlaceholder": "Поиск задач",
-    "loading": "Загрузка задач",
     "noTasks": "Задачи не найдены. Создайте задачу или измените фильтры.",
     "key": "Ключ",
     "titleCol": "Название",
@@ -820,8 +822,6 @@
     "strikethrough": "Зачёркнутый"
   },
   "pagination": {
-    "previous": "Назад",
-    "next": "Далее",
     "totalItems": "всего",
     "pages": "страниц",
     "auto": "Auto"

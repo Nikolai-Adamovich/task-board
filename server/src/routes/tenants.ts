@@ -42,8 +42,10 @@ export function createTenantRoutes(): Hono<AppEnv> {
   });
 
   router.get('/:tenantId', async (c) => {
+    const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
-    const tenant = await c.get('svc').tenants.getTenant(tenantId);
+    // Membership check inside the service (IDOR guard)
+    const tenant = await c.get('svc').tenants.getTenantForUser(userId, tenantId);
 
     return c.json({ data: tenant });
   });
@@ -98,8 +100,10 @@ export function createTenantRoutes(): Hono<AppEnv> {
   // ─── Member Management ─────────────────────────────────────────────────
 
   router.get('/:tenantId/members', async (c) => {
+    const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
-    const members = await c.get('svc').tenantMembers.getTenantMembers(tenantId);
+    // Membership check inside the service (IDOR guard)
+    const members = await c.get('svc').tenantMembers.getTenantMembers(userId, tenantId);
 
     return c.json({ data: members });
   });

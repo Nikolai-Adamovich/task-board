@@ -46,9 +46,12 @@ export class TenantMemberService {
 
   // ─── Member Management ─────────────────────────────────────────────────────
 
-  async getTenantMembers(tenantId: string): Promise<TenantMember[]> {
+  async getTenantMembers(requesterId: string, tenantId: string): Promise<TenantMember[]> {
+    // IDOR guard: only tenant members may list the tenant's members
+    await this.requireMembership(requesterId, tenantId);
+
     const members = await this.tenantMemberRepo.findByTenant(tenantId);
-    const enriched: TenantMember[] = [];
+    const effectiveMembers: TenantMember[] = [];
 
     for (const member of members) {
       // DEC-055 lazy revoke: an ACTIVE membership past its expiration is
@@ -61,15 +64,19 @@ export class TenantMemberService {
         if (flipped) effective = flipped;
       }
 
-      const user = effective.userId ? await this.userRepo.findById(effective.userId) : null;
-
-      enriched.push({
-        ...effective,
-        displayName: user?.displayName ?? null,
-        email: user?.email ?? null,
-      });
+      effectiveMembers.push(effective);
     }
-    return enriched;
+
+    // Batch user lookup (N+1 fix): one `$in` query instead of one per member
+    const userIds = [...new Set(effectiveMembers.map((m) => m.userId).filter((id): id is string => Boolean(id)))];
+    const users = await this.userRepo.findByIds(userIds);
+    const userById = new Map(users.map((u) => [u.id, u]));
+
+    return effectiveMembers.map((effective) => ({
+      ...effective,
+      displayName: effective.userId ? (userById.get(effective.userId)?.displayName ?? null) : null,
+      email: effective.userId ? (userById.get(effective.userId)?.email ?? null) : null,
+    }));
   }
 
   async inviteUser(requesterId: string, tenantId: string, email: string, role: string): Promise<TenantMember> {
@@ -460,11 +467,21 @@ export class TenantMemberService {
 
   async getMyInvitations(email: string): Promise<MyInvitation[]> {
     const memberships = await this.tenantMemberRepo.findPendingByEmail(email);
+    // Batch lookups (N+1 fix): one `$in` query per collection instead of
+    // per-invitation user/tenant fetches
+    const userIds = [...new Set(memberships.map((doc) => doc.userId).filter((id): id is string => Boolean(id)))];
+    const tenantIds = [...new Set(memberships.map((doc) => doc.tenantId))];
+    const [users, tenants] = await Promise.all([
+      this.userRepo.findByIds(userIds),
+      this.tenantRepo.findByIds(tenantIds),
+    ]);
+    const userById = new Map(users.map((u) => [u.id, u]));
+    const tenantById = new Map(tenants.map((t) => [t.id, t]));
     const enriched: MyInvitation[] = [];
 
     for (const doc of memberships) {
-      const user = doc.userId ? await this.userRepo.findById(doc.userId) : null;
-      const tenant = await this.tenantRepo.findById(doc.tenantId);
+      const user = doc.userId ? (userById.get(doc.userId) ?? null) : null;
+      const tenant = tenantById.get(doc.tenantId);
 
       enriched.push({
         tenantName: tenant?.name ?? '',

@@ -1,6 +1,7 @@
 import type { TaskType, CreateTaskType, UpdateTaskType } from '@task-board/shared';
-import { ConflictError, NotFoundError } from '../errors/app-error.js';
+import { ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { TaskTypeRepository } from '../repositories/task-type.repository.js';
+import { ensurePermission } from './rbac.service.js';
 import type { AuditService } from './audit.service.js';
 
 // ─── Interfaces for cross-repository dependencies ────────────────────────────
@@ -16,6 +17,11 @@ export interface TaskTypeServiceProjectRepo {
   findById(id: string): Promise<{ tenantId: string } | null>;
 }
 
+/** Minimal project-member repository interface to resolve the caller's project role */
+export interface TaskTypeServiceProjectMemberRepo {
+  findByUserAndProject(userId: string, projectId: string): Promise<{ role: string } | null>;
+}
+
 // ─── TaskType Service ────────────────────────────────────────────────────────
 
 export class TaskTypeService {
@@ -24,7 +30,28 @@ export class TaskTypeService {
     private readonly taskRepo: TaskTypeServiceTaskRepo,
     private readonly projectRepo?: TaskTypeServiceProjectRepo,
     private readonly auditService?: AuditService,
+    private readonly projectMemberRepo?: TaskTypeServiceProjectMemberRepo,
   ) {}
+
+  /**
+   * V2-4: gate every mutation behind `edit_project_config` (PROJECT_ADMIN
+   * only; tenant Owner/Admin bypass inside the RBAC matrix). Routes with
+   * `:projectId` in the path are additionally gated by requirePermission —
+   * this is the defense-in-depth / id-based-route layer.
+   */
+  private async ensureEditProjectConfig(projectId: string, userId?: string, userRole?: string): Promise<void> {
+    if (!userId || !userRole) {
+      return; // no caller context → nothing to enforce against (legacy/test callers)
+    }
+
+    if (!this.projectMemberRepo) {
+      throw new ForbiddenError('Project membership lookup is unavailable');
+    }
+
+    const membership = await this.projectMemberRepo.findByUserAndProject(userId, projectId);
+
+    ensurePermission('edit_project_config', userRole, membership?.role ?? null);
+  }
 
   async getTaskTypesByProject(projectId: string): Promise<TaskType[]> {
     return this.taskTypeRepo.findByProject(projectId);
@@ -34,7 +61,14 @@ export class TaskTypeService {
    * Reorder task types in a single bulk pass (transactional alternative to
    * two sequential PATCH calls that could leave positions inconsistent).
    */
-  async reorder(projectId: string, items: { id: string; position: number }[]): Promise<TaskType[]> {
+  async reorder(
+    projectId: string,
+    items: { id: string; position: number }[],
+    userId?: string,
+    userRole?: string,
+  ): Promise<TaskType[]> {
+    await this.ensureEditProjectConfig(projectId, userId, userRole);
+
     const taskTypes = await this.taskTypeRepo.findByProject(projectId);
     const knownIds = new Set(taskTypes.map((t) => t.id));
 
@@ -47,7 +81,14 @@ export class TaskTypeService {
     return this.taskTypeRepo.findByProject(projectId);
   }
 
-  async createTaskType(projectId: string, input: CreateTaskType, userId?: string): Promise<TaskType> {
+  async createTaskType(
+    projectId: string,
+    input: CreateTaskType,
+    userId?: string,
+    userRole?: string,
+  ): Promise<TaskType> {
+    await this.ensureEditProjectConfig(projectId, userId, userRole);
+
     const existing = await this.taskTypeRepo.findByProjectAndKey(projectId, input.key);
 
     if (existing) {
@@ -73,12 +114,19 @@ export class TaskTypeService {
     return taskType;
   }
 
-  async updateTaskType(taskTypeId: string, input: UpdateTaskType, userId?: string): Promise<TaskType> {
+  async updateTaskType(
+    taskTypeId: string,
+    input: UpdateTaskType,
+    userId?: string,
+    userRole?: string,
+  ): Promise<TaskType> {
     const taskType = await this.taskTypeRepo.findById(taskTypeId);
 
     if (!taskType) {
       throw new NotFoundError('Task type not found');
     }
+
+    await this.ensureEditProjectConfig(taskType.projectId, userId, userRole);
 
     // Key is immutable — ignore any key in input
     const updated = await this.taskTypeRepo.update(taskTypeId, {
@@ -114,12 +162,19 @@ export class TaskTypeService {
     return updated;
   }
 
-  async deleteTaskType(taskTypeId: string, replacementTypeId?: string, userId?: string): Promise<void> {
+  async deleteTaskType(
+    taskTypeId: string,
+    replacementTypeId?: string,
+    userId?: string,
+    userRole?: string,
+  ): Promise<void> {
     const taskType = await this.taskTypeRepo.findById(taskTypeId);
 
     if (!taskType) {
       throw new NotFoundError('Task type not found');
     }
+
+    await this.ensureEditProjectConfig(taskType.projectId, userId, userRole);
 
     // Check if any tasks use this type
     const tasksWithType = await this.taskRepo.countByType(taskType.projectId, taskTypeId);

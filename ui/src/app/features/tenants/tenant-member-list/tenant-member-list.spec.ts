@@ -351,7 +351,8 @@ describe('TenantMemberList', () => {
       const root: HTMLElement = fixture.nativeElement.children[0];
 
       // Exactly viewport minus app header (--header-height: 4rem) minus main vertical padding
-      expect(root.classList.contains('h-[calc(100dvh-var(--header-height)-3rem)]')).toBe(true);
+      expect(root.classList.contains('h-[calc(100dvh-var(--header-height)-1.5rem)]')).toBe(true);
+      expect(root.classList.contains('lg:h-[calc(100dvh-var(--header-height)-3rem)]')).toBe(true);
       expect(root.classList.contains('flex-col')).toBe(true);
 
       const tableArea = root.children[1] as HTMLElement;

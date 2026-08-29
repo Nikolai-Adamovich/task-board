@@ -2,6 +2,7 @@ import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
 import type { Document } from 'mongodb';
 import type { Task, IdentitySnapshot } from '@task-board/shared';
+import { escapeRegExp } from '../utils/regex.js';
 
 // Required MongoDB indexes:
 // - { id: 1 } (unique)
@@ -167,7 +168,8 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       };
     }
     if (search) {
-      const regex = { $regex: search, $options: 'i' };
+      // Escape user input — raw input is compiled as a regex (ReDoS / 500 on invalid patterns)
+      const regex = { $regex: escapeRegExp(search), $options: 'i' };
 
       query.$or = [
         { title: regex },
@@ -439,7 +441,8 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
    * Search tasks by text across number, title, description, and snapshots.
    */
   async search(projectId: string, searchTerm: string): Promise<Task[]> {
-    const regex = { $regex: searchTerm, $options: 'i' };
+    // Escape user input — raw input is compiled as a regex (ReDoS / 500 on invalid patterns)
+    const regex = { $regex: escapeRegExp(searchTerm), $options: 'i' };
     const query = {
       projectId,
       $or: [
@@ -458,6 +461,17 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
   /**
    * Delete all entities belonging to a project. Used for cascade delete.
    */
+  /**
+   * Lightweight id-only lookup for a project's tasks — used by the project
+   * cascade to delete comments (keyed by `taskId`, not `projectId`) BEFORE
+   * the tasks themselves are removed.
+   */
+  async findIdsByProject(projectId: string): Promise<string[]> {
+    const docs = await this.collection.find({ projectId }, { projection: { id: 1, _id: 0 } }).toArray();
+
+    return docs.map((doc) => doc.id);
+  }
+
   async deleteByProject(projectId: string): Promise<void> {
     await this.collection.deleteMany({ projectId });
   }

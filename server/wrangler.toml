@@ -7,8 +7,9 @@ compatibility_flags = ["nodejs_compat"]
 MONGODB_URI = ""
 JWT_SECRET = ""
 
-# Comma-separated list of allowed origins for CORS. Use "*" for development.
-ALLOWED_ORIGINS = "*"
+# Comma-separated list of allowed origins for CORS.
+# Production MUST set an explicit origin list — never deploy with "*".
+ALLOWED_ORIGINS = "http://localhost:4200"
 
 # Suppress esbuild [import-is-undefined] warning caused by unenv's whatwg-url shim
 # lacking a default export (used by mongodb → mongodb-connection-string-url).

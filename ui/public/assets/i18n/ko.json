@@ -288,6 +288,9 @@
     "roleOwner": "소유자",
     "roleAdmin": "관리자",
     "roleMember": "멤버",
+    "roleProjectAdmin": "프로젝트 관리자",
+    "roleEditor": "편집자",
+    "roleViewer": "뷰어",
     "name": "이름",
     "status": "상태",
     "actions": "동작",
@@ -668,7 +671,6 @@
     "filtersDesc": "상태, 우선순위, 담당자 등으로 작업을 필터링합니다.",
     "title": "작업",
     "searchPlaceholder": "작업 검색",
-    "loading": "작업 로딩 중",
     "noTasks": "작업이 없습니다. 작업을 생성하거나 필터를 변경하세요.",
     "key": "키",
     "titleCol": "제목",
@@ -820,8 +822,6 @@
     "strikethrough": "취소선"
   },
   "pagination": {
-    "previous": "이전",
-    "next": "다음",
     "totalItems": "항목",
     "pages": "페이지",
     "auto": "Auto"

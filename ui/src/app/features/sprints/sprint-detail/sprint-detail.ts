@@ -295,7 +295,7 @@ export class SprintDetail implements OnInit {
 
         this.router.navigate(['/w', getTenantSlug(this.route), 'projects', projectKey]);
       },
-      error: (err) => console.error(err),
+      error: (err) => this.notify.error(getErrorMessage(err)),
     });
   }
 
@@ -321,7 +321,7 @@ export class SprintDetail implements OnInit {
           this.sprint.set(sprint);
           this.loadSprintTasks(sprint.projectId);
         },
-        error: (err) => console.error(err),
+        error: (err) => this.notify.error(getErrorMessage(err)),
       });
   }
 
@@ -330,12 +330,12 @@ export class SprintDetail implements OnInit {
     this.refStore.ensure(projectId, ['statuses', 'sprints']);
     this.taskClient.list(projectId, { sprintId: this.sprintId(), limit: 200 }).subscribe({
       next: (res) => this.sprintTasks.set(res.data),
-      error: (err) => console.error(err),
+      error: (err) => this.notify.error(getErrorMessage(err)),
     });
     // Future sprints are the "Move to…" targets of the disposition dialog
     this.sprintClient.list(projectId).subscribe({
       next: (sprints) => this.futureSprints.set(sprints.filter((sp) => sp.status === SprintStatus.FUTURE)),
-      error: (err) => console.error(err),
+      error: (err) => this.notify.error(getErrorMessage(err)),
     });
   }
 

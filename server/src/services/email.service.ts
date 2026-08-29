@@ -67,13 +67,20 @@ export class EmailService {
 }
 
 /* eslint-disable no-console -- ConsoleEmailService is a dev/test stub that intentionally logs instead of sending emails */
+/** Mask the `token` query parameter of a URL before logging it — if the
+ * console mailer ever runs in production (missing RESEND_API_KEY), raw
+ * invitation/reset tokens must not leak into logs. */
+function maskTokenInUrl(url: string): string {
+  return url.replace(/(token=)[^&]+/, '$1<redacted>');
+}
+
 export class ConsoleEmailService implements Pick<
   EmailService,
   'sendEmail' | 'sendInvitationEmail' | 'sendPasswordResetEmail'
 > {
   async sendPasswordResetEmail(params: { to: string; resetUrl: string; expiresInMinutes: number }): Promise<void> {
     console.log(`[EMAIL] Password reset to ${params.to}`);
-    console.log(`  Reset URL: ${params.resetUrl}`);
+    console.log(`  Reset URL: ${maskTokenInUrl(params.resetUrl)} (token masked — dev stub does not deliver email)`);
     console.log(`  Expires in: ${params.expiresInMinutes} minutes`);
   }
 
@@ -89,7 +96,7 @@ export class ConsoleEmailService implements Pick<
     console.log(`[EMAIL] Invitation to ${params.to}`);
     console.log(`  Tenant: ${params.tenantName}`);
     console.log(`  Role: ${params.role}`);
-    console.log(`  Accept URL: ${acceptUrl}`);
+    console.log(`  Accept URL: ${maskTokenInUrl(acceptUrl)} (token masked — dev stub does not deliver email)`);
   }
 
   async sendEmail(options: EmailOptions): Promise<void> {

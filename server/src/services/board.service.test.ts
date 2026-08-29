@@ -174,4 +174,75 @@ describe('BoardService', () => {
       await expect(service.deleteBoard('missing')).rejects.toThrow('Board not found');
     });
   });
+
+  // ── V2-4: manage_boards enforcement ──────────────────────────────────────
+
+  describe('manage_boards enforcement', () => {
+    let projectMemberRepo: { findByUserAndProject: ReturnType<typeof vi.fn> };
+
+    beforeEach(() => {
+      projectMemberRepo = { findByUserAndProject: vi.fn().mockResolvedValue(null) };
+      service = new BoardService(boardRepo, statusRepo, undefined, undefined, projectMemberRepo);
+    });
+
+    it('denies createBoard for a VIEWER', async () => {
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'VIEWER' });
+
+      await expect(
+        service.createBoard(
+          'project-1',
+          { name: 'Board', type: 'KANBAN', columns: [{ statusIds: ['status-1'], position: 0 }] },
+          'user-1',
+          'VIEWER',
+        ),
+      ).rejects.toThrow("Insufficient permissions. Requires 'manage_boards'.");
+      expect(boardRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('denies updateBoard for an EDITOR (manage_boards is PROJECT_ADMIN only)', async () => {
+      boardRepo.findById = vi.fn().mockResolvedValue(makeBoard());
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'EDITOR' });
+
+      await expect(service.updateBoard('board-1', { name: 'X' }, 'user-1', 'EDITOR')).rejects.toThrow(
+        "Insufficient permissions. Requires 'manage_boards'.",
+      );
+      expect(boardRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('allows createBoard for a PROJECT_ADMIN', async () => {
+      statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
+      boardRepo.create = vi.fn().mockResolvedValue(makeBoard({ name: 'New Board' }));
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'PROJECT_ADMIN' });
+
+      const result = await service.createBoard(
+        'project-1',
+        { name: 'New Board', type: 'KANBAN', columns: [{ statusIds: ['status-1'], position: 0 }] },
+        'user-1',
+        'PROJECT_ADMIN',
+      );
+
+      expect(result.name).toBe('New Board');
+    });
+
+    it('bypasses the project role for a tenant ADMIN', async () => {
+      boardRepo.findById = vi.fn().mockResolvedValue(makeBoard());
+      boardRepo.delete = vi.fn().mockResolvedValue(true);
+      // no membership record at all — tenant ADMIN bypasses project-level checks
+      projectMemberRepo.findByUserAndProject.mockResolvedValue(null);
+
+      await service.deleteBoard('board-1', 'user-1', 'ADMIN');
+
+      expect(boardRepo.delete).toHaveBeenCalledWith('board-1');
+    });
+
+    it('skips the check when no caller context is provided (legacy/test callers)', async () => {
+      boardRepo.findById = vi.fn().mockResolvedValue(makeBoard());
+      boardRepo.delete = vi.fn().mockResolvedValue(true);
+
+      await service.deleteBoard('board-1');
+
+      expect(projectMemberRepo.findByUserAndProject).not.toHaveBeenCalled();
+      expect(boardRepo.delete).toHaveBeenCalledWith('board-1');
+    });
+  });
 });

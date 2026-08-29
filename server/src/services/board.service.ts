@@ -1,12 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import type { Board, CreateBoard, UpdateBoard } from '@task-board/shared';
-import { NotFoundError } from '../errors/app-error.js';
+import { ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { BoardRepository } from '../repositories/board.repository.js';
 import { StatusRepository } from '../repositories/status.repository.js';
+import { ensurePermission } from './rbac.service.js';
 import type { AuditService } from './audit.service.js';
 
 export interface BoardServiceProjectRepo {
   findById(id: string): Promise<{ tenantId: string } | null>;
+}
+
+/** Minimal project-member repository interface to resolve the caller's project role */
+export interface BoardServiceProjectMemberRepo {
+  findByUserAndProject(userId: string, projectId: string): Promise<{ role: string } | null>;
 }
 
 // ─── Board Service ───────────────────────────────────────────────────────────
@@ -17,7 +23,28 @@ export class BoardService {
     private readonly statusRepo: StatusRepository,
     private readonly projectRepo?: BoardServiceProjectRepo,
     private readonly auditService?: AuditService,
+    private readonly projectMemberRepo?: BoardServiceProjectMemberRepo,
   ) {}
+
+  /**
+   * V2-4: gate every mutation behind `manage_boards` (PROJECT_ADMIN only;
+   * tenant Owner/Admin bypass inside the RBAC matrix). Routes with
+   * `:projectId` in the path are additionally gated by requirePermission —
+   * this is the defense-in-depth / id-based-route layer.
+   */
+  private async ensureManageBoards(projectId: string, userId?: string, userRole?: string): Promise<void> {
+    if (!userId || !userRole) {
+      return; // no caller context → nothing to enforce against (legacy/test callers)
+    }
+
+    if (!this.projectMemberRepo) {
+      throw new ForbiddenError('Project membership lookup is unavailable');
+    }
+
+    const membership = await this.projectMemberRepo.findByUserAndProject(userId, projectId);
+
+    ensurePermission('manage_boards', userRole, membership?.role ?? null);
+  }
 
   async getBoardsByProject(projectId: string): Promise<Board[]> {
     return this.boardRepo.findByProject(projectId);
@@ -32,7 +59,9 @@ export class BoardService {
     return board;
   }
 
-  async createBoard(projectId: string, input: CreateBoard, userId?: string): Promise<Board> {
+  async createBoard(projectId: string, input: CreateBoard, userId?: string, userRole?: string): Promise<Board> {
+    await this.ensureManageBoards(projectId, userId, userRole);
+
     // Validate all statusIds belong to the same project
     await this.validateStatusIds(
       projectId,
@@ -68,8 +97,11 @@ export class BoardService {
     return board;
   }
 
-  async updateBoard(id: string, input: UpdateBoard, userId?: string): Promise<Board> {
+  async updateBoard(id: string, input: UpdateBoard, userId?: string, userRole?: string): Promise<Board> {
     const board = await this.getBoard(id);
+
+    await this.ensureManageBoards(board.projectId, userId, userRole);
+
     const updateFields: { name?: string; columns?: { id: string; statusIds: string[]; position: number }[] } = {};
 
     if (input.name !== undefined) {
@@ -118,12 +150,14 @@ export class BoardService {
     return updated;
   }
 
-  async deleteBoard(id: string, userId?: string): Promise<void> {
+  async deleteBoard(id: string, userId?: string, userRole?: string): Promise<void> {
     const board = await this.boardRepo.findById(id);
 
     if (!board) {
       throw new NotFoundError('Board not found');
     }
+
+    await this.ensureManageBoards(board.projectId, userId, userRole);
 
     // Audit side effect (before delete)
     if (this.auditService && userId && this.projectRepo) {

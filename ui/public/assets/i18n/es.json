@@ -288,6 +288,9 @@
     "roleOwner": "Propietario",
     "roleAdmin": "Administrador",
     "roleMember": "Miembro",
+    "roleProjectAdmin": "Administrador de proyecto",
+    "roleEditor": "Editor",
+    "roleViewer": "Lector",
     "name": "Nombre",
     "status": "Estado",
     "actions": "Acciones",
@@ -668,7 +671,6 @@
     "filtersDesc": "Filtra tareas por estado, prioridad, responsable y más.",
     "title": "Tareas",
     "searchPlaceholder": "Buscar tareas",
-    "loading": "Cargando tareas",
     "noTasks": "No se encontraron tareas. Cree una tarea o cambie sus filtros.",
     "key": "Clave",
     "titleCol": "Título",
@@ -820,8 +822,6 @@
     "strikethrough": "Tachado"
   },
   "pagination": {
-    "previous": "Anterior",
-    "next": "Siguiente",
     "totalItems": "elementos",
     "pages": "páginas",
     "auto": "Auto"

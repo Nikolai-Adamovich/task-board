@@ -7,6 +7,7 @@ import { TenantMemberService } from './tenant-member.service.js';
 function createMockTenantRepo() {
   return {
     findById: vi.fn(),
+    findByIds: vi.fn().mockResolvedValue([]),
     findBySlug: vi.fn(),
     slugExists: vi.fn().mockResolvedValue(false),
     findAll: vi.fn(),
@@ -43,6 +44,7 @@ function createMockProjectMemberRepo() {
 function createMockUserRepo() {
   return {
     findById: vi.fn(),
+    findByIds: vi.fn().mockResolvedValue([]),
     findByEmail: vi.fn(),
     create: vi.fn(),
     softDelete: vi.fn().mockResolvedValue(true),
@@ -228,9 +230,10 @@ describe('TenantService', () => {
         makeMember({ tenantId: 't1', status: 'ACTIVE' }),
         makeMember({ tenantId: 't2', role: 'MEMBER', status: 'ACTIVE' }),
       ]);
-      tenantRepo.findById
-        .mockResolvedValueOnce(makeTenant({ id: 't1', name: 'Tenant 1' }))
-        .mockResolvedValueOnce(makeTenant({ id: 't2', name: 'Tenant 2' }));
+      tenantRepo.findByIds.mockResolvedValue([
+        makeTenant({ id: 't1', name: 'Tenant 1' }),
+        makeTenant({ id: 't2', name: 'Tenant 2' }),
+      ]);
 
       const result = await service.listTenantsForUser('user-1');
 
@@ -485,12 +488,15 @@ describe('TenantService', () => {
 
   describe('getTenantMembers', () => {
     it('returns all members for a tenant with resolved user data', async () => {
+      // requester membership (IDOR guard) + listed members
+      memberRepo.findByUserAndTenant.mockResolvedValue(makeMember({ userId: 'requester-1' }));
       memberRepo.findByTenant.mockResolvedValue([makeMember(), makeMember({ userId: 'user-2', role: 'MEMBER' })]);
-      userRepo.findById
-        .mockResolvedValueOnce({ id: 'user-1', displayName: 'Alice', email: 'alice@example.com' })
-        .mockResolvedValueOnce({ id: 'user-2', displayName: 'Bob', email: 'bob@example.com' });
+      userRepo.findByIds.mockResolvedValue([
+        { id: 'user-1', displayName: 'Alice', email: 'alice@example.com' },
+        { id: 'user-2', displayName: 'Bob', email: 'bob@example.com' },
+      ]);
 
-      const result = await memberService.getTenantMembers('tenant-1');
+      const result = await memberService.getTenantMembers('requester-1', 'tenant-1');
 
       expect(result).toHaveLength(2);
       expect(result[0].displayName).toBe('Alice');
@@ -500,10 +506,11 @@ describe('TenantService', () => {
     });
 
     it('returns null displayName/email when user not found', async () => {
+      memberRepo.findByUserAndTenant.mockResolvedValue(makeMember({ userId: 'requester-1' }));
       memberRepo.findByTenant.mockResolvedValue([makeMember()]);
-      userRepo.findById.mockResolvedValue(null);
+      userRepo.findByIds.mockResolvedValue([]);
 
-      const result = await memberService.getTenantMembers('tenant-1');
+      const result = await memberService.getTenantMembers('requester-1', 'tenant-1');
 
       expect(result).toHaveLength(1);
       expect(result[0].displayName).toBeNull();

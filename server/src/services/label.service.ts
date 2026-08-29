@@ -1,6 +1,7 @@
 import type { Label, CreateLabel, UpdateLabel } from '@task-board/shared';
-import { ConflictError, NotFoundError } from '../errors/app-error.js';
+import { ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error.js';
 import { LabelRepository } from '../repositories/label.repository.js';
+import { ensurePermission } from './rbac.service.js';
 import type { AuditService } from './audit.service.js';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -13,6 +14,11 @@ export interface LabelServiceProjectRepo {
   findById(id: string): Promise<{ tenantId: string } | null>;
 }
 
+/** Minimal project-member repository interface to resolve the caller's project role */
+export interface LabelServiceProjectMemberRepo {
+  findByUserAndProject(userId: string, projectId: string): Promise<{ role: string } | null>;
+}
+
 // ─── Label Service ───────────────────────────────────────────────────────────
 
 export class LabelService {
@@ -21,13 +27,36 @@ export class LabelService {
     private readonly taskRepo: LabelServiceTaskRepo,
     private readonly projectRepo?: LabelServiceProjectRepo,
     private readonly auditService?: AuditService,
+    private readonly projectMemberRepo?: LabelServiceProjectMemberRepo,
   ) {}
+
+  /**
+   * V2-4: gate every mutation behind `manage_labels` (PROJECT_ADMIN + EDITOR;
+   * tenant Owner/Admin bypass inside the RBAC matrix). Routes with
+   * `:projectId` in the path are additionally gated by requirePermission —
+   * this is the defense-in-depth / id-based-route layer.
+   */
+  private async ensureManageLabels(projectId: string, userId?: string, userRole?: string): Promise<void> {
+    if (!userId || !userRole) {
+      return; // no caller context → nothing to enforce against (legacy/test callers)
+    }
+
+    if (!this.projectMemberRepo) {
+      throw new ForbiddenError('Project membership lookup is unavailable');
+    }
+
+    const membership = await this.projectMemberRepo.findByUserAndProject(userId, projectId);
+
+    ensurePermission('manage_labels', userRole, membership?.role ?? null);
+  }
 
   async getLabelsByProject(projectId: string): Promise<Label[]> {
     return this.labelRepo.findByProject(projectId);
   }
 
-  async createLabel(projectId: string, input: CreateLabel, userId?: string): Promise<Label> {
+  async createLabel(projectId: string, input: CreateLabel, userId?: string, userRole?: string): Promise<Label> {
+    await this.ensureManageLabels(projectId, userId, userRole);
+
     const normalizedName = input.name.toLowerCase().trim();
     const existing = await this.labelRepo.findByProjectAndNormalizedName(projectId, normalizedName);
 
@@ -54,12 +83,14 @@ export class LabelService {
     return label;
   }
 
-  async updateLabel(labelId: string, input: UpdateLabel, userId?: string): Promise<Label> {
+  async updateLabel(labelId: string, input: UpdateLabel, userId?: string, userRole?: string): Promise<Label> {
     const label = await this.labelRepo.findById(labelId);
 
     if (!label) {
       throw new NotFoundError('Label not found');
     }
+
+    await this.ensureManageLabels(label.projectId, userId, userRole);
 
     const normalizedName = input.name.toLowerCase().trim();
     const existing = await this.labelRepo.findByProjectAndNormalizedName(label.projectId, normalizedName);
@@ -92,12 +123,14 @@ export class LabelService {
     return updated;
   }
 
-  async deleteLabel(labelId: string, userId?: string): Promise<void> {
+  async deleteLabel(labelId: string, userId?: string, userRole?: string): Promise<void> {
     const label = await this.labelRepo.findById(labelId);
 
     if (!label) {
       throw new NotFoundError('Label not found');
     }
+
+    await this.ensureManageLabels(label.projectId, userId, userRole);
 
     // Remove all task-label associations
     await this.taskRepo.removeLabelFromAll(label.projectId, labelId);

@@ -57,6 +57,7 @@ vi.mock('../services/tenant.service.js', () => ({
     listTenantsWithRole: vi.fn().mockResolvedValue([{ ...mockTenant, role: 'OWNER' }]),
     createTenant: vi.fn().mockResolvedValue(mockTenant),
     getTenant: vi.fn().mockResolvedValue(mockTenant),
+    getTenantForUser: vi.fn().mockResolvedValue(mockTenant),
     updateTenant: vi.fn().mockResolvedValue(mockTenant),
     deleteTenant: vi.fn().mockResolvedValue(undefined),
     archiveTenant: vi.fn().mockResolvedValue(undefined),

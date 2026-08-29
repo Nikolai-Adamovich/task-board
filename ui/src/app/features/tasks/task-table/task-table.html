@@ -1,11 +1,12 @@
 <!-- R3-P3/Q6-F-13: full-height flex column — exactly viewport minus the app header
-     (--header-height: 4rem) and the shell <main> vertical padding (py-4 → 2rem below
-     sm, p-6 → 3rem from sm up). Horizontal padding comes from the shell (F-12).
-     Toolbar / chips / table / pagination stack vertically; the table wrapper flexes
-     to fill the rest so the table bottom aligns with the page bottom (no dead space,
-     no page scroll). Toolbar wraps instead of overflowing on mobile. -->
+     (--header-height: 2.5rem below lg, 4rem from lg) and the shell <main> vertical
+     padding (p-3 → 1.5rem below lg, p-6 → 3rem from lg). Horizontal padding comes
+     from the shell (F-12). Toolbar / chips / table / pagination stack vertically;
+     the table wrapper flexes to fill the rest so the table bottom aligns with the
+     page bottom (no dead space, no page scroll). Toolbar wraps instead of
+     overflowing on mobile. -->
 <div
-  class="flex h-[calc(100dvh-var(--header-height)-3rem)] max-sm:h-[calc(100dvh-var(--header-height)-2rem)] w-full min-w-0 flex-col"
+  class="flex h-[calc(100dvh-var(--header-height)-1.5rem)] lg:h-[calc(100dvh-var(--header-height)-3rem)] w-full min-w-0 flex-col"
 >
   <div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
     <h2 class="text-2xl font-bold text-foreground">{{ 'taskTable.title' | transloco }}</h2>
@@ -23,7 +24,6 @@
       <button
         hlmBtn
         variant="outline"
-        size="sm"
         [hlmTooltip]="'taskTable.filters' | transloco"
         [attr.aria-label]="'taskTable.filters' | transloco"
         (click)="showFilterDialog.set(true)"
@@ -34,7 +34,6 @@
       <button
         hlmBtn
         variant="outline"
-        size="sm"
         [hlmTooltip]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
         [attr.aria-label]="(isCompact() ? 'tableDensity.comfortable' : 'tableDensity.compact') | transloco"
         (click)="toggleDensity()"
@@ -47,7 +46,6 @@
           hlmPopoverTrigger
           hlmBtn
           variant="outline"
-          size="sm"
           [hlmTooltip]="'taskTable.columns' | transloco"
           [attr.aria-label]="'taskTable.columns' | transloco"
         >
@@ -59,7 +57,7 @@
         </hlm-popover-content>
       </hlm-popover>
       @if (canCreateTasks()) {
-        <button hlmBtn size="sm" (click)="goToNewTask()">
+        <button hlmBtn (click)="goToNewTask()">
           {{ 'taskTable.newTask' | transloco }}
         </button>
       }
@@ -449,11 +447,12 @@
             }
           </tr>
         } @empty {
-          <tr hlmTableRow>
+          <!-- data-table-empty-row: excluded from the Auto page-size row
+               measurement — this message row is much taller than a data row and
+               would skew the computed page size. -->
+          <tr hlmTableRow data-table-empty-row>
             <td hlmTableCell [attr.colspan]="renderedColumnCount()" class="py-12 text-center">
-              @if (loading()) {
-                <p class="text-sm text-muted-foreground">{{ 'taskTable.loading' | transloco }}</p>
-              } @else if (hasActiveFilters()) {
+              @if (hasActiveFilters()) {
                 <!-- Filtered-empty state: distinct from true-empty, one-click reset -->
                 <p class="text-sm text-muted-foreground">{{ 'taskTable.noMatchingTasks' | transloco }}</p>
                 <button hlmBtn variant="outline" size="sm" class="mt-3" (click)="clearFilters()">
@@ -467,6 +466,62 @@
         }
       </tbody>
     </table>
+
+    <!-- Auto page-size probe: an invisible, out-of-flow row with the SAME cell
+         structure as a data row (badges included, columns mirrored via
+         visibleFields). Its measured height is the authoritative row height for
+         the Auto math — available BEFORE the first fetch and immune to the
+         transient layout of freshly rendered data rows. -->
+    <table
+      hlmTable
+      aria-hidden="true"
+      data-row-probe-table
+      class="invisible pointer-events-none absolute top-0 left-0 w-full"
+      [class.table-density-compact]="isCompact()"
+    >
+      <tbody>
+        <tr hlmTableRow data-row-probe>
+          @if (canCreateTasks()) {
+            <td hlmTableCell class="w-10 pr-0"><span class="inline-block size-4"></span></td>
+          }
+          @if (visibleFields().has('number')) {
+            <td hlmTableCell class="truncate font-mono text-xs text-muted-foreground">Ag</td>
+          }
+          @if (visibleFields().has('title')) {
+            <td hlmTableCell class="max-w-0 truncate font-medium">Ag</td>
+          }
+          @if (visibleFields().has('typeId')) {
+            <td hlmTableCell class="truncate"><span hlmBadge class="text-xs">Ag</span></td>
+          }
+          @if (visibleFields().has('statusId')) {
+            <td hlmTableCell class="truncate"><span hlmBadge variant="outline" class="text-xs">Ag</span></td>
+          }
+          @if (visibleFields().has('priority')) {
+            <td hlmTableCell class="truncate"><span hlmBadge class="text-xs">Ag</span></td>
+          }
+          @if (visibleFields().has('assigneeId')) {
+            <td hlmTableCell class="truncate text-xs text-muted-foreground">Ag</td>
+          }
+          @if (visibleFields().has('reporterId')) {
+            <td hlmTableCell class="truncate text-xs text-muted-foreground">Ag</td>
+          }
+          @if (visibleFields().has('sprintId')) {
+            <td hlmTableCell class="truncate text-xs text-muted-foreground">Ag</td>
+          }
+          @if (visibleFields().has('labelIds')) {
+            <td hlmTableCell class="truncate">
+              <span hlmBadge variant="secondary" class="shrink-0 text-[10px]">Ag</span>
+            </td>
+          }
+          @if (visibleFields().has('createdAt')) {
+            <td hlmTableCell class="truncate text-xs text-muted-foreground">Ag</td>
+          }
+          @if (visibleFields().has('updatedAt')) {
+            <td hlmTableCell class="truncate text-xs text-muted-foreground">Ag</td>
+          }
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <ui-pagination
@@ -474,6 +529,7 @@
     [totalPages]="totalPages()"
     [pageSize]="pageSize()"
     [total]="total()"
+    [pageSizes]="[10, 20, 30, 50, 70, 100, 200]"
     [autoEnabled]="true"
     [isAuto]="isAutoMode()"
     (pageChange)="onPageChange($event)"

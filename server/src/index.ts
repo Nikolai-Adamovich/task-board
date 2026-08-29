@@ -10,6 +10,7 @@ import {
   backfillTenantSlugs,
   ensureTenantSlugUniqueIndex,
   backfillMemberExpiresAt,
+  ensureCoreIndexes,
 } from './db/migrations.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { authMiddleware } from './middleware/auth.js';
@@ -30,11 +31,14 @@ app.use('*', logger());
 // CORS middleware memoized per config value: `c.env` only exists per request,
 // but ALLOWED_ORIGINS is immutable for a deployment, so we rebuild the
 // middleware only when the configured value actually changes.
+// Default is the local dev UI origin — NEVER `*`: production must configure
+// ALLOWED_ORIGINS explicitly (a wildcard default would let any origin call
+// the authenticated API).
 let corsConfigCache: string | null = null;
 let corsMiddleware: ReturnType<typeof cors> | null = null;
 
 app.use('*', async (c, next) => {
-  const allowedOrigins = c.env?.ALLOWED_ORIGINS ?? '*';
+  const allowedOrigins = c.env?.ALLOWED_ORIGINS ?? 'http://localhost:4200';
 
   if (!corsMiddleware || corsConfigCache !== allowedOrigins) {
     corsConfigCache = allowedOrigins;
@@ -73,6 +77,7 @@ app.use('/api/*', async (c, next) => {
           await backfillTenantSlugs(db); // DEC-032 — must run before the unique slug index
           await ensureTenantSlugUniqueIndex(db);
           await backfillMemberExpiresAt(db); // DEC-055 — expiresAt: null on legacy members
+          await ensureCoreIndexes(db); // create every repository-documented index (idempotent)
           migrationsRun = true;
         }
         await next();

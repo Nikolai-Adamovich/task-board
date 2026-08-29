@@ -288,6 +288,9 @@
     "roleOwner": "Właściciel",
     "roleAdmin": "Administrator",
     "roleMember": "Członek",
+    "roleProjectAdmin": "Administrator projektu",
+    "roleEditor": "Edytor",
+    "roleViewer": "Obserwator",
     "name": "Nazwa",
     "status": "Status",
     "actions": "Akcje",
@@ -668,7 +671,6 @@
     "filtersDesc": "Filtruj zadania według statusu, priorytetu, przypisania i więcej.",
     "title": "Zadania",
     "searchPlaceholder": "Szukaj zadań",
-    "loading": "Ładowanie zadań",
     "noTasks": "Nie znaleziono zadań. Utwórz zadanie lub zmień filtry.",
     "key": "Klucz",
     "titleCol": "Tytuł",
@@ -820,8 +822,6 @@
     "strikethrough": "Przekreślenie"
   },
   "pagination": {
-    "previous": "Poprzednia",
-    "next": "Następna",
     "totalItems": "wyników",
     "pages": "stron",
     "auto": "Auto"

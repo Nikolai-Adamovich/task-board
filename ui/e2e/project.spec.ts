@@ -1,40 +1,78 @@
 /**
- * E2E tests for project management: create, list, detail view.
+ * E2E tests for project creation and navigation.
  *
- * Projects are the primary organizational unit within a tenant.
- * These tests verify the project CRUD user journeys.
+ * The project creation modal lives on the tenant home page ("Create Project"
+ * CTA opens a dialog with name/key fields). Tests create their own workspace
+ * first so they are independent of seeded data.
+ *
+ * Requires: Angular dev server (port 4200) + backend API (port 8787).
  */
 import { test, expect } from '@playwright/test';
+import { registerUser, uniqueEmail } from './helpers';
+
+/** Register a user, create a workspace, and land on the tenant home page. */
+async function setupWorkspace(page: import('@playwright/test').Page): Promise<string> {
+  await registerUser(page, uniqueEmail('project'));
+  await page.goto('/workspace/create');
+
+  const workspaceName = `E2E Projects ${Date.now()}`;
+
+  await page.getByPlaceholder('My Workspace').fill(workspaceName);
+  await page.locator('button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/w\//, { timeout: 10_000 });
+
+  // Extract the tenant slug from the URL for deep-link navigation
+  return page.url().split('/w/')[1].split('/')[0];
+}
 
 test.describe('Projects', () => {
-  test.describe('Project List', () => {
-    test('should show the project list page when authenticated', async ({ page }) => {
-      // Navigate to a tenant-scoped project list
-      // Note: requires authentication and tenant context
-      // In a real setup, you'd use a test helper to login first
-      await page.goto('/');
+  test('tenant home shows the Create Project CTA', async ({ page }) => {
+    await setupWorkspace(page);
 
-      // Should redirect to login if not authenticated
-      // or show dashboard/projects if authenticated
-      const url = page.url();
-
-      expect(url).toBeTruthy();
-    });
+    await expect(page.getByRole('button', { name: /Create Project/i })).toBeVisible();
   });
 
-  test.describe('Create Project', () => {
-    test('should show create project form/button', async ({ page }) => {
-      // This test verifies the UI elements exist for project creation
-      await page.goto('/');
+  test('creates a project and navigates to its detail page', async ({ page }) => {
+    await setupWorkspace(page);
 
-      // Look for a create project button or form
-      // Look for create project button
-      page.locator('button', { hasText: /create|new|add/i });
-      // Either the button exists (authenticated) or we're redirected to login
+    const projectName = `E2E Project ${Date.now()}`;
 
-      const currentUrl = page.url();
+    await page
+      .getByRole('button', { name: /Create Project/i })
+      .first()
+      .click();
 
-      expect(currentUrl).toBeTruthy();
-    });
+    // The creation dialog opens — fill the first text input (project name)
+    const dialog = page.getByRole('dialog');
+
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[type="text"]').first().fill(projectName);
+    await dialog.getByRole('button', { name: /Create/i }).click();
+
+    // Project detail is routed under /w/:slug/projects/:key
+    await expect(page).toHaveURL(/\/projects\//, { timeout: 10_000 });
+    await expect(page.getByText(projectName).first()).toBeVisible();
+  });
+
+  test('project detail exposes the task table route', async ({ page }) => {
+    const slug = await setupWorkspace(page);
+    const projectName = `E2E Tasks ${Date.now()}`;
+
+    await page
+      .getByRole('button', { name: /Create Project/i })
+      .first()
+      .click();
+
+    const dialog = page.getByRole('dialog');
+
+    await dialog.locator('input[type="text"]').first().fill(projectName);
+    await dialog.getByRole('button', { name: /Create/i }).click();
+    await expect(page).toHaveURL(/\/projects\//, { timeout: 10_000 });
+
+    const projectKey = page.url().split('/projects/')[1].split('/')[0];
+
+    // The task table route resolves for the created project
+    await page.goto(`/w/${slug}/projects/${projectKey}/tasks`);
+    await expect(page).toHaveURL(new RegExp(`/w/${slug}/projects/${projectKey}/tasks`));
   });
 });

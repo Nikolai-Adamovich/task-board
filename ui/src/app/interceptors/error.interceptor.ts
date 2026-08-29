@@ -134,17 +134,9 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           }
           break;
 
-        case 403:
-          console.error('Permission denied:', userMessage);
-          break;
-
-        case 409:
-          console.error('Conflict:', userMessage);
-          break;
-
-        case 422:
-          console.error('Validation error:', (error.error as ErrorResponse)?.error?.details ?? userMessage);
-          break;
+        // 403/409/422 are EXPECTED client errors — the calling component handles
+        // them inline (toast/inline message) after the re-throw below; logging
+        // them here was console-only noise with no user-facing value.
       }
 
       return throwError(() => error);

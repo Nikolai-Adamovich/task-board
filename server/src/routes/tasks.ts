@@ -1,10 +1,9 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types/context.js';
-import { validateBody } from '../middleware/validation.js';
+import { validateBody, validateQuery } from '../middleware/validation.js';
 import { requirePermission } from '../middleware/rbac.js';
-import { AppError } from '../errors/app-error.js';
 import type { TaskQueryOptions } from '../repositories/task.repository.js';
-import { BulkUpdateTasksSchema, CreateTaskSchema, UpdateTaskSchema } from '../schemas/task.js';
+import { BulkUpdateTasksSchema, CreateTaskSchema, TaskQuerySchema, UpdateTaskSchema } from '../schemas/task.js';
 
 // ─── Task Routes ─────────────────────────────────────────────────────────────
 
@@ -13,48 +12,29 @@ export function createTaskRoutes(): Hono<AppEnv> {
 
   /**
    * GET /projects/:projectId/tasks — List tasks with filters, pagination, sort.
+   * Query is validated via Zod (bounded page/limit, whitelisted sort fields,
+   * ISO date ranges) — invalid input → 400 instead of NaN reaching MongoDB.
    */
-  router.get('/projects/:projectId/tasks', async (c) => {
+  router.get('/projects/:projectId/tasks', validateQuery(TaskQuerySchema), async (c) => {
     const projectId = c.req.param('projectId');
-    const pageStr = c.req.query('page');
-    const limitStr = c.req.query('limit');
-    const sortParam = c.req.query('sort');
-    let sort: { field: string; direction: 'asc' | 'desc' } | undefined;
-
-    if (sortParam) {
-      const [field, direction] = sortParam.split(':');
-
-      sort = { field, direction: direction === 'asc' ? 'asc' : 'desc' };
-    }
-
-    // Q13/F-01: inclusive ISO date (`YYYY-MM-DD`) range filters — invalid format → 400
-    const isoDateParam = (name: string): string | undefined => {
-      const value = c.req.query(name);
-
-      if (value === undefined) return undefined;
-
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        throw new AppError(400, 'VALIDATION_ERROR', `${name} must be an ISO date (YYYY-MM-DD)`);
-      }
-
-      return value;
-    };
+    const q = c.req.valid('query');
+    const [sortField, sortDirection] = q.sort ? q.sort.split(':') : [];
     const options: TaskQueryOptions = {
-      page: pageStr ? parseInt(pageStr, 10) : 1,
-      limit: limitStr ? parseInt(limitStr, 10) : 20,
-      search: c.req.query('search'),
-      statusId: c.req.query('statusId'),
-      priority: c.req.query('priority'),
-      typeId: c.req.query('typeId'),
-      assigneeId: c.req.query('assigneeId'),
-      reporterId: c.req.query('reporterId'),
-      sprintId: c.req.query('sprintId'),
-      labelId: c.req.query('labelId'),
-      createdFrom: isoDateParam('createdFrom'),
-      createdTo: isoDateParam('createdTo'),
-      updatedFrom: isoDateParam('updatedFrom'),
-      updatedTo: isoDateParam('updatedTo'),
-      sort,
+      page: q.page,
+      limit: q.limit,
+      search: q.search,
+      statusId: q.statusId,
+      priority: q.priority,
+      typeId: q.typeId,
+      assigneeId: q.assigneeId,
+      reporterId: q.reporterId,
+      sprintId: q.sprintId,
+      labelId: q.labelId,
+      createdFrom: q.createdFrom,
+      createdTo: q.createdTo,
+      updatedFrom: q.updatedFrom,
+      updatedTo: q.updatedTo,
+      sort: sortField && sortDirection ? { field: sortField, direction: sortDirection as 'asc' | 'desc' } : undefined,
     };
     const result = await c.get('svc').tasks.getTasksByProject(projectId, options);
 

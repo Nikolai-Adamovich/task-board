@@ -25,9 +25,12 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
     <div class="flex items-center justify-between gap-2 px-4 py-2">
       <div class="flex items-center gap-1 text-sm text-nowrap text-gray-600">
         <b>{{ totalItems() }}</b>
-        {{ totalItemsLabel() }} |
-        <b>{{ _lastPageNumber() }}</b>
-        {{ pagesLabel() }}
+        {{ totalItemsLabel() }}
+        @if (pagesLabel()) {
+          |
+          <b>{{ _lastPageNumber() }}</b>
+          {{ pagesLabel() }}
+        }
       </div>
 
       <nav hlmPagination>
@@ -41,7 +44,8 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
               [class.pointer-events-none]="_isFirstPageActive()"
               [class.opacity-50]="_isFirstPageActive()"
             >
-              <hlm-pagination-previous [text]="previousText()" />
+              <!-- Empty text → icon-only: 32×32 centred chevron, no label padding -->
+              <hlm-pagination-previous [text]="previousText()" [iconOnly]="!previousText()" />
             </li>
           }
 
@@ -64,7 +68,7 @@ import { HlmPaginationPrevious } from './hlm-pagination-previous';
               [class.pointer-events-none]="_isLastPageActive()"
               [class.opacity-50]="_isLastPageActive()"
             >
-              <hlm-pagination-next [text]="nextText()" />
+              <hlm-pagination-next [text]="nextText()" [iconOnly]="!nextText()" />
             </li>
           }
         </ul>

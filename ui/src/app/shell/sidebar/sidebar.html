@@ -48,6 +48,7 @@
                     [routerLink]="['/w', tenant.slug, 'settings']"
                     routerLinkActive
                     #rlaSettings="routerLinkActive"
+                    [routerLinkActiveOptions]="{ exact: true }"
                     [isActive]="rlaSettings.isActive"
                     [tooltip]="'sidebar.settings' | transloco"
                     size="lg"
@@ -165,6 +166,7 @@
                     [routerLink]="['/w', tenant.slug, 'projects', projectId, 'settings']"
                     routerLinkActive
                     #rlaSettings="routerLinkActive"
+                    [routerLinkActiveOptions]="{ exact: true }"
                     [isActive]="rlaSettings.isActive"
                     [tooltip]="'sidebar.projectSettings' | transloco"
                     size="default"

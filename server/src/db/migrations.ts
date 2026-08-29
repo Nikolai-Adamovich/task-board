@@ -165,3 +165,95 @@ export async function renameSeedStatusNames(db: Db): Promise<number> {
 
   return updated;
 }
+
+// ─── Core Indexes ────────────────────────────────────────────────────────────
+
+interface IndexDefinition {
+  collection: string;
+  spec: Record<string, 1 | -1>;
+  options?: { unique?: boolean };
+}
+
+/**
+ * Every index required by the repositories, created programmatically.
+ *
+ * Repository file headers document these indexes, but before this function
+ * nothing created them — new environments silently ran with full collection
+ * scans and no uniqueness enforcement (e.g. `users.email`: the check-then-insert
+ * registration flow races into duplicate accounts without it).
+ */
+const CORE_INDEXES: IndexDefinition[] = [
+  // users
+  { collection: 'users', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'users', spec: { email: 1 }, options: { unique: true } },
+  // tenants ({ slug: 1 } unique is handled by ensureTenantSlugUniqueIndex)
+  { collection: 'tenants', spec: { id: 1 }, options: { unique: true } },
+  // tenant_members
+  { collection: 'tenant_members', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'tenant_members', spec: { tenantId: 1, userId: 1 }, options: { unique: true } },
+  { collection: 'tenant_members', spec: { tenantId: 1 } },
+  { collection: 'tenant_members', spec: { 'invitation.tokenHash': 1 } },
+  { collection: 'tenant_members', spec: { 'invitation.invitedEmail': 1 } },
+  // projects
+  { collection: 'projects', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'projects', spec: { tenantId: 1, key: 1 }, options: { unique: true } },
+  // project_members
+  { collection: 'project_members', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'project_members', spec: { projectId: 1, userId: 1 }, options: { unique: true } },
+  // tasks
+  { collection: 'tasks', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'tasks', spec: { projectId: 1, number: -1 }, options: { unique: true } },
+  { collection: 'tasks', spec: { projectId: 1, createdAt: -1 } },
+  { collection: 'tasks', spec: { projectId: 1, updatedAt: -1 } },
+  { collection: 'tasks', spec: { projectId: 1, statusId: 1 } },
+  { collection: 'tasks', spec: { projectId: 1, sprintId: 1 } },
+  { collection: 'tasks', spec: { projectId: 1, assigneeId: 1 } },
+  // comments
+  { collection: 'comments', spec: { taskId: 1 } },
+  // task_relationships
+  { collection: 'task_relationships', spec: { projectId: 1 } },
+  { collection: 'task_relationships', spec: { sourceTaskId: 1 } },
+  { collection: 'task_relationships', spec: { targetTaskId: 1 } },
+  // audit_events
+  { collection: 'audit_events', spec: { tenantId: 1, createdAt: -1 } },
+  { collection: 'audit_events', spec: { projectId: 1, createdAt: -1 } },
+  // filters
+  { collection: 'filters', spec: { userId: 1, projectId: 1 } },
+  // labels
+  { collection: 'labels', spec: { projectId: 1 } },
+  // statuses
+  { collection: 'statuses', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'statuses', spec: { projectId: 1, normalizedName: 1 }, options: { unique: true } },
+  // task_types
+  { collection: 'task_types', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'task_types', spec: { projectId: 1, key: 1 }, options: { unique: true } },
+  // boards
+  { collection: 'boards', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'boards', spec: { projectId: 1 } },
+  // sprints
+  { collection: 'sprints', spec: { id: 1 }, options: { unique: true } },
+  { collection: 'sprints', spec: { projectId: 1, status: 1 } },
+  // user_preferences / user_settings
+  { collection: 'user_preferences', spec: { userId: 1, projectId: 1 }, options: { unique: true } },
+  { collection: 'user_settings', spec: { userId: 1 }, options: { unique: true } },
+];
+
+/**
+ * Create all core indexes (idempotent — `createIndex` is a no-op for an
+ * existing identical index).
+ *
+ * Indexes are created independently: a failure on one (e.g. a unique index
+ * conflicting with pre-existing duplicate documents) is logged and does not
+ * block the remaining indexes or the API request.
+ */
+export async function ensureCoreIndexes(db: Db): Promise<void> {
+  await Promise.all(
+    CORE_INDEXES.map(async ({ collection, spec, options }) => {
+      try {
+        await db.collection(collection).createIndex(spec, options);
+      } catch (err) {
+        console.error(`[migrations] Failed to create index ${collection} ${JSON.stringify(spec)}:`, err);
+      }
+    }),
+  );
+}

@@ -12,6 +12,8 @@ import { lucideBuilding2, lucideCheck, lucideMail } from '@ng-icons/lucide';
 import { finalize } from 'rxjs';
 import type { MyInvitation } from '@app/types/frontend';
 import { roleBadgeVariant } from '@app/constants/priority';
+import { injectToasts } from '@app/shared/utils/toast-utils';
+import { getErrorMessage } from '@app/shared/utils/error-utils';
 
 @Component({
   selector: 'ui-welcome-view',
@@ -22,6 +24,7 @@ import { roleBadgeVariant } from '@app/constants/priority';
 export class WelcomeView {
   protected readonly authStore = inject(AuthStore);
   private readonly tenantClient = inject(TenantClient);
+  private readonly notify = injectToasts();
   readonly invitations = input<MyInvitation[]>([]);
   readonly invitationHandled = output();
   protected readonly acceptingId = signal<string | null>(null);
@@ -37,7 +40,7 @@ export class WelcomeView {
         next: () => {
           this.invitationHandled.emit();
         },
-        error: (err) => console.error(err),
+        error: (err) => this.notify.error(getErrorMessage(err)),
       });
   }
 }

@@ -37,10 +37,28 @@ async function createTestToken(
   return `${headerB64}.${payloadB64}.${signatureB64}`;
 }
 
+/**
+ * Users "in the database" for the fake service graph. The middleware now
+ * verifies the user still exists (soft-delete check) via `svc.auth`.
+ */
+const activeUsers = new Map<string, Record<string, unknown>>();
+
+function fakeUser(id: string, email: string, displayName: string) {
+  return { id, email, displayName, avatarUrl: null, createdAt: '', updatedAt: '', deletedAt: null };
+}
+
 function createTestApp() {
   const app = new Hono<AppEnv>();
 
   app.onError(errorHandler);
+  app.use('/protected/*', (c, next) => {
+    c.set('svc', {
+      auth: {
+        findActiveUser: async (id: string) => activeUsers.get(id) ?? null,
+      },
+    } as never);
+    return next();
+  });
   app.use('/protected/*', authMiddleware);
   app.get('/protected/me', (c) => {
     const userId = c.get('userId');
@@ -107,6 +125,8 @@ describe('authMiddleware', () => {
   });
 
   it('sets userId and user context for valid token', async () => {
+    activeUsers.set('user-123', fakeUser('user-123', 'test@example.com', 'Test User'));
+
     const token = await createTestToken({
       sub: 'user-123',
       email: 'test@example.com',
@@ -127,6 +147,8 @@ describe('authMiddleware', () => {
   });
 
   it('sets user with null avatarUrl by default', async () => {
+    activeUsers.set('user-456', fakeUser('user-456', 'avatar@example.com', 'Avatar User'));
+
     const token = await createTestToken({
       sub: 'user-456',
       email: 'avatar@example.com',
@@ -142,5 +164,19 @@ describe('authMiddleware', () => {
 
     expect(body.user.avatarUrl).toBeNull();
     expect(body.user.deletedAt).toBeNull();
+  });
+
+  it('returns 401 when the user no longer exists (soft-deleted)', async () => {
+    // 'deleted-user' is NOT in activeUsers — simulates a soft-deleted account
+    const token = await createTestToken({ sub: 'deleted-user', email: 'gone@example.com' });
+    const res = await requestWithEnv(app, '/protected/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(res.status).toBe(401);
+
+    const json = (await res.json()) as { error: { code: string } };
+
+    expect(json.error.code).toBe('UNAUTHORIZED');
   });
 });

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TaskTypeService } from './task-type.service.js';
-import type { TaskTypeServiceTaskRepo, TaskTypeServiceProjectRepo } from './task-type.service.js';
+import type {
+  TaskTypeServiceTaskRepo,
+  TaskTypeServiceProjectRepo,
+  TaskTypeServiceProjectMemberRepo,
+} from './task-type.service.js';
 import { TaskTypeRepository } from '../repositories/task-type.repository.js';
 import type { AuditService } from './audit.service.js';
 import type { TaskType } from '@task-board/shared';
@@ -204,6 +208,72 @@ describe('TaskTypeService', () => {
           actorId: 'user-1',
         }),
       );
+    });
+  });
+
+  // ── V2-4: edit_project_config enforcement ────────────────────────────────
+
+  describe('edit_project_config enforcement', () => {
+    let projectMemberRepo: TaskTypeServiceProjectMemberRepo & { findByUserAndProject: ReturnType<typeof vi.fn> };
+
+    beforeEach(() => {
+      projectMemberRepo = { findByUserAndProject: vi.fn().mockResolvedValue(null) };
+      service = new TaskTypeService(taskTypeRepo, taskRepo, projectRepo, auditService, projectMemberRepo);
+    });
+
+    it('denies createTaskType for an EDITOR (edit_project_config is PROJECT_ADMIN only)', async () => {
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'EDITOR' });
+
+      await expect(
+        service.createTaskType('project-1', { key: 'BUG', name: 'Bug', position: 0 }, 'user-1', 'EDITOR'),
+      ).rejects.toThrow("Insufficient permissions. Requires 'edit_project_config'.");
+      expect(taskTypeRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('denies updateTaskType for a VIEWER', async () => {
+      taskTypeRepo.findById = vi.fn().mockResolvedValue(makeTaskType());
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'VIEWER' });
+
+      await expect(service.updateTaskType('type-1', { name: 'X' }, 'user-1', 'VIEWER')).rejects.toThrow(
+        "Insufficient permissions. Requires 'edit_project_config'.",
+      );
+      expect(taskTypeRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('allows createTaskType for a PROJECT_ADMIN', async () => {
+      taskTypeRepo.findByProjectAndKey = vi.fn().mockResolvedValue(null);
+      taskTypeRepo.create = vi.fn().mockResolvedValue(makeTaskType({ id: 'type-new', key: 'BUG', name: 'Bug' }));
+      projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: 'PROJECT_ADMIN' });
+
+      const result = await service.createTaskType(
+        'project-1',
+        { key: 'BUG', name: 'Bug', position: 0 },
+        'user-1',
+        'PROJECT_ADMIN',
+      );
+
+      expect(result.key).toBe('BUG');
+    });
+
+    it('bypasses the project role for a tenant OWNER', async () => {
+      taskTypeRepo.findById = vi.fn().mockResolvedValue(makeTaskType());
+      taskTypeRepo.delete = vi.fn().mockResolvedValue(true);
+      // no membership record at all — tenant OWNER bypasses project-level checks
+      projectMemberRepo.findByUserAndProject.mockResolvedValue(null);
+
+      await service.deleteTaskType('type-1', undefined, 'user-1', 'OWNER');
+
+      expect(taskTypeRepo.delete).toHaveBeenCalledWith('type-1');
+    });
+
+    it('skips the check when no caller context is provided (legacy/test callers)', async () => {
+      taskTypeRepo.findById = vi.fn().mockResolvedValue(makeTaskType());
+      taskTypeRepo.delete = vi.fn().mockResolvedValue(true);
+
+      await service.deleteTaskType('type-1');
+
+      expect(projectMemberRepo.findByUserAndProject).not.toHaveBeenCalled();
+      expect(taskTypeRepo.delete).toHaveBeenCalledWith('type-1');
     });
   });
 });

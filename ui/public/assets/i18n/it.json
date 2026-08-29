@@ -288,6 +288,9 @@
     "roleOwner": "Proprietario",
     "roleAdmin": "Amministratore",
     "roleMember": "Membro",
+    "roleProjectAdmin": "Amministratore del progetto",
+    "roleEditor": "Editor",
+    "roleViewer": "Visualizzatore",
     "name": "Nome",
     "status": "Stato",
     "actions": "Azioni",
@@ -668,7 +671,6 @@
     "filtersDesc": "Filtra le attività per stato, priorità, assegnatario e altro.",
     "title": "Attività",
     "searchPlaceholder": "Cerca attività",
-    "loading": "Caricamento attività",
     "noTasks": "Nessuna attività trovata. Crea un'attività o modifica i filtri.",
     "key": "Chiave",
     "titleCol": "Titolo",
@@ -820,8 +822,6 @@
     "strikethrough": "Barrato"
   },
   "pagination": {
-    "previous": "Precedente",
-    "next": "Successivo",
     "totalItems": "elementi",
     "pages": "pagine",
     "auto": "Auto"

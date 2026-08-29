@@ -1,11 +1,11 @@
 <!-- Q2 (F-05)/Q6 (F-13): full-height flex column — exactly viewport minus the app header
-     (--header-height: 4rem) and the shell <main> vertical padding (py-4 → 2rem below
-     sm, p-6 → 3rem from sm up). Horizontal padding comes from the shell (F-12).
-     Header / table / pagination stack vertically; the table wrapper flexes to fill
-     the rest so the table bottom aligns with the page bottom (no dead space).
-     Toolbar wraps instead of overflowing on mobile. -->
+     (--header-height: 2.5rem below lg, 4rem from lg) and the shell <main> vertical
+     padding (p-3 → 1.5rem below lg, p-6 → 3rem from lg). Horizontal padding comes
+     from the shell (F-12). Header / table / pagination stack vertically; the table
+     wrapper flexes to fill the rest so the table bottom aligns with the page bottom
+     (no dead space). Toolbar wraps instead of overflowing on mobile. -->
 <div
-  class="flex h-[calc(100dvh-var(--header-height)-3rem)] max-sm:h-[calc(100dvh-var(--header-height)-2rem)] w-full min-w-0 flex-col"
+  class="flex h-[calc(100dvh-var(--header-height)-1.5rem)] lg:h-[calc(100dvh-var(--header-height)-3rem)] w-full min-w-0 flex-col"
 >
   <!-- R3-P7: heading + icon aligned via flex items-center -->
   <div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
@@ -196,7 +196,9 @@
           <!-- "No results" only when not loading — during a fetch the previous/empty
                  page stays visible instead of flashing the empty state. -->
           @if (!loading()) {
-            <tr hlmTableRow>
+            <!-- data-table-empty-row: excluded from the Auto page-size row
+                 measurement (much taller than a data row). -->
+            <tr hlmTableRow data-table-empty-row>
               <td hlmTableCell colspan="5" class="py-12 text-center">
                 <hlm-empty>
                   <hlm-empty-header>

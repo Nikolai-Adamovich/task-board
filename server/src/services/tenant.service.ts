@@ -71,36 +71,29 @@ export class TenantService {
 
   async listTenantsForUser(userId: string): Promise<Tenant[]> {
     const memberships = await this.tenantMemberRepo.findByUser(userId);
-    const tenants: Tenant[] = [];
+    const tenantIds = memberships.filter((m) => m.status === MemberStatus.ACTIVE).map((m) => m.tenantId);
+    // Batch lookup (N+1 fix): one `$in` query instead of one `findById` per membership
+    const tenants = await this.tenantRepo.findByIds(tenantIds);
+    const tenantById = new Map(tenants.map((t) => [t.id, t]));
 
-    for (const membership of memberships) {
-      if (membership.status !== MemberStatus.ACTIVE) continue;
-
-      const tenant = await this.tenantRepo.findById(membership.tenantId);
-
-      if (tenant) {
-        tenants.push(tenant);
-      }
-    }
-
-    return tenants;
+    // Preserve membership order
+    return tenantIds.map((id) => tenantById.get(id)).filter((t): t is Tenant => t !== undefined);
   }
 
   async listTenantsWithRole(userId: string): Promise<(Tenant & { role: string })[]> {
     const memberships = await this.tenantMemberRepo.findByUser(userId);
-    const result: (Tenant & { role: string })[] = [];
+    const active = memberships.filter((m) => m.status === MemberStatus.ACTIVE);
+    // Batch lookup (N+1 fix): one `$in` query instead of one `findById` per membership
+    const tenants = await this.tenantRepo.findByIds(active.map((m) => m.tenantId));
+    const tenantById = new Map(tenants.map((t) => [t.id, t]));
 
-    for (const m of memberships) {
-      if (m.status !== MemberStatus.ACTIVE) continue;
+    return active
+      .map((m) => {
+        const tenant = tenantById.get(m.tenantId);
 
-      const tenant = await this.tenantRepo.findById(m.tenantId);
-
-      if (tenant) {
-        result.push({ ...tenant, role: m.role });
-      }
-    }
-
-    return result;
+        return tenant ? { ...tenant, role: m.role } : undefined;
+      })
+      .filter((t) => t !== undefined);
   }
 
   async getTenant(id: string): Promise<Tenant> {
@@ -110,6 +103,17 @@ export class TenantService {
       throw new NotFoundError('Tenant not found');
     }
     return tenant;
+  }
+
+  /**
+   * Get a tenant for a specific requester — verifies membership first.
+   * IDOR guard: `GET /tenants/:tenantId` must not expose arbitrary tenants
+   * to any authenticated user.
+   */
+  async getTenantForUser(userId: string, id: string): Promise<Tenant> {
+    await this.requireMembership(userId, id);
+
+    return this.getTenant(id);
   }
 
   /**

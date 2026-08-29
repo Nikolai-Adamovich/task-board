@@ -288,6 +288,9 @@
     "roleOwner": "オーナー",
     "roleAdmin": "管理者",
     "roleMember": "メンバー",
+    "roleProjectAdmin": "プロジェクト管理者",
+    "roleEditor": "編集者",
+    "roleViewer": "閲覧者",
     "name": "名前",
     "status": "ステータス",
     "actions": "アクション",
@@ -668,7 +671,6 @@
     "filtersDesc": "ステータス・優先度・担当者などでタスクを絞り込みます。",
     "title": "タスク",
     "searchPlaceholder": "タスクを検索",
-    "loading": "タスクを読み込み中",
     "noTasks": "タスクが見つかりませんでした。タスクを作成するかフィルターを変更してください。",
     "key": "キー",
     "titleCol": "タイトル",
@@ -820,8 +822,6 @@
     "strikethrough": "取り消し線"
   },
   "pagination": {
-    "previous": "前へ",
-    "next": "次へ",
     "totalItems": "件",
     "pages": "ページ",
     "auto": "Auto"

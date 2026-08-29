@@ -293,6 +293,9 @@
     "roleOwner": "Owner",
     "roleAdmin": "Admin",
     "roleMember": "Member",
+    "roleProjectAdmin": "Project Admin",
+    "roleEditor": "Editor",
+    "roleViewer": "Viewer",
     "contextError": "Members could not be loaded because the project context is unavailable.",
     "editRole": "Edit role",
     "invitationPending": "Invitation pending",
@@ -716,7 +719,6 @@
     "hideColumn": "Hide this column",
     "title": "Tasks",
     "searchPlaceholder": "Search tasks",
-    "loading": "Loading tasks",
     "noTasks": "No tasks found. Create a task or change your filters.",
     "key": "Key",
     "titleCol": "Title",
@@ -779,8 +781,6 @@
     }
   },
   "pagination": {
-    "previous": "Previous",
-    "next": "Next",
     "totalItems": "total items",
     "pages": "pages",
     "auto": "Auto"
