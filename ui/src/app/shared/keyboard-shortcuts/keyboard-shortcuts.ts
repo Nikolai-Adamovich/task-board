@@ -2,7 +2,11 @@ import { DOCUMENT, Service, inject, signal } from '@angular/core';
 import { ActivatedRouteSnapshot, Router } from '@angular/router';
 import { fromEvent, firstValueFrom } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
+// Deep import: the `@spartan-ng/helm/sidebar` barrel re-exports every sidebar
+// component (and, transitively, `helm/input` → `brain/field` → `@angular/forms`).
+// This root-provided service only needs the service file itself, keeping the
+// sidebar component library out of the initial bundle.
+import { HlmSidebarService } from '@spartan-ng/helm/sidebar/service';
 import { BoardClient } from '@services/board-client';
 import { resolveBoardId } from '@app/shared/utils/board-utils';
 import { PreferencesStore } from '@stores/preferences-store';

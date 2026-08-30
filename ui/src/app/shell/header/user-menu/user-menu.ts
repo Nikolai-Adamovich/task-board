@@ -16,8 +16,8 @@ import { AuthStore } from '@stores/auth-store';
 import { KeyboardShortcuts } from '../../../shared/keyboard-shortcuts/keyboard-shortcuts';
 import { LanguageSwitcher } from '../language-switcher/language-switcher';
 import { getRoleColor } from '../role-color.util';
-import { UserMenuThemeSheet } from './user-menu-theme-sheet/user-menu-theme-sheet';
 import { UserMenuZoomControls } from './user-menu-zoom-controls/user-menu-zoom-controls';
+import { UserMenuThemeSheet } from './user-menu-theme-sheet/user-menu-theme-sheet';
 
 @Component({
   selector: 'ui-user-menu',
@@ -32,6 +32,9 @@ import { UserMenuZoomControls } from './user-menu-zoom-controls/user-menu-zoom-c
     HlmDropdownMenuSeparator,
     HlmDropdownMenuTrigger,
     LanguageSwitcher,
+    // Only referenced inside the `@defer` block in the template — the compiler
+    // extracts it (with its @angular/forms + sonner dependency graph) into a
+    // lazy chunk instead of the initial bundle.
     UserMenuThemeSheet,
     UserMenuZoomControls,
   ],

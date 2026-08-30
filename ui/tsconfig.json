@@ -43,7 +43,8 @@
       "@spartan-ng/helm/input-group": ["./libs/ui/input-group/src/index.ts"],
       "@spartan-ng/helm/date-picker": ["./libs/ui/date-picker/src/index.ts"],
       "@spartan-ng/helm/calendar": ["./libs/ui/calendar/src/index.ts"],
-      "@spartan-ng/helm/radio-group": ["./libs/ui/radio-group/src/index.ts"]
+      "@spartan-ng/helm/radio-group": ["./libs/ui/radio-group/src/index.ts"],
+      "@spartan-ng/helm/sidebar/service": ["./libs/ui/sidebar/src/lib/hlm-sidebar.service.ts"]
     }
   }
 }

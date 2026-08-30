@@ -1,6 +1,9 @@
 import { Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
+// Deep import (see keyboard-shortcuts.ts): the `@spartan-ng/helm/sidebar`
+// barrel would drag every sidebar component — and transitively `helm/input` →
+// `brain/field` → `@angular/forms` — into the initial bundle.
+import { HlmSidebarService } from '@spartan-ng/helm/sidebar/service';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMenu } from '@ng-icons/lucide';

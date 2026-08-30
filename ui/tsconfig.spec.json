@@ -52,6 +52,7 @@
       "@spartan-ng/helm/input-group": ["./libs/ui/input-group/src/index.ts"],
       "@spartan-ng/helm/accordion": ["./libs/ui/accordion/src/index.ts"],
       "@spartan-ng/helm/radio-group": ["./libs/ui/radio-group/src/index.ts"],
+      "@spartan-ng/helm/sidebar/service": ["./libs/ui/sidebar/src/lib/hlm-sidebar.service.ts"],
       "lowlight": ["../node_modules/lowlight/lib/index.js"]
     }
   },

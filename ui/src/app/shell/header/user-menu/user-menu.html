@@ -57,7 +57,12 @@
   </hlm-dropdown-menu>
 </ng-template>
 
-<ui-user-menu-theme-sheet [(open)]="themeSheetOpen" />
+<!-- The theme sheet (and its dependency graph: theme-mode-switch → radio-group →
+     @angular/forms, plus the sonner toast API) is only needed when the user opens
+     it — defer the whole subtree out of the initial bundle. -->
+@defer (when themeSheetOpen() === 'open') {
+  <ui-user-menu-theme-sheet [(open)]="themeSheetOpen" />
+}
 
 <ng-template #languageMenu>
   <ui-language-switcher />
