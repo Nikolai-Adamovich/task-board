@@ -57,20 +57,5 @@ jobs:
       - name: Build UI
         run: npm run build --workspace=ui
 
-      # ─── Deployment steps (uncomment when secrets are configured) ────────
-      #
-      # - name: Deploy backend to Cloudflare Workers
-      #   uses: cloudflare/wrangler-action@v3
-      #   with:
-      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      #     workingDirectory: server
-      #     command: deploy
-      #
-      # - name: Deploy frontend to Cloudflare Pages
-      #   uses: cloudflare/wrangler-action@v3
-      #   with:
-      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      #     workingDirectory: ui
-      #     command: pages deploy dist/ui/browser --project-name=task-board-ui
+      # Deployment lives in cd.yml, which is gated on this workflow's success
+      # via the `workflow_run` trigger.

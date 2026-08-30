@@ -33,7 +33,7 @@ npm run build            # shared → server → ui
 npm run typecheck        # shared + server tsc
 npm test                 # vitest: run both server and ui suites
 npm run lint             # eslint across repo
-npm run dev --workspace=server   # wrangler dev (needs MONGODB_URI/JWT_SECRET in wrangler.toml [vars])
+npm run dev --workspace=server   # wrangler dev (needs MONGODB_URI/JWT_SECRET in server/.dev.vars, gitignored)
 npm start --workspace=ui         # ng serve
 npm run test:e2e                 # playwright
 ```
@@ -47,8 +47,8 @@ Always verify with `typecheck` + `test` + `lint` before finishing a task.
   database operations (drop/delete of collections or data).
 - Only when explicitly asked: `git commit`, `git push`. Never force-push or rewrite history.
 - Never run automatically: `npm run deploy:server` / `deploy:ui` (production deploys) — prefer that a human runs them.
-- Secrets (`wrangler.toml [vars]`: `MONGODB_URI`, `JWT_SECRET`; any `.env`): read only when genuinely necessary, never
-  print, copy into reports, logs, or commits.
+- Secrets (`server/.dev.vars` for local dev; Worker secrets + GitHub repo secrets for production): read only when
+  genuinely necessary, never print, copy into reports, logs, or commits.
 
 ## Layout
 

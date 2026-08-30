@@ -159,6 +159,21 @@ export default [
       'no-unused-vars': 'off',
     },
   },
+  // Cloudflare Pages Functions (ui/public/functions/, deployed as-is) run in the
+  // Workers runtime — declare its globals so no-undef passes for plain .js files.
+  {
+    files: ['**/public/functions/**/*.js'],
+    languageOptions: {
+      globals: {
+        fetch: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        Request: 'readonly',
+        Response: 'readonly',
+        Headers: 'readonly',
+      },
+    },
+  },
   {
     ignores: [
       '**/node_modules/',

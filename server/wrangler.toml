@@ -4,10 +4,14 @@ compatibility_date = "2025-07-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-MONGODB_URI = ""
-JWT_SECRET = ""
+# MONGODB_URI / JWT_SECRET are deliberately NOT defined here: on `wrangler deploy`
+# a [vars] entry overrides the Worker secret of the same name (it would push an
+# empty string over the real secret on every deploy). Local dev reads them from
+# server/.dev.vars (gitignored); production sets them via `wrangler secret put`
+# in .github/workflows/cd.yml.
 
 # Comma-separated list of allowed origins for CORS.
+# Local dev default; production overrides it via `wrangler deploy --var` in CD.
 # Production MUST set an explicit origin list — never deploy with "*".
 ALLOWED_ORIGINS = "http://localhost:4200"
 
