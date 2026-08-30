@@ -67,6 +67,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
 
+      # TEMPORARY diagnostics: CI hashes 869 files while a local build of the
+      # same sources produces 241 — show what is actually in the deploy dir.
+      - name: Debug — list deploy directory contents
+        working-directory: ui/dist/ui/browser
+        run: |
+          echo "total files: $(find . -type f | wc -l)"
+          echo "by extension:"
+          find . -type f | sed 's/.*\.//' | sort | uniq -c | sort -rn
+          echo "non-js files (first 40):"
+          find . -type f ! -name '*.js' | head -40
+
       # Run from the build output: wrangler resolves the Pages Functions
       # directory relative to the CWD (./functions), not the deployed directory.
       #
