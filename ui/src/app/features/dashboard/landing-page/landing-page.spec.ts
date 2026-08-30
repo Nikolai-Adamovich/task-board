@@ -7,14 +7,16 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { LandingPage } from './landing-page';
 import { API_BASE_URL } from '@app/api-url.token';
 
 describe('LandingPage', () => {
-  function setup() {
+  async function setup() {
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -22,14 +24,16 @@ describe('LandingPage', () => {
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
       ],
     });
+
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
   }
 
-  it('should create the component', () => {
-    setup();
+  it('should create the component', async () => {
+    await setup();
 
     const fixture = TestBed.createComponent(LandingPage);
 
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(fixture.componentInstance).toBeTruthy();
   });

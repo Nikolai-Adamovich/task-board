@@ -11,15 +11,16 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { ProjectSettingsGeneral } from './project-settings-general';
 import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Project } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockProject: Project = {
@@ -43,7 +44,7 @@ let projectClientMock: Record<string, ReturnType<typeof vi.fn>>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let activeProjectMock: any;
 
-function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
+async function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
   const state: { project: Project | null } = { project: mockProject };
 
   activeProjectMock = Object.assign(() => state.project, {
@@ -66,6 +67,7 @@ function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
   TestBed.configureTestingModule({
     imports: [
       TranslocoTestingModule.forRoot({
+        preloadLangs: true,
         langs: { en: { common: { charCount: '{{count}}/{{max}}' } } },
         translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
       }),
@@ -86,24 +88,25 @@ function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
       },
     ],
   });
+  await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
   fixture = TestBed.createComponent(ProjectSettingsGeneral);
 
   fixture.componentRef.setInput('projectKey', mockProject.key);
   component = fixture.componentInstance;
-  fixture.detectChanges();
+  await settle(fixture);
 }
 
 describe('ProjectSettingsGeneral', () => {
-  it('should seed the form from the project context', () => {
-    setup();
+  it('should seed the form from the project context', async () => {
+    await setup();
 
     expect(component.model().name).toBe('Test Project');
     expect(component.model().description).toBe('A project for testing');
   });
 
   it('should save name and description via ProjectClient.update', async () => {
-    setup();
+    await setup();
     component.model.update((m: { name: string; description: string }) => ({
       ...m,
       name: 'Renamed Project',
@@ -119,7 +122,7 @@ describe('ProjectSettingsGeneral', () => {
   });
 
   it('should sync the project store after a successful save', async () => {
-    setup();
+    await setup();
     component.model.update((m: { name: string; description: string }) => ({ ...m, name: 'Renamed Project' }));
     submit(component.generalForm);
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -128,7 +131,7 @@ describe('ProjectSettingsGeneral', () => {
   });
 
   it('should surface an error message when the update fails', async () => {
-    setup();
+    await setup();
     projectClientMock.update?.mockReturnValueOnce(throwError(() => new Error('boom')));
     component.model.update((m: { name: string; description: string }) => ({ ...m, name: 'Nope' }));
     submit(component.generalForm);
@@ -139,24 +142,24 @@ describe('ProjectSettingsGeneral', () => {
 
   // ── Round 5 P2: description 120-char limit + counter ──────────────────
 
-  it('should mark the description invalid over 120 characters (Round 5 P2)', () => {
-    setup();
+  it('should mark the description invalid over 120 characters (Round 5 P2)', async () => {
+    await setup();
     component.model.update((m: { description: string }) => ({ ...m, description: 'a'.repeat(121) }));
 
     expect(component.generalForm.description().invalid()).toBe(true);
     expect(component.generalForm().invalid()).toBe(true);
   });
 
-  it('should accept a description of exactly 120 characters (Round 5 P2)', () => {
-    setup();
+  it('should accept a description of exactly 120 characters (Round 5 P2)', async () => {
+    await setup();
     component.model.update((m: { description: string }) => ({ ...m, description: 'a'.repeat(120) }));
 
     expect(component.generalForm.description().valid()).toBe(true);
   });
 
-  it('should render the character counter under the description field (Round 5 P2)', () => {
-    setup();
-    fixture.detectChanges();
+  it('should render the character counter under the description field (Round 5 P2)', async () => {
+    await setup();
+    await settle(fixture);
 
     const counter = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="desc-char-count"]');
 
@@ -165,14 +168,14 @@ describe('ProjectSettingsGeneral', () => {
   });
 
   describe('isAdmin', () => {
-    it('should be true for tenant OWNER', () => {
-      setup({ tenantRole: 'OWNER' });
+    it('should be true for tenant OWNER', async () => {
+      await setup({ tenantRole: 'OWNER' });
 
       expect(component.isAdmin()).toBe(true);
     });
 
-    it('should be false for EDITOR without tenant role', () => {
-      setup({ tenantRole: 'MEMBER', projectRole: 'EDITOR' });
+    it('should be false for EDITOR without tenant role', async () => {
+      await setup({ tenantRole: 'MEMBER', projectRole: 'EDITOR' });
 
       expect(component.isAdmin()).toBe(false);
     });

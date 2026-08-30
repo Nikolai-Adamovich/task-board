@@ -12,7 +12,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { firstValueFrom, of, Subject } from 'rxjs';
 import { TranslocoTestingModule, TranslocoService } from '@jsverse/transloco';
 import { TaskTable } from './task-table';
 import { safeNumericParam } from '@app/shared/utils/numeric-param';
@@ -24,6 +24,7 @@ import { PreferencesStore } from '@stores/preferences-store';
 import { ProjectRefStore } from '@stores/project-ref-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
+import { clickUntil, settle } from '@app/shared/testing/zoneless';
 
 describe('TaskTable — W9 polish', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,7 +34,7 @@ describe('TaskTable — W9 polish', () => {
   let routerMock: { navigate: ReturnType<typeof vi.fn>; events: unknown };
   let routerEvents: Subject<NavigationEnd>;
 
-  function setup(
+  async function setup(
     inputOverrides: Record<string, unknown> = {},
     storedPageSize = 30,
     tenantRole: string | null = 'OWNER',
@@ -49,6 +50,7 @@ describe('TaskTable — W9 polish', () => {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
+          preloadLangs: true,
           langs: { en: {} },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
         }),
@@ -102,6 +104,7 @@ describe('TaskTable — W9 polish', () => {
         },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     fixture = TestBed.createComponent(TaskTable);
 
@@ -111,7 +114,7 @@ describe('TaskTable — W9 polish', () => {
     });
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Debounced search ───────────────────────────────────
@@ -170,9 +173,9 @@ describe('TaskTable — W9 polish', () => {
   // ── V4-7: no literal "undefined" in the search input ───
 
   describe('search input rendering (V4-7 regression)', () => {
-    it('should render an empty search input when no ?search= param is present', () => {
+    it('should render an empty search input when no ?search= param is present', async () => {
       // Simulate withComponentInputBinding handing `undefined` for the absent param
-      setup({ search: undefined });
+      await setup({ search: undefined });
 
       expect(component.searchInput()).toBe('');
 
@@ -182,13 +185,13 @@ describe('TaskTable — W9 polish', () => {
       expect(input.value).toBe('');
     });
 
-    it('should keep the buffered search text empty when the URL param is removed', () => {
-      setup({ search: 'hello' });
+    it('should keep the buffered search text empty when the URL param is removed', async () => {
+      await setup({ search: 'hello' });
       expect(component.searchInput()).toBe('hello');
 
       // Chip removal / back-navigation clears the param — router binds undefined
       fixture.componentRef.setInput('search', undefined);
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.searchInput()).toBe('');
     });
@@ -197,8 +200,8 @@ describe('TaskTable — W9 polish', () => {
   // ── V4-8: Title column width + clickable sort ──────────
 
   describe('title column header (V4-8 regression)', () => {
-    it('should give the Title th an explicit percentage width with a min-width', () => {
-      setup();
+    it('should give the Title th an explicit percentage width with a min-width', async () => {
+      await setup();
 
       const headers = fixture.nativeElement.querySelectorAll('thead th');
       // Q10: first th is the selection checkbox — Title is the third column
@@ -208,8 +211,8 @@ describe('TaskTable — W9 polish', () => {
       expect(titleTh.className).toContain('min-w-50');
     });
 
-    it('should keep the fixed widths of non-title columns well below typical container widths', () => {
-      setup();
+    it('should keep the fixed widths of non-title columns well below typical container widths', async () => {
+      await setup();
 
       // V4-8 (reopened): if these sum ≥ available width, Title collapses to 0px.
       const pxWidths = component.taskColumns
@@ -224,8 +227,8 @@ describe('TaskTable — W9 polish', () => {
       expect(sum).toBe(1132);
     });
 
-    it('should yield a Title column wider than 150px at a common desktop viewport (fixed-layout math)', () => {
-      setup();
+    it('should yield a Title column wider than 150px at a common desktop viewport (fixed-layout math)', async () => {
+      await setup();
 
       // The unit-test DOM has no layout engine, so assert the CSS invariant the
       // classes encode: under `table-fixed`, when specified widths exceed the
@@ -246,8 +249,8 @@ describe('TaskTable — W9 polish', () => {
       expect(titleWidth).toBeGreaterThan(150);
     });
 
-    it('should keep the Title sort button clickable by mouse', () => {
-      setup();
+    it('should keep the Title sort button clickable by mouse', async () => {
+      await setup();
 
       const headers = fixture.nativeElement.querySelectorAll('thead th');
       // Q10: first th is the selection checkbox — Title is the third column
@@ -255,8 +258,15 @@ describe('TaskTable — W9 polish', () => {
       const sortButton = titleTh.querySelector('button') as HTMLButtonElement;
 
       expect(sortButton).toBeTruthy();
-      sortButton.click();
-      fixture.detectChanges();
+      await clickUntil(
+        () => sortButton.click(),
+        () =>
+          expect(routerMock.navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { sort: 'title:asc', page: null } }),
+          ),
+      );
+      await settle(fixture);
 
       expect(routerMock.navigate).toHaveBeenCalledWith(
         [],
@@ -268,14 +278,14 @@ describe('TaskTable — W9 polish', () => {
   // ── Empty-state distinction ────────────────────────────
 
   describe('empty states', () => {
-    it('should report no active filters when the URL has none', () => {
-      setup();
+    it('should report no active filters when the URL has none', async () => {
+      await setup();
 
       expect(component.hasActiveFilters()).toBe(false);
     });
 
-    it('should detect active filters and build a chip per filter', () => {
-      setup({ search: 'hello', priority: 'HIGH' });
+    it('should detect active filters and build a chip per filter', async () => {
+      await setup({ search: 'hello', priority: 'HIGH' });
 
       expect(component.hasActiveFilters()).toBe(true);
 
@@ -288,8 +298,8 @@ describe('TaskTable — W9 polish', () => {
       ]);
     });
 
-    it('should resolve reference-data names for filter chips', () => {
-      setup({ status: 'To Do' });
+    it('should resolve reference-data names for filter chips', async () => {
+      await setup({ status: 'To Do' });
 
       expect(component.activeFilterChips()).toEqual([
         { param: 'status', labelKey: 'taskTable.filterStatus', value: 'To Do' },
@@ -403,7 +413,7 @@ describe('TaskTable — W9 polish', () => {
       expect(component.taskColumns.find((c: { field: string }) => c.field === 'title').width).toBe('w-[30%] min-w-50');
     });
 
-    it('should hard-truncate a 500-char unbreakable title (max-w-0 + truncate + tooltip)', () => {
+    it('should hard-truncate a 500-char unbreakable title (max-w-0 + truncate + tooltip)', async () => {
       const longTitle = 'x'.repeat(500);
 
       taskClientMock.list.mockReturnValue(
@@ -428,7 +438,7 @@ describe('TaskTable — W9 polish', () => {
       const fixture2 = TestBed.createComponent(TaskTable);
 
       fixture2.componentRef.setInput('projectKey', 'ABC');
-      fixture2.detectChanges();
+      await settle(fixture2);
 
       // Q10: first td is the selection checkbox — Title is the third cell
       const titleCell: HTMLElement = fixture2.nativeElement.querySelector('tbody tr td:nth-child(3)');
@@ -517,8 +527,8 @@ describe('TaskTable — W9 polish', () => {
       expect(computeAutoPageSize(100000)).toBe(100); // clamped to maximum
     });
 
-    it('should derive the effective size from the MEASURED wrapper when Auto is persisted', () => {
-      setup({}, AUTO_PAGE_SIZE_SENTINEL);
+    it('should derive the effective size from the MEASURED wrapper when Auto is persisted', async () => {
+      await setup({}, AUTO_PAGE_SIZE_SENTINEL);
 
       expect(component.isAutoMode()).toBe(true);
 
@@ -527,13 +537,13 @@ describe('TaskTable — W9 polish', () => {
       expect(ro).toBeDefined();
 
       ro?.trigger(720); // floor(720/48) = 15 rows
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.pageSize()).toBe(15);
     });
 
-    it('should recompute on wrapper resize and refetch only when the row count changes', () => {
-      setup({}, AUTO_PAGE_SIZE_SENTINEL);
+    it('should recompute on wrapper resize and refetch only when the row count changes', async () => {
+      await setup({}, AUTO_PAGE_SIZE_SENTINEL);
 
       // The probe row renders with a real height in the browser; mock it for jsdom
       const probe: HTMLElement = fixture.nativeElement.querySelector('tbody tr[data-row-probe]');
@@ -545,7 +555,7 @@ describe('TaskTable — W9 polish', () => {
       const initialCalls = taskClientMock.list.mock.calls.length;
 
       ro?.trigger(720); // floor(720/44) = 16 rows
-      fixture.detectChanges();
+      await settle(fixture);
 
       const afterFirst = taskClientMock.list.mock.calls.length;
 
@@ -557,40 +567,40 @@ describe('TaskTable — W9 polish', () => {
       expect(lastQuery).toEqual(expect.objectContaining({ limit: 16 }));
 
       ro?.trigger(730); // still 16 rows → no refetch
-      fixture.detectChanges();
+      await settle(fixture);
       expect(taskClientMock.list.mock.calls.length).toBe(afterFirst);
 
       ro?.trigger(2000); // floor(2000/45) = 44 rows (incl. the 1px row-border pitch) → one refetch
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.pageSize()).toBe(44);
       expect(taskClientMock.list.mock.calls.length).toBe(afterFirst + 1);
     });
 
-    it('should fill the page at common viewport heights (900px / 700px mocked chrome-adjusted wrappers)', () => {
-      setup({}, AUTO_PAGE_SIZE_SENTINEL);
+    it('should fill the page at common viewport heights (900px / 700px mocked chrome-adjusted wrappers)', async () => {
+      await setup({}, AUTO_PAGE_SIZE_SENTINEL);
 
       const ro = wrapperObserver();
 
       // 900px viewport − header/paddings chrome ≈ 788px of table wrapper
       ro?.trigger(788);
-      fixture.detectChanges();
+      await settle(fixture);
       expect(component.pageSize()).toBe(16); // floor(788/48)
 
       // 700px viewport ≈ 588px of table wrapper
       ro?.trigger(588);
-      fixture.detectChanges();
+      await settle(fixture);
       expect(component.pageSize()).toBe(12); // floor(588/48)
     });
 
-    it('should fit MORE rows using the MEASURED row height than the 48px fallback', () => {
-      setup({}, AUTO_PAGE_SIZE_SENTINEL);
+    it('should fit MORE rows using the MEASURED row height than the 48px fallback', async () => {
+      await setup({}, AUTO_PAGE_SIZE_SENTINEL);
       // tasks is now a resource-backed computed — seed the resource value instead
       component.tasksResource.value.set({
         data: [{ id: 't1' } as never],
         pagination: { page: 1, limit: 30, total: 1, totalPages: 1 },
       });
-      fixture.detectChanges();
+      await settle(fixture);
 
       // Real rows are ~44px tall vs the 48px fallback constant
       const row: HTMLElement = fixture.nativeElement.querySelector('tbody tr:not([aria-hidden="true"])');
@@ -601,13 +611,13 @@ describe('TaskTable — W9 polish', () => {
       const ro = wrapperObserver();
 
       ro?.trigger(720); // floor(720/48) = 15 with the fallback, floor(720/44) = 16 measured
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.pageSize()).toBe(16);
     });
 
-    it('should persist the Auto sentinel and omit limit from the URL when selected', () => {
-      setup();
+    it('should persist the Auto sentinel and omit limit from the URL when selected', async () => {
+      await setup();
 
       const setPageSize = TestBed.inject(PreferencesStore).setPageSize as ReturnType<typeof vi.fn>;
 
@@ -620,8 +630,8 @@ describe('TaskTable — W9 polish', () => {
       );
     });
 
-    it('should persist numeric sizes with the URL limit param', () => {
-      setup();
+    it('should persist numeric sizes with the URL limit param', async () => {
+      await setup();
 
       const setPageSize = TestBed.inject(PreferencesStore).setPageSize as ReturnType<typeof vi.fn>;
 
@@ -640,7 +650,7 @@ describe('TaskTable — W9 polish', () => {
   describe('status names & label padding (DR-1/DR-4)', () => {
     beforeEach(() => setup());
 
-    function renderOneTask(): ComponentFixture<TaskTable> {
+    async function renderOneTask(): Promise<ComponentFixture<TaskTable>> {
       taskClientMock.list.mockReturnValue(
         of({
           data: [
@@ -663,13 +673,13 @@ describe('TaskTable — W9 polish', () => {
       const fx = TestBed.createComponent(TaskTable);
 
       fx.componentRef.setInput('projectKey', 'ABC');
-      fx.detectChanges();
+      await settle(fx);
 
       return fx;
     }
 
-    it('should render the status badge with the human display name, not the raw id', () => {
-      const fx = renderOneTask();
+    it('should render the status badge with the human display name, not the raw id', async () => {
+      const fx = await renderOneTask();
       // Q10: first td is the selection checkbox — Status is the fifth cell
       const statusCell: HTMLElement = fx.nativeElement.querySelector('tbody tr td:nth-child(5)');
 
@@ -683,8 +693,8 @@ describe('TaskTable — W9 polish', () => {
       expect(statusCellTooltip).toBeTruthy();
     });
 
-    it('should expose named status options to the column filter select', () => {
-      renderOneTask();
+    it('should expose named status options to the column filter select', async () => {
+      await renderOneTask();
 
       const statusColumn = component.taskColumns.find((c: { field: string }) => c.field === 'statusId');
       const options: { id: string; name: string }[] = statusColumn.getOptions();
@@ -693,8 +703,8 @@ describe('TaskTable — W9 polish', () => {
       expect(statusColumn.itemToString('st1')).toBe('To Do');
     });
 
-    it('should pad the labels cell so chips do not crowd the right edge (DR-4)', () => {
-      const fx = renderOneTask();
+    it('should pad the labels cell so chips do not crowd the right edge (DR-4)', async () => {
+      const fx = await renderOneTask();
       // Q10 adds a leading selection cell: 1 ✓, 2 Key, 3 Title, 4 Type, 5 Status,
       // 6 Priority, 7 Assignee, 8 Reporter, 9 Sprint, 10 Labels
       const labelsCell: HTMLElement = fx.nativeElement.querySelector('tbody tr td:nth-child(10)');
@@ -713,22 +723,22 @@ describe('TaskTable — W9 polish', () => {
       expect(safeNumericParam('25')).toBe(25);
     });
 
-    it('should fall back to the stored preference when the URL limit is not a number', () => {
-      setup({ limit: 'abc' }, 30);
+    it('should fall back to the stored preference when the URL limit is not a number', async () => {
+      await setup({ limit: 'abc' }, 30);
 
       expect(Number.isNaN(component.pageSize())).toBe(false);
       expect(component.pageSize()).toBe(30);
     });
 
-    it('should never write a non-finite page size to the URL', () => {
-      setup();
+    it('should never write a non-finite page size to the URL', async () => {
+      await setup();
       component.onPageSizeChange(Number.NaN);
 
       expect(routerMock.navigate).not.toHaveBeenCalled();
     });
 
     it('should refetch when a navigation completes after mount (stale list fix)', async () => {
-      setup();
+      await setup();
 
       const callsAfterMount = taskClientMock.list.mock.calls.length;
 
@@ -751,19 +761,19 @@ describe('TaskTable — W9 polish', () => {
   // ── V2-10: role-gated New Task control ─────────────────
 
   describe('role-gated write controls (V2-10)', () => {
-    it('should hide the New Task control from VIEWER-role users', () => {
-      setup({}, 30, null, 'VIEWER');
+    it('should hide the New Task control from VIEWER-role users', async () => {
+      await setup({}, 30, null, 'VIEWER');
 
       expect(component.canCreateTasks()).toBe(false);
 
-      fixture.detectChanges();
+      await settle(fixture);
 
       // Transloco test module has no dictionaries — the raw key would render if ungated
       expect(fixture.nativeElement.textContent).not.toContain('taskTable.newTask');
     });
 
-    it('should show the New Task control to EDITOR-role users', () => {
-      setup({}, 30, null, 'EDITOR');
+    it('should show the New Task control to EDITOR-role users', async () => {
+      await setup({}, 30, null, 'EDITOR');
 
       expect(component.canCreateTasks()).toBe(true);
     });
@@ -779,8 +789,8 @@ describe('TaskTable — W9 polish', () => {
       };
     }
 
-    it('should render all 11 columns when the persisted preference is null (default set)', () => {
-      setup();
+    it('should render all 11 columns when the persisted preference is null (default set)', async () => {
+      await setup();
 
       const headers = fixture.nativeElement.querySelectorAll('thead th');
 
@@ -789,10 +799,10 @@ describe('TaskTable — W9 polish', () => {
       expect(component.visibleColumnCount()).toBe(11);
     });
 
-    it('should remove hidden columns from the DOM when a preference is stored', () => {
-      setup({}, 30, 'OWNER', null, ['key', 'title', 'priority']);
+    it('should remove hidden columns from the DOM when a preference is stored', async () => {
+      await setup({}, 30, 'OWNER', null, ['key', 'title', 'priority']);
 
-      fixture.detectChanges();
+      await settle(fixture);
 
       const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')) as HTMLElement[];
       const headerText = headers.map((h) => h.textContent ?? '').join('|');
@@ -808,10 +818,10 @@ describe('TaskTable — W9 polish', () => {
       expect(component.visibleColumnCount()).toBe(3);
     });
 
-    it('should always keep the pinned Key/Title columns even if missing from the preference', () => {
-      setup({}, 30, 'OWNER', null, ['status']);
+    it('should always keep the pinned Key/Title columns even if missing from the preference', async () => {
+      await setup({}, 30, 'OWNER', null, ['status']);
 
-      fixture.detectChanges();
+      await settle(fixture);
 
       const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')) as HTMLElement[];
       const headerText = headers.map((h) => h.textContent ?? '').join('|');
@@ -823,9 +833,9 @@ describe('TaskTable — W9 polish', () => {
       expect(headers).toHaveLength(4);
     });
 
-    it('should apply a toggle immediately and persist the canonical payload after ~400 ms', () => {
+    it('should apply a toggle immediately and persist the canonical payload after ~400 ms', async () => {
+      await setup();
       vi.useFakeTimers();
-      setup();
 
       component.toggleColumn('type', false);
 
@@ -856,9 +866,9 @@ describe('TaskTable — W9 polish', () => {
       vi.useRealTimers();
     });
 
-    it('should coalesce rapid toggles into one debounced persist call', () => {
+    it('should coalesce rapid toggles into one debounced persist call', async () => {
+      await setup();
       vi.useFakeTimers();
-      setup();
 
       component.toggleColumn('type', false);
       vi.advanceTimersByTime(200);
@@ -887,9 +897,9 @@ describe('TaskTable — W9 polish', () => {
       vi.useRealTimers();
     });
 
-    it('must not hide the pinned Key/Title columns', () => {
+    it('must not hide the pinned Key/Title columns', async () => {
+      await setup();
       vi.useFakeTimers();
-      setup();
 
       component.toggleColumn('key', false);
       component.toggleColumn('title', false);
@@ -906,9 +916,9 @@ describe('TaskTable — W9 polish', () => {
       vi.useRealTimers();
     });
 
-    it('should hide the context-targeted column via "Hide this column"', () => {
+    it('should hide the context-targeted column via "Hide this column"', async () => {
+      await setup();
       vi.useFakeTimers();
-      setup();
 
       const typeColumn = component.taskColumns.find((c: { field: string }) => c.field === 'typeId');
 
@@ -926,8 +936,8 @@ describe('TaskTable — W9 polish', () => {
       vi.useRealTimers();
     });
 
-    it('should disable "Hide this column" for pinned columns', () => {
-      setup();
+    it('should disable "Hide this column" for pinned columns', async () => {
+      await setup();
 
       const keyColumn = component.taskColumns.find((c: { field: string }) => c.field === 'number');
 
@@ -936,8 +946,8 @@ describe('TaskTable — W9 polish', () => {
       expect(component.canHideContextColumn()).toBe(false);
     });
 
-    it('should open the cursor-anchored chooser from the context menu action', () => {
-      setup();
+    it('should open the cursor-anchored chooser from the context menu action', async () => {
+      await setup();
 
       expect(component.showContextColumnChooser()).toBe(false);
 
@@ -949,8 +959,8 @@ describe('TaskTable — W9 polish', () => {
       expect(component.showColumnChooser()).toBe(false);
     });
 
-    it('should keep only one chooser instance open at a time', () => {
-      setup();
+    it('should keep only one chooser instance open at a time', async () => {
+      await setup();
 
       // Opening the cursor instance (context-menu path) closes the toolbar instance
       component.showColumnChooser.set(true);
@@ -965,11 +975,11 @@ describe('TaskTable — W9 polish', () => {
       expect(component.showContextColumnChooser()).toBe(false);
     });
 
-    it('should render a dialog-style header with a close button that closes the open instance', () => {
-      setup();
+    it('should render a dialog-style header with a close button that closes the open instance', async () => {
+      await setup();
 
       component.showColumnChooser.set(true);
-      fixture.detectChanges();
+      await settle(fixture);
 
       // The chooser content renders into the CDK overlay (document.body)
       const closeBtn = document.body.querySelector('[data-column-chooser-close]');
@@ -986,8 +996,8 @@ describe('TaskTable — W9 polish', () => {
     // the overlay's internal state goes 'open' while the `[state]` binding
     // signal stayed false, so the × button's set(false) was a no-op. The
     // stateChanged handler must mirror 'open' into the signal.
-    it('should sync showColumnChooser when the toolbar instance reports open (× regression)', () => {
-      setup();
+    it('should sync showColumnChooser when the toolbar instance reports open (× regression)', async () => {
+      await setup();
 
       expect(component.showColumnChooser()).toBe(false);
 
@@ -1000,8 +1010,8 @@ describe('TaskTable — W9 polish', () => {
       expect(component.showColumnChooser()).toBe(false);
     });
 
-    it('should sync showContextColumnChooser when the cursor instance reports open', () => {
-      setup();
+    it('should sync showContextColumnChooser when the cursor instance reports open', async () => {
+      await setup();
 
       component.onContextChooserStateChange('open');
 
@@ -1017,11 +1027,11 @@ describe('TaskTable — W9 polish', () => {
     // row must therefore come LAST in DOM (order-first keeps it visually on
     // top) so focus lands on the Select-all checkbox, not the × (whose focus
     // tooltip used to hang over the button).
-    it('should render the select-all checkbox before the × button in DOM order', () => {
-      setup();
+    it('should render the select-all checkbox before the × button in DOM order', async () => {
+      await setup();
 
       component.showColumnChooser.set(true);
-      fixture.detectChanges();
+      await settle(fixture);
 
       const closeBtn = document.body.querySelector('[data-column-chooser-close]');
 
@@ -1047,9 +1057,9 @@ describe('TaskTable — W9 polish', () => {
       expect(content?.firstElementChild?.contains(anyCheckbox as Node)).toBe(true);
     });
 
-    it('should toggle all non-pinned columns with Select all and persist once', () => {
+    it('should toggle all non-pinned columns with Select all and persist once', async () => {
+      await setup();
       vi.useFakeTimers();
-      setup();
 
       // Hide all — pinned Key/Title must survive
       component.toggleAllColumns(false);
@@ -1091,8 +1101,8 @@ describe('TaskTable — W9 polish', () => {
       vi.useRealTimers();
     });
 
-    it('should report indeterminate while only some non-pinned columns are visible', () => {
-      setup();
+    it('should report indeterminate while only some non-pinned columns are visible', async () => {
+      await setup();
 
       component.toggleColumn('type', false);
 
@@ -1128,18 +1138,18 @@ describe('TaskTable — W9 polish', () => {
       };
     }
 
-    function setupWithTasks(tenantRole: string | null = 'OWNER', projectRole: string | null = null) {
-      setup({}, 30, tenantRole, projectRole);
+    async function setupWithTasks(tenantRole: string | null = 'OWNER', projectRole: string | null = null) {
+      await setup({}, 30, tenantRole, projectRole);
       // tasks is now a resource-backed computed — seed the resource value instead
       component.tasksResource.value.set({
         data: [makeTask('t1'), makeTask('t2')],
         pagination: { page: 1, limit: 30, total: 2, totalPages: 1 },
       });
-      fixture.detectChanges();
+      await settle(fixture);
     }
 
-    it('should toggle individual row selection', () => {
-      setupWithTasks();
+    it('should toggle individual row selection', async () => {
+      await setupWithTasks();
 
       component.toggleRowSelection('t1', true);
 
@@ -1156,8 +1166,8 @@ describe('TaskTable — W9 polish', () => {
       expect(component.allSelected()).toBe(false);
     });
 
-    it('should select all loaded tasks with select-all and clear with clearSelection', () => {
-      setupWithTasks();
+    it('should select all loaded tasks with select-all and clear with clearSelection', async () => {
+      await setupWithTasks();
 
       component.toggleSelectAll(true);
 
@@ -1170,8 +1180,8 @@ describe('TaskTable — W9 polish', () => {
       expect(component.allSelected()).toBe(false);
     });
 
-    it('should enforce exactly-one-field by clearing other bulk fields', () => {
-      setupWithTasks();
+    it('should enforce exactly-one-field by clearing other bulk fields', async () => {
+      await setupWithTasks();
 
       component.onBulkStatusChange('st1');
       component.onBulkAssigneeChange('u9');
@@ -1187,14 +1197,14 @@ describe('TaskTable — W9 polish', () => {
       expect(component.canApplyBulk()).toBe(true);
     });
 
-    it('should not allow apply when no bulk field is chosen', () => {
-      setupWithTasks();
+    it('should not allow apply when no bulk field is chosen', async () => {
+      await setupWithTasks();
 
       expect(component.canApplyBulk()).toBe(false);
     });
 
-    it('should send a single-field payload and clear the selection on success', () => {
-      setupWithTasks();
+    it('should send a single-field payload and clear the selection on success', async () => {
+      await setupWithTasks();
       taskClientMock['bulkUpdate'] = vi.fn().mockReturnValue(of({ updated: 2 }));
 
       component.toggleRowSelection('t1', true);
@@ -1210,8 +1220,8 @@ describe('TaskTable — W9 polish', () => {
       expect(component.bulkStatus()).toBe('');
     });
 
-    it('should map the unassigned sentinel to a null assigneeId', () => {
-      setupWithTasks();
+    it('should map the unassigned sentinel to a null assigneeId', async () => {
+      await setupWithTasks();
       taskClientMock['bulkUpdate'] = vi.fn().mockReturnValue(of({ updated: 1 }));
 
       component.toggleRowSelection('t1', true);
@@ -1224,8 +1234,8 @@ describe('TaskTable — W9 polish', () => {
       });
     });
 
-    it('should do nothing when apply is triggered without a valid field or selection', () => {
-      setupWithTasks();
+    it('should do nothing when apply is triggered without a valid field or selection', async () => {
+      await setupWithTasks();
       taskClientMock['bulkUpdate'] = vi.fn();
 
       component.applyBulkUpdate();
@@ -1233,8 +1243,8 @@ describe('TaskTable — W9 polish', () => {
       expect(taskClientMock['bulkUpdate']).not.toHaveBeenCalled();
     });
 
-    it('should hide checkboxes and the bulk bar from users who cannot write', () => {
-      setupWithTasks(null, 'VIEWER');
+    it('should hide checkboxes and the bulk bar from users who cannot write', async () => {
+      await setupWithTasks(null, 'VIEWER');
 
       expect(component.canCreateTasks()).toBe(false);
 
@@ -1260,7 +1270,7 @@ describe('TaskTable — W9 polish', () => {
     }
 
     it('should KEEP the selection when a limit-only refetch completes (P8-12)', async () => {
-      setupWithTasks();
+      await setupWithTasks();
       component.toggleRowSelection('t1', true);
 
       expect(component.selectedCount()).toBe(1);
@@ -1269,7 +1279,7 @@ describe('TaskTable — W9 polish', () => {
 
       // Auto page-size re-measure → only `limit` changes, scope is identical
       fixture.componentRef.setInput('limit', 10);
-      fixture.detectChanges();
+      await settle(fixture);
       await waitForListCalls(callsBefore + 1);
 
       expect(component.selectedIds().has('t1')).toBe(true);
@@ -1277,14 +1287,14 @@ describe('TaskTable — W9 polish', () => {
     });
 
     it('should CLEAR the selection when the query scope changes (filter change)', async () => {
-      setupWithTasks();
+      await setupWithTasks();
       component.toggleRowSelection('t1', true);
 
       const callsBefore = taskClientMock.list.mock.calls.length;
 
       // Status filter changes WHICH tasks are listed → page-scoped selection resets
       fixture.componentRef.setInput('status', 'To Do');
-      fixture.detectChanges();
+      await settle(fixture);
       await waitForListCalls(callsBefore + 1);
 
       expect(component.selectedCount()).toBe(0);
@@ -1340,10 +1350,10 @@ describe('TaskTable — W9 polish', () => {
       );
     });
 
-    it('should capture URL date params into currentFilters for saved views', () => {
+    it('should capture URL date params into currentFilters for saved views', async () => {
       fixture.componentRef.setInput('createdFrom', '2026-01-01');
       fixture.componentRef.setInput('updatedTo', '2026-03-31');
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.currentFilters()).toEqual(
         expect.objectContaining({ createdFrom: '2026-01-01', updatedTo: '2026-03-31' }),
@@ -1409,9 +1419,9 @@ describe('TaskTable — W9 polish', () => {
       }
     });
 
-    it('should keep an existing from bound and clear to when switching to between (F2)', () => {
+    it('should keep an existing from bound and clear to when switching to between (F2)', async () => {
       fixture.componentRef.setInput('createdFrom', '2026-01-01');
-      fixture.detectChanges();
+      await settle(fixture);
 
       component.onDateModeChange(col('createdAt'), 'between');
 
@@ -1424,10 +1434,10 @@ describe('TaskTable — W9 polish', () => {
       );
     });
 
-    it('should collapse both bounds to a single day when switching to on (F2)', () => {
+    it('should collapse both bounds to a single day when switching to on (F2)', async () => {
       fixture.componentRef.setInput('createdFrom', '2026-01-01');
       fixture.componentRef.setInput('createdTo', '2026-01-31');
-      fixture.detectChanges();
+      await settle(fixture);
 
       component.onDateModeChange(col('createdAt'), 'on');
 

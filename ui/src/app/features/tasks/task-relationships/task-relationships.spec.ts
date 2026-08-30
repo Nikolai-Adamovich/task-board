@@ -12,13 +12,14 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, of, throwError } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { TaskRelationships } from './task-relationships';
 import { TaskRelationshipClient } from '@services/task-relationship-client';
 import { API_BASE_URL } from '@app/api-url.token';
 import { TaskRelationshipType } from '@task-board/shared';
 import type { TaskRelationship } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockRelationships: TaskRelationship[] = [
@@ -51,7 +52,7 @@ describe('TaskRelationships', () => {
     delete: ReturnType<typeof vi.fn>;
   };
 
-  function setup(relationships: TaskRelationship[] = mockRelationships) {
+  async function setup(relationships: TaskRelationship[] = mockRelationships) {
     clientMock = {
       list: vi.fn().mockReturnValue(of(relationships)),
       create: vi.fn().mockReturnValue(
@@ -69,7 +70,7 @@ describe('TaskRelationships', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -78,6 +79,7 @@ describe('TaskRelationships', () => {
         { provide: TaskRelationshipClient, useValue: clientMock },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     const fixture = TestBed.createComponent(TaskRelationships);
 
@@ -85,18 +87,18 @@ describe('TaskRelationships', () => {
     fixture.componentRef.setInput('projectId', 'p1');
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Loading ─────────────────────────────────────────────────────
-  it('should load relationships on init', () => {
-    setup();
+  it('should load relationships on init', async () => {
+    await setup();
     expect(clientMock.list).toHaveBeenCalledWith('tk1');
     expect(component.relationships()).toHaveLength(2);
     expect(component.loading()).toBe(false);
   });
 
-  it('should handle load error', () => {
+  it('should handle load error', async () => {
     clientMock = {
       list: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
       create: vi.fn(),
@@ -104,7 +106,7 @@ describe('TaskRelationships', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -113,6 +115,7 @@ describe('TaskRelationships', () => {
         { provide: TaskRelationshipClient, useValue: clientMock },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     const fixture = TestBed.createComponent(TaskRelationships);
 
@@ -120,14 +123,14 @@ describe('TaskRelationships', () => {
     fixture.componentRef.setInput('projectId', 'p1');
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(component.error()).toBe('relationships.loadError');
   });
 
   // ── Create ──────────────────────────────────────────────────────
-  it('should create a new relationship', () => {
-    setup();
+  it('should create a new relationship', async () => {
+    await setup();
     component.targetTaskId.set('tk4');
     component.relationshipType.set(TaskRelationshipType.DUPLICATES);
     component.createRelationship();
@@ -139,16 +142,16 @@ describe('TaskRelationships', () => {
     expect(component.showCreateForm()).toBe(false);
   });
 
-  it('should not create with empty target task ID', () => {
-    setup();
+  it('should not create with empty target task ID', async () => {
+    await setup();
     component.targetTaskId.set('   ');
     component.createRelationship();
     expect(clientMock.create).not.toHaveBeenCalled();
   });
 
   // ── Delete ──────────────────────────────────────────────────────
-  it('should confirm and delete a relationship', () => {
-    setup();
+  it('should confirm and delete a relationship', async () => {
+    await setup();
 
     const rel = component.relationships()[0];
 
@@ -163,8 +166,8 @@ describe('TaskRelationships', () => {
   });
 
   // ── Helpers ─────────────────────────────────────────────────────
-  it('should correctly identify source relationships', () => {
-    setup();
+  it('should correctly identify source relationships', async () => {
+    await setup();
 
     const asSource = component.relationships()[0]; // sourceTaskId = tk1
     const asTarget = component.relationships()[1]; // targetTaskId = tk1
@@ -173,8 +176,8 @@ describe('TaskRelationships', () => {
     expect(component.isSource(asTarget)).toBe(false);
   });
 
-  it('should return the other task ID', () => {
-    setup();
+  it('should return the other task ID', async () => {
+    await setup();
 
     const asSource = component.relationships()[0];
     const asTarget = component.relationships()[1];
@@ -183,8 +186,8 @@ describe('TaskRelationships', () => {
     expect(component.otherTaskId(asTarget)).toBe('tk3');
   });
 
-  it('should identify BLOCKS relationships', () => {
-    setup();
+  it('should identify BLOCKS relationships', async () => {
+    await setup();
 
     const blocks = component.relationships()[0];
     const relates = component.relationships()[1];

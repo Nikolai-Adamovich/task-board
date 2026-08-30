@@ -102,9 +102,19 @@ Full rationale in [`docs/architecture.md`](docs/architecture.md) §Decisions.
 
 - Server tests mock repos/services with `vi.mock`; route tests inject a fake `svc` via middleware — see any
   `routes/*.test.ts` `createTestApp()`.
+- **UI tests are zoneless (Angular 22): `fixture.detectChanges()` is an ANTI-PATTERN — never use it.** It forces CD
+  off-schedule and races the zoneless scheduler (intermittent "click didn't emit" / "translated text is empty" flakes).
+  Canonical pattern (see `ui/src/app/shared/testing/zoneless.ts` and any migrated spec):
+  1. In setup: `TranslocoTestingModule.forRoot({ ..., preloadLangs: true })`, then
+     `await firstValueFrom(TestBed.inject(TranslocoService).load('en'))` (warms the cache before first render).
+  2. After `createComponent` / `setInput` / simulated events: `await settle(fixture)` (helper = `whenStable()` +
+     `TestBed.tick()`, bounded at 250 ms — some specs intentionally keep pending work).
+  3. For native `.click()` on Angular-bound elements use `await clickUntil(() => el.click(), () => expect(effect))` —
+     the listener attachment itself is racy, so retry the interaction until the effect is observed.
+  4. Never select elements by translated text; use structural selectors (CSS/attributes/element order).
+  5. Install `vi.useFakeTimers()` only AFTER setup/settle; `ui/test-setup.ts` resets to real timers after every test.
 - UI resource-based components resolve asynchronously: poll the signal state
   (`for (… && !component.task()) await setTimeout(10)`) instead of fixed timeouts.
-- Known flaky historically: milkdown spec — fixed by state polling; keep that pattern.
 - **E2E/Playwright policy**: do NOT run Playwright/e2e after every iteration (too slow). When e2e or live-browser
   verification is needed, the ORCHESTRATING agent must delegate it to a subagent — never run it in the main agent's
   context (it bloats context with screenshots/snapshots). Unit tests (`npm test`) are fine to run directly.

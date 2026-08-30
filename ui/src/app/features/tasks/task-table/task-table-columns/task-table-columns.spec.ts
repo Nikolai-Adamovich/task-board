@@ -8,7 +8,9 @@
  */
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { TaskTableColumns } from './task-table-columns';
 import type { TaskColumnDef } from '../task-column-def';
 
@@ -22,15 +24,18 @@ describe('TaskTableColumns', () => {
   let fixture: ComponentFixture<TaskTableColumns>;
   let component: TaskTableColumns;
 
-  function setup(visible: string[] = ['key', 'title', 'type']) {
+  async function setup(visible: string[] = ['key', 'title', 'type']) {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
           langs: { en: {} },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
         }),
       ],
     });
+
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     fixture = TestBed.createComponent(TaskTableColumns);
     fixture.componentRef.setInput('taskColumns', COLUMNS);
@@ -39,24 +44,24 @@ describe('TaskTableColumns', () => {
     fixture.componentRef.setInput('someColumnsSelected', visible.length > 0 && visible.length < COLUMNS.length);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
-  it('should render one checkbox row per column with pinned rows disabled', () => {
-    setup();
+  it('should render one checkbox row per column with pinned rows disabled', async () => {
+    await setup();
     // The chooser rows live inside the popover portal — rendered only when open
     component.showColumnChooser.set(true);
-    fixture.detectChanges();
+    await settle(fixture);
 
     const checkboxes = fixture.debugElement.queryAll(By.css('hlm-checkbox'));
 
     expect(checkboxes.length).toBe(COLUMNS.length + 1); // + select-all row
   });
 
-  it('should emit toggleColumn with the column key and visibility', () => {
-    setup(['key', 'title']);
+  it('should emit toggleColumn with the column key and visibility', async () => {
+    await setup(['key', 'title']);
     component.showColumnChooser.set(true);
-    fixture.detectChanges();
+    await settle(fixture);
 
     const emitted: { columnKey: string; visible: boolean }[] = [];
 
@@ -71,10 +76,10 @@ describe('TaskTableColumns', () => {
     expect(emitted).toEqual([{ columnKey: 'type', visible: true }]);
   });
 
-  it('should emit toggleAll from the select-all checkbox', () => {
-    setup();
+  it('should emit toggleAll from the select-all checkbox', async () => {
+    await setup();
     component.showColumnChooser.set(true);
-    fixture.detectChanges();
+    await settle(fixture);
 
     const emitted: boolean[] = [];
 
@@ -87,16 +92,16 @@ describe('TaskTableColumns', () => {
     expect(emitted).toEqual([false]);
   });
 
-  it('should refuse to hide pinned columns via the context menu', () => {
-    setup();
+  it('should refuse to hide pinned columns via the context menu', async () => {
+    await setup();
 
     component.contextColumn.set(COLUMNS[0] ?? null); // key — pinned
 
     expect(component.canHideContextColumn()).toBe(false);
   });
 
-  it('should emit hideColumn for a visible non-pinned context column', () => {
-    setup();
+  it('should emit hideColumn for a visible non-pinned context column', async () => {
+    await setup();
 
     const emitted: string[] = [];
 
@@ -111,8 +116,8 @@ describe('TaskTableColumns', () => {
     expect(emitted).toEqual(['type']);
   });
 
-  it('should keep chooser instances mutually exclusive', () => {
-    setup();
+  it('should keep chooser instances mutually exclusive', async () => {
+    await setup();
 
     component.showColumnChooser.set(true);
     component.onContextChooserStateChange('open');
@@ -140,7 +145,7 @@ describe('TaskTableColumns', () => {
    * ArrowUp wrapped to the last item.
    */
   it('syncs keyboard nav after programmatic open: one ArrowDown moves focus to the second item', async () => {
-    setup();
+    await setup();
 
     component.onHeaderContextMenu(
       new MouseEvent('contextmenu', { clientX: 10, clientY: 10 }),

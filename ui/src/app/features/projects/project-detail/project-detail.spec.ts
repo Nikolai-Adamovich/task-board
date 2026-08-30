@@ -13,8 +13,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, of } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { ProjectDetail } from './project-detail';
 import { ProjectClient } from '@services/project-client';
 import { BoardClient } from '@services/board-client';
@@ -27,6 +27,7 @@ import { PreferencesStore } from '@stores/preferences-store';
 import { TenantStore } from '@stores/tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Project, Board, Sprint, Status, Task } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockProject: Project = {
@@ -122,13 +123,13 @@ function paginated(data: unknown[], total = data.length) {
 /** Poll until the condition holds (async resources resolve on microtasks/timers) */
 async function until(condition: () => boolean): Promise<void> {
   for (let i = 0; i < 200 && !condition(); i++) {
-    fixture.detectChanges();
+    await settle(fixture);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  fixture.detectChanges();
+  await settle(fixture);
 }
 
-function setup(options: { tenantRole?: string; projectStatus?: Project['status'] } = {}) {
+async function setup(options: { tenantRole?: string; projectStatus?: Project['status'] } = {}) {
   const project = options.projectStatus ? { ...mockProject, status: options.projectStatus } : mockProject;
 
   projectClientMock = { getById: vi.fn().mockReturnValue(of(project)) };
@@ -152,7 +153,7 @@ function setup(options: { tenantRole?: string; projectStatus?: Project['status']
 
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+    imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -188,16 +189,17 @@ function setup(options: { tenantRole?: string; projectStatus?: Project['status']
       { provide: TenantStore, useValue: { activeTenant: vi.fn().mockReturnValue({ slug: 'ws' }) } },
     ],
   });
+  await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
   fixture = TestBed.createComponent(ProjectDetail);
   fixture.componentRef.setInput('projectKey', mockProject.key);
   component = fixture.componentInstance;
-  fixture.detectChanges();
+  await settle(fixture);
 }
 
 describe('ProjectDetail (overview)', () => {
   it('should load the project and boards', async () => {
-    setup();
+    await setup();
     await until(() => component.project() !== null);
 
     expect(projectClientMock.getById).toHaveBeenCalledWith(mockProject.id);
@@ -207,7 +209,7 @@ describe('ProjectDetail (overview)', () => {
   });
 
   it('should expose the ACTIVE sprint', async () => {
-    setup();
+    await setup();
     await until(() => component.activeSprint() !== null);
 
     expect(sprintClientMock.list).toHaveBeenCalledWith(mockProject.id);
@@ -215,7 +217,7 @@ describe('ProjectDetail (overview)', () => {
   });
 
   it('should compute per-status totals from the status-summary endpoint (S-05)', async () => {
-    setup();
+    await setup();
     await until(() => component.statusCounts().length > 0);
 
     expect(taskClientMock.statusSummary).toHaveBeenCalledWith(mockProject.id);
@@ -227,7 +229,7 @@ describe('ProjectDetail (overview)', () => {
   });
 
   it('should load recent tasks sorted by updatedAt desc', async () => {
-    setup();
+    await setup();
     await until(() => component.recentTasks().length > 0);
 
     expect(taskClientMock.list).toHaveBeenCalledWith(mockProject.id, { limit: 5, sort: 'updatedAt:desc' });
@@ -235,21 +237,21 @@ describe('ProjectDetail (overview)', () => {
   });
 
   it('should show a read-only banner for archived projects', async () => {
-    setup({ projectStatus: 'ARCHIVED' });
+    await setup({ projectStatus: 'ARCHIVED' });
     await until(() => component.project() !== null);
 
     expect(component.readOnlyBannerKey()).toBe('projectDetail.archivedBanner');
   });
 
   it('should show a read-only banner for deletion-pending projects', async () => {
-    setup({ projectStatus: 'DELETION_PENDING' });
+    await setup({ projectStatus: 'DELETION_PENDING' });
     await until(() => component.project() !== null);
 
     expect(component.readOnlyBannerKey()).toBe('projectDetail.deletionPendingBanner');
   });
 
   it('should not show a banner for active projects', async () => {
-    setup();
+    await setup();
     await until(() => component.project() !== null);
 
     expect(component.readOnlyBannerKey()).toBe('');
@@ -257,14 +259,14 @@ describe('ProjectDetail (overview)', () => {
 
   describe('isAdmin', () => {
     it('should be true for tenant OWNER', async () => {
-      setup({ tenantRole: 'OWNER' });
+      await setup({ tenantRole: 'OWNER' });
       await until(() => component.project() !== null);
 
       expect(component.isAdmin()).toBe(true);
     });
 
     it('should be false for tenant MEMBER without project role', async () => {
-      setup({ tenantRole: 'MEMBER' });
+      await setup({ tenantRole: 'MEMBER' });
       await until(() => component.project() !== null);
 
       expect(component.isAdmin()).toBe(false);
@@ -272,7 +274,7 @@ describe('ProjectDetail (overview)', () => {
   });
 
   it('should build member initials from display name or email', async () => {
-    setup();
+    await setup();
     await until(() => component.project() !== null);
 
     expect(component.memberInitials('Ada Lovelace', undefined)).toBe('AL');
@@ -283,7 +285,7 @@ describe('ProjectDetail (overview)', () => {
   // ── Round 5: equal-height overview cards ─────────────────────
 
   it('should render equal-height overview cards (items-stretch grid + h-full cards)', async () => {
-    setup();
+    await setup();
     await until(() => component.project() !== null);
 
     const el: HTMLElement = fixture.nativeElement;

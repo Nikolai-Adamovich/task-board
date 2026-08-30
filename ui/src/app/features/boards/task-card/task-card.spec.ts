@@ -11,7 +11,9 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { TaskCard } from './task-card';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Task } from '@task-board/shared';
@@ -48,12 +50,13 @@ describe('TaskCard', () => {
   let component: any;
   let fixture: ComponentFixture<TaskCard>;
 
-  function setup(taskOverrides: Partial<Task> = {}, projectKey = 'PROJ') {
+  async function setup(taskOverrides: Partial<Task> = {}, projectKey = 'PROJ') {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
           langs: { en: {} },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
         }),
       ],
       providers: [
@@ -64,26 +67,28 @@ describe('TaskCard', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     fixture = TestBed.createComponent(TaskCard);
 
     fixture.componentRef.setInput('task', makeTask(taskOverrides));
     fixture.componentRef.setInput('projectKey', projectKey);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── priorityLabel (P11: translated display label) ────────────────────────
 
   describe('priorityLabel', () => {
-    it('should render the priority label through i18n (P11)', () => {
-      setup({ priority: 'MEDIUM' });
+    it('should render the priority label through i18n (P11)', async () => {
+      await setup({ priority: 'MEDIUM' });
       // Test dictionary is empty → the i18n key renders, proving the badge label is translated
       expect(fixture.nativeElement.textContent).toContain('priority.medium');
     });
 
-    it('should render unknown priorities verbatim', () => {
-      setup({ priority: 'unknown' as Task['priority'] });
+    it('should render unknown priorities verbatim', async () => {
+      await setup({ priority: 'unknown' as Task['priority'] });
       expect(component.priorityLabel('unknown')).toBe('unknown');
     });
   });
@@ -91,28 +96,28 @@ describe('TaskCard', () => {
   // ── priorityVariant ──────────────────────────────────────────────────────
 
   describe('priorityVariant', () => {
-    it('should return correct color for LOW', () => {
-      setup({ priority: 'LOW' });
+    it('should return correct color for LOW', async () => {
+      await setup({ priority: 'LOW' });
       expect(component.priorityVariant()).toBe('outline');
     });
 
-    it('should return correct color for MEDIUM', () => {
-      setup({ priority: 'MEDIUM' });
+    it('should return correct color for MEDIUM', async () => {
+      await setup({ priority: 'MEDIUM' });
       expect(component.priorityVariant()).toBe('secondary');
     });
 
-    it('should return correct color for HIGH', () => {
-      setup({ priority: 'HIGH' });
+    it('should return correct color for HIGH', async () => {
+      await setup({ priority: 'HIGH' });
       expect(component.priorityVariant()).toBe('default');
     });
 
-    it('should return correct color for CRITICAL', () => {
-      setup({ priority: 'CRITICAL' });
+    it('should return correct color for CRITICAL', async () => {
+      await setup({ priority: 'CRITICAL' });
       expect(component.priorityVariant()).toBe('destructive');
     });
 
-    it('should return fallback for unknown priority', () => {
-      setup({ priority: 'unknown' as Task['priority'] });
+    it('should return fallback for unknown priority', async () => {
+      await setup({ priority: 'unknown' as Task['priority'] });
       expect(component.priorityVariant()).toBe('outline');
     });
   });
@@ -120,13 +125,13 @@ describe('TaskCard', () => {
   // ── taskLabel ──────────────────────────────────────────────────────────
 
   describe('taskLabel', () => {
-    it('should return project key + number when projectKey is set', () => {
-      setup({ number: 42 });
+    it('should return project key + number when projectKey is set', async () => {
+      await setup({ number: 42 });
       expect(component.taskLabel()).toBe('PROJ-42');
     });
 
-    it('should return #number when projectKey is empty', () => {
-      setup({ number: 7 }, '');
+    it('should return #number when projectKey is empty', async () => {
+      await setup({ number: 7 }, '');
       expect(component.taskLabel()).toBe('#7');
     });
   });

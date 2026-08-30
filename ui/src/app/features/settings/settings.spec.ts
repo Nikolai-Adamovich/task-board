@@ -17,6 +17,7 @@ import { Settings } from './settings';
 import { PreferencesStore } from '@stores/preferences-store';
 import { ThemeRegistry } from '@services/theme-registry';
 import { ToastAlertIcon } from '@app/shared/toast-alert-icon/toast-alert-icon';
+import { settle } from '@app/shared/testing/zoneless';
 
 describe('Settings', () => {
   beforeEach(() => {
@@ -52,7 +53,7 @@ describe('Settings', () => {
   };
   let themeRegistryMock: { themes: ReturnType<typeof signal>; load: ReturnType<typeof vi.fn> };
 
-  function setup() {
+  async function setup() {
     preferencesStoreMock = {
       zoom: signal(100),
       themeMode: signal('auto'),
@@ -86,6 +87,7 @@ describe('Settings', () => {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
+          preloadLangs: true,
           langs: {
             en: {
               themes: {
@@ -104,6 +106,7 @@ describe('Settings', () => {
         { provide: ThemeRegistry, useValue: themeRegistryMock },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     // V5-3: the language combobox resolves labels from Transloco's available langs
     const transloco = TestBed.inject(TranslocoService);
@@ -115,11 +118,11 @@ describe('Settings', () => {
 
     fixture = TestBed.createComponent(Settings);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
-  it('should render the five preference cards', () => {
-    setup();
+  it('should render the five preference cards', async () => {
+    await setup();
 
     // hlmCard is an attribute directive rendered on plain divs
     const cards = fixture.nativeElement.querySelectorAll('[hlmCard]');
@@ -130,23 +133,23 @@ describe('Settings', () => {
 
   // ── V5-3: closed triggers show human labels, not raw values ─────────────
 
-  it('should map a theme id to its display name via itemToString', () => {
-    setup();
+  it('should map a theme id to its display name via itemToString', async () => {
+    await setup();
 
     expect(component.themeName('dark')).toBe('Dark');
     // Unknown ids fall back to the raw value instead of rendering empty
     expect(component.themeName('contrast')).toBe('contrast');
   });
 
-  it('should render zoom values with a percent sign via itemToString', () => {
-    setup();
+  it('should render zoom values with a percent sign via itemToString', async () => {
+    await setup();
 
     expect(component.zoomLabel(100)).toBe('100%');
     expect(component.zoomLabel(150)).toBe('150%');
   });
 
-  it('should map a locale code to its language name via itemToString', () => {
-    setup();
+  it('should map a locale code to its language name via itemToString', async () => {
+    await setup();
 
     expect(component.languageLabel('de')).toBe('Deutsch');
     expect(component.languageLabel('xx')).toBe('xx');
@@ -154,8 +157,8 @@ describe('Settings', () => {
 
   // ── Change handlers ──────────────────────────────────────────────────────
 
-  it('should commit dark-dropdown picks as a dark-mode choice', () => {
-    setup();
+  it('should commit dark-dropdown picks as a dark-mode choice', async () => {
+    await setup();
 
     component.onDarkThemeChange('dark');
 
@@ -163,8 +166,8 @@ describe('Settings', () => {
     expect(preferencesStoreMock.commitTheme).toHaveBeenCalled();
   });
 
-  it('should commit light-dropdown picks as a light-mode choice', () => {
-    setup();
+  it('should commit light-dropdown picks as a light-mode choice', async () => {
+    await setup();
 
     component.onLightThemeChange('light');
 
@@ -174,8 +177,8 @@ describe('Settings', () => {
 
   // ── Both per-mode selections are marked, regardless of the active mode ───
 
-  it('should mark BOTH per-mode selections as selected in auto mode', () => {
-    setup();
+  it('should mark BOTH per-mode selections as selected in auto mode', async () => {
+    await setup();
 
     expect(component.isLightSelected('light')).toBe(true);
     expect(component.isDarkSelected('dark')).toBe(true);
@@ -185,10 +188,10 @@ describe('Settings', () => {
     expect(component.isLightSelected('contrast')).toBe(false);
   });
 
-  it('should fall back to the default theme ids when a per-mode choice is unset', () => {
+  it('should fall back to the default theme ids when a per-mode choice is unset', async () => {
     preferencesStoreMock.lightTheme.set(null);
     preferencesStoreMock.darkTheme.set(null);
-    setup();
+    await setup();
 
     expect(component.isLightSelected('light')).toBe(true);
     expect(component.isDarkSelected('dark')).toBe(true);
@@ -199,7 +202,7 @@ describe('Settings', () => {
   // ── Neutral warning toast on a "hidden" (cross-mode) pick ────────────────
 
   it('should show a neutral warning toast when the picked theme will not be applied now', async () => {
-    setup();
+    await setup();
     // Preload the lang so synchronous translate() resolves real strings
     await firstValueFrom(TestBed.inject(TranslocoService).selectTranslate('themes.deferredToast'));
 
@@ -213,8 +216,8 @@ describe('Settings', () => {
     );
   });
 
-  it('should NOT show a toast when the picked theme is applied immediately', () => {
-    setup();
+  it('should NOT show a toast when the picked theme is applied immediately', async () => {
+    await setup();
 
     // Auto mode, browser prefers light → picking a light theme applies at once
     component.onLightThemeChange('light');
@@ -222,8 +225,8 @@ describe('Settings', () => {
     expect(toast.warning).not.toHaveBeenCalled();
   });
 
-  it('should commit numeric zoom changes through the store', () => {
-    setup();
+  it('should commit numeric zoom changes through the store', async () => {
+    await setup();
 
     component.onZoomChange('150');
 
@@ -231,8 +234,8 @@ describe('Settings', () => {
     expect(preferencesStoreMock.commitZoom).toHaveBeenCalled();
   });
 
-  it('should ignore non-finite zoom input', () => {
-    setup();
+  it('should ignore non-finite zoom input', async () => {
+    await setup();
 
     component.onZoomChange('auto');
 
@@ -240,8 +243,8 @@ describe('Settings', () => {
     expect(preferencesStoreMock.commitZoom).not.toHaveBeenCalled();
   });
 
-  it('should persist language changes through the store', () => {
-    setup();
+  it('should persist language changes through the store', async () => {
+    await setup();
 
     component.onLanguageChange('de');
 
@@ -250,16 +253,16 @@ describe('Settings', () => {
 
   // ── R3-P8: date/time format preference ───────────────────────────────────
 
-  it('should persist date format changes through the store', () => {
-    setup();
+  it('should persist date format changes through the store', async () => {
+    await setup();
 
     component.onDateFormatChange('DD/MM/YYYY');
 
     expect(preferencesStoreMock.setDateFormat).toHaveBeenCalledWith('DD/MM/YYYY');
   });
 
-  it('should persist time format changes through the store', () => {
-    setup();
+  it('should persist time format changes through the store', async () => {
+    await setup();
 
     component.onTimeFormatChange('12h');
 
@@ -268,8 +271,8 @@ describe('Settings', () => {
 
   // ── P12 (DEC-056): free-form custom date format ──────────────────────────
 
-  it('should persist a valid custom date format live', () => {
-    setup();
+  it('should persist a valid custom date format live', async () => {
+    await setup();
 
     component.onCustomDateFormatChange('DD MMM YY');
 
@@ -278,8 +281,8 @@ describe('Settings', () => {
     expect(preferencesStoreMock.setDateFormat).toHaveBeenCalledWith('DD MMM YY');
   });
 
-  it('should NOT persist an invalid custom date format and flag it', () => {
-    setup();
+  it('should NOT persist an invalid custom date format and flag it', async () => {
+    await setup();
 
     component.onCustomDateFormatChange('YYYY; DROP');
 
@@ -288,8 +291,8 @@ describe('Settings', () => {
     expect(preferencesStoreMock.setDateFormat).not.toHaveBeenCalled();
   });
 
-  it('should not flag the untouched (empty) custom input as invalid', () => {
-    setup();
+  it('should not flag the untouched (empty) custom input as invalid', async () => {
+    await setup();
 
     component.onCustomDateFormatChange('');
 
@@ -297,26 +300,27 @@ describe('Settings', () => {
     expect(preferencesStoreMock.setDateFormat).not.toHaveBeenCalled();
   });
 
-  it('should keep the custom input in sync when a preset is picked', () => {
-    setup();
+  it('should keep the custom input in sync when a preset is picked', async () => {
+    await setup();
 
     component.onDateFormatChange('MM/DD/YYYY');
 
     expect(component.customFormat()).toBe('MM/DD/YYYY');
   });
 
-  it('should prefill the custom input with a stored custom format on init', () => {
+  it('should prefill the custom input with a stored custom format on init', async () => {
     preferencesStoreMock.dateFormat = signal('DD MMM YY');
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         { provide: PreferencesStore, useValue: preferencesStoreMock },
         { provide: ThemeRegistry, useValue: themeRegistryMock },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
     fixture = TestBed.createComponent(Settings);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(component.customFormat()).toBe('DD MMM YY');
   });

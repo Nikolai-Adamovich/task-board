@@ -8,8 +8,10 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
 import { KeyboardShortcuts } from '@app/shared/keyboard-shortcuts/keyboard-shortcuts';
+import { clickUntil, settle } from '@app/shared/testing/zoneless';
 import { HelpMenu } from './help-menu';
 
 /**
@@ -24,32 +26,29 @@ function stubShortcuts(): Pick<KeyboardShortcuts, 'helpOpen' | 'openHelp' | 'clo
   return { helpOpen, openHelp: () => helpOpen.set(true), closeHelp: () => helpOpen.set(false) };
 }
 
-async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let i = 0; i < 100 && !predicate(); i++) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-}
-
 describe('HelpMenu', () => {
   let service: KeyboardShortcuts;
 
-  function setup(): ReturnType<typeof TestBed.createComponent<HelpMenu>> {
+  async function setup(): Promise<ReturnType<typeof TestBed.createComponent<HelpMenu>>> {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
           langs: { en: { header: { help: 'Help', hotkeys: 'Hotkeys' } } },
+          preloadLangs: true,
         }),
         HelpMenu,
       ],
       providers: [provideRouter([]), { provide: KeyboardShortcuts, useValue: stubShortcuts() }],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     service = TestBed.inject(KeyboardShortcuts);
 
     const fixture = TestBed.createComponent(HelpMenu);
 
-    fixture.detectChanges();
+    await settle(fixture);
 
     return fixture;
   }
@@ -59,13 +58,15 @@ describe('HelpMenu', () => {
   });
 
   it('opens the help dialog when the Hotkeys item is clicked', async () => {
-    const fixture = setup();
+    const fixture = await setup();
     const trigger = fixture.nativeElement.querySelector('button');
 
     expect(trigger).toBeTruthy();
 
-    trigger.click();
-    await waitFor(() => document.querySelectorAll('[role="menuitem"]').length > 0);
+    await clickUntil(
+      () => trigger.click(),
+      () => expect(document.querySelectorAll('[role="menuitem"]').length).toBeGreaterThan(0),
+    );
 
     const items = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'));
     // TranslocoTestingModule may render the raw key (e.g. "en.header.hotkeys")
@@ -74,17 +75,20 @@ describe('HelpMenu', () => {
     expect(hotkeysItem).toBeTruthy();
     expect(service.helpOpen()).toBe(false);
 
-    hotkeysItem?.click();
-
-    expect(service.helpOpen()).toBe(true);
+    await clickUntil(
+      () => hotkeysItem?.click(),
+      () => expect(service.helpOpen()).toBe(true),
+    );
   });
 
   it('lists Hotkeys as the FIRST item in the menu', async () => {
-    const fixture = setup();
+    const fixture = await setup();
     const trigger = fixture.nativeElement.querySelector('button');
 
-    trigger.click();
-    await waitFor(() => document.querySelectorAll('[role="menuitem"]').length > 0);
+    await clickUntil(
+      () => trigger.click(),
+      () => expect(document.querySelectorAll('[role="menuitem"]').length).toBeGreaterThan(0),
+    );
 
     const items = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'));
 

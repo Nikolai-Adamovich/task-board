@@ -13,13 +13,14 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, of, throwError } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { FilterPanel, stableValue, type AppliedFilterState } from './filter-panel';
 import { FilterClient } from '@services/filter-client';
 import { ProjectRefStore } from '@stores/project-ref-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Filter } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const refStoreMock = {
   ensure: vi.fn(),
@@ -73,7 +74,7 @@ describe('FilterPanel', () => {
   };
   let emittedCriteria: AppliedFilterState | undefined;
 
-  function setup(filters: Filter[] = mockFilters, currentFilters: Record<string, unknown> = { search: 'test' }) {
+  async function setup(filters: Filter[] = mockFilters, currentFilters: Record<string, unknown> = { search: 'test' }) {
     emittedCriteria = undefined;
 
     filterClientMock = {
@@ -97,7 +98,7 @@ describe('FilterPanel', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -107,6 +108,7 @@ describe('FilterPanel', () => {
         { provide: ProjectRefStore, useValue: refStoreMock },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     const fixture = TestBed.createComponent(FilterPanel);
 
@@ -119,7 +121,7 @@ describe('FilterPanel', () => {
     component.filterApplied.subscribe((state: AppliedFilterState) => {
       emittedCriteria = state;
     });
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   /** Waits until the rxResource-backed views list resolves */
@@ -128,12 +130,12 @@ describe('FilterPanel', () => {
       await new Promise((r) => setTimeout(r, 10));
     }
 
-    fixtureRef.detectChanges();
+    await settle(fixtureRef);
   }
 
   // ── Loading ─────────────────────────────────────────────────────
   it('should load saved views for the project', async () => {
-    setup();
+    await setup();
     await waitForViews();
     expect(filterClientMock.list).toHaveBeenCalledWith('p1');
     expect(component.filters()).toHaveLength(3);
@@ -149,7 +151,7 @@ describe('FilterPanel', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -159,6 +161,7 @@ describe('FilterPanel', () => {
         { provide: ProjectRefStore, useValue: refStoreMock },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     const fixture = TestBed.createComponent(FilterPanel);
 
@@ -167,14 +170,14 @@ describe('FilterPanel', () => {
     fixture.componentRef.setInput('currentSort', { field: 'createdAt', direction: 'desc' });
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(component.loadError()).toBe(true);
   });
 
   // ── Save ────────────────────────────────────────────────────────
   it('should save current filter criteria under a name', async () => {
-    setup();
+    await setup();
     await waitForViews();
     component.saveModel.set({ name: 'New Filter' });
     component.submitSave();
@@ -188,7 +191,7 @@ describe('FilterPanel', () => {
   });
 
   it('should not save with an empty name', async () => {
-    setup();
+    await setup();
     await waitForViews();
     component.saveModel.set({ name: '   ' });
     component.submitSave();
@@ -197,7 +200,7 @@ describe('FilterPanel', () => {
 
   // ── Apply ───────────────────────────────────────────────────────
   it('should emit filterApplied when applying a view', async () => {
-    setup();
+    await setup();
     await waitForViews();
 
     const view = component.filters()[0];
@@ -213,16 +216,16 @@ describe('FilterPanel', () => {
 
   describe('filter fields (V4-10)', () => {
     it('should seed the draft from the current filters', async () => {
-      setup();
+      await setup();
       await waitForViews();
       fixtureRef.componentRef.setInput('currentFilters', { search: 'bug', statusIds: ['st1'] });
-      fixtureRef.detectChanges();
+      await settle(fixtureRef);
 
       expect(component.draft()).toEqual({ search: 'bug', statusIds: ['st1'] });
     });
 
     it('should emit the edited criteria on applyDraft', async () => {
-      setup(); // draft seeded from currentFilters: { search: 'test' }
+      await setup(); // draft seeded from currentFilters: { search: 'test' }
       await waitForViews();
       component.setSingle('statusIds', 'st1');
       component.onDraftPriority('HIGH');
@@ -232,10 +235,10 @@ describe('FilterPanel', () => {
     });
 
     it('should clear a single-value key when set to empty and emit an empty state on clearDraft', async () => {
-      setup();
+      await setup();
       await waitForViews();
       fixtureRef.componentRef.setInput('currentFilters', { search: 'bug', statusIds: ['st1'] });
-      fixtureRef.detectChanges();
+      await settle(fixtureRef);
 
       component.setSingle('statusIds', '');
       expect(component.draft().statusIds).toBeUndefined();
@@ -247,7 +250,7 @@ describe('FilterPanel', () => {
 
   // ── Rename ──────────────────────────────────────────────────────
   it('should rename a view via PATCH', async () => {
-    setup();
+    await setup();
     await waitForViews();
 
     const view = component.filters()[0];
@@ -264,7 +267,7 @@ describe('FilterPanel', () => {
   });
 
   it('should not rename to an empty or unchanged name', async () => {
-    setup();
+    await setup();
     await waitForViews();
 
     const view = component.filters()[0];
@@ -281,17 +284,17 @@ describe('FilterPanel', () => {
 
   // ── Active-view detection ───────────────────────────────────────
   it('should mark the view active whose criteria+sort match the current state', async () => {
-    setup(mockFilters, { search: 'bug', statusIds: ['s1'] });
+    await setup(mockFilters, { search: 'bug', statusIds: ['s1'] });
     fixtureRef.componentRef.setInput('currentSort', { field: 'createdAt', direction: 'asc' });
-    fixtureRef.detectChanges();
+    await settle(fixtureRef);
     await waitForViews();
 
     expect(component.activeViewId()).toBe('f2');
   });
 
   it('should have no active view when nothing matches', async () => {
-    setup(mockFilters, {});
-    fixtureRef.detectChanges();
+    await setup(mockFilters, {});
+    await settle(fixtureRef);
     await waitForViews();
 
     expect(component.activeViewId()).toBeNull();
@@ -312,7 +315,7 @@ describe('FilterPanel', () => {
     };
 
     it('should capture date-range criteria when saving a view', async () => {
-      setup(mockFilters, DATE_FILTERS);
+      await setup(mockFilters, DATE_FILTERS);
       await waitForViews();
       component.saveModel.set({ name: 'Dated View' });
       component.submitSave();
@@ -325,7 +328,7 @@ describe('FilterPanel', () => {
     });
 
     it('should emit date-range criteria when applying a saved view', async () => {
-      setup();
+      await setup();
       await waitForViews();
 
       component.applyFilter(component.filters()[2]);
@@ -338,21 +341,21 @@ describe('FilterPanel', () => {
     });
 
     it('should detect the active view by its date-range criteria', async () => {
-      setup(mockFilters, { createdFrom: '2026-01-01', createdTo: '2026-01-31', updatedFrom: '2026-01-01' });
+      await setup(mockFilters, { createdFrom: '2026-01-01', createdTo: '2026-01-31', updatedFrom: '2026-01-01' });
       await waitForViews();
 
       expect(component.activeViewId()).toBe('f3');
     });
 
     it('should have no active view when only the dates differ', async () => {
-      setup(mockFilters, { createdFrom: '2026-02-01', createdTo: '2026-01-31', updatedFrom: '2026-01-01' });
+      await setup(mockFilters, { createdFrom: '2026-02-01', createdTo: '2026-01-31', updatedFrom: '2026-01-01' });
       await waitForViews();
 
       expect(component.activeViewId()).toBeNull();
     });
 
-    it('should report active state when only date criteria are set', () => {
-      setup(mockFilters, { updatedTo: '2026-02-15' });
+    it('should report active state when only date criteria are set', async () => {
+      await setup(mockFilters, { updatedTo: '2026-02-15' });
 
       expect(component.hasActiveState()).toBe(true);
     });
@@ -360,7 +363,7 @@ describe('FilterPanel', () => {
 
   // ── Delete ──────────────────────────────────────────────────────
   it('should confirm and delete a view', async () => {
-    setup();
+    await setup();
     await waitForViews();
 
     const view = component.filters()[0];

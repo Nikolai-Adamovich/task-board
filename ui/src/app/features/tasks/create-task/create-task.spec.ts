@@ -12,9 +12,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router, ActivatedRoute } from '@angular/router';
 import { Location } from '@angular/common';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { Component, input, output } from '@angular/core';
 import { TaskCreate } from './create-task';
 import { MilkdownEditor } from '@app/shared/milkdown-editor/milkdown-editor';
@@ -24,6 +24,7 @@ import { ProjectStore } from '@stores/project-store';
 import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Task } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 /** Stub keeps the spec independent of the lazy-loaded Milkdown bundle */
 @Component({
@@ -98,7 +99,7 @@ describe('TaskCreate (U1 — unified create-task page)', () => {
     mockProject = { id: 'p1', key: 'ABC', defaultStatusId: 'st-todo' };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -132,15 +133,16 @@ describe('TaskCreate (U1 — unified create-task page)', () => {
       remove: { imports: [MilkdownEditor] },
       add: { imports: [MilkdownEditorStub] },
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     fixture = TestBed.createComponent(TaskCreate);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
 
     // Wait for the default-preselection effects to run against loaded options
     for (let i = 0; i < 50 && !component.model().statusId; i++) {
       await new Promise((r) => setTimeout(r, 10));
-      fixture.detectChanges();
+      await settle(fixture);
     }
   }
 
@@ -161,14 +163,14 @@ describe('TaskCreate (U1 — unified create-task page)', () => {
 
     // Simulate user typing in the title (marks the Signal Form dirty)
     component.model.update((m: { title: string }) => ({ ...m, title: 'Half-typed task' }));
-    fixture.detectChanges();
+    await settle(fixture);
     component.createForm().markAsDirty();
 
     expect(component.hasPendingChanges()).toBe(true);
 
     // Resetting the form (post-create path) clears the pending state
     component.createForm().reset();
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(component.hasPendingChanges()).toBe(false);
 
@@ -226,7 +228,7 @@ describe('TaskCreate (U1 — unified create-task page)', () => {
     await setup();
 
     submit(component.createForm);
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(component.createForm.title().touched()).toBe(true);
     expect(component.createForm.title().invalid()).toBe(true);
@@ -243,7 +245,7 @@ describe('TaskCreate (U1 — unified create-task page)', () => {
     component.model.update((m: Record<string, unknown>) => ({ ...m, title: 'Created Task' }));
     submit(component.createForm);
     await new Promise((r) => setTimeout(r, 20));
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(component.error()).not.toBe('');
     expect(routerMock.navigate).not.toHaveBeenCalled();

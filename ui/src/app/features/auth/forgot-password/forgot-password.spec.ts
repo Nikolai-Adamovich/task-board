@@ -8,7 +8,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { ForgotPassword } from './forgot-password';
 import { API_BASE_URL } from '@app/api-url.token';
 
@@ -17,9 +19,9 @@ describe('ForgotPassword', () => {
   let component: any;
   let httpMock: HttpTestingController;
 
-  function setup() {
+  async function setup() {
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -28,12 +30,14 @@ describe('ForgotPassword', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     httpMock = TestBed.inject(HttpTestingController);
 
     const fixture = TestBed.createComponent(ForgotPassword);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Email validation ─────────────────────────────────────────────────────

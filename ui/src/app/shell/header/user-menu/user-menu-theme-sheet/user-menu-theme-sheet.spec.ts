@@ -36,6 +36,7 @@ import { UserMenuThemeSheet } from './user-menu-theme-sheet';
 import { PreferencesStore } from '@stores/preferences-store';
 import { ThemeRegistry } from '@services/theme-registry';
 import { ToastAlertIcon } from '@app/shared/toast-alert-icon/toast-alert-icon';
+import { settle } from '@app/shared/testing/zoneless';
 
 describe('UserMenuThemeSheet', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,7 +57,7 @@ describe('UserMenuThemeSheet', () => {
     load: ReturnType<typeof vi.fn>;
   };
 
-  function setup(): void {
+  async function setup(): Promise<void> {
     preferencesStoreMock = {
       themeMode: signal('auto'),
       lightTheme: signal('light'),
@@ -89,6 +90,7 @@ describe('UserMenuThemeSheet', () => {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
+          preloadLangs: true,
           langs: {
             en: {
               themes: {
@@ -107,10 +109,11 @@ describe('UserMenuThemeSheet', () => {
         { provide: ThemeRegistry, useValue: themeRegistryMock },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     fixture = TestBed.createComponent(UserMenuThemeSheet);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   beforeEach(() => {
@@ -123,8 +126,8 @@ describe('UserMenuThemeSheet', () => {
 
   // ── Both per-mode selections are marked, regardless of the active mode ───
 
-  it('should mark BOTH per-mode selections as selected in auto mode', () => {
-    setup();
+  it('should mark BOTH per-mode selections as selected in auto mode', async () => {
+    await setup();
 
     expect(component.isSelected('light')).toBe(true);
     expect(component.isSelected('dark')).toBe(true);
@@ -133,21 +136,21 @@ describe('UserMenuThemeSheet', () => {
     expect(component.isSelected('contrast')).toBe(false);
   });
 
-  it('should mark both selections even when the effective theme is only one of them', () => {
+  it('should mark both selections even when the effective theme is only one of them', async () => {
     // Auto mode, browser prefers light → effective is the light selection,
     // but the dark selection must still be marked.
     preferencesStoreMock.effectiveTheme.set('light');
     preferencesStoreMock.selectedTheme.set('light');
-    setup();
+    await setup();
 
     expect(component.isSelected('dark')).toBe(true);
     expect(component.isSelected('light')).toBe(true);
   });
 
-  it('should fall back to the default theme ids when a per-mode choice is unset', () => {
+  it('should fall back to the default theme ids when a per-mode choice is unset', async () => {
     preferencesStoreMock.lightTheme.set(null);
     preferencesStoreMock.darkTheme.set(null);
-    setup();
+    await setup();
 
     expect(component.isSelected('light')).toBe(true);
     expect(component.isSelected('dark')).toBe(true);
@@ -157,7 +160,7 @@ describe('UserMenuThemeSheet', () => {
   // ── Neutral warning toast on a "hidden" (cross-mode) pick ────────────────
 
   it('should show a neutral warning toast when the picked theme will not be applied now', async () => {
-    setup();
+    await setup();
     // Preload the lang so synchronous translate() resolves real strings
     await firstValueFrom(TestBed.inject(TranslocoService).selectTranslate('themes.deferredToast'));
 
@@ -172,8 +175,8 @@ describe('UserMenuThemeSheet', () => {
     );
   });
 
-  it('should NOT show a toast when the picked theme is applied immediately', () => {
-    setup();
+  it('should NOT show a toast when the picked theme is applied immediately', async () => {
+    await setup();
 
     // Auto mode, browser prefers light → picking a light theme applies at once
     component.selectTheme('ocean');
@@ -228,8 +231,8 @@ describe('UserMenuThemeSheet', () => {
     return { currentTarget: grid, relatedTarget } as unknown as FocusEvent;
   }
 
-  it('should hand focus back to the mode selector (active mode) on ArrowUp from the top row', () => {
-    setup();
+  it('should hand focus back to the mode selector (active mode) on ArrowUp from the top row', async () => {
+    await setup();
 
     const focusActive = vi.fn();
 
@@ -246,8 +249,8 @@ describe('UserMenuThemeSheet', () => {
     expect(component.focusedTheme()).toBeNull();
   });
 
-  it('should move the highlight up on ArrowUp from a non-top row and smooth-scroll it into view', () => {
-    setup();
+  it('should move the highlight up on ArrowUp from a non-top row and smooth-scroll it into view', async () => {
+    await setup();
 
     const { grid, buttons } = makeGrid();
 
@@ -261,8 +264,8 @@ describe('UserMenuThemeSheet', () => {
     expect(buttons['light']?.scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
   });
 
-  it('should move the highlight on horizontal arrows and smooth-scroll it into view', () => {
-    setup();
+  it('should move the highlight on horizontal arrows and smooth-scroll it into view', async () => {
+    await setup();
 
     const { grid, buttons } = makeGrid();
 
@@ -275,8 +278,8 @@ describe('UserMenuThemeSheet', () => {
     expect(buttons['ocean']?.scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
   });
 
-  it('should focus the FIRST theme item on focusThemeGrid when nothing was highlighted before', () => {
-    setup();
+  it('should focus the FIRST theme item on focusThemeGrid when nothing was highlighted before', async () => {
+    await setup();
 
     const { grid, buttons } = makeGrid();
 
@@ -291,8 +294,8 @@ describe('UserMenuThemeSheet', () => {
     expect(buttons['light']?.scrollIntoView).not.toHaveBeenCalled();
   });
 
-  it('should RESTORE the last highlighted theme on focusThemeGrid (Down handoff after focus-out)', () => {
-    setup();
+  it('should RESTORE the last highlighted theme on focusThemeGrid (Down handoff after focus-out)', async () => {
+    await setup();
 
     const { grid, buttons } = makeGrid();
 
@@ -317,20 +320,20 @@ describe('UserMenuThemeSheet', () => {
 
   // ── Highlight continuity: independent of the selection ───────────────────
 
-  it('should NOT highlight any theme when the sheet opens (focus starts on the mode switch)', () => {
-    setup();
+  it('should NOT highlight any theme when the sheet opens (focus starts on the mode switch)', async () => {
+    await setup();
 
     preferencesStoreMock.effectiveTheme.set('ocean');
     component.open.set(ExpandState.Open);
-    fixture.detectChanges(); // flush the open-effect
+    await settle(fixture); // flush the open-effect
 
     // Only one region highlights at a time: with focus on the mode switch the
     // listbox shows no highlight (previously it fell back to the selection).
     expect(component.getHighlightedTheme()).toBeNull();
   });
 
-  it('should KEEP the highlight on the picked theme after a pick (no reset to the selection)', () => {
-    setup();
+  it('should KEEP the highlight on the picked theme after a pick (no reset to the selection)', async () => {
+    await setup();
 
     const { grid } = makeGrid();
 
@@ -348,8 +351,8 @@ describe('UserMenuThemeSheet', () => {
     expect(component.focusedTheme()).toBe('ocean');
   });
 
-  it('should sync the highlight when a theme button receives real focus', () => {
-    setup();
+  it('should sync the highlight when a theme button receives real focus', async () => {
+    await setup();
 
     component.onThemeFocus('dark');
 
@@ -357,8 +360,8 @@ describe('UserMenuThemeSheet', () => {
     expect(component.getHighlightedTheme()).toBe('dark');
   });
 
-  it('should CLEAR the listbox highlight when focus leaves the grid (no double highlight with the mode switch)', () => {
-    setup();
+  it('should CLEAR the listbox highlight when focus leaves the grid (no double highlight with the mode switch)', async () => {
+    await setup();
 
     const { grid } = makeGrid();
 
@@ -371,8 +374,8 @@ describe('UserMenuThemeSheet', () => {
     expect(component.getHighlightedTheme()).toBeNull();
   });
 
-  it('should KEEP the highlight when focus moves WITHIN the grid (button → button)', () => {
-    setup();
+  it('should KEEP the highlight when focus moves WITHIN the grid (button → button)', async () => {
+    await setup();
 
     const { grid } = makeGrid();
 
@@ -387,8 +390,8 @@ describe('UserMenuThemeSheet', () => {
     expect(component.focusedTheme()).toBe('dark');
   });
 
-  it('should remember the last highlighted theme on the Up handoff and restore it on the Down handoff', () => {
-    setup();
+  it('should remember the last highlighted theme on the Up handoff and restore it on the Down handoff', async () => {
+    await setup();
 
     const focusActive = vi.fn();
 
@@ -417,8 +420,8 @@ describe('UserMenuThemeSheet', () => {
 
   // ── Smooth scrolling ─────────────────────────────────────────────────────
 
-  it('should smooth-scroll each navigated theme into view (block end) without moving focus', () => {
-    setup();
+  it('should smooth-scroll each navigated theme into view (block end) without moving focus', async () => {
+    await setup();
 
     const { grid, buttons } = makeGrid();
 

@@ -14,8 +14,8 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { Component } from '@angular/core';
 import { BrnTooltip } from '@spartan-ng/brain/tooltip';
-import { of } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, of } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { TenantRole } from '@task-board/shared';
 import type { Board, Project } from '@task-board/shared';
@@ -27,6 +27,7 @@ import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { PreferencesStore } from '@stores/preferences-store';
 import { BoardClient } from '@services/board-client';
+import { settle } from '@app/shared/testing/zoneless';
 
 /** Route target that is never instantiated (no router-outlet in the test DOM). */
 @Component({
@@ -70,9 +71,9 @@ function makeBoard(id: string): Board {
 }
 
 describe('Sidebar', () => {
-  function setup() {
+  async function setup() {
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } }), Sidebar],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } }), Sidebar],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -83,6 +84,7 @@ describe('Sidebar', () => {
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     const router = TestBed.inject(Router);
     const tenantStore = TestBed.inject(TenantStore);
@@ -97,7 +99,7 @@ describe('Sidebar', () => {
 
   async function enterProjectContext(
     fixture: ReturnType<typeof TestBed.createComponent<Sidebar>>,
-    deps: ReturnType<typeof setup>,
+    deps: Awaited<ReturnType<typeof setup>>,
     boards: Board[],
   ): Promise<void> {
     vi.spyOn(deps.boardClient, 'list').mockReturnValue(of(boards));
@@ -106,33 +108,24 @@ describe('Sidebar', () => {
     deps.projectStore.activeProject.set(makeProject());
     await deps.router.navigateByUrl('/w/acme/projects/PROJ');
 
-    // Poll until the async resources resolve (see AGENTS.md testing notes)
+    // Poll until the async resources resolve (see AGENTS.md testing notes).
+    // Time-bounded: when the project has NO boards, boardId() never populates.
     const sidebar = fixture.componentInstance as unknown as { boardId(): string | null };
+    const deadline = Date.now() + 2000;
 
-    for (let i = 0; i < 100 && !sidebar.boardId(); i++) {
-      fixture.detectChanges();
+    for (let i = 0; i < 100 && !sidebar.boardId() && Date.now() < deadline; i++) {
+      await settle(fixture);
       await new Promise((r) => setTimeout(r, 10));
     }
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   function queryAnchors(el: HTMLElement): HTMLAnchorElement[] {
     return Array.from(el.querySelectorAll('a[data-sidebar="menu-button"]'));
   }
 
-  /** Zoneless-safe settle: a few CD passes (never await whenStable — pending
-   *  resource requests would hang it). */
-  async function settle(fixture: ReturnType<typeof TestBed.createComponent<Sidebar>>): Promise<void> {
-    for (let i = 0; i < 5; i++) {
-      fixture.detectChanges();
-      await new Promise((r) => setTimeout(r, 10));
-    }
-
-    fixture.detectChanges();
-  }
-
   it('orders tenant nav Members before Settings (both admin-gated)', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     deps.tenantStore.setActiveTenant(makeTenant());
@@ -150,7 +143,7 @@ describe('Sidebar', () => {
   });
 
   it('hides Members and Settings for non-admin tenants', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     deps.tenantStore.setActiveTenant(makeTenant());
@@ -164,7 +157,7 @@ describe('Sidebar', () => {
   });
 
   it('shows the Board item linking to the first board when no preference is set', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     await enterProjectContext(fixture, deps, [makeBoard('board-1'), makeBoard('board-2')]);
@@ -175,7 +168,7 @@ describe('Sidebar', () => {
   });
 
   it('prefers the user default board over the first board', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     vi.spyOn(deps.preferencesStore, 'getDefaultBoardId').mockReturnValue('board-2');
@@ -188,7 +181,7 @@ describe('Sidebar', () => {
   });
 
   it('falls back to the board manager when the project has no boards', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     await enterProjectContext(fixture, deps, []);
@@ -199,7 +192,7 @@ describe('Sidebar', () => {
   });
 
   it('renders compact icon triggers for both switchers in collapsed-icon mode', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     deps.tenantStore.setActiveTenant(makeTenant());
@@ -221,7 +214,7 @@ describe('Sidebar', () => {
   }
 
   it('renders the footer toggle as a square icon button aligned to the right edge', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     deps.tenantStore.setActiveTenant(makeTenant());
@@ -246,7 +239,7 @@ describe('Sidebar', () => {
   });
 
   it('binds an always-on tooltip to the footer toggle (expanded AND collapsed)', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     deps.tenantStore.setActiveTenant(makeTenant());
@@ -272,7 +265,7 @@ describe('Sidebar', () => {
   });
 
   it('exposes hover and active accent classes on nav menu buttons', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     deps.tenantStore.setActiveTenant(makeTenant());
@@ -300,7 +293,7 @@ describe('Sidebar', () => {
   });
 
   it('keeps the active state visible when collapsed (icon-only mode)', async () => {
-    const deps = setup();
+    const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
 
     deps.tenantStore.setActiveTenant(makeTenant());

@@ -1,8 +1,9 @@
+import { firstValueFrom } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { errorInterceptor } from './error.interceptor';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
@@ -11,11 +12,11 @@ describe('errorInterceptor', () => {
   let httpMock: HttpTestingController;
   let http: HttpClient;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
@@ -23,6 +24,7 @@ describe('errorInterceptor', () => {
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     httpMock = TestBed.inject(HttpTestingController);
     http = TestBed.inject(HttpClient);

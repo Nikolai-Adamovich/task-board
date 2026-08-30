@@ -9,7 +9,9 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { Login } from './login';
 import { API_BASE_URL } from '@app/api-url.token';
 
@@ -18,9 +20,9 @@ describe('Login form validation', () => {
   let component: any;
   let fixture: ComponentFixture<Login>;
 
-  function setup() {
+  async function setup() {
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -29,10 +31,12 @@ describe('Login form validation', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     fixture = TestBed.createComponent(Login);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Email validation ─────────────────────────────────────────────────────

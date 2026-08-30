@@ -8,12 +8,12 @@
  * - goToTask navigation
  * - goToNewTask navigation (U1 — create dialog replaced by tasks/new page)
  */
-import { TestBed } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router, ActivatedRoute } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, of, throwError } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { BoardView } from './board-view';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
@@ -24,6 +24,7 @@ import { ProjectStore } from '@stores/project-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Board, Task } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 // ── Test fixtures ───────────────────────────────────────────
 
@@ -128,7 +129,7 @@ describe('BoardView', () => {
   let sprintClientMock: ReturnType<typeof createSprintClientMock>;
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
 
-  function setup(
+  async function setup(
     inputOverrides: Record<string, unknown> = {},
     statuses: { id: string; name: string }[] = [],
     board: Board = mockBoard,
@@ -141,7 +142,7 @@ describe('BoardView', () => {
     routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -180,6 +181,7 @@ describe('BoardView', () => {
         },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     const fixture = TestBed.createComponent(BoardView);
 
@@ -191,30 +193,30 @@ describe('BoardView', () => {
     });
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
 
     return fixture;
   }
 
   /** Poll until `cond()` is true (reference data resolves asynchronously via ProjectRefStore) */
-  async function until(fx: { detectChanges(): void }, cond: () => boolean): Promise<void> {
+  async function until(fx: ComponentFixture<unknown>, cond: () => boolean): Promise<void> {
     for (let i = 0; i < 200 && !cond(); i++) {
       await new Promise((resolve) => setTimeout(resolve, 10));
-      fx.detectChanges();
+      await settle(fx);
     }
   }
 
   // ── Loading state ───────────────────────────────────────
 
   describe('loading state', () => {
-    it('should show loading spinner while data is being fetched', () => {
+    it('should show loading spinner while data is being fetched', async () => {
       boardClientMock = createBoardClientMock();
       taskClientMock = createTaskClientMock();
       sprintClientMock = createSprintClientMock();
       routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
       TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+        imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -252,6 +254,7 @@ describe('BoardView', () => {
           },
         ],
       });
+      await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
       const fixture = TestBed.createComponent(BoardView);
 
@@ -262,13 +265,13 @@ describe('BoardView', () => {
       expect(component.loading()).toBe(true);
     });
 
-    it('should set loading to false after board loads successfully', () => {
-      setup();
+    it('should set loading to false after board loads successfully', async () => {
+      await setup();
 
       expect(component.loading()).toBe(false);
     });
 
-    it('should set loading to false when board fetch fails', () => {
+    it('should set loading to false when board fetch fails', async () => {
       boardClientMock = createBoardClientMock();
       boardClientMock.getById.mockReturnValue(throwError(() => new Error('Network error')));
       taskClientMock = createTaskClientMock();
@@ -276,7 +279,7 @@ describe('BoardView', () => {
       routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
       TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+        imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -314,12 +317,13 @@ describe('BoardView', () => {
           },
         ],
       });
+      await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
       const fixture = TestBed.createComponent(BoardView);
 
       fixture.componentRef.setInput('boardId', 'b0000000-0000-0000-0000-000000000001');
       component = fixture.componentInstance;
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.loading()).toBe(false);
     });
@@ -410,9 +414,9 @@ describe('BoardView', () => {
       expect(component.sprints()).toEqual(mockSprints);
     });
 
-    it('should scope the task query when sprintId input is set', () => {
+    it('should scope the task query when sprintId input is set', async () => {
       TestBed.resetTestingModule();
-      setup({ sprintId: 'sp1' });
+      await setup({ sprintId: 'sp1' });
 
       expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
@@ -420,16 +424,16 @@ describe('BoardView', () => {
       });
     });
 
-    it('should resolve the scoped sprint display name from the list', () => {
+    it('should resolve the scoped sprint display name from the list', async () => {
       TestBed.resetTestingModule();
-      setup({ sprintId: 'sp1' });
+      await setup({ sprintId: 'sp1' });
 
       expect(component.selectedSprintName()).toBe('Sprint 1');
     });
 
-    it('should fall back to the raw id for an unknown sprint', () => {
+    it('should fall back to the raw id for an unknown sprint', async () => {
       TestBed.resetTestingModule();
-      setup({ sprintId: 'unknown-id' });
+      await setup({ sprintId: 'unknown-id' });
 
       expect(component.selectedSprintName()).toBe('unknown-id');
     });
@@ -464,9 +468,9 @@ describe('BoardView', () => {
   // ── Board assignee/priority filters (F-08) ──────────────
 
   describe('board filters (F-08)', () => {
-    it('should resolve ?assignee=me to the current user id at query time', () => {
+    it('should resolve ?assignee=me to the current user id at query time', async () => {
       TestBed.resetTestingModule();
-      setup({ assignee: 'me' }, [], mockBoard, mockTasks, { id: 'u1' });
+      await setup({ assignee: 'me' }, [], mockBoard, mockTasks, { id: 'u1' });
 
       expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
@@ -474,9 +478,9 @@ describe('BoardView', () => {
       });
     });
 
-    it('should pass a concrete member id server-side', () => {
+    it('should pass a concrete member id server-side', async () => {
       TestBed.resetTestingModule();
-      setup({ assignee: 'u2' });
+      await setup({ assignee: 'u2' });
 
       expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
@@ -484,12 +488,12 @@ describe('BoardView', () => {
       });
     });
 
-    it('should not send assigneeId for ?assignee=unassigned and post-filter client-side', () => {
+    it('should not send assigneeId for ?assignee=unassigned and post-filter client-side', async () => {
       TestBed.resetTestingModule();
 
       const assigned = makeTask({ id: 'tk-assigned', statusId: 's1', title: 'Assigned', number: 9, assigneeId: 'u2' });
 
-      setup({ assignee: 'unassigned' }, [], mockBoard, [...mockTasks, assigned]);
+      await setup({ assignee: 'unassigned' }, [], mockBoard, [...mockTasks, assigned]);
 
       const call = taskClientMock.list.mock.calls[0]?.[1] as Record<string, unknown>;
 
@@ -498,9 +502,9 @@ describe('BoardView', () => {
       expect(component.filteredTasks()).toHaveLength(mockTasks.length);
     });
 
-    it('should send the priority filter server-side', () => {
+    it('should send the priority filter server-side', async () => {
       TestBed.resetTestingModule();
-      setup({ priority: 'HIGH' });
+      await setup({ priority: 'HIGH' });
 
       expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
@@ -508,8 +512,8 @@ describe('BoardView', () => {
       });
     });
 
-    it('should write ?assignee= to the URL on selection and clear with the empty value', () => {
-      setup();
+    it('should write ?assignee= to the URL on selection and clear with the empty value', async () => {
+      await setup();
 
       component.onAssigneeSelect('u2');
 
@@ -534,8 +538,8 @@ describe('BoardView', () => {
       );
     });
 
-    it('should write ?priority= to the URL on selection and clear with the empty value', () => {
-      setup();
+    it('should write ?priority= to the URL on selection and clear with the empty value', async () => {
+      await setup();
 
       component.onPrioritySelect('HIGH');
 
@@ -560,15 +564,15 @@ describe('BoardView', () => {
       );
     });
 
-    it('should fall back to the raw id for the assignee chip label when members are not loaded', () => {
+    it('should fall back to the raw id for the assignee chip label when members are not loaded', async () => {
       TestBed.resetTestingModule();
-      setup({ assignee: 'u2' });
+      await setup({ assignee: 'u2' });
 
       expect(component.selectedAssigneeLabel()).toBe('u2');
     });
 
-    it('should produce an empty chip label when no assignee filter is set', () => {
-      setup();
+    it('should produce an empty chip label when no assignee filter is set', async () => {
+      await setup();
 
       expect(component.selectedAssigneeLabel()).toBe('');
       expect(component.selectedPriorityLabel()).toBe('');
@@ -586,7 +590,7 @@ describe('BoardView', () => {
     ];
 
     it('should render human status names (not raw ids) in board column headers', async () => {
-      const fx = setup({}, namedStatuses);
+      const fx = await setup({}, namedStatuses);
 
       // Column names resolve asynchronously once ProjectRefStore has the statuses
       await until(fx, () => fx.nativeElement.textContent.includes('To Do / In Progress'));
@@ -599,8 +603,8 @@ describe('BoardView', () => {
       expect(text).not.toContain('Column 1');
     });
 
-    it('should fall back to a positional label when statuses are not loaded', () => {
-      const fx = setup({});
+    it('should fall back to a positional label when statuses are not loaded', async () => {
+      const fx = await setup({});
 
       expect(fx.nativeElement.textContent).toContain('Column 1');
     });
@@ -610,7 +614,7 @@ describe('BoardView', () => {
 
   describe('WIP counts in column headers (Q9)', () => {
     it('should render a muted count badge with the number of tasks in each column', async () => {
-      const fx = setup({});
+      const fx = await setup({});
 
       // Wait for the board + tasks to render (mockTasks: 2×s1 → col1, 1×s3 → col2)
       await until(fx, () => !!fx.nativeElement.querySelector('.cdk-drop-list'));
@@ -646,12 +650,12 @@ describe('BoardView', () => {
       makeTask({ id: 'tk-done', statusId: 's2', title: 'Done Task', number: 4 }),
     ];
 
-    function setupOverlap(): ReturnType<typeof setup> {
+    async function setupOverlap() {
       return setup({}, [], overlapBoard, overlapTasks);
     }
 
-    it('should show a REOPENED task only in the combined column (never duplicated)', () => {
-      setupOverlap();
+    it('should show a REOPENED task only in the combined column (never duplicated)', async () => {
+      await setupOverlap();
 
       const reopened = overlapTasks[1];
       const combined = component.board().columns.find((c: { id: string }) => c.id === 'col-combined');
@@ -663,8 +667,8 @@ describe('BoardView', () => {
       }
     });
 
-    it('should show an IN_PROGRESS task only in the dedicated IN_PROGRESS column', () => {
-      setupOverlap();
+    it('should show an IN_PROGRESS task only in the dedicated IN_PROGRESS column', async () => {
+      await setupOverlap();
 
       const inProgress = overlapTasks[2];
       const combined = component.board().columns.find((c: { id: string }) => c.id === 'col-combined');
@@ -675,8 +679,8 @@ describe('BoardView', () => {
       expect((component.tasksByColumnId().get(combined.id) ?? []).map((t: Task) => t.id)).not.toContain(inProgress?.id);
     });
 
-    it('should render every task in exactly one column (no card duplication)', () => {
-      setupOverlap();
+    it('should render every task in exactly one column (no card duplication)', async () => {
+      await setupOverlap();
 
       const columns = component.board().columns;
       const assignments = overlapTasks.map((task) =>
@@ -694,8 +698,8 @@ describe('BoardView', () => {
   // ── Empty columns ───────────────────────────────────────
 
   describe('empty columns', () => {
-    it('should render no placeholder text at all in an empty column', () => {
-      const fx = setup();
+    it('should render no placeholder text at all in an empty column', async () => {
+      const fx = await setup();
       // col3 (statusIds: ['s4']) has no matching tasks
       const dropList = fx.nativeElement.querySelector('#column-col3');
 

@@ -13,15 +13,16 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { ProjectMemberList } from './project-member-list';
 import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { ProjectMember } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockMembers: ProjectMember[] = [
@@ -67,7 +68,7 @@ describe('ProjectMemberList', () => {
     projectRole: ReturnType<typeof vi.fn>;
   };
 
-  function setup(
+  async function setup(
     projectRole = 'PROJECT_ADMIN',
     tenantRole = 'MEMBER',
     activeProject: { id: string } | null = { id: 'p1' },
@@ -90,7 +91,7 @@ describe('ProjectMemberList', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -101,11 +102,12 @@ describe('ProjectMemberList', () => {
         { provide: ProjectStore, useValue: projectStoreMock },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     const fixture = TestBed.createComponent(ProjectMemberList);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Loading ─────────────────────────────────────────────────────
@@ -129,16 +131,16 @@ describe('ProjectMemberList', () => {
   // ── V1-10/V2-1 regression: missing project context ─────────────
 
   describe('missing project context guard', () => {
-    it('should not fetch members when no active project is resolved', () => {
-      setup('PROJECT_ADMIN', 'MEMBER', null);
+    it('should not fetch members when no active project is resolved', async () => {
+      await setup('PROJECT_ADMIN', 'MEMBER', null);
 
       expect(component.hasContext()).toBe(false);
       expect(projectClientMock.listMembers).not.toHaveBeenCalled();
       expect(component.members()).toEqual([]);
     });
 
-    it('should not POST an added member when no active project is resolved', () => {
-      setup('PROJECT_ADMIN', 'MEMBER', null);
+    it('should not POST an added member when no active project is resolved', async () => {
+      await setup('PROJECT_ADMIN', 'MEMBER', null);
 
       component.memberModel.update((m: { userId: string; role: string }) => ({ ...m, userId: 'u9' }));
       submit(component.addMemberForm);
@@ -146,8 +148,8 @@ describe('ProjectMemberList', () => {
       expect(projectClientMock.addMember).not.toHaveBeenCalled();
     });
 
-    it('should not call updateMemberRole when no active project is resolved', () => {
-      setup('PROJECT_ADMIN', 'MEMBER', null);
+    it('should not call updateMemberRole when no active project is resolved', async () => {
+      await setup('PROJECT_ADMIN', 'MEMBER', null);
 
       component.changeRole({ userId: 'u2', role: 'EDITOR' }, 'VIEWER');
 
@@ -220,23 +222,23 @@ describe('ProjectMemberList', () => {
   // ── canManage ──────────────────────────────────────────────────
 
   describe('canManage', () => {
-    it('should be true for PROJECT_ADMIN', () => {
-      setup('PROJECT_ADMIN');
+    it('should be true for PROJECT_ADMIN', async () => {
+      await setup('PROJECT_ADMIN');
       expect(component.canManage()).toBe(true);
     });
 
-    it('should be true for a tenant ADMIN without a project role', () => {
-      setup('VIEWER', 'ADMIN');
+    it('should be true for a tenant ADMIN without a project role', async () => {
+      await setup('VIEWER', 'ADMIN');
       expect(component.canManage()).toBe(true);
     });
 
-    it('should be false for EDITOR', () => {
-      setup('EDITOR');
+    it('should be false for EDITOR', async () => {
+      await setup('EDITOR');
       expect(component.canManage()).toBe(false);
     });
 
-    it('should be false for VIEWER', () => {
-      setup('VIEWER');
+    it('should be false for VIEWER', async () => {
+      await setup('VIEWER');
       expect(component.canManage()).toBe(false);
     });
   });

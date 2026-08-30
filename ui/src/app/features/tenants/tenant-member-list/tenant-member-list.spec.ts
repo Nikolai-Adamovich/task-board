@@ -16,7 +16,9 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { TenantMemberList } from './tenant-member-list';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
@@ -95,7 +97,7 @@ describe('TenantMemberList', () => {
   };
   let tenantStoreMock: { activeTenant: ReturnType<typeof vi.fn> };
 
-  function setup(role = 'OWNER', activeTenant: { id: string } | null = { id: 't1' }) {
+  async function setup(role = 'OWNER', activeTenant: { id: string } | null = { id: 't1' }) {
     tenantClientMock = {
       listMembers: vi.fn().mockReturnValue(of(mockMembers)),
       inviteMember: vi.fn().mockReturnValue(of(mockMembers[0])),
@@ -117,7 +119,7 @@ describe('TenantMemberList', () => {
     tenantStoreMock = { activeTenant: vi.fn().mockReturnValue(activeTenant) };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -129,10 +131,12 @@ describe('TenantMemberList', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     const fixture = TestBed.createComponent(TenantMemberList);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
 
     return fixture;
   }
@@ -158,16 +162,16 @@ describe('TenantMemberList', () => {
   // ── V1-10/V2-1 regression: missing tenant context ──────────────
 
   describe('missing tenant context guard', () => {
-    it('should not fetch members when no active tenant is resolved', () => {
-      setup('OWNER', null);
+    it('should not fetch members when no active tenant is resolved', async () => {
+      await setup('OWNER', null);
 
       expect(component.hasContext()).toBe(false);
       expect(tenantClientMock.listMembers).not.toHaveBeenCalled();
       expect(component.members()).toEqual([]);
     });
 
-    it('should not POST an invite when no active tenant is resolved', () => {
-      setup('OWNER', null);
+    it('should not POST an invite when no active tenant is resolved', async () => {
+      await setup('OWNER', null);
 
       component.model.update((m: { email: string; role: string }) => ({ ...m, email: 'new@example.com' }));
       submit(component.inviteForm);
@@ -175,8 +179,8 @@ describe('TenantMemberList', () => {
       expect(tenantClientMock.inviteMember).not.toHaveBeenCalled();
     });
 
-    it('should not call updateMember when no active tenant is resolved', () => {
-      setup('OWNER', null);
+    it('should not call updateMember when no active tenant is resolved', async () => {
+      await setup('OWNER', null);
 
       component.onMemberChange({ row: { userId: 'u2', role: 'MEMBER' }, role: 'ADMIN' });
 
@@ -327,18 +331,18 @@ describe('TenantMemberList', () => {
   // ── canManage ──────────────────────────────────────────────────
 
   describe('canManage', () => {
-    it('should be true for OWNER', () => {
-      setup('OWNER');
+    it('should be true for OWNER', async () => {
+      await setup('OWNER');
       expect(component.canManage()).toBe(true);
     });
 
-    it('should be true for ADMIN', () => {
-      setup('ADMIN');
+    it('should be true for ADMIN', async () => {
+      await setup('ADMIN');
       expect(component.canManage()).toBe(true);
     });
 
-    it('should be false for MEMBER', () => {
-      setup('MEMBER');
+    it('should be false for MEMBER', async () => {
+      await setup('MEMBER');
       expect(component.canManage()).toBe(false);
     });
   });
@@ -346,8 +350,8 @@ describe('TenantMemberList', () => {
   // ── Layout (Q2/F-05: full-height flex column, like the task table) ──
 
   describe('layout', () => {
-    it('should lay out as a fixed-height flex column with a flexing member-table area', () => {
-      const fixture = setup();
+    it('should lay out as a fixed-height flex column with a flexing member-table area', async () => {
+      const fixture = await setup();
       const root: HTMLElement = fixture.nativeElement.children[0];
 
       // Exactly viewport minus app header (--header-height: 4rem) minus main vertical padding
@@ -361,8 +365,8 @@ describe('TenantMemberList', () => {
       expect(tableArea.classList.contains('min-h-0')).toBe(true);
     });
 
-    it('should stretch the member-table host so the pagination pins to the page bottom', () => {
-      const fixture = setup();
+    it('should stretch the member-table host so the pagination pins to the page bottom', async () => {
+      const fixture = await setup();
       const host = fixture.nativeElement.querySelector('ui-member-table') as HTMLElement;
 
       expect(host).toBeTruthy();

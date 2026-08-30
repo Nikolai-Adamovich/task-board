@@ -12,8 +12,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
-import { of } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, of } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { CreateWorkspace } from './create-workspace';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
@@ -56,7 +57,7 @@ describe('CreateWorkspace', () => {
   };
   let routerMock: { navigateByUrl: ReturnType<typeof vi.fn> };
 
-  function setup() {
+  async function setup() {
     tenantStoreMock = {
       createTenant: vi.fn().mockResolvedValue(mockTenant),
     };
@@ -79,6 +80,7 @@ describe('CreateWorkspace', () => {
         TranslocoTestingModule.forRoot({
           langs: { en: { common: { charCount: '{{count}}/{{max}}' } } },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
         }),
       ],
       providers: [
@@ -93,23 +95,25 @@ describe('CreateWorkspace', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     httpMock = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(CreateWorkspace);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   /** Fill the name, wait out the debounce, and answer the availability check. */
   async function fillNameAndCheckSlug(name: string, available: boolean): Promise<void> {
     component.model.update((m: { name: string }) => ({ ...m, name }));
-    fixture.detectChanges();
+    await settle(fixture);
     await waitForSlugDebounce();
 
     const req = httpMock.expectOne((r) => r.url.includes('/tenants/slug-available'));
 
     expect(req.request.method).toBe('GET');
     req.flush({ data: { available } });
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   /** Dispatch a submit event on the details-step form (runs the submission action). */
@@ -118,7 +122,7 @@ describe('CreateWorkspace', () => {
 
     formEl.dispatchEvent(new Event('submit'));
     await Promise.resolve();
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── name field validation ──────────────────────────────────────────────
@@ -171,13 +175,13 @@ describe('CreateWorkspace', () => {
       expect(component.workspaceForm.description().valid()).toBe(true);
     });
 
-    it('should render the character counter under the field', () => {
+    it('should render the character counter under the field', async () => {
       component.model.update((m: { name: string; description: string }) => ({
         ...m,
         name: 'NewCo',
         description: 'abc',
       }));
-      fixture.detectChanges();
+      await settle(fixture);
 
       const counter = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="desc-char-count"]');
 
@@ -192,7 +196,7 @@ describe('CreateWorkspace', () => {
 
     it('should auto-generate the slug from the workspace name', async () => {
       component.model.update((m: { name: string }) => ({ ...m, name: 'My Workspace!' }));
-      fixture.detectChanges();
+      await settle(fixture);
       await waitForSlugDebounce();
 
       expect(component.model().slug).toBe('my-workspace');
@@ -202,21 +206,21 @@ describe('CreateWorkspace', () => {
     it('should stop auto-generating once the user edits the slug manually', async () => {
       component.markSlugEdited();
       component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: 'custom-slug' }));
-      fixture.detectChanges();
+      await settle(fixture);
       await waitForSlugDebounce();
 
       component.model.update((m: { name: string }) => ({ ...m, name: 'Another Name' }));
-      fixture.detectChanges();
+      await settle(fixture);
       await waitForSlugDebounce();
 
       expect(component.model().slug).toBe('custom-slug');
       httpMock.expectOne((r) => r.url.includes('/tenants/slug-available')).flush({ data: { available: true } });
     });
 
-    it('should be invalid for a slug violating the slug rules', () => {
+    it('should be invalid for a slug violating the slug rules', async () => {
       component.markSlugEdited();
       component.model.update((m: { name: string; slug: string }) => ({ ...m, slug: 'Bad Slug!' }));
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.workspaceForm.slug().invalid()).toBe(true);
       expect(component.workspaceForm.slug().errors()[0].kind).toBe('pattern');
@@ -286,7 +290,7 @@ describe('CreateWorkspace', () => {
       component.confirmCheckout();
       // Billing mock resolves synchronously; allow promise chain to settle.
       await new Promise((resolve) => setTimeout(resolve, 0));
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(billingMock.completeMockCheckout).toHaveBeenCalledWith(FREE_PLAN_ID, {
         workspaceName: 'NewCo',
@@ -314,7 +318,7 @@ describe('CreateWorkspace', () => {
 
       component.confirmCheckout();
       await new Promise((resolve) => setTimeout(resolve, 0));
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.step()).toBe('checkout');
       expect(routerMock.navigateByUrl).not.toHaveBeenCalled();

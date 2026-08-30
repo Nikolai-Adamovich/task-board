@@ -10,22 +10,24 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { TaskTableFilters } from './task-table-filters';
 import { FilterClient } from '@services/filter-client';
 import { API_BASE_URL } from '@app/api-url.token';
-import { of } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 
 describe('TaskTableFilters', () => {
   let fixture: ComponentFixture<TaskTableFilters>;
   let component: TaskTableFilters;
 
-  function setup() {
+  async function setup() {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
           langs: { en: {} },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
         }),
       ],
       providers: [
@@ -36,38 +38,41 @@ describe('TaskTableFilters', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     fixture = TestBed.createComponent(TaskTableFilters);
     fixture.componentRef.setInput('projectId', 'p1');
     component = fixture.componentInstance;
+    await settle(fixture);
   }
 
-  it('should render one chip per active filter', () => {
-    setup();
+  it('should render one chip per active filter', async () => {
+    await setup();
     fixture.componentRef.setInput('chips', [
       { param: 'search', labelKey: 'taskTable.filterSearch', value: 'foo' },
       { param: 'status', labelKey: 'taskTable.filterStatus', value: 'To Do' },
     ]);
-    fixture.detectChanges();
+    await settle(fixture);
 
     const badges = fixture.debugElement.queryAll(By.css('span[hlmBadge]'));
 
     expect(badges.length).toBe(2);
   });
 
-  it('should render no chip row when there are no active filters', () => {
-    setup();
+  it('should render no chip row when there are no active filters', async () => {
+    await setup();
     fixture.componentRef.setInput('chips', []);
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(fixture.debugElement.queryAll(By.css('span[hlmBadge]')).length).toBe(0);
   });
 
-  it('should emit removeFilter with the chip param on × click', () => {
-    setup();
+  it('should emit removeFilter with the chip param on × click', async () => {
+    await setup();
     fixture.componentRef.setInput('chips', [
       { param: 'priority', labelKey: 'taskTable.filterPriority', value: 'HIGH' },
     ]);
-    fixture.detectChanges();
+    await settle(fixture);
 
     const emitted: string[] = [];
 
@@ -76,15 +81,22 @@ describe('TaskTableFilters', () => {
     const removeButton = fixture.debugElement.query(By.css('span[hlmBadge] button'));
 
     expect(removeButton).toBeTruthy();
-    removeButton.nativeElement.click();
 
-    expect(emitted).toEqual(['priority']);
+    // Zoneless click race: retry the native click until the Angular listener
+    // observes it (listener attachment can lag the connected DOM node).
+    await vi.waitFor(
+      () => {
+        removeButton.nativeElement.click();
+        expect(emitted).toEqual(['priority']);
+      },
+      { timeout: 2000 },
+    );
   });
 
-  it('should mirror the dialog open state up via dialogOpenChange', () => {
-    setup();
+  it('should mirror the dialog open state up via dialogOpenChange', async () => {
+    await setup();
     fixture.componentRef.setInput('dialogOpen', true);
-    fixture.detectChanges();
+    await settle(fixture);
 
     const emitted: boolean[] = [];
 

@@ -14,7 +14,9 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { AcceptInvitation } from './accept-invitation';
 import { TenantClient } from '@services/tenant-client';
 import { AuthStore } from '@stores/auth-store';
@@ -46,7 +48,7 @@ describe('AcceptInvitation', () => {
   };
   let routeMock: { snapshot: { queryParamMap: { get: ReturnType<typeof vi.fn> } } };
 
-  function setup(token: string | null = 'valid-token', details: InvitationDetails = mockInvitationDetails) {
+  async function setup(token: string | null = 'valid-token', details: InvitationDetails = mockInvitationDetails) {
     tenantClientMock = {
       getInvitationDetails: vi.fn().mockReturnValue(of(details)),
       acceptInvitation: vi.fn().mockReturnValue(of(mockAuthResponse)),
@@ -63,7 +65,7 @@ describe('AcceptInvitation', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -75,10 +77,12 @@ describe('AcceptInvitation', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     fixture = TestBed.createComponent(AcceptInvitation);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Form field validation ──────────────────────────────────────────────
@@ -185,23 +189,23 @@ describe('AcceptInvitation', () => {
   // ── ngOnInit ───────────────────────────────────────────────────────────
 
   describe('ngOnInit', () => {
-    it('should fetch invitation details when token is present', () => {
-      setup('valid-token');
+    it('should fetch invitation details when token is present', async () => {
+      await setup('valid-token');
 
       expect(tenantClientMock.getInvitationDetails).toHaveBeenCalledWith('valid-token');
       expect(component.invitation()).toEqual(mockInvitationDetails);
       expect(component.loading()).toBe(false);
     });
 
-    it('should set error when no token in query params', () => {
-      setup(null);
+    it('should set error when no token in query params', async () => {
+      await setup(null);
 
       expect(component.error()).toBe('auth.invitation.noToken');
       expect(component.loading()).toBe(false);
       expect(tenantClientMock.getInvitationDetails).not.toHaveBeenCalled();
     });
 
-    it('should set error on invitation fetch failure', () => {
+    it('should set error on invitation fetch failure', async () => {
       tenantClientMock = {
         getInvitationDetails: vi
           .fn()
@@ -212,7 +216,7 @@ describe('AcceptInvitation', () => {
       routeMock = { snapshot: { queryParamMap: { get: vi.fn().mockReturnValue('bad-token') } } };
 
       TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -224,10 +228,12 @@ describe('AcceptInvitation', () => {
         ],
       });
 
+      await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
       const fixture = TestBed.createComponent(AcceptInvitation);
 
       component = fixture.componentInstance;
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.error()).toBe('Expired invitation');
       expect(component.loading()).toBe(false);
@@ -238,7 +244,7 @@ describe('AcceptInvitation', () => {
 
   describe('acceptAsNewUser (V5-2)', () => {
     it('should send token + password + displayName so the placeholder account becomes usable', async () => {
-      setup();
+      await setup();
 
       component.model.update(() => ({
         displayName: 'V Five Member',
@@ -256,7 +262,7 @@ describe('AcceptInvitation', () => {
     });
 
     it('should not call the client when passwords do not match', async () => {
-      setup();
+      await setup();
 
       component.model.update(() => ({
         displayName: 'V Five Member',
@@ -269,14 +275,14 @@ describe('AcceptInvitation', () => {
       expect(authStoreMock.setSession).not.toHaveBeenCalled();
     });
 
-    it('should render the registration form for an unregistered invitee (isRegistered=false)', () => {
-      setup('valid-token', { ...mockInvitationDetails, isRegistered: false });
+    it('should render the registration form for an unregistered invitee (isRegistered=false)', async () => {
+      await setup('valid-token', { ...mockInvitationDetails, isRegistered: false });
 
       expect(fixture.nativeElement.querySelector('#invitation-form')).toBeTruthy();
     });
 
-    it('should NOT render the registration form for a registered invitee', () => {
-      setup('valid-token', { ...mockInvitationDetails, isRegistered: true });
+    it('should NOT render the registration form for a registered invitee', async () => {
+      await setup('valid-token', { ...mockInvitationDetails, isRegistered: true });
 
       expect(fixture.nativeElement.querySelector('#invitation-form')).toBeNull();
     });

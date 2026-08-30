@@ -8,15 +8,17 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
 import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { API_BASE_URL } from '@app/api-url.token';
+import { clickUntil, settle } from '@app/shared/testing/zoneless';
 import { Header } from './header';
 
 describe('Header', () => {
-  function setup() {
+  async function setup() {
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } }), Header],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true }), Header],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -25,10 +27,12 @@ describe('Header', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     const sidebarService = TestBed.inject(HlmSidebarService);
     const fixture = TestBed.createComponent(Header);
 
-    fixture.detectChanges();
+    await settle(fixture);
 
     return { fixture, sidebarService };
   }
@@ -40,20 +44,21 @@ describe('Header', () => {
     return buttons.find((b) => b.classList.contains('md:hidden')) ?? null;
   }
 
-  it('renders a mobile-only hamburger button', () => {
-    const { fixture } = setup();
+  it('renders a mobile-only hamburger button', async () => {
+    const { fixture } = await setup();
     const hamburger = findHamburger(fixture);
 
     expect(hamburger).toBeTruthy();
     expect(hamburger?.getAttribute('aria-label')).toBeTruthy();
   });
 
-  it('opens the mobile sidebar sheet on click', () => {
-    const { fixture, sidebarService } = setup();
+  it('opens the mobile sidebar sheet on click', async () => {
+    const { fixture, sidebarService } = await setup();
     const spy = vi.spyOn(sidebarService, 'setOpenMobile');
 
-    findHamburger(fixture)?.click();
-
-    expect(spy).toHaveBeenCalledWith(true);
+    await clickUntil(
+      () => findHamburger(fixture)?.click(),
+      () => expect(spy).toHaveBeenCalledWith(true),
+    );
   });
 });

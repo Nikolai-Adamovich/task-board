@@ -14,7 +14,9 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { SprintList, CreateSprintForm } from './sprint-list';
 import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
@@ -65,7 +67,7 @@ describe('SprintList', () => {
     tenantId: ReturnType<typeof vi.fn>;
   };
 
-  function setup(projectId?: string) {
+  async function setup(projectId?: string) {
     sprintClientMock = {
       list: vi.fn().mockReturnValue(of(mockSprints)),
       listByTenant: vi.fn().mockReturnValue(of(mockSprints)),
@@ -83,7 +85,7 @@ describe('SprintList', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -106,7 +108,7 @@ describe('SprintList', () => {
     }
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Loading ─────────────────────────────────────────────
@@ -142,7 +144,7 @@ describe('SprintList', () => {
       expect(component.loading()).toBe(false);
     });
 
-    it('should handle error and set loading to false', () => {
+    it('should handle error and set loading to false', async () => {
       sprintClientMock = {
         list: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
         listByTenant: vi.fn(),
@@ -158,7 +160,7 @@ describe('SprintList', () => {
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -171,10 +173,12 @@ describe('SprintList', () => {
         ],
       });
 
+      await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
       const fixture = TestBed.createComponent(SprintList);
 
       component = fixture.componentInstance;
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.loading()).toBe(false);
     });
@@ -283,7 +287,7 @@ describe('SprintList', () => {
       for (let i = 0; i < 20 && component.sprints().length === 0; i++) {
         await new Promise((r) => setTimeout(r, 10));
       }
-      fixture.detectChanges();
+      await settle(fixture);
 
       const el: HTMLElement = fixture.nativeElement;
       const backlogLinks = Array.from(el.querySelectorAll<HTMLAnchorElement>('a')).filter((a) =>

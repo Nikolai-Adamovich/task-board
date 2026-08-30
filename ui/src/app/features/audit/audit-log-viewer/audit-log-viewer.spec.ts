@@ -12,13 +12,14 @@
  */
 import { TestBed } from '@angular/core/testing';
 import { Router, ActivatedRoute, NavigationEnd } from '@angular/router';
-import { Subject, of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, Subject, of, throwError } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { AuditLogViewer } from './audit-log-viewer';
 import { AuditClient } from '@services/audit-client';
 import { ProjectStore } from '@stores/project-store';
 import { PreferencesStore } from '@stores/preferences-store';
 import type { AuditEvent, PaginatedResponse } from '@task-board/shared';
+import { clickUntil, settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockEvents: AuditEvent[] = [
@@ -88,18 +89,17 @@ describe('AuditLogViewer (R3-P7 table)', () => {
   let routerMock: { navigate: ReturnType<typeof vi.fn>; events: unknown };
   let routerEvents: Subject<NavigationEnd>;
 
-  async function settle() {
+  async function waitForLoaded() {
     for (let i = 0; i < 50 && component.loading(); i++) {
       await new Promise((r) => setTimeout(r, 10));
-      fixture.detectChanges();
     }
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   /** Current persisted rows-per-page preference (0 = Auto sentinel) — mutable per test. */
   let preferencesPageSize = 20;
 
-  function setup(listFn?: ReturnType<typeof vi.fn>, persistedPageSize = 20) {
+  async function setup(listFn?: ReturnType<typeof vi.fn>, persistedPageSize = 20) {
     preferencesPageSize = persistedPageSize;
     auditClientMock = {
       listByProject: listFn ?? vi.fn().mockReturnValue(of(mockPaginatedResponse)),
@@ -110,6 +110,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
+          preloadLangs: true,
           langs: { en: EN_LANG },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
         }),
@@ -140,16 +141,17 @@ describe('AuditLogViewer (R3-P7 table)', () => {
         },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     fixture = TestBed.createComponent(AuditLogViewer);
     fixture.componentRef.setInput('projectKey', 'proj-key');
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   it('renders the five table columns', async () => {
     await setup();
-    await settle();
+    await waitForLoaded();
 
     const headers = [...fixture.nativeElement.querySelectorAll('th')].map((th: HTMLElement) => th.textContent?.trim());
 
@@ -158,7 +160,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
 
   it('renders enriched rows without raw UUIDs for status/sprint/task entities', async () => {
     await setup();
-    await settle();
+    await waitForLoaded();
 
     const text = fixture.nativeElement.textContent as string;
 
@@ -173,7 +175,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
 
   it('shows compact diffs (field: old → new) and collapses long change lists', async () => {
     await setup();
-    await settle();
+    await waitForLoaded();
 
     const text = fixture.nativeElement.textContent as string;
 
@@ -185,16 +187,18 @@ describe('AuditLogViewer (R3-P7 table)', () => {
 
   it('expands the full changes detail on row click', async () => {
     await setup();
-    await settle();
+    await waitForLoaded();
 
     const rows = fixture.nativeElement.querySelectorAll('tbody tr');
 
-    (rows[1] as HTMLElement).click();
-    fixture.detectChanges();
+    await clickUntil(
+      () => (rows[1] as HTMLElement).click(),
+      () => expect(component.expandedEventId()).toBe('ae2'),
+    );
+    await settle(fixture);
 
     const text = fixture.nativeElement.textContent as string;
 
-    expect(component.expandedEventId()).toBe('ae2');
     expect(text).toContain('goal:');
     expect(text).not.toContain('+1');
   });
@@ -202,15 +206,22 @@ describe('AuditLogViewer (R3-P7 table)', () => {
   describe('time sort toggle', () => {
     it('defaults to desc and toggles to asc via the URL', async () => {
       await setup();
-      await settle();
+      await waitForLoaded();
 
       expect(component.sort()).toBe('desc');
 
       const timeHeader = fixture.nativeElement.querySelector('th') as HTMLElement;
       const sortButton = timeHeader.querySelector('button') as HTMLButtonElement;
 
-      sortButton.click();
-      fixture.detectChanges();
+      await clickUntil(
+        () => sortButton.click(),
+        () =>
+          expect(routerMock.navigate).toHaveBeenCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { sort: 'asc' }, queryParamsHandling: 'merge', replaceUrl: true }),
+          ),
+      );
+      await settle(fixture);
 
       expect(routerMock.navigate).toHaveBeenCalledWith(
         [],
@@ -222,13 +233,13 @@ describe('AuditLogViewer (R3-P7 table)', () => {
   describe('filters', () => {
     it('narrow the server query when bound from the URL', async () => {
       await setup();
-      await settle();
+      await waitForLoaded();
       auditClientMock.listByProject.mockClear();
 
       fixture.componentRef.setInput('action', 'UPDATED');
       fixture.componentRef.setInput('entityType', 'SPRINT');
       fixture.componentRef.setInput('actor', 'u2');
-      await settle();
+      await waitForLoaded();
 
       expect(auditClientMock.listByProject).toHaveBeenCalledWith(
         'p1',
@@ -238,7 +249,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
 
     it('write the action filter to the URL and reset the page', async () => {
       await setup();
-      await settle();
+      await waitForLoaded();
 
       component.onActionChange('DELETED');
 
@@ -259,7 +270,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
           }),
         ),
       );
-      await settle();
+      await waitForLoaded();
 
       component.goToPage(2);
 
@@ -268,7 +279,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
 
     it('ignores out-of-range pages', async () => {
       await setup();
-      await settle();
+      await waitForLoaded();
 
       component.goToPage(0);
       component.goToPage(99);
@@ -280,7 +291,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
   describe('error handling', () => {
     it('surfaces the error message', async () => {
       await setup(vi.fn().mockReturnValue(throwError(() => ({ error: { message: 'Forbidden' } }))));
-      await settle();
+      await waitForLoaded();
 
       expect(component.error()).toBe('Forbidden');
       expect(component.loading()).toBe(false);
@@ -289,7 +300,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
 
   it('aligns the history icon with the heading (flex items-center)', async () => {
     await setup();
-    await settle();
+    await waitForLoaded();
 
     const heading = fixture.nativeElement.querySelector('h2') as HTMLElement;
 
@@ -301,7 +312,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
   describe('Q2 (F-05) full-height + Auto page size', () => {
     it('renders no loading spinner — the defaultValue empty state shows directly', async () => {
       await setup(vi.fn().mockReturnValue(new Subject())); // never emits — stays loading forever
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(fixture.nativeElement.querySelector('hlm-spinner')).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('Loading audit events');
@@ -309,7 +320,7 @@ describe('AuditLogViewer (R3-P7 table)', () => {
 
     it('derives the effective limit from the measured wrapper when the Auto sentinel is persisted', async () => {
       await setup(undefined, 0); // AUTO_PAGE_SIZE_SENTINEL
-      await settle();
+      await waitForLoaded();
 
       // jsdom wrapper has no height → clamped to the minimum of 3 rows
       expect(auditClientMock.listByProject).toHaveBeenCalledWith('p1', expect.objectContaining({ limit: 3 }));

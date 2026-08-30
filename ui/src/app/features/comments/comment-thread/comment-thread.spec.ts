@@ -13,7 +13,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { CommentThread } from './comment-thread';
 import { CommentClient } from '@services/comment-client';
 import { AuthStore } from '@stores/auth-store';
@@ -52,7 +54,7 @@ describe('CommentThread', () => {
     delete: ReturnType<typeof vi.fn>;
   };
 
-  function setup(opts: { comments?: Comment[]; canEdit?: boolean } = {}) {
+  async function setup(opts: { comments?: Comment[]; canEdit?: boolean } = {}) {
     const { comments = mockComments, canEdit = false } = opts;
 
     commentClientMock = {
@@ -83,7 +85,7 @@ describe('CommentThread', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -100,6 +102,8 @@ describe('CommentThread', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     const fixture = TestBed.createComponent(CommentThread);
 
     fixture.componentRef.setInput('taskId', 'tk1');
@@ -107,17 +111,17 @@ describe('CommentThread', () => {
     fixture.componentRef.setInput('canEdit', canEdit);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Loading ─────────────────────────────────────────────────────
-  it('should load comments on init', () => {
-    setup();
+  it('should load comments on init', async () => {
+    await setup();
     expect(commentClientMock.list).toHaveBeenCalledWith('tk1');
     expect(component.comments()).toHaveLength(2);
   });
 
-  it('should handle load error', () => {
+  it('should handle load error', async () => {
     commentClientMock = {
       list: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
       create: vi.fn(),
@@ -126,7 +130,7 @@ describe('CommentThread', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -140,6 +144,8 @@ describe('CommentThread', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     const fixture = TestBed.createComponent(CommentThread);
 
     fixture.componentRef.setInput('taskId', 'tk1');
@@ -147,14 +153,14 @@ describe('CommentThread', () => {
     fixture.componentRef.setInput('canEdit', false);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(component.error()).toBe('comments.loadError');
   });
 
   // ── Create ──────────────────────────────────────────────────────
-  it('should submit a new comment', () => {
-    setup();
+  it('should submit a new comment', async () => {
+    await setup();
     component.newBody.set('New comment');
     component.submitComment();
     expect(commentClientMock.create).toHaveBeenCalledWith('tk1', { body: 'New comment' });
@@ -162,16 +168,16 @@ describe('CommentThread', () => {
     expect(component.newBody()).toBe('');
   });
 
-  it('should not submit empty comment', () => {
-    setup();
+  it('should not submit empty comment', async () => {
+    await setup();
     component.newBody.set('   ');
     component.submitComment();
     expect(commentClientMock.create).not.toHaveBeenCalled();
   });
 
   // ── Edit ────────────────────────────────────────────────────────
-  it('should start and cancel inline edit', () => {
-    setup();
+  it('should start and cancel inline edit', async () => {
+    await setup();
 
     const comment = component.comments()[0];
 
@@ -184,8 +190,8 @@ describe('CommentThread', () => {
     expect(component.editBody()).toBe('');
   });
 
-  it('should save an edited comment', () => {
-    setup();
+  it('should save an edited comment', async () => {
+    await setup();
     component.startEdit(component.comments()[0]);
     component.editBody.set('Updated body');
     component.saveEdit('c1');
@@ -194,8 +200,8 @@ describe('CommentThread', () => {
   });
 
   // ── Delete ──────────────────────────────────────────────────────
-  it('should confirm and delete a comment', () => {
-    setup();
+  it('should confirm and delete a comment', async () => {
+    await setup();
 
     const comment = component.comments()[0];
 
@@ -210,24 +216,24 @@ describe('CommentThread', () => {
   });
 
   // ── Permissions ─────────────────────────────────────────────────
-  it('should allow author to modify own comment', () => {
-    setup();
+  it('should allow author to modify own comment', async () => {
+    await setup();
 
     const ownComment = component.comments()[0]; // authorId = u1
 
     expect(component.canModifyComment(ownComment)).toBe(true);
   });
 
-  it('should not allow non-author to modify comment without canEdit', () => {
-    setup();
+  it('should not allow non-author to modify comment without canEdit', async () => {
+    await setup();
 
     const otherComment = component.comments()[1]; // authorId = u2
 
     expect(component.canModifyComment(otherComment)).toBe(false);
   });
 
-  it('should allow admin to modify any comment when canEdit is true', () => {
-    setup({ canEdit: true });
+  it('should allow admin to modify any comment when canEdit is true', async () => {
+    await setup({ canEdit: true });
 
     const otherComment = component.comments()[1]; // authorId = u2
 

@@ -10,7 +10,9 @@ import { signal, type WritableSignal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { TenantHome } from './tenant-home';
 import { ProjectClient } from '@services/project-client';
 import { TaskClient } from '@services/task-client';
@@ -117,7 +119,7 @@ describe('TenantHome', () => {
   let tenantStoreMock: { activeTenant: WritableSignal<any> };
   let authStoreMock: { currentUser: ReturnType<typeof vi.fn>; tenantRole: ReturnType<typeof vi.fn> };
 
-  function setup(opts: { role?: string; myTasks?: Task[] } = {}) {
+  async function setup(opts: { role?: string; myTasks?: Task[] } = {}) {
     const role = opts.role ?? 'OWNER';
 
     projectClientMock = {
@@ -143,6 +145,7 @@ describe('TenantHome', () => {
         TranslocoTestingModule.forRoot({
           langs: { en: { common: { charCount: '{{count}}/{{max}}' } } },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
         }),
         TenantHome,
       ],
@@ -156,14 +159,16 @@ describe('TenantHome', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     fixture = TestBed.createComponent(TenantHome);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   it('should load the tenant projects', async () => {
-    setup();
+    await setup();
 
     await new Promise((r) => setTimeout(r, 0));
 
@@ -172,7 +177,7 @@ describe('TenantHome', () => {
   });
 
   it('should scope My Tasks to this tenant and resolve KEY-NUMBER segments', async () => {
-    setup();
+    await setup();
 
     // Wait for both resources to emit
     for (let i = 0; i < 20 && component.myTaskItems().length === 0; i++) {
@@ -187,7 +192,7 @@ describe('TenantHome', () => {
   });
 
   it('should expose pending invitations for admins', async () => {
-    setup({ role: 'ADMIN' });
+    await setup({ role: 'ADMIN' });
 
     for (let i = 0; i < 20 && component.pendingInvites().length === 0; i++) {
       await new Promise((r) => setTimeout(r, 10));
@@ -198,7 +203,7 @@ describe('TenantHome', () => {
   });
 
   it('should not fetch members for plain members', async () => {
-    setup({ role: 'MEMBER' });
+    await setup({ role: 'MEMBER' });
 
     await new Promise((r) => setTimeout(r, 0));
 
@@ -208,7 +213,7 @@ describe('TenantHome', () => {
   // ── Round 5 F-01: resources must re-run when the active workspace changes ──
 
   it('should re-fetch projects and my tasks when the active tenant switches (Round 5 F-01)', async () => {
-    setup();
+    await setup();
 
     await new Promise((r) => setTimeout(r, 0));
 
@@ -226,7 +231,7 @@ describe('TenantHome', () => {
     for (let i = 0; i < 20 && component.projects() !== projectsB; i++) {
       await new Promise((r) => setTimeout(r, 10));
     }
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(projectClientMock.list).toHaveBeenCalledTimes(2);
     expect(taskClientMock.getMyTasks).toHaveBeenCalledTimes(2);
@@ -235,12 +240,12 @@ describe('TenantHome', () => {
   });
 
   it('should render the standard empty state (icon + title + hint) when My Tasks is empty (DR-8)', async () => {
-    setup({ myTasks: [] });
+    await setup({ myTasks: [] });
 
     for (let i = 0; i < 20 && component.myTaskItems().length !== 0; i++) {
       await new Promise((r) => setTimeout(r, 10));
     }
-    fixture.detectChanges();
+    await settle(fixture);
 
     const el: HTMLElement = fixture.nativeElement;
     const empty = el.querySelector('hlm-empty');
@@ -253,28 +258,28 @@ describe('TenantHome', () => {
 
   // ── V2-10: role-gated Create-project CTA ──────────────────────
 
-  it('should allow project creation for OWNER (V2-10)', () => {
-    setup({ role: 'OWNER' });
+  it('should allow project creation for OWNER (V2-10)', async () => {
+    await setup({ role: 'OWNER' });
 
     expect(component.canCreate()).toBe(true);
   });
 
-  it('should allow project creation for ADMIN (V2-10)', () => {
-    setup({ role: 'ADMIN' });
+  it('should allow project creation for ADMIN (V2-10)', async () => {
+    await setup({ role: 'ADMIN' });
 
     expect(component.canCreate()).toBe(true);
   });
 
-  it('should hide the Create-project CTA from plain MEMBERs (V2-10)', () => {
-    setup({ role: 'MEMBER' });
+  it('should hide the Create-project CTA from plain MEMBERs (V2-10)', async () => {
+    await setup({ role: 'MEMBER' });
 
     expect(component.canCreate()).toBe(false);
   });
 
   // ── Round 5 P2: project description 120-char limit ────────────
 
-  it('should mark the create-project description invalid over 120 characters (Round 5 P2)', () => {
-    setup({ role: 'OWNER' });
+  it('should mark the create-project description invalid over 120 characters (Round 5 P2)', async () => {
+    await setup({ role: 'OWNER' });
 
     component.model.update((m: { description: string }) => ({ ...m, description: 'a'.repeat(121) }));
 
@@ -282,8 +287,8 @@ describe('TenantHome', () => {
     expect(component.newProjectForm().invalid()).toBe(true);
   });
 
-  it('should accept a create-project description of exactly 120 characters (Round 5 P2)', () => {
-    setup({ role: 'OWNER' });
+  it('should accept a create-project description of exactly 120 characters (Round 5 P2)', async () => {
+    await setup({ role: 'OWNER' });
 
     component.model.update((m: { name: string; key: string; description: string }) => ({
       ...m,

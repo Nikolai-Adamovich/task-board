@@ -29,6 +29,7 @@ describe('injectUndoToasts', () => {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
+          preloadLangs: true,
           langs: {
             en: {
               common: { undo: 'Undo', undoSuccess: 'Restored successfully', undoFailed: 'Could not undo' },
@@ -39,6 +40,7 @@ describe('injectUndoToasts', () => {
         }),
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     // Preload the lang so synchronous translate() calls resolve to real strings
     await firstValueFrom(TestBed.inject(TranslocoService).selectTranslate('common.undo'));

@@ -11,8 +11,8 @@ import { Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, of, throwError } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { ProjectDangerZone } from './project-danger-zone';
 import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
@@ -20,6 +20,7 @@ import { ProjectStore } from '@stores/project-store';
 import { TenantStore } from '@stores/tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Project } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 
@@ -44,7 +45,7 @@ function makeProject(status: Project['status'] = 'ACTIVE'): Project {
 let component: any;
 let projectClientMock: Record<string, ReturnType<typeof vi.fn>>;
 
-function setup(projectStatus: Project['status'] = 'ACTIVE') {
+async function setup(projectStatus: Project['status'] = 'ACTIVE') {
   const project = makeProject(projectStatus);
 
   projectClientMock = {
@@ -56,7 +57,7 @@ function setup(projectStatus: Project['status'] = 'ACTIVE') {
 
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+    imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
     providers: [
       provideRouter([]),
       provideHttpClient(),
@@ -74,17 +75,18 @@ function setup(projectStatus: Project['status'] = 'ACTIVE') {
       { provide: TenantStore, useValue: { activeTenant: vi.fn().mockReturnValue({ slug: 'ws' }) } },
     ],
   });
+  await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
   const fixture = TestBed.createComponent(ProjectDangerZone);
 
   fixture.componentRef.setInput('projectKey', 'TP');
   component = fixture.componentInstance;
-  fixture.detectChanges();
+  await settle(fixture);
 }
 
 describe('ProjectDangerZone', () => {
-  it('should archive an active project', () => {
-    setup();
+  it('should archive an active project', async () => {
+    await setup();
 
     component.archiveProject();
 
@@ -92,8 +94,8 @@ describe('ProjectDangerZone', () => {
     expect(component.project()?.status).toBe('ARCHIVED');
   });
 
-  it('should restore an archived project', () => {
-    setup('ARCHIVED');
+  it('should restore an archived project', async () => {
+    await setup('ARCHIVED');
 
     component.restoreProject();
 
@@ -102,8 +104,8 @@ describe('ProjectDangerZone', () => {
     expect(component.project()?.deletionScheduledAt).toBeNull();
   });
 
-  it('should cancel a pending deletion', () => {
-    setup('DELETION_PENDING');
+  it('should cancel a pending deletion', async () => {
+    await setup('DELETION_PENDING');
 
     component.cancelDeletion();
 
@@ -112,8 +114,8 @@ describe('ProjectDangerZone', () => {
   });
 
   describe('typed confirmation (delete)', () => {
-    it('should block confirmation until the typed text matches the key', () => {
-      setup();
+    it('should block confirmation until the typed text matches the key', async () => {
+      await setup();
 
       component.requestDeleteProject();
 
@@ -125,8 +127,8 @@ describe('ProjectDangerZone', () => {
       expect(component.canConfirmDelete()).toBe(false);
     });
 
-    it('should allow confirmation when the typed text matches the key', () => {
-      setup();
+    it('should allow confirmation when the typed text matches the key', async () => {
+      await setup();
 
       component.requestDeleteProject();
       component.deleteConfirmText.set('TP');
@@ -134,8 +136,8 @@ describe('ProjectDangerZone', () => {
       expect(component.canConfirmDelete()).toBe(true);
     });
 
-    it('should not call delete when confirmation does not match', () => {
-      setup();
+    it('should not call delete when confirmation does not match', async () => {
+      await setup();
 
       component.deleteConfirmText.set('WRONG');
       component.confirmDeleteProject();
@@ -144,7 +146,7 @@ describe('ProjectDangerZone', () => {
     });
 
     it('should close the dialog after a successful delete request', async () => {
-      setup();
+      await setup();
       vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
       component.requestDeleteProject();
@@ -158,7 +160,7 @@ describe('ProjectDangerZone', () => {
     });
 
     it('should surface an error when delete fails', async () => {
-      setup();
+      await setup();
       vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       projectClientMock.delete?.mockReturnValueOnce(throwError(() => new Error('boom')));
 

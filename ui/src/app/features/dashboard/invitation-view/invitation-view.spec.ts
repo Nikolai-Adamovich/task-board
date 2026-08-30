@@ -11,7 +11,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { InvitationView } from './invitation-view';
 import { TenantClient } from '@services/tenant-client';
 import { API_BASE_URL } from '@app/api-url.token';
@@ -57,14 +59,14 @@ describe('InvitationView', () => {
     declineInvitation: ReturnType<typeof vi.fn>;
   };
 
-  function setup() {
+  async function setup() {
     tenantClientMock = {
       acceptInvitationById: vi.fn().mockReturnValue(of({ success: true })),
       declineInvitation: vi.fn().mockReturnValue(of({ success: true })),
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -74,12 +76,14 @@ describe('InvitationView', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     const fixture = TestBed.createComponent(InvitationView);
 
     fixture.componentRef.setInput('invitations', mockInvitations);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   describe('acceptInvitation', () => {

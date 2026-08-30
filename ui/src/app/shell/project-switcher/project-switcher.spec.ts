@@ -8,13 +8,15 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
 import { TenantRole } from '@task-board/shared';
 import type { Project } from '@task-board/shared';
 import { ProjectSwitcher } from './project-switcher';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
+import { settle } from '@app/shared/testing/zoneless';
 
 function makeProject(key: string, name: string): Project {
   return {
@@ -34,9 +36,9 @@ function makeProject(key: string, name: string): Project {
 }
 
 describe('ProjectSwitcher', () => {
-  function setup() {
+  async function setup() {
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -45,40 +47,42 @@ describe('ProjectSwitcher', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     const tenantStore = TestBed.inject(TenantStore);
     const router = TestBed.inject(Router);
 
     return { tenantStore, router };
   }
 
-  it('should create the component', () => {
-    setup();
+  it('should create the component', async () => {
+    await setup();
 
     const fixture = TestBed.createComponent(ProjectSwitcher);
 
-    fixture.detectChanges();
+    await settle(fixture);
 
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should show the select-project placeholder when no project is active', () => {
-    setup();
+  it('should show the select-project placeholder when no project is active', async () => {
+    await setup();
 
     const fixture = TestBed.createComponent(ProjectSwitcher);
 
-    fixture.detectChanges();
+    await settle(fixture);
 
     const el = fixture.nativeElement as HTMLElement;
 
     expect(el.textContent).toContain('projectSwitcher.selectProject');
   });
 
-  it('should navigate to the project route on select', () => {
-    const { tenantStore, router } = setup();
+  it('should navigate to the project route on select', async () => {
+    const { tenantStore, router } = await setup();
     const fixture = TestBed.createComponent(ProjectSwitcher);
 
     tenantStore.setActiveTenant({ id: 'tenant-1', slug: 'acme', name: 'Acme' } as never);
-    fixture.detectChanges();
+    await settle(fixture);
 
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
@@ -88,8 +92,8 @@ describe('ProjectSwitcher', () => {
     expect(navigateSpy).toHaveBeenCalledWith(['/w', 'acme', 'projects', 'PROJ']);
   });
 
-  it('should allow project creation for OWNER and ADMIN only', () => {
-    const { tenantStore } = setup();
+  it('should allow project creation for OWNER and ADMIN only', async () => {
+    const { tenantStore } = await setup();
     const fixture = TestBed.createComponent(ProjectSwitcher);
 
     tenantStore.setActiveTenant({ id: 'tenant-1', slug: 'acme', name: 'Acme' } as never);
@@ -97,24 +101,24 @@ describe('ProjectSwitcher', () => {
     const authStore = TestBed.inject(AuthStore);
 
     authStore.setTenantRole(TenantRole.MEMBER);
-    fixture.detectChanges();
+    await settle(fixture);
     expect(fixture.componentInstance['canCreateProject']()).toBe(false);
 
     authStore.setTenantRole(TenantRole.ADMIN);
-    fixture.detectChanges();
+    await settle(fixture);
     expect(fixture.componentInstance['canCreateProject']()).toBe(true);
 
     authStore.setTenantRole(TenantRole.OWNER);
-    fixture.detectChanges();
+    await settle(fixture);
     expect(fixture.componentInstance['canCreateProject']()).toBe(true);
   });
 
-  it('should navigate to the tenant home (create dialog lives there) on create-project', () => {
-    const { tenantStore, router } = setup();
+  it('should navigate to the tenant home (create dialog lives there) on create-project', async () => {
+    const { tenantStore, router } = await setup();
     const fixture = TestBed.createComponent(ProjectSwitcher);
 
     tenantStore.setActiveTenant({ id: 'tenant-1', slug: 'acme', name: 'Acme' } as never);
-    fixture.detectChanges();
+    await settle(fixture);
 
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 

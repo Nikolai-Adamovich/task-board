@@ -17,7 +17,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router, ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { SprintDetail } from './sprint-detail';
 import { SprintClient } from '@services/sprint-client';
 import { TaskClient } from '@services/task-client';
@@ -116,7 +118,7 @@ describe('SprintDetail', () => {
     nameOf: vi.fn(),
   };
 
-  function setup(sprintOverrides: Partial<Sprint> = {}, tasks: Task[] = mockSprintTasks) {
+  async function setup(sprintOverrides: Partial<Sprint> = {}, tasks: Task[] = mockSprintTasks) {
     const sprint = { ...mockSprint, ...sprintOverrides };
 
     sprintClientMock = {
@@ -142,7 +144,7 @@ describe('SprintDetail', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -163,12 +165,14 @@ describe('SprintDetail', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     fixture = TestBed.createComponent(SprintDetail);
 
     fixture.componentRef.setInput('sprintId', mockSprint.id);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   /** Tasks whose status is the project's final DONE status (`s2`). */
@@ -197,7 +201,7 @@ describe('SprintDetail', () => {
       expect(component.loading()).toBe(false);
     });
 
-    it('should set loading to false on error', () => {
+    it('should set loading to false on error', async () => {
       sprintClientMock = {
         getById: vi.fn().mockReturnValue(throwError(() => new Error('fail'))),
         update: vi.fn(),
@@ -215,7 +219,7 @@ describe('SprintDetail', () => {
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -235,11 +239,13 @@ describe('SprintDetail', () => {
         ],
       });
 
+      await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
       const fixture = TestBed.createComponent(SprintDetail);
 
       fixture.componentRef.setInput('sprintId', mockSprint.id);
       component = fixture.componentInstance;
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.loading()).toBe(false);
       expect(component.sprint()).toBeNull();
@@ -319,23 +325,23 @@ describe('SprintDetail', () => {
   // ── Status transitions ────────────────────────────────────────
 
   describe('status transitions', () => {
-    it('should show Start Sprint for FUTURE sprint', () => {
-      setup({ status: 'FUTURE' });
+    it('should show Start Sprint for FUTURE sprint', async () => {
+      await setup({ status: 'FUTURE' });
       expect(component.availableTransitions).toEqual([{ label: 'Start Sprint', status: 'ACTIVE' }]);
     });
 
-    it('should show Complete Sprint for ACTIVE sprint', () => {
-      setup({ status: 'ACTIVE' });
+    it('should show Complete Sprint for ACTIVE sprint', async () => {
+      await setup({ status: 'ACTIVE' });
       expect(component.availableTransitions).toEqual([{ label: 'Complete Sprint', status: 'COMPLETED' }]);
     });
 
-    it('should show Reopen Sprint for COMPLETED sprint', () => {
-      setup({ status: 'COMPLETED' });
+    it('should show Reopen Sprint for COMPLETED sprint', async () => {
+      await setup({ status: 'COMPLETED' });
       expect(component.availableTransitions).toEqual([{ label: 'Reopen Sprint', status: 'ACTIVE' }]);
     });
 
-    it('should call sprintClient.update on transitionSprint when no unfinished tasks remain', () => {
-      setup({ status: 'ACTIVE' }, doneTasks);
+    it('should call sprintClient.update on transitionSprint when no unfinished tasks remain', async () => {
+      await setup({ status: 'ACTIVE' }, doneTasks);
       component.transitionSprint('COMPLETED');
 
       expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'COMPLETED' });
@@ -345,8 +351,8 @@ describe('SprintDetail', () => {
   // ── V4-11: Start must PATCH ACTIVE — never the hardcoded COMPLETED flow ──
 
   describe('start sprint (V4-11 regression)', () => {
-    it('should PATCH status ACTIVE on Start and not move any tasks', () => {
-      setup({ status: 'FUTURE' }, mockSprintTasks); // unfinished tasks present
+    it('should PATCH status ACTIVE on Start and not move any tasks', async () => {
+      await setup({ status: 'FUTURE' }, mockSprintTasks); // unfinished tasks present
       component.transitionSprint('ACTIVE');
 
       expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'ACTIVE' });
@@ -354,8 +360,8 @@ describe('SprintDetail', () => {
       expect(component.showDispositionDialog()).toBe(false);
     });
 
-    it('should not open the disposition dialog on Start even with unfinished tasks', () => {
-      setup({ status: 'FUTURE' }, mockSprintTasks);
+    it('should not open the disposition dialog on Start even with unfinished tasks', async () => {
+      await setup({ status: 'FUTURE' }, mockSprintTasks);
       component.transitionSprint('ACTIVE');
 
       expect(component.showDispositionDialog()).toBe(false);
@@ -365,31 +371,31 @@ describe('SprintDetail', () => {
   // ── V1-7: completion disposition dialog ───────────────────────
 
   describe('completion disposition (V1-7)', () => {
-    it('should compute unfinished tasks from the project final/DONE status', () => {
-      setup({ status: 'ACTIVE' });
+    it('should compute unfinished tasks from the project final/DONE status', async () => {
+      await setup({ status: 'ACTIVE' });
 
       expect(component.unfinishedTasks()).toHaveLength(2);
       expect(component.finalStatusIds().has('s2')).toBe(true);
     });
 
-    it('should open the disposition dialog instead of completing when unfinished tasks exist', () => {
-      setup({ status: 'ACTIVE' });
+    it('should open the disposition dialog instead of completing when unfinished tasks exist', async () => {
+      await setup({ status: 'ACTIVE' });
       component.transitionSprint('COMPLETED');
 
       expect(component.showDispositionDialog()).toBe(true);
       expect(sprintClientMock.update).not.toHaveBeenCalled();
     });
 
-    it('should complete directly when all tasks are done', () => {
-      setup({ status: 'ACTIVE' }, doneTasks);
+    it('should complete directly when all tasks are done', async () => {
+      await setup({ status: 'ACTIVE' }, doneTasks);
       component.transitionSprint('COMPLETED');
 
       expect(component.showDispositionDialog()).toBe(false);
       expect(sprintClientMock.update).toHaveBeenCalledWith(mockSprint.id, { status: 'COMPLETED' });
     });
 
-    it('should bulk-move unfinished tasks to the backlog (default) then complete the sprint', () => {
-      setup({ status: 'ACTIVE' });
+    it('should bulk-move unfinished tasks to the backlog (default) then complete the sprint', async () => {
+      await setup({ status: 'ACTIVE' });
       component.transitionSprint('COMPLETED'); // opens the dialog
       component.completeSprint();
 
@@ -400,8 +406,8 @@ describe('SprintDetail', () => {
       expect(component.showDispositionDialog()).toBe(false);
     });
 
-    it('should move unfinished tasks to a chosen future sprint then complete', () => {
-      setup({ status: 'ACTIVE' });
+    it('should move unfinished tasks to a chosen future sprint then complete', async () => {
+      await setup({ status: 'ACTIVE' });
       component.transitionSprint('COMPLETED');
       component.dispositionTarget.set('sp-future');
       component.completeSprint();
@@ -414,8 +420,8 @@ describe('SprintDetail', () => {
 
     // ── V5-1: dialog copy must show the real count, not the raw placeholder ──
 
-    it('should pass the count param and use transloco interpolation syntax in all locales', () => {
-      setup({ status: 'ACTIVE' });
+    it('should pass the count param and use transloco interpolation syntax in all locales', async () => {
+      await setup({ status: 'ACTIVE' });
 
       // The unit-test DOM cannot load translations, so assert the contract that
       // fixed V5-1 directly: every locale's dispositionDesc uses transloco's

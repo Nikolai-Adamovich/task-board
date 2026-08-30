@@ -9,10 +9,12 @@
  * - `focusActive()` focuses the radio of the currently active mode
  */
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
 import { signal } from '@angular/core';
 import { ThemeModeSwitch } from './theme-mode-switch';
 import { PreferencesStore } from '@stores/preferences-store';
+import { settle } from '@app/shared/testing/zoneless';
 
 describe('ThemeModeSwitch', () => {
   let fixture: ComponentFixture<ThemeModeSwitch>;
@@ -20,7 +22,7 @@ describe('ThemeModeSwitch', () => {
   let component: any;
   let setThemeModeLocal: ReturnType<typeof vi.fn>;
 
-  function setup(mode = 'auto'): void {
+  async function setup(mode = 'auto'): Promise<void> {
     setThemeModeLocal = vi.fn();
 
     const preferencesStoreMock = {
@@ -35,14 +37,17 @@ describe('ThemeModeSwitch', () => {
             en: { themes: { mode: 'Mode', modeAuto: 'Auto', modeLight: 'Light', modeDark: 'Dark' } },
           },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
         }),
       ],
       providers: [{ provide: PreferencesStore, useValue: preferencesStoreMock }],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     fixture = TestBed.createComponent(ThemeModeSwitch);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   function radioValues(): string[] {
@@ -66,16 +71,16 @@ describe('ThemeModeSwitch', () => {
 
   // ── Mode order: Auto first ───────────────────────────────────────────────
 
-  it('should render Auto first, then Light, then Dark', () => {
-    setup();
+  it('should render Auto first, then Light, then Dark', async () => {
+    await setup();
 
     expect(radioValues()).toEqual(['auto', 'light', 'dark']);
   });
 
   // ── Horizontal-only keyboard model ───────────────────────────────────────
 
-  it('should emit navigateDown on ArrowDown and prevent native vertical movement', () => {
-    setup();
+  it('should emit navigateDown on ArrowDown and prevent native vertical movement', async () => {
+    await setup();
 
     const emitted: unknown[] = [];
 
@@ -88,8 +93,8 @@ describe('ThemeModeSwitch', () => {
     expect(setThemeModeLocal).not.toHaveBeenCalled();
   });
 
-  it('should do nothing on ArrowUp (blocked, no navigation, no mode change)', () => {
-    setup();
+  it('should do nothing on ArrowUp (blocked, no navigation, no mode change)', async () => {
+    await setup();
 
     const emitted: unknown[] = [];
 
@@ -102,8 +107,8 @@ describe('ThemeModeSwitch', () => {
     expect(setThemeModeLocal).not.toHaveBeenCalled();
   });
 
-  it('should leave ArrowLeft/ArrowRight to the native radio group (mode switching)', () => {
-    setup();
+  it('should leave ArrowLeft/ArrowRight to the native radio group (mode switching)', async () => {
+    await setup();
 
     const emitted: unknown[] = [];
 
@@ -118,8 +123,8 @@ describe('ThemeModeSwitch', () => {
 
   // ── focusActive ──────────────────────────────────────────────────────────
 
-  it('should focus the radio of the currently active mode', () => {
-    setup('dark');
+  it('should focus the radio of the currently active mode', async () => {
+    await setup('dark');
 
     component.focusActive();
 

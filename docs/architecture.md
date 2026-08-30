@@ -138,7 +138,14 @@ boards/tasks/sprints/members/settings/audit.
 
 - **Server:** Vitest. Service tests mock repos via constructor; route tests mock service classes with `vi.mock` and
   inject a fake `svc` through middleware in `createTestApp()` (see any `routes/*.test.ts`).
-- **UI:** Vitest via `ng test`. Resource-based components resolve asynchronously — poll signal state
+- **UI:** Vitest via `ng test`, zoneless. `fixture.detectChanges()` is an anti-pattern — it forces CD off-schedule and
+  races the zoneless scheduler (intermittent "click didn't emit" / "translated text is empty" flakes; validated by
+  instrumented full-suite loops). Canonical pattern: `TranslocoTestingModule.forRoot({ ..., preloadLangs: true })` +
+  explicit `TranslocoService.load('en')` in setup; `await settle(fixture)` (`whenStable()` + `TestBed.tick()`, bounded)
+  after create/setInput/events; `await clickUntil(() => el.click(), () => expect(effect))` for native clicks on
+  Angular-bound elements (listener attachment is itself racy); structural selectors, never translated text. Helpers in
+  `ui/src/app/shared/testing/zoneless.ts`; rationale and rules in `AGENTS.md` §Testing notes.
+- Resource-based components resolve asynchronously — poll signal state
   (`for (i < N && !component.task()) await setTimeout(10)`) instead of fixed timeouts.
 - **E2E:** Playwright specs in `ui/e2e/`.
 

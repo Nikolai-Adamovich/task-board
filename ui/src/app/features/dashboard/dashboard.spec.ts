@@ -12,7 +12,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { Dashboard } from './dashboard';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
@@ -53,7 +55,7 @@ describe('Dashboard', () => {
   let tenantClientMock: { getMyInvitations: ReturnType<typeof vi.fn> };
   let routerNavigateSpy: ReturnType<typeof vi.fn>;
 
-  function setup(
+  async function setup(
     opts: {
       authenticated?: boolean;
       hasUser?: boolean;
@@ -89,7 +91,7 @@ describe('Dashboard', () => {
       getMyInvitations: vi.fn().mockReturnValue(of(invitations)),
     };
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -101,17 +103,19 @@ describe('Dashboard', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     // Spy on navigation instead of replacing the Router (RouterLink needs the real one)
     routerNavigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     const fixture = TestBed.createComponent(Dashboard);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   it('should redirect an authenticated user with tenants to the tenant home', async () => {
-    setup();
+    await setup();
 
     // Wait for async tenant loading + navigation
     await new Promise((r) => setTimeout(r, 0));
@@ -122,7 +126,7 @@ describe('Dashboard', () => {
   });
 
   it('should show the welcome view for an authenticated user without tenants', async () => {
-    setup({ tenants: [] });
+    await setup({ tenants: [] });
 
     await new Promise((r) => setTimeout(r, 0));
 
@@ -131,15 +135,15 @@ describe('Dashboard', () => {
   });
 
   it('should show the invitation view when there are only pending invitations', async () => {
-    setup({ tenants: [], invitations: [{ id: 'inv1' } as MyInvitation] });
+    await setup({ tenants: [], invitations: [{ id: 'inv1' } as MyInvitation] });
 
     await new Promise((r) => setTimeout(r, 0));
 
     expect(component.dashboardState()).toBe('pending-invitations');
   });
 
-  it('should show the landing page for a visitor', () => {
-    setup({ authenticated: false, hasUser: false, token: null });
+  it('should show the landing page for a visitor', async () => {
+    await setup({ authenticated: false, hasUser: false, token: null });
 
     expect(component.dashboardState()).toBe('visitor');
     expect(component.loading()).toBe(false);
@@ -147,7 +151,7 @@ describe('Dashboard', () => {
 
   describe('onInvitationHandled', () => {
     it('should reload tenants and navigate once a tenant is available', async () => {
-      setup({ tenants: [] });
+      await setup({ tenants: [] });
 
       await new Promise((r) => setTimeout(r, 0));
 

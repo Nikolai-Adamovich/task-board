@@ -8,7 +8,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { ResetPassword } from './reset-password';
 import { API_BASE_URL } from '@app/api-url.token';
 
@@ -17,9 +19,9 @@ describe('ResetPassword', () => {
   let component: any;
   let httpMock: HttpTestingController;
 
-  function setup(token?: string) {
+  async function setup(token?: string) {
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -27,6 +29,8 @@ describe('ResetPassword', () => {
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
       ],
     });
+
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     httpMock = TestBed.inject(HttpTestingController);
 
@@ -36,7 +40,7 @@ describe('ResetPassword', () => {
     if (token !== undefined) {
       fixture.componentRef.setInput('token', token);
     }
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Token handling ───────────────────────────────────────────────────────

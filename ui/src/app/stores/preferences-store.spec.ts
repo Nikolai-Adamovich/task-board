@@ -1,9 +1,10 @@
+import { firstValueFrom } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { importProvidersFrom } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { PreferencesStore } from './preferences-store';
 import { AuthStore } from './auth-store';
 import { ThemeLoader } from '@services/theme-loader';
@@ -23,7 +24,7 @@ describe('PreferencesStore (theme mode model)', () => {
     preview: { primary: '#000', muted: '#111', foreground: '#222', card: '#333', border: '#444' },
   });
 
-  function createModule() {
+  async function createModule() {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
@@ -33,6 +34,7 @@ describe('PreferencesStore (theme mode model)', () => {
         { provide: API_BASE_URL, useValue: 'http://localhost/api' },
         importProvidersFrom(
           TranslocoTestingModule.forRoot({
+            preloadLangs: true,
             langs: { en: {}, pl: {}, de: {} },
             translocoConfig: { availableLangs: ['en', 'pl', 'de'], defaultLang: 'en' },
           }),
@@ -47,6 +49,7 @@ describe('PreferencesStore (theme mode model)', () => {
         },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     httpMock = TestBed.inject(HttpTestingController);
     themeLoader = TestBed.inject(ThemeLoader) as unknown as { loadTheme: ReturnType<typeof vi.fn> };
@@ -70,8 +73,8 @@ describe('PreferencesStore (theme mode model)', () => {
     });
   }
 
-  it('should default to Auto mode with browser-driven resolution', () => {
-    createModule();
+  it('should default to Auto mode with browser-driven resolution', async () => {
+    await createModule();
 
     const store = TestBed.inject(PreferencesStore);
 
@@ -83,12 +86,12 @@ describe('PreferencesStore (theme mode model)', () => {
     expect(themeLoader.loadTheme).toHaveBeenCalledWith('light');
   });
 
-  it('should restore mode-aware theme preferences from localStorage', () => {
+  it('should restore mode-aware theme preferences from localStorage', async () => {
     localStorage.setItem(
       'taskboard_theme_v2',
       JSON.stringify({ themeMode: 'dark', lightTheme: null, darkTheme: 'nord' }),
     );
-    createModule();
+    await createModule();
 
     const store = TestBed.inject(PreferencesStore);
 
@@ -98,8 +101,8 @@ describe('PreferencesStore (theme mode model)', () => {
     expect(themeLoader.loadTheme).toHaveBeenCalledWith('nord');
   });
 
-  it('should apply the resolved theme at bootstrap even with nothing persisted (P8-13)', () => {
-    createModule();
+  it('should apply the resolved theme at bootstrap even with nothing persisted (P8-13)', async () => {
+    await createModule();
 
     const store = TestBed.inject(PreferencesStore);
 
@@ -107,8 +110,8 @@ describe('PreferencesStore (theme mode model)', () => {
     expect(themeLoader.loadTheme).toHaveBeenCalledWith('light');
   });
 
-  it('should resolve auto mode from the system color-scheme signal', () => {
-    createModule();
+  it('should resolve auto mode from the system color-scheme signal', async () => {
+    await createModule();
 
     const store = TestBed.inject(PreferencesStore);
 
@@ -119,12 +122,12 @@ describe('PreferencesStore (theme mode model)', () => {
     expect(store.effectiveTheme()).toBe('light');
   });
 
-  it('should resolve explicit light/dark modes from the per-mode choices', () => {
+  it('should resolve explicit light/dark modes from the per-mode choices', async () => {
     localStorage.setItem(
       'taskboard_theme_v2',
       JSON.stringify({ themeMode: 'light', lightTheme: 'github-light', darkTheme: 'nord' }),
     );
-    createModule();
+    await createModule();
 
     const store = TestBed.inject(PreferencesStore);
 
@@ -136,7 +139,7 @@ describe('PreferencesStore (theme mode model)', () => {
 
   it('should migrate a legacy localStorage theme id to the mode model', async () => {
     localStorage.setItem('taskboard_theme', 'nord');
-    createModule();
+    await createModule();
 
     const store = TestBed.inject(PreferencesStore);
 
@@ -158,7 +161,7 @@ describe('PreferencesStore (theme mode model)', () => {
   });
 
   it('should load mode-aware preferences from the backend', async () => {
-    createModule();
+    await createModule();
 
     const authStore = TestBed.inject(AuthStore);
 
@@ -204,7 +207,7 @@ describe('PreferencesStore (theme mode model)', () => {
   });
 
   it('should migrate a legacy backend payload (theme only) to the mode model', async () => {
-    createModule();
+    await createModule();
 
     const authStore = TestBed.inject(AuthStore);
 
@@ -241,8 +244,8 @@ describe('PreferencesStore (theme mode model)', () => {
     put.flush({} as UserPreferences);
   });
 
-  it('should set zoom locally without backend call, then persist on commit', () => {
-    createModule();
+  it('should set zoom locally without backend call, then persist on commit', async () => {
+    await createModule();
 
     const authStore = TestBed.inject(AuthStore);
 
@@ -266,8 +269,8 @@ describe('PreferencesStore (theme mode model)', () => {
     req.flush({} as UserPreferences);
   });
 
-  it('should set the theme mode locally without backend call, then persist on commit', () => {
-    createModule();
+  it('should set the theme mode locally without backend call, then persist on commit', async () => {
+    await createModule();
 
     const authStore = TestBed.inject(AuthStore);
 
@@ -292,8 +295,8 @@ describe('PreferencesStore (theme mode model)', () => {
     req.flush({} as UserPreferences);
   });
 
-  it('should store a theme choice per mode and persist it on commit', () => {
-    createModule();
+  it('should store a theme choice per mode and persist it on commit', async () => {
+    await createModule();
 
     const authStore = TestBed.inject(AuthStore);
 
@@ -327,8 +330,8 @@ describe('PreferencesStore (theme mode model)', () => {
     req2.flush({} as UserPreferences);
   });
 
-  it('should keep the applied theme browser-driven in auto mode while storing a per-mode choice', () => {
-    createModule();
+  it('should keep the applied theme browser-driven in auto mode while storing a per-mode choice', async () => {
+    await createModule();
 
     const store = TestBed.inject(PreferencesStore);
 
@@ -347,8 +350,8 @@ describe('PreferencesStore (theme mode model)', () => {
     expect(store.effectiveTheme()).toBe('nord');
   });
 
-  it('should set language and persist to backend', () => {
-    createModule();
+  it('should set language and persist to backend', async () => {
+    await createModule();
 
     const authStore = TestBed.inject(AuthStore);
 

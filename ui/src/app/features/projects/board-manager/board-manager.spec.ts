@@ -12,9 +12,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { BoardManager } from './board-manager';
 import { BoardClient } from '@services/board-client';
 import { StatusClient } from '@services/status-client';
@@ -22,6 +22,7 @@ import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Project, Board, Status } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockProject: Project = {
@@ -62,13 +63,13 @@ let boardClientMock: Record<string, ReturnType<typeof vi.fn>>;
 
 async function until(condition: () => boolean): Promise<void> {
   for (let i = 0; i < 200 && !condition(); i++) {
-    fixture.detectChanges();
+    await settle(fixture);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  fixture.detectChanges();
+  await settle(fixture);
 }
 
-function setup(boards: Board[] = [makeBoard('b1', 'Default'), makeBoard('b2', 'Sprint Board')]) {
+async function setup(boards: Board[] = [makeBoard('b1', 'Default'), makeBoard('b2', 'Sprint Board')]) {
   boardClientMock = {
     list: vi.fn().mockReturnValue(of(boards)),
     create: vi.fn().mockImplementation((_pid: string, data: { name: string }) => of(makeBoard('b3', data.name))),
@@ -82,7 +83,7 @@ function setup(boards: Board[] = [makeBoard('b1', 'Default'), makeBoard('b2', 'S
 
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+    imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
     providers: [
       provideRouter([]),
       provideHttpClient(),
@@ -100,16 +101,17 @@ function setup(boards: Board[] = [makeBoard('b1', 'Default'), makeBoard('b2', 'S
       },
     ],
   });
+  await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
   fixture = TestBed.createComponent(BoardManager);
   fixture.componentRef.setInput('projectKey', mockProject.key);
   component = fixture.componentInstance;
-  fixture.detectChanges();
+  await settle(fixture);
 }
 
 describe('BoardManager', () => {
   it('should load the board list', async () => {
-    setup();
+    await setup();
     await until(() => component.boards().length > 0);
 
     expect(boardClientMock.list).toHaveBeenCalledWith(mockProject.id);
@@ -117,7 +119,7 @@ describe('BoardManager', () => {
   });
 
   it('should create a board with empty columns and add it to the list', async () => {
-    setup();
+    await setup();
     await until(() => component.boards().length > 0);
 
     component.createModel.update((m: { name: string; type: string }) => ({ ...m, name: 'New Board' }));
@@ -138,7 +140,7 @@ describe('BoardManager', () => {
   });
 
   it('should rename a board and update the list', async () => {
-    setup();
+    await setup();
     await until(() => component.boards().length > 0);
 
     component.openRenameDialog(component.boards()[1]);
@@ -152,7 +154,7 @@ describe('BoardManager', () => {
   });
 
   it('should refuse to delete the default board (BR-023)', async () => {
-    setup();
+    await setup();
     await until(() => component.boards().length > 0);
 
     const defaultBoard = component.boards()[0];
@@ -166,7 +168,7 @@ describe('BoardManager', () => {
   });
 
   it('should delete a non-default board after confirmation', async () => {
-    setup();
+    await setup();
     await until(() => component.boards().length > 0);
 
     component.requestDelete(component.boards()[1]);
@@ -183,7 +185,7 @@ describe('BoardManager', () => {
       { id: 'c2', statusIds: ['deleted-status'], position: 1 },
     ]);
 
-    setup([makeBoard('b1', 'Default'), stale]);
+    await setup([makeBoard('b1', 'Default'), stale]);
     await until(() => component.boards().length > 0);
 
     expect(component.hasInvalidRefs(component.boards()[0])).toBe(false);
@@ -191,7 +193,7 @@ describe('BoardManager', () => {
   });
 
   it('should surface an error when delete fails', async () => {
-    setup();
+    await setup();
     await until(() => component.boards().length > 0);
 
     boardClientMock.delete?.mockReturnValueOnce(throwError(() => new Error('boom')));

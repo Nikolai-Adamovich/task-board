@@ -14,7 +14,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { submit } from '@angular/forms/signals';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom } from 'rxjs';
+import { settle } from '@app/shared/testing/zoneless';
 import { TenantSettings } from './tenant-settings';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
@@ -48,7 +50,7 @@ describe('TenantSettings', () => {
   let authStoreMock: { tenantRole: ReturnType<typeof vi.fn> };
   let routerMock: { navigate: ReturnType<typeof vi.fn> };
 
-  function setup(role = 'OWNER') {
+  async function setup(role = 'OWNER') {
     tenantStoreMock = {
       activeTenant: vi.fn().mockReturnValue(mockTenant),
       updateTenant: vi.fn().mockResolvedValue({ ...mockTenant, name: 'Updated' }),
@@ -63,7 +65,7 @@ describe('TenantSettings', () => {
     routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} }, preloadLangs: true })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -75,10 +77,12 @@ describe('TenantSettings', () => {
       ],
     });
 
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
     const fixture = TestBed.createComponent(TenantSettings);
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Initialization ─────────────────────────────────────────────────────
@@ -102,18 +106,18 @@ describe('TenantSettings', () => {
   // ── canEdit ────────────────────────────────────────────────────────────
 
   describe('canEdit', () => {
-    it('should be true for OWNER', () => {
-      setup('OWNER');
+    it('should be true for OWNER', async () => {
+      await setup('OWNER');
       expect(component.canEdit()).toBe(true);
     });
 
-    it('should be true for ADMIN', () => {
-      setup('ADMIN');
+    it('should be true for ADMIN', async () => {
+      await setup('ADMIN');
       expect(component.canEdit()).toBe(true);
     });
 
-    it('should be false for MEMBER', () => {
-      setup('MEMBER');
+    it('should be false for MEMBER', async () => {
+      await setup('MEMBER');
       expect(component.canEdit()).toBe(false);
     });
   });

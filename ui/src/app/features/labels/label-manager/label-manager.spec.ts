@@ -12,9 +12,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { submit } from '@angular/forms/signals';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { LabelManager } from './label-manager';
 import { LabelClient } from '@services/label-client';
 import { ProjectStore } from '@stores/project-store';
@@ -22,6 +22,7 @@ import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { toast } from '@spartan-ng/brain/sonner';
 import type { Label } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockLabels: Label[] = [
@@ -44,7 +45,7 @@ describe('LabelManager', () => {
     vi.restoreAllMocks();
   });
 
-  function setup() {
+  async function setup() {
     // Spy on the sonner toast object directly — module mocking is unreliable
     // under the Angular vitest builder when several specs mock the same module.
     vi.spyOn(toast, 'success').mockReturnValue('toast-id');
@@ -71,7 +72,7 @@ describe('LabelManager', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+      imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -90,12 +91,13 @@ describe('LabelManager', () => {
         { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     const fixture = TestBed.createComponent(LabelManager);
 
     fixture.componentRef.setInput('projectKey', 'proj-key');
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
   }
 
   // ── Loading ─────────────────────────────────────────────
@@ -116,11 +118,11 @@ describe('LabelManager', () => {
       expect(component.loading()).toBe(false);
     });
 
-    it('should handle error on load', () => {
+    it('should handle error on load', async () => {
       labelClientMock.list.mockReturnValueOnce(throwError(() => new Error('fail')));
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
-        imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+        imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
         providers: [
           provideHttpClient(),
           provideHttpClientTesting(),
@@ -139,12 +141,13 @@ describe('LabelManager', () => {
           { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'p1' }), projectRole: () => null } },
         ],
       });
+      await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
       const fixture = TestBed.createComponent(LabelManager);
 
       fixture.componentRef.setInput('projectKey', 'proj-key');
       component = fixture.componentInstance;
-      fixture.detectChanges();
+      await settle(fixture);
       expect(component.loading()).toBe(false);
     });
   });

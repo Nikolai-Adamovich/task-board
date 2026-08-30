@@ -18,8 +18,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, ActivatedRoute } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { firstValueFrom, of, throwError } from 'rxjs';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { TaskDetail } from './task-detail';
 import { TaskClient } from '@services/task-client';
 import { LabelClient } from '@services/label-client';
@@ -27,6 +27,7 @@ import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { HttpErrorResponse } from '@angular/common/http';
 import type { Task, User } from '@task-board/shared';
+import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockTask: Task = {
@@ -97,6 +98,7 @@ describe('TaskDetail', () => {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
+          preloadLangs: true,
           langs: { en: {} },
           translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
         }),
@@ -126,17 +128,18 @@ describe('TaskDetail', () => {
         },
       ],
     });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
     fixture = TestBed.createComponent(TaskDetail);
 
     fixture.componentRef.setInput('taskNumber', 'TK-1');
 
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await settle(fixture);
     // rxResource resolves asynchronously — poll until the task signal populates
     for (let i = 0; i < 100 && !component.task(); i++) {
       await new Promise((r) => setTimeout(r, 10));
-      fixture.detectChanges();
+      await settle(fixture);
     }
   }
 
@@ -144,7 +147,7 @@ describe('TaskDetail', () => {
   async function pollUntil(condition: () => boolean, tries = 100): Promise<void> {
     for (let i = 0; i < tries && !condition(); i++) {
       await new Promise((r) => setTimeout(r, 10));
-      fixture.detectChanges();
+      await settle(fixture);
     }
   }
 
@@ -181,6 +184,7 @@ describe('TaskDetail', () => {
       TestBed.configureTestingModule({
         imports: [
           TranslocoTestingModule.forRoot({
+            preloadLangs: true,
             langs: { en: {} },
             translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
           }),
@@ -210,17 +214,18 @@ describe('TaskDetail', () => {
           },
         ],
       });
+      await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
       fixture = TestBed.createComponent(TaskDetail);
 
       fixture.componentRef.setInput('taskNumber', 'TK-1');
       component = fixture.componentInstance;
-      fixture.detectChanges();
+      await settle(fixture);
 
       // rxResource settles asynchronously — give it a moment to settle
       for (let i = 0; i < 20 && !component.task(); i++) {
         await new Promise((r) => setTimeout(r, 10));
-        fixture.detectChanges();
+        await settle(fixture);
       }
 
       expect(component.task()).toBeNull();
@@ -264,7 +269,7 @@ describe('TaskDetail', () => {
   describe('edit mode removal', () => {
     it('should not render an Edit button', async () => {
       await setup();
-      fixture.detectChanges();
+      await settle(fixture);
 
       const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLElement[];
 
@@ -382,7 +387,7 @@ describe('TaskDetail', () => {
   describe('header layout', () => {
     it('should render nowrap key, clamped title and own-row priority badge', async () => {
       await setup({ title: 'A very long task title that should wrap onto multiple lines without widening layout' });
-      fixture.detectChanges();
+      await settle(fixture);
 
       const el: HTMLElement = fixture.nativeElement;
       const key = el.querySelector('span.font-mono');
@@ -453,7 +458,7 @@ describe('TaskDetail', () => {
   describe('viewer sees no edit affordances', () => {
     it('should disable editing and hide affordances for users without write access', async () => {
       await setup({}, { tenantRole: null });
-      fixture.detectChanges();
+      await settle(fixture);
 
       expect(component.canEdit()).toBe(false);
 

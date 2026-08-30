@@ -1,3 +1,4 @@
+import { firstValueFrom } from 'rxjs';
 /**
  * Tests for the ProjectSettingsHub (DEC-035).
  *
@@ -7,18 +8,19 @@
  */
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { TranslocoTestingModule } from '@jsverse/transloco';
+import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { ProjectSettingsHub } from './project-settings-hub';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
+import { settle } from '@app/shared/testing/zoneless';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let component: any;
 
-function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
+async function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    imports: [TranslocoTestingModule.forRoot({ langs: { en: {} } })],
+    imports: [TranslocoTestingModule.forRoot({ preloadLangs: true, langs: { en: {} } })],
     providers: [
       provideRouter([]),
       { provide: AuthStore, useValue: { tenantRole: vi.fn().mockReturnValue(options.tenantRole ?? 'OWNER') } },
@@ -28,17 +30,18 @@ function setup(options: { tenantRole?: string; projectRole?: string } = {}) {
       },
     ],
   });
+  await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
 
   const fixture = TestBed.createComponent(ProjectSettingsHub);
 
   fixture.componentRef.setInput('projectKey', 'TP');
   component = fixture.componentInstance;
-  fixture.detectChanges();
+  await settle(fixture);
 }
 
 describe('ProjectSettingsHub', () => {
-  it('should list all admin sections for a tenant owner', () => {
-    setup();
+  it('should list all admin sections for a tenant owner', async () => {
+    await setup();
 
     const segments = component.adminLinks().map((l: { segment: string }) => l.segment);
 
@@ -46,20 +49,20 @@ describe('ProjectSettingsHub', () => {
     expect(component.isAdmin()).toBe(true);
   });
 
-  it('should list all admin sections for a PROJECT_ADMIN', () => {
-    setup({ tenantRole: 'MEMBER', projectRole: 'PROJECT_ADMIN' });
+  it('should list all admin sections for a PROJECT_ADMIN', async () => {
+    await setup({ tenantRole: 'MEMBER', projectRole: 'PROJECT_ADMIN' });
 
     expect(component.isAdmin()).toBe(true);
   });
 
-  it('should hide admin sections for an EDITOR', () => {
-    setup({ tenantRole: 'MEMBER', projectRole: 'EDITOR' });
+  it('should hide admin sections for an EDITOR', async () => {
+    await setup({ tenantRole: 'MEMBER', projectRole: 'EDITOR' });
 
     expect(component.isAdmin()).toBe(false);
   });
 
-  it('should mark the danger zone link as destructive', () => {
-    setup();
+  it('should mark the danger zone link as destructive', async () => {
+    await setup();
 
     const danger = component.adminLinks().find((l: { segment: string }) => l.segment === 'danger-zone');
 
