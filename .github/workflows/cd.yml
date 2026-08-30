@@ -67,24 +67,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
 
-      # TEMPORARY: the project's Pages asset store is corrupted (manifest claims
-      # hashes exist that 404 in production — "Uploaded 0 files (869 already
-      # uploaded)" while ~70% of chunks 404). Appending a unique comment to
-      # every .js changes all content hashes, forcing wrangler to re-upload
-      # everything. Remove this step once the store is verified healthy
-      # (removing it changes hashes again, which self-verifies with one more
-      # full upload).
-      - name: Force-fresh asset hashes (corrupted Pages asset store workaround)
-        working-directory: ui/dist/ui/browser
-        run: |
-          nonce="/* deploy:${{ github.sha }} $(date -u +%Y%m%d%H%M%S) */"
-          find . -name '*.js' -type f -exec sh -c 'printf "\n%s" "$1" >> "$2"' _ "$nonce" {} \;
-
       # Run from the build output: wrangler resolves the Pages Functions
       # directory relative to the CWD (./functions), not the deployed directory.
+      #
+      # --skip-caching: the project's Pages asset store got corrupted (the
+      # differential-upload API reported hashes as "already uploaded" while the
+      # assets 404 in production — cf. cloudflare/workers-sdk#14021, #12586).
+      # The flag bypasses check-missing deduplication and uploads every file.
       - name: Deploy frontend to Cloudflare Pages
         working-directory: ui/dist/ui/browser
-        run: npx wrangler pages deploy . --project-name=${{ vars.PROJECT_NAME }} --branch=main
+        run: npx wrangler pages deploy . --project-name=${{ vars.PROJECT_NAME }} --branch=main --skip-caching
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
