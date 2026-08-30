@@ -113,6 +113,11 @@ Full rationale in [`docs/architecture.md`](docs/architecture.md) §Decisions.
      the listener attachment itself is racy, so retry the interaction until the effect is observed.
   4. Never select elements by translated text; use structural selectors (CSS/attributes/element order).
   5. Install `vi.useFakeTimers()` only AFTER setup/settle; `ui/test-setup.ts` resets to real timers after every test.
+- **`@angular/build` is pinned to 22.1.2 on purpose** (`ui/package.json`). Versions ≥22.1.3 ship unit-test builder
+  regressions: `isolate: false` + once-per-worker TestBed init bleed state across spec files (angular/angular-cli#33047,
+  #33728); 22.1.5+ forces `disableCodeSplitting` (#33948) and can kill esbuild on 2-CPU CI runners (#33900).
+  `isolate: true` is set in `ui/angular.json` as a second line of defense. Unpin only after upstream fixes land and
+  re-validate with a full-suite loop.
 - UI resource-based components resolve asynchronously: poll the signal state
   (`for (… && !component.task()) await setTimeout(10)`) instead of fixed timeouts.
 - **E2E/Playwright policy**: do NOT run Playwright/e2e after every iteration (too slow). When e2e or live-browser

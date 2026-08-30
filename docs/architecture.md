@@ -145,6 +145,9 @@ boards/tasks/sprints/members/settings/audit.
   after create/setInput/events; `await clickUntil(() => el.click(), () => expect(effect))` for native clicks on
   Angular-bound elements (listener attachment is itself racy); structural selectors, never translated text. Helpers in
   `ui/src/app/shared/testing/zoneless.ts`; rationale and rules in `AGENTS.md` §Testing notes.
+- **UI test isolation:** the builder's default `isolate: false` + once-per-worker TestBed init bleed state across spec
+  files (angular/angular-cli#33047, #33728) — `isolate: true` is set in `ui/angular.json`, and `@angular/build` is
+  pinned to 22.1.2 until upstream fixes the ≥22.1.3 regressions (#33948, #33900).
 - Resource-based components resolve asynchronously — poll signal state
   (`for (i < N && !component.task()) await setTimeout(10)`) instead of fixed timeouts.
 - **E2E:** Playwright specs in `ui/e2e/`.
