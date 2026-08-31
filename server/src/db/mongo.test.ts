@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ClientSession, Db, MongoClient } from 'mongodb';
-import { runWithDb, withTransaction, TransactionsUnsupportedError } from './mongo.js';
+import { runWithDb, withTransaction, TransactionsUnsupportedError, buildDirectConnectionUri } from './mongo.js';
 
 // ─── Fake Client / Session ───────────────────────────────────────────────────
 
@@ -89,5 +89,39 @@ describe('withTransaction', () => {
     const result = await runInDbContext(client, () => withTransaction(async () => 'ok'));
 
     expect(result).toBe('ok');
+  });
+});
+
+describe('buildDirectConnectionUri', () => {
+  it('rewrites an Atlas SRV URI to the deterministic shard host with direct params', () => {
+    const uri = 'mongodb+srv://user:p%40ss@cluster0.abc123.mongodb.net/task-board?retryWrites=true&w=majority';
+
+    expect(buildDirectConnectionUri(uri)).toBe(
+      'mongodb://user:p%40ss@cluster0-shard-00-00.abc123.mongodb.net:27017/task-board' +
+        '?retryWrites=true&w=majority&authSource=admin&tls=true&directConnection=true',
+    );
+  });
+
+  it('adds authSource=admin only when the URI does not already carry one', () => {
+    const uri = 'mongodb+srv://user:secret@cluster0.abc123.mongodb.net/?authSource=admin&x=1';
+    const rewritten = buildDirectConnectionUri(uri);
+
+    expect(rewritten).toContain('authSource=admin');
+    expect(rewritten.match(/authSource=admin/g)).toHaveLength(1);
+    expect(rewritten).toContain('x=1');
+  });
+
+  it('passes a non-SRV URI through untouched (multi-node seed lists need discovery)', () => {
+    const uri = 'mongodb://user:secret@host1:27017,host2:27017/db?replicaSet=rs0';
+
+    expect(buildDirectConnectionUri(uri)).toBe(uri);
+  });
+
+  it('handles an SRV URI without credentials', () => {
+    const uri = 'mongodb+srv://cluster0.abc123.mongodb.net/db';
+
+    expect(buildDirectConnectionUri(uri)).toBe(
+      'mongodb://cluster0-shard-00-00.abc123.mongodb.net:27017/db?authSource=admin&tls=true&directConnection=true',
+    );
   });
 });

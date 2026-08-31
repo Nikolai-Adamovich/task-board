@@ -16,6 +16,55 @@ import type { ClientSession, Collection, Db, MongoClient } from 'mongodb';
 const dbStorage = new AsyncLocalStorage<Db>();
 
 /**
+ * Rewrite an Atlas SRV URI (`mongodb+srv://`) into a direct single-host URI.
+ *
+ * Every request creates a fresh MongoClient (see module docstring), so the
+ * driver repeats the full connection dance each time. With an SRV URI that
+ * dance is especially expensive on Workers: two DNS-over-HTTPS lookups (SRV +
+ * TXT) for topology discovery, then TCP + TLS + SCRAM against the discovered
+ * host — measured at ~300 ms per request. `directConnection` skips discovery
+ * entirely and connects straight to one known host.
+ *
+ * Atlas dedicated clusters (M0/M2/M5 — single-node replica sets) expose the
+ * node at the deterministic `<cluster>-shard-00-00.<id>.mongodb.net:27017`
+ * host, so the rewrite is safe: there is exactly one node and it is always
+ * the primary. If the cluster is ever upgraded to a multi-node topology, the
+ * MONGODB_URI secret should be switched to an explicit non-SRV seed list and
+ * this rewrite becomes a no-op for it.
+ *
+ * SRV URIs imply `tls`, `authSource=admin` and `retryWrites=true`; a plain
+ * URI does not, so the rewrite re-adds them explicitly.
+ */
+export function buildDirectConnectionUri(uri: string): string {
+  const SRV_PREFIX = 'mongodb+srv://';
+
+  if (!uri.startsWith(SRV_PREFIX)) {
+    return uri; // already a seed-list URI — leave it untouched
+  }
+
+  // Parse via the WHATWG URL API (mongodb+srv is not a registered scheme, so
+  // swap in http:// for parsing only — the result is an absolute URL, the
+  // scheme itself is never used). username/password stay percent-encoded.
+  const parsed = new URL(`http://${uri.slice(SRV_PREFIX.length)}`);
+  const host = parsed.hostname; // e.g. cluster0.abc123.mongodb.net
+  const dotIndex = host.indexOf('.');
+  const cluster = dotIndex === -1 ? host : host.slice(0, dotIndex);
+  const rest = dotIndex === -1 ? '' : host.slice(dotIndex); // ".abc123.mongodb.net"
+  const directHost = `${cluster}-shard-00-00${rest}`;
+  const params = parsed.searchParams;
+
+  if (!params.has('authSource')) {
+    params.set('authSource', 'admin');
+  }
+  params.set('tls', 'true');
+  params.set('directConnection', 'true');
+
+  const userinfo = parsed.username ? `${parsed.username}${parsed.password ? `:${parsed.password}` : ''}@` : '';
+
+  return `mongodb://${userinfo}${directHost}:27017${parsed.pathname}?${params.toString()}`;
+}
+
+/**
  * Create a fresh `MongoClient`, connect it, and return both the client and
  * its `Db` handle.  The caller is responsible for closing the client when
  * the request is done.
@@ -24,11 +73,16 @@ export async function connectMongo(uri: string): Promise<{ client: MongoClient; 
   // Dynamic import required — MongoDB's BSON module calls crypto.randomBytes()
   // at module load time, which Cloudflare Workers forbids at global scope.
   const { MongoClient: MC } = await import('mongodb');
-  const client = new MC(uri, {
+  const directUri = buildDirectConnectionUri(uri);
+  const client = new MC(directUri, {
     maxPoolSize: 1,
     minPoolSize: 0,
     connectTimeoutMS: 5_000,
     serverSelectionTimeoutMS: 5_000,
+    // Only force direct topology when we rewrote an SRV URI ourselves; a
+    // caller-provided non-SRV seed list may legitimately describe a
+    // multi-node replica set that needs discovery.
+    ...(directUri !== uri ? { directConnection: true } : {}),
   });
 
   await client.connect();
