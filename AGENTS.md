@@ -120,6 +120,15 @@ Full rationale in [`docs/architecture.md`](docs/architecture.md) §Decisions.
   re-validate with a full-suite loop.
 - UI resource-based components resolve asynchronously: poll the signal state
   (`for (… && !component.task()) await setTimeout(10)`) instead of fixed timeouts.
+- **Deploy (CD):** the UI is deployed with an explicit path from the repo root —
+  `npx wrangler pages deploy ui/dist/ui/browser`. NEVER pass a bare `.`/`./` with `working-directory` set: npm exec
+  rewrites the positional to the npm project root (`ui/`), uploading the whole source tree instead of the build output
+  (this caused a full production outage on 2026-08-31). The UI calls the Workers API directly (`API_URL` GitHub variable
+  injected into `environment.prod.ts` at build time) — there is no Pages Functions proxy. A smoke-check step fails CD
+  unless the fresh deployment serves `GET /` → 200.
+- **When the user points to a reference project, inspect its FULL configuration** — including `.github/workflows/*`, not
+  just the files matching the current symptom. A working deploy command in `../application/.github/workflows/cd.yml`
+  already contained the fix while debugging focused elsewhere.
 - **E2E/Playwright policy**: do NOT run Playwright/e2e after every iteration (too slow). When e2e or live-browser
   verification is needed, the ORCHESTRATING agent must delegate it to a subagent — never run it in the main agent's
   context (it bloats context with screenshots/snapshots). Unit tests (`npm test`) are fine to run directly.
