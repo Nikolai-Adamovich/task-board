@@ -83,16 +83,30 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
 
-      # --skip-caching: the project's Pages asset store got corrupted (the
-      # differential-upload API reported hashes as "already uploaded" while the
-      # assets 404 in production — cf. cloudflare/workers-sdk#14021, #12586).
-      # The flag bypasses check-missing deduplication and uploads every file.
+      # NOTE: do NOT run `npx wrangler pages deploy .` with working-directory set
+      # to the output dir. npm exec rewrites a bare `.` positional to the npm
+      # project root (ui/), so the whole ui/ source tree (800+ files) gets
+      # uploaded instead of the build output — the deployment then 404s on `/`
+      # because there is no root index.html. Always pass an explicit path.
       - name: Deploy frontend to Cloudflare Pages
-        working-directory: ui/dist/ui/browser
-        run: npx wrangler pages deploy . --project-name=${{ vars.PROJECT_NAME }} --branch=main --skip-caching
+        run: npx wrangler pages deploy ui/dist/ui/browser --project-name=${{ vars.PROJECT_NAME }} --branch=main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Fail loudly if the deployment cannot serve its own index.html (e.g. the
+      # wrong directory was uploaded). The unique <hash>.pages.dev hostname is
+      # never CDN-cached, so this probes the real deployment content.
+      - name: Smoke-check deployment
+        run: |
+          URL=$(npx wrangler pages deployment list --project-name="$PROJECT_NAME" | grep -o 'https://[0-9a-f]*\.'"$PROJECT_NAME"'.pages.dev' | head -1)
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL/")
+          echo "GET $URL/ -> $CODE"
+          if [ "$CODE" != "200" ]; then echo "Deployment does not serve index.html"; exit 1; fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT_NAME: ${{ vars.PROJECT_NAME }}
 
       # --var overrides the dev defaults in server/wrangler.toml [vars] for this
       # deployment only: strict production boot checks (M-09), the Pages origin
