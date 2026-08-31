@@ -52,8 +52,11 @@ export class TenantMemberService {
     // IDOR guard: only tenant members may list the tenant's members
     await this.requireMembership(requesterId, tenantId, precheckedMembership);
 
-    const members = await this.tenantMemberRepo.findByTenant(tenantId);
-    const effectiveMembers: TenantMember[] = [];
+    // One round-trip: members with their user profiles joined server-side
+    // ($lookup, soft-deleted users excluded) — replaces the previous
+    // findByTenant → users.$in two-step enrichment.
+    const members = await this.tenantMemberRepo.findByTenantWithUsers(tenantId);
+    const effectiveMembers: (TenantMember & { userEmail: string | null; userDisplayName: string | null })[] = [];
 
     for (const member of members) {
       // DEC-055 lazy revoke: an ACTIVE membership past its expiration is
@@ -63,21 +66,16 @@ export class TenantMemberService {
       if (member.status === MemberStatus.ACTIVE && isMembershipExpired(member)) {
         const flipped = await this.tenantMemberRepo.update(member.id, { status: MemberStatus.ACCESS_REVOKED });
 
-        if (flipped) effective = flipped;
+        if (flipped) effective = { ...flipped, userEmail: member.userEmail, userDisplayName: member.userDisplayName };
       }
 
       effectiveMembers.push(effective);
     }
 
-    // Batch user lookup (N+1 fix): one `$in` query instead of one per member
-    const userIds = [...new Set(effectiveMembers.map((m) => m.userId).filter((id): id is string => Boolean(id)))];
-    const users = await this.userRepo.findByIds(userIds);
-    const userById = new Map(users.map((u) => [u.id, u]));
-
     return effectiveMembers.map((effective) => ({
       ...effective,
-      displayName: effective.userId ? (userById.get(effective.userId)?.displayName ?? null) : null,
-      email: effective.userId ? (userById.get(effective.userId)?.email ?? null) : null,
+      displayName: effective.userId ? (effective.userDisplayName ?? null) : null,
+      email: effective.userId ? (effective.userEmail ?? null) : null,
     }));
   }
 

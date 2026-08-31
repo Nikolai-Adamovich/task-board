@@ -78,19 +78,18 @@ export class TenantService {
   }
 
   async listTenantsWithRole(userId: string): Promise<(Tenant & { role: string })[]> {
-    const memberships = await this.tenantMemberRepo.findByUser(userId);
-    const active = memberships.filter((m) => m.status === MemberStatus.ACTIVE);
-    // Batch lookup (N+1 fix): one `$in` query instead of one `findById` per membership
-    const tenants = await this.tenantRepo.findByIds(active.map((m) => m.tenantId));
-    const tenantById = new Map(tenants.map((t) => [t.id, t]));
+    // One round-trip: memberships with tenant documents joined server-side
+    // ($lookup) — replaces the previous findByUser → tenants.$in two-step.
+    // Order: natural tenant_members order (same as findByUser had).
+    const rows = await this.tenantMemberRepo.findByUserWithTenants(userId);
 
-    return active
-      .map((m) => {
-        const tenant = tenantById.get(m.tenantId);
+    return rows
+      .filter((r) => r.membership.status === MemberStatus.ACTIVE && r.tenant !== null)
+      .map((r) => {
+        const tenant = r.tenant as Tenant;
 
-        return tenant ? { ...tenant, role: m.role } : undefined;
-      })
-      .filter((t) => t !== undefined);
+        return { ...tenant, role: r.membership.role };
+      });
   }
 
   async getTenant(id: string): Promise<Tenant> {

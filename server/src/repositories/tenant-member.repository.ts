@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Collection } from 'mongodb';
 import { MemberStatus, InvitationStatus, TenantRole } from '@task-board/shared';
 import type { TenantMember, Invitation } from '@task-board/shared';
+import { toDomain as tenantToDomain } from './tenant.repository.js';
 
 // Required MongoDB indexes:
 // - { tenantId: 1, userId: 1 } (unique)
@@ -80,6 +81,78 @@ export class TenantMemberRepository {
     const docs = await this.collection.find({ userId }).toArray();
 
     return docs.map(toDomain);
+  }
+
+  /**
+   * Members of a tenant with their user profiles joined server-side in ONE
+   * round-trip (`$lookup` + `$unwind`, soft-deleted users excluded). Replaces
+   * the previous `findByTenant` → `users.$in` two-step enrichment.
+   * Order: natural collection order (same as `findByTenant` had).
+   */
+  async findByTenantWithUsers(
+    tenantId: string,
+  ): Promise<(TenantMember & { userEmail: string | null; userDisplayName: string | null })[]> {
+    const docs = await this.collection
+      .aggregate([
+        { $match: { tenantId } },
+        {
+          $lookup: {
+            from: 'users',
+            let: { uid: '$userId' },
+            pipeline: [{ $match: { $expr: { $eq: ['$id', '$$uid'] }, deletedAt: null } }],
+            as: 'user',
+          },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      ])
+      .toArray();
+
+    return docs.map((doc) => {
+      const member = toDomain(doc as TenantMemberDocument);
+      const user = (doc as { user?: { email?: string; displayName?: string } | null }).user;
+
+      return {
+        ...member,
+        userEmail: user?.email ?? null,
+        userDisplayName: user?.displayName ?? null,
+      };
+    });
+  }
+
+  /**
+   * Memberships of a user with the tenant documents joined server-side in ONE
+   * round-trip. Replaces the previous `findByUser` → `tenants.$in` two-step
+   * lookup in `listTenantsWithRole`. Order: natural collection order (same as
+   * `findByUser` had). Tenants are returned unfiltered (status checks stay in
+   * the service), `tenant` is null when the tenant document is missing.
+   */
+  async findByUserWithTenants(
+    userId: string,
+  ): Promise<{ membership: TenantMember; tenant: import('@task-board/shared').Tenant | null }[]> {
+    const docs = await this.collection
+      .aggregate([
+        { $match: { userId } },
+        {
+          $lookup: {
+            from: 'tenants',
+            localField: 'tenantId',
+            foreignField: 'id',
+            as: 'tenant',
+          },
+        },
+        { $unwind: { path: '$tenant', preserveNullAndEmptyArrays: true } },
+      ])
+      .toArray();
+
+    return docs.map((doc) => {
+      const member = toDomain(doc as TenantMemberDocument);
+      const tenantDoc = (doc as { tenant?: Record<string, unknown> | null }).tenant;
+
+      return {
+        membership: member,
+        tenant: tenantDoc ? tenantToDomain(tenantDoc as never) : null,
+      };
+    });
   }
 
   async findById(id: string): Promise<TenantMemberDocument | null> {

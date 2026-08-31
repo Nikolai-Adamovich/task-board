@@ -22,6 +22,7 @@ function createMockTenantMemberRepo() {
   return {
     findByUserAndTenant: vi.fn(),
     findByTenant: vi.fn(),
+    findByTenantWithUsers: vi.fn().mockResolvedValue([]),
     findPendingByEmail: vi.fn().mockResolvedValue([]),
     findById: vi.fn(),
     create: vi.fn(),
@@ -524,8 +525,7 @@ describe('TenantMemberService — precheckedMembership reuse', () => {
       emailService as never,
     );
     memberRepo.findByUserAndTenant.mockResolvedValue(makeMember());
-    memberRepo.findByTenant.mockResolvedValue([makeMember()]);
-    userRepo.findByIds.mockResolvedValue([makeMember()]);
+    memberRepo.findByTenantWithUsers.mockResolvedValue([{ ...makeMember(), userEmail: null, userDisplayName: null }]);
   });
 
   it('skips the membership lookup when the prechecked membership matches', async () => {
@@ -533,7 +533,7 @@ describe('TenantMemberService — precheckedMembership reuse', () => {
     const members = await service.getTenantMembers('user-1', 'tenant-1', prechecked);
 
     expect(memberRepo.findByUserAndTenant).not.toHaveBeenCalled();
-    expect(memberRepo.findByTenant).toHaveBeenCalledWith('tenant-1');
+    expect(memberRepo.findByTenantWithUsers).toHaveBeenCalledWith('tenant-1');
     expect(members.length).toBe(1);
   });
 

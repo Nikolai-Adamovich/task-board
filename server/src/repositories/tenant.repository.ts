@@ -23,7 +23,8 @@ export interface TenantDocument {
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
-function toDomain(doc: TenantDocument): Tenant {
+/** Exported for cross-repository aggregates (e.g. tenant-member $lookup joins). */
+export function toDomain(doc: TenantDocument): Tenant {
   return {
     id: doc.id,
     name: doc.name,
