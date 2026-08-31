@@ -2,6 +2,16 @@ name = "task-board-api"
 main = "src/index.ts"
 compatibility_date = "2025-07-01"
 compatibility_flags = ["nodejs_compat"]
+
+# Smart Placement: moves execution next to the busiest upstream (MongoDB
+# Atlas) so every Mongo round trip — handshake AND queries — drops to
+# single-digit ms (see Cloudflare "Placement" docs; available on all plans).
+# Needs traffic from multiple locations to converge; with single-user traffic
+# it may stay INSUFFICIENT_INVOCATIONS. A deterministic alternative is
+# `host = "<atlas-cluster-host>:27017"` — the hostname is part of the
+# MONGODB_URI secret and is deliberately NOT hardcoded here.
+[placement]
+mode = "smart"
 # Minify the bundle (~3.2 MB → ~1.5 MB). Isolate cold start is dominated by
 # parsing the bundled MongoDB driver; minification measurably reduces the
 # ~2.9 s first-request latency observed on the deployed Worker.

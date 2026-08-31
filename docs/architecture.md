@@ -18,7 +18,8 @@ runtime-library-free (no Zod/Angular/Hono imports).
 ### 2.1 Request lifecycle (order matters)
 
 ```
-logger → CORS (memoized per config) → [per-request MongoClient via runWithDb(AsyncLocalStorage)]
+logger → CORS (memoized per config) → [MongoClient cached per isolate (singleton experiment,
+DB_CLIENT_MODE=per-request rolls back) via runWithDb(AsyncLocalStorage)]
 → provideServices (builds service graph into c.set('svc')) → onError(errorHandler)
 → /api/auth (no tenant ctx) → authMiddleware (hono/jwt verify) → /api/tenants, invitations,
 preferences, tasks/my (auth only) → tenantScoped sub-app: tenantContextMiddleware → RBAC → routes
@@ -30,8 +31,11 @@ preferences, tasks/my (auth only) → tenantScoped sub-app: tenantContextMiddlew
   graph **once per request**.
 - [`middleware/services.ts`](../server/src/middleware/services.ts) — `provideServices` middleware exposes it as typed
   `c.get('svc')` (Hono `Variables`).
-- **Must NOT memoize at module level**: repositories capture `Collection` objects bound to the per-request
-  `MongoClient`; Workers reuse isolates across requests → stale sockets.
+- **Must NOT memoize at module level**: repositories capture `Collection` objects bound to the isolate-wide shared
+  `MongoClient`; only the service graph is request-scoped. (The MongoClient itself IS cached per isolate —
+  `db/mongo.ts`, rollback via `DB_CLIENT_MODE=per-request`.)
+- **Migrations are NOT in the request path**: `server/scripts/migrate.ts` runs the same `runMigrations()` from CD before
+  the Worker deploy (additive + idempotent, safe against the still-running old Worker).
 - Services declare narrow constructor interfaces for cross-aggregate deps (e.g. `TaskServiceUserRepo`) — keeps them
   unit-testable without casts.
 

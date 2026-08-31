@@ -2,16 +2,8 @@ import { Hono } from 'hono';
 import { HttpMethod } from '@task-board/shared';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import type { Db } from 'mongodb';
 import type { AppEnv } from './types/context.js';
-import { connectMongo, runWithDb } from './db/mongo.js';
-import {
-  migrateInvitedMembershipsToRevoked,
-  renameSeedStatusNames,
-  ensureTenantSlugIntegrity,
-  backfillMemberExpiresAt,
-  ensureCoreIndexes,
-} from './db/migrations.js';
+import { getMongoClient, isIoContextError, resetSharedClient, runWithDb } from './db/mongo.js';
 import { redactAuthorization } from './utils/redact.js';
 import { createLogger } from './utils/logger.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
@@ -91,37 +83,30 @@ app.use('*', async (c, next) => {
   return corsMiddleware(c, next);
 });
 
-// Create a per-request MongoDB connection and close it after the response.
-// Cloudflare Workers kill TCP sockets between requests, so we must NOT
-// cache a single MongoClient.  Each request gets its own client, and
-// `runWithDb` makes the Db available to `getDb()` / `getCollection()`
-// via AsyncLocalStorage.
+// ── TEMPORARY perf instrumentation (remove after the singleton experiment) ──
 
-/**
- * Idempotent data migrations, run once per isolate. M-04: the slug backfill
- * and the unique slug index are a single step — splitting them left a window
- * where a concurrent isolate could insert a duplicate slug in between.
- */
-async function runMigrations(db: Db): Promise<void> {
-  await migrateInvitedMembershipsToRevoked(db);
-  await renameSeedStatusNames(db); // DR-1 — raw seed-status keys → display names
-  await ensureTenantSlugIntegrity(db); // DEC-032 — backfill + unique index back-to-back
-  await backfillMemberExpiresAt(db); // DEC-055 — expiresAt: null on legacy members
-  await ensureCoreIndexes(db); // create every repository-documented index (idempotent)
-}
+const perfLog = createLogger({ scope: 'perf-tmp' });
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Liveness + no-DB baselines (mounted BEFORE the DB middleware on purpose) ──
+// `/api/health` is liveness: it must answer even when the database is down or
+// unconfigured, so it must not sit behind the DB middleware. `/api/ping` is a
+// TEMPORARY twin used by the perf experiment as the true no-DB baseline.
+app.get('/api/ping', (c) => c.json({ status: 'ok' }));
+app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // ── Readiness probe (N-20) ────────────────────────────────────────────────────
-// Mounted BEFORE the DB middleware on purpose: readiness must not depend on
-// migrations having succeeded, and the probe verifies that a *fresh* Mongo
-// connection works (Workers kill sockets between requests). It manages its
-// own short-lived client and never touches the request-scoped Db context.
+// Also mounted before the DB middleware: readiness verifies that a *fresh*
+// Mongo connection works. It manages its own short-lived client and never
+// touches the request-scoped Db context.
 app.route('/api', createReadyzRoutes());
 
-// M-03: migrations run once per isolate via a shared promise (deployment-scoped,
-// not request-scoped state) so concurrent cold requests coalesce onto a single
-// run instead of racing through a check-then-set flag.
-let migrationsPromise: Promise<void> | null = null;
-
+// MongoDB client acquisition. The client is cached per isolate (singleton —
+// see mongo.ts) so the connection pool amortises the handshake across
+// requests; `DB_CLIENT_MODE=per-request` restores the old behaviour without a
+// code deploy. Migrations are NOT run here — they live in
+// server/scripts/migrate.ts and are executed by CD before the deploy.
 app.use('/api/*', async (c, next) => {
   const uri = c.env.MONGODB_URI;
 
@@ -134,23 +119,36 @@ app.use('/api/*', async (c, next) => {
     );
   }
 
-  const { client, db } = await connectMongo(uri);
+  const mode = c.env.DB_CLIENT_MODE === 'per-request' ? 'per-request' : 'singleton';
+  const clientStartedAt = Date.now();
+  const client = await getMongoClient(uri, mode);
+
+  perfLog.info(`client acquisition (${mode}): ${Date.now() - clientStartedAt}ms`);
+
+  const dbPhaseStartedAt = Date.now();
 
   try {
-    await runWithDb(db, async () => {
-      if (!migrationsPromise) {
-        migrationsPromise = runMigrations(db).catch((error) => {
-          migrationsPromise = null; // allow a later cold request to retry
-          throw error;
-        });
-      }
-      await migrationsPromise;
-      await next();
-    });
+    await runWithDb(client.db(), () => next());
+  } catch (err) {
+    // workerd binds sockets to the request context that created them; when a
+    // request surfaces an I/O-context error the cached client is dead — drop
+    // it so the next request builds a fresh one. Narrow check: ordinary
+    // MongoDB/network errors must not churn the pool.
+    if (isIoContextError(err)) {
+      resetSharedClient();
+      perfLog.error('I/O context error — shared Mongo client reset');
+    }
+    throw err;
   } finally {
-    client.close().catch(() => {
-      /* swallow — socket may already be dead */
-    });
+    // Rollback mode keeps the old semantics exactly: a fresh client per
+    // request, closed after the response. Singleton mode NEVER closes here —
+    // the pool must survive across requests.
+    if (mode === 'per-request') {
+      client.close().catch(() => {
+        /* swallow — socket may already be dead */
+      });
+    }
+    perfLog.info(`request db phase (${mode}): ${Date.now() - dbPhaseStartedAt}ms`);
   }
 
   // noImplicitReturns: the early DB_UNAVAILABLE path returns a Response; this
@@ -164,11 +162,6 @@ app.onError(errorHandler);
 // Request-scoped service graph (must run after the DB middleware above,
 // so getCollection() resolves within the request's AsyncLocalStorage context)
 app.use('/api/*', provideServices);
-
-// ── Health check (no auth required) ───────────────────────────────────────────
-app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
 
 // ── Auth routes (no tenant context or RBAC required) ──────────────────────────
 app.route('/api/auth', routeRegistry.auth);

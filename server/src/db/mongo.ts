@@ -1,45 +1,124 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { ClientSession, Collection, Db, MongoClient } from 'mongodb';
+import type { ClientSession, Collection, CommandSucceededEvent, Db, MongoClient } from 'mongodb';
+import { createLogger } from '../utils/logger.js';
 
 /**
- * Per-request MongoDB storage.
+ * MongoDB client lifecycle for Cloudflare Workers.
  *
- * In Cloudflare Workers TCP sockets do not survive between requests, so a
- * cached `MongoClient` becomes stale immediately.  The correct pattern is to
- * create a **new `MongoClient` per request** and close it when the response
- * is sent.
+ * The `MongoClient` is cached per isolate (singleton) and shared across
+ * requests: the driver's connection pool amortises the expensive handshake
+ * (DNS-over-HTTPS SRV/TXT, TCP, TLS, SCRAM auth, topology discovery —
+ * ~300 ms when paid per request) over the isolate lifetime. This is an
+ * EXPERIMENT guarded by `DB_CLIENT_MODE`:
  *
- * `AsyncLocalStorage` makes the per-request `Db` instance available to all
- * downstream code (`getDb()`, `getCollection()`) without threading it through
- * every function parameter.
+ * - 'singleton' (default) — one client per isolate, reused across requests.
+ *   workerd historically tied sockets to the request context that created
+ *   them (workerd#2721: "Cannot perform I/O on behalf of a different
+ *   request"); newer runtimes reportedly tolerate module-cached clients.
+ *   When such an I/O-context error surfaces, the middleware resets the cache
+ *   (see `resetSharedClient`) and the next request builds a fresh client.
+ * - 'per-request' — the previous behaviour: a fresh client per request,
+ *   closed after the response. Rollback switch, changeable via `--var`
+ *   without a code deploy.
+ *
+ * `AsyncLocalStorage` still makes the per-request `Db` instance available to
+ * all downstream code (`getDb()`, `getCollection()`) without threading it
+ * through every function parameter.
  */
 const dbStorage = new AsyncLocalStorage<Db>();
 
+/** Client lifecycle mode — see module docstring. */
+export type MongoClientMode = 'singleton' | 'per-request';
+
+// ── TEMPORARY perf instrumentation (remove after the singleton experiment) ──
+
+const perfLog = createLogger({ scope: 'perf-tmp' });
+
+/** Attach TEMP command-duration listeners (driver 7: monitorCommands + events). */
+function attachPerfListeners(client: MongoClient): void {
+  client.on('commandSucceeded', (event: CommandSucceededEvent) => {
+    perfLog.info(`mongo ${event.commandName}: ${event.duration}ms`);
+  });
+  client.on('commandFailed', (event) => {
+    perfLog.error(`mongo ${event.commandName} FAILED after ${event.duration}ms`);
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Create a fresh `MongoClient`, connect it, and return both the client and
- * its `Db` handle.  The caller is responsible for closing the client when
- * the request is done.
- *
- * NOTE: do NOT "optimize" this by rewriting an Atlas SRV URI into a guessed
- * `directConnection` host (e.g. `<cluster>-shard-00-00.<id>.mongodb.net`).
- * It was tried and broke production: new Atlas clusters (and Flex/M0) do not
- * guarantee shard hostnames derived from the cluster name, so the guessed
- * host fails DNS/connect with `MongoServerSelectionError: proxy request
- * failed, cannot connect to the specified address`. The real fix for the
- * ~300 ms per-request handshake is a Durable Object holding the client.
+ * Detect workerd I/O-context failures — signals that the cached client's
+ * sockets were created in a request context that has since ended, so the
+ * client must be discarded and rebuilt. Deliberately NARROW: ordinary
+ * MongoDB/network errors must NOT reset the pool (the driver recovers from
+ * those itself).
  */
-export async function connectMongo(uri: string): Promise<{ client: MongoClient; db: Db }> {
+export function isIoContextError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+
+  return (
+    message.includes('Cannot perform I/O on behalf of a different request') ||
+    message.includes('hanging Promise was canceled')
+  );
+}
+
+let sharedClientPromise: Promise<MongoClient> | undefined;
+
+/** Drop the cached client; the next request builds a fresh one. */
+export function resetSharedClient(): void {
+  sharedClientPromise = undefined;
+}
+
+async function createConnectedClient(uri: string, mode: MongoClientMode): Promise<MongoClient> {
   // Dynamic import required — MongoDB's BSON module calls crypto.randomBytes()
   // at module load time, which Cloudflare Workers forbids at global scope.
   const { MongoClient: MC } = await import('mongodb');
   const client = new MC(uri, {
-    maxPoolSize: 1,
+    maxPoolSize: 5,
     minPoolSize: 0,
+    maxIdleTimeMS: 30_000,
     connectTimeoutMS: 5_000,
     serverSelectionTimeoutMS: 5_000,
+    // TEMP perf instrumentation — remove after the singleton experiment.
+    monitorCommands: true,
   });
 
+  attachPerfListeners(client);
+
+  const startedAt = Date.now();
+
   await client.connect();
+  perfLog.info(`mongo client connect (${mode}): ${Date.now() - startedAt}ms`);
+  return client;
+}
+
+/**
+ * Return the MongoDB client to use for a request.
+ *
+ * 'singleton' mode caches the connect promise at module level, so concurrent
+ * requests all await the SAME `connect()` — no duplicate clients can be
+ * created. A failed connect clears the cache so the next request retries
+ * instead of awaiting a poisoned (rejected) promise forever.
+ */
+export async function getMongoClient(uri: string, mode: MongoClientMode = 'singleton'): Promise<MongoClient> {
+  if (mode === 'per-request') {
+    return createConnectedClient(uri, mode);
+  }
+
+  sharedClientPromise ??= createConnectedClient(uri, mode).catch((err: unknown) => {
+    sharedClientPromise = undefined;
+    throw err;
+  });
+  return sharedClientPromise;
+}
+
+/**
+ * Create a FRESH client + Db handle and return both. Used only by the
+ * readiness probe, whose job is to verify that a brand-new connection works.
+ * The caller is responsible for closing the client.
+ */
+export async function connectMongo(uri: string): Promise<{ client: MongoClient; db: Db }> {
+  const client = await createConnectedClient(uri, 'per-request');
+
   return { client, db: client.db() };
 }
 

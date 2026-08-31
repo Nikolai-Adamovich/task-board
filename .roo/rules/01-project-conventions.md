@@ -13,8 +13,10 @@ Read `AGENTS.md` first for the full mental model; read `docs/architecture.md` se
 ## MUST
 
 - Server DI: services come from the request-scoped container — `c.get('svc').x` (`container.ts` + `provideServices`
-  middleware). Never call `getCollection()` in routes, never cache services/collections at module level (per-request
-  MongoClient).
+  middleware). Never call `getCollection()` in routes, never cache services/collections at module level. The
+  `MongoClient` itself is cached per isolate (singleton experiment, `db/mongo.ts`; rollback via
+  `DB_CLIENT_MODE=per-request`).
+- Migrations never run in the request path — `server/scripts/migrate.ts` runs them from CD before the Worker deploy.
 - Body validation: `zValidator('json', Schema)` + `c.req.valid('json')`.
 - JWT: `hono/jwt` only. Authorization: `ensurePermission()` from `services/rbac.service.ts`.
 - New repositories extend `BaseRepository`. Response envelope `{ data }` / `{ error: { code, message } }`.

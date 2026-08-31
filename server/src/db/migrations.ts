@@ -276,3 +276,18 @@ export async function ensureCoreIndexes(db: Db): Promise<void> {
     }),
   );
 }
+
+/**
+ * Idempotent data migrations, executed by `server/scripts/migrate.ts` (from
+ * CD before the Worker deploy, or locally) — NEVER in the Worker request
+ * path. M-04: the slug backfill and the unique slug index are a single step
+ * — splitting them left a window where a concurrent run could insert a
+ * duplicate slug in between.
+ */
+export async function runMigrations(db: Db): Promise<void> {
+  await migrateInvitedMembershipsToRevoked(db);
+  await renameSeedStatusNames(db); // DR-1 — raw seed-status keys → display names
+  await ensureTenantSlugIntegrity(db); // DEC-032 — backfill + unique index back-to-back
+  await backfillMemberExpiresAt(db); // DEC-055 — expiresAt: null on legacy members
+  await ensureCoreIndexes(db); // create every repository-documented index (idempotent)
+}

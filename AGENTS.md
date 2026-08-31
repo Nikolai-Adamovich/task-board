@@ -67,8 +67,11 @@ Full rationale in [`docs/architecture.md`](docs/architecture.md) §Decisions.
 ### Server
 
 - **NEVER** access `getCollection()` inline in route handlers — go through a service.
-- **NEVER** cache services/repositories/collections at module level — the MongoClient is per-request; use
-  `container.ts` + `provideServices` middleware (`c.get('svc')`).
+- **NEVER** cache services/repositories/collections at module level — only the `MongoClient` is cached per isolate
+  (singleton experiment, `db/mongo.ts`, rollback via `DB_CLIENT_MODE=per-request`); the service graph stays
+  request-scoped: `container.ts` + `provideServices` middleware (`c.get('svc')`).
+- **NEVER** run migrations in the request path — they live in `server/scripts/migrate.ts` and run from CD before the
+  Worker deploy (additive + idempotent, so safe against the still-running old Worker).
 - Body validation: `zValidator('json', Schema)` + `c.req.valid('json')`. No hand-written body types.
 - JWT: only `hono/jwt` (`sign`/`verify`). No custom crypto.
 - Authorization: coarse checks in `middleware/rbac.ts`, fine-grained via `ensurePermission()` from

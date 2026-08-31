@@ -69,6 +69,47 @@ jobs:
       - name: Build frontend
         run: npm run build --workspace=@task-board/ui
 
+      # Schema migrations run OUTSIDE the Worker request path (the Worker no
+      # longer migrates on cold start). They are additive and idempotent, so
+      # running them BEFORE the deploy is safe for the still-running old
+      # Worker (old code tolerates new indexes) and guarantees the new code
+      # never serves traffic without its indexes. A failure here fails the
+      # job before anything is deployed.
+      - name: Run database migrations
+        working-directory: server
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npx -y tsx scripts/migrate.ts
+
+      # --var overrides the dev defaults in server/wrangler.toml [vars] for this
+      # deployment only: strict production boot checks (M-09), the Pages origin
+      # for CORS, and the correct base URL for invitation/reset email links.
+      - name: Deploy backend to Cloudflare Workers
+        working-directory: server
+        run: >-
+          npx wrangler deploy --var ENVIRONMENT:production --var ALLOWED_ORIGINS:https://${{ vars.PROJECT_NAME
+          }}.pages.dev --var FRONTEND_URL:https://${{ vars.PROJECT_NAME }}.pages.dev
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # printf '%s' (not a heredoc) so no trailing newline lands in the secret
+      # value — a "\n" suffix can break the MongoDB connection string.
+      - name: Set Worker secrets
+        working-directory: server
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          printf '%s' "$MONGODB_URI" | npx wrangler secret put MONGODB_URI
+          printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
+          if [ -n "$RESEND_API_KEY" ]; then
+            printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY
+          fi
+
       # Idempotent: creates the project on the first run, skips when it already
       # exists. No `|| true` — a real failure (e.g. the API token lacking the
       # "Cloudflare Pages: Edit" permission) must fail the pipeline loudly,
@@ -107,32 +148,3 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
-
-      # --var overrides the dev defaults in server/wrangler.toml [vars] for this
-      # deployment only: strict production boot checks (M-09), the Pages origin
-      # for CORS, and the correct base URL for invitation/reset email links.
-      - name: Deploy backend to Cloudflare Workers
-        working-directory: server
-        run: >-
-          npx wrangler deploy --var ENVIRONMENT:production --var ALLOWED_ORIGINS:https://${{ vars.PROJECT_NAME
-          }}.pages.dev --var FRONTEND_URL:https://${{ vars.PROJECT_NAME }}.pages.dev
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      # printf '%s' (not a heredoc) so no trailing newline lands in the secret
-      # value — a "\n" suffix can break the MongoDB connection string.
-      - name: Set Worker secrets
-        working-directory: server
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-        run: |
-          printf '%s' "$MONGODB_URI" | npx wrangler secret put MONGODB_URI
-          printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
-          if [ -n "$RESEND_API_KEY" ]; then
-            printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY
-          fi

@@ -1,6 +1,27 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ClientSession, Db, MongoClient } from 'mongodb';
-import { runWithDb, withTransaction, TransactionsUnsupportedError } from './mongo.js';
+import {
+  runWithDb,
+  withTransaction,
+  TransactionsUnsupportedError,
+  getMongoClient,
+  resetSharedClient,
+  isIoContextError,
+} from './mongo.js';
+
+// ─── Fake runtime mongodb module (for the singleton experiment tests) ────────
+
+const mongoMocks = vi.hoisted(() => ({
+  connect: vi.fn(),
+}));
+
+vi.mock('mongodb', () => ({
+  MongoClient: class FakeMongoClient {
+    connect = mongoMocks.connect;
+    db = vi.fn();
+    on = vi.fn();
+  },
+}));
 
 // ─── Fake Client / Session ───────────────────────────────────────────────────
 
@@ -89,5 +110,57 @@ describe('withTransaction', () => {
     const result = await runInDbContext(client, () => withTransaction(async () => 'ok'));
 
     expect(result).toBe('ok');
+  });
+});
+
+describe('getMongoClient — singleton experiment', () => {
+  beforeEach(() => {
+    resetSharedClient();
+    mongoMocks.connect.mockReset();
+    mongoMocks.connect.mockResolvedValue(undefined);
+  });
+
+  it('reuses ONE client across concurrent calls (a single connect)', async () => {
+    const [a, b, c] = await Promise.all([
+      getMongoClient('mongodb://localhost:1/db'),
+      getMongoClient('mongodb://localhost:1/db'),
+      getMongoClient('mongodb://localhost:1/db'),
+    ]);
+
+    expect(a).toBe(b);
+    expect(b).toBe(c);
+    expect(mongoMocks.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cache a failed connect — the next call retries', async () => {
+    mongoMocks.connect.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(undefined);
+
+    await expect(getMongoClient('mongodb://localhost:1/db')).rejects.toThrow('boom');
+
+    const second = await getMongoClient('mongodb://localhost:1/db');
+
+    expect(second).toBeDefined();
+    expect(mongoMocks.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('per-request mode creates a fresh client on every call', async () => {
+    const a = await getMongoClient('mongodb://localhost:1/db', 'per-request');
+    const b = await getMongoClient('mongodb://localhost:1/db', 'per-request');
+
+    expect(a).not.toBe(b);
+    expect(mongoMocks.connect).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('isIoContextError', () => {
+  it('matches workerd I/O-context failures', () => {
+    expect(isIoContextError(new Error('Cannot perform I/O on behalf of a different request'))).toBe(true);
+    expect(isIoContextError(new Error('A hanging Promise was canceled. ...'))).toBe(true);
+  });
+
+  it('does not match ordinary MongoDB or network errors', () => {
+    expect(isIoContextError(new Error('MongoServerSelectionError: connection refused'))).toBe(false);
+    expect(isIoContextError(new Error('topology was destroyed'))).toBe(false);
+    expect(isIoContextError('plain string error')).toBe(false);
   });
 });

@@ -18,6 +18,8 @@ export interface AppEnv {
     LOG_LEVEL?: string;
     RESEND_API_KEY?: string;
     FRONTEND_URL?: string;
+    /** Mongo client lifecycle: 'singleton' (default) | 'per-request' (rollback switch) */
+    DB_CLIENT_MODE?: string;
   };
   Variables: {
     /** Correlation id for this request (set by requestIdMiddleware, M-10) */

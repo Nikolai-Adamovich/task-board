@@ -3,9 +3,10 @@
  *
  * Builds the full repository/service graph once per request.
  * ⚠️ Must stay request-scoped: repositories capture MongoDB `Collection`
- * objects bound to the per-request `MongoClient` (see index.ts) — caching
- * this graph at module level would leak closed sockets across requests
- * on Cloudflare Workers.
+ * objects bound to the isolate-wide shared `MongoClient` (see db/mongo.ts) —
+ * caching this graph at module level would leak request state across
+ * requests on Cloudflare Workers. (The MongoClient itself IS cached per
+ * isolate; only the service graph must stay per-request.)
  */
 
 import type { Document } from 'mongodb';
