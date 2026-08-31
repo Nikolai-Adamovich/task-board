@@ -224,6 +224,13 @@ const CORE_INDEXES: IndexDefinition[] = [
   { collection: 'tasks', spec: { projectId: 1, assigneeId: 1 } },
   // S-15: label filter queries (`labelIds` array) — multikey index
   { collection: 'tasks', spec: { projectId: 1, labelIds: 1 } },
+  // Capacity experiment 2026-08-31: title sort (task-table) — covers
+  // {projectId} + sort {title} without a blocking SORT at 1k-10k tasks/project
+  { collection: 'tasks', spec: { projectId: 1, title: 1 } },
+  // Capacity experiment 2026-08-31: statusId filter + updatedAt sort
+  // (task-table status filter + updatedAt:desc) — covers filter+sort in one
+  // IXSCAN instead of IXSCAN + blocking SORT over all matching tasks
+  { collection: 'tasks', spec: { projectId: 1, statusId: 1, updatedAt: -1 } },
   // comments
   { collection: 'comments', spec: { taskId: 1 } },
   // task_relationships
