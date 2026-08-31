@@ -17,19 +17,15 @@
 
 import { app, shouldProxyToDurable } from './app.js';
 import { MongoHonoDurableObject } from './do/mongo-do.js';
-import { createLogger } from './utils/logger.js';
 import type { AppEnv } from './types/context.js';
 
 export { MongoHonoDurableObject };
-
-const perfLog = createLogger({ scope: 'perf-tmp' });
 
 export default {
   async fetch(request: Request, env: AppEnv['Bindings'], ctx: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url);
 
     if (shouldProxyToDurable(env.DB_CLIENT_MODE, pathname)) {
-      const startedAt = Date.now();
       // `idFromName` gives one stable DO identity. The per-get coordination
       // cost is acceptable at current traffic; revisit cached
       // `idFromString` only if the benchmark shows it matters.
@@ -39,7 +35,6 @@ export default {
       const stub = env.MONGO_DO.get(id, { locationHint: 'weur' });
       const response = await stub.fetch(request);
 
-      perfLog.info(`worker→do (${pathname}): ${Date.now() - startedAt}ms`);
       return response;
     }
 
