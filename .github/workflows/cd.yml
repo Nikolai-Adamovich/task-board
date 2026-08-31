@@ -84,11 +84,17 @@ jobs:
       # --var overrides the dev defaults in server/wrangler.toml [vars] for this
       # deployment only: strict production boot checks (M-09), the Pages origin
       # for CORS, and the correct base URL for invitation/reset email links.
+      # DB_CLIENT_MODE=per-request is a TEMPORARY pin: the singleton MongoClient
+      # experiment failed in production (workerd ties pool sockets to the
+      # request context that created them — the next request hangs and the
+      # runtime kills it with error 1101). Remove this var only when a Durable
+      # Object client holder replaces the singleton.
       - name: Deploy backend to Cloudflare Workers
         working-directory: server
         run: >-
-          npx wrangler deploy --var ENVIRONMENT:production --var ALLOWED_ORIGINS:https://${{ vars.PROJECT_NAME
-          }}.pages.dev --var FRONTEND_URL:https://${{ vars.PROJECT_NAME }}.pages.dev
+          npx wrangler deploy --var DB_CLIENT_MODE:per-request --var ENVIRONMENT:production --var
+          ALLOWED_ORIGINS:https://${{ vars.PROJECT_NAME }}.pages.dev --var FRONTEND_URL:https://${{ vars.PROJECT_NAME
+          }}.pages.dev
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
