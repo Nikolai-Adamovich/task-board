@@ -84,15 +84,14 @@ jobs:
       # --var overrides the dev defaults in server/wrangler.toml [vars] for this
       # deployment only: strict production boot checks (M-09), the Pages origin
       # for CORS, and the correct base URL for invitation/reset email links.
-      # DB_CLIENT_MODE=per-request is a TEMPORARY pin: the singleton MongoClient
-      # experiment failed in production (workerd ties pool sockets to the
-      # request context that created them — the next request hangs and the
-      # runtime kills it with error 1101). Remove this var only when a Durable
-      # Object client holder replaces the singleton.
+      # DB_CLIENT_MODE=durable: the Hono app + persistent MongoClient run inside
+      # MongoHonoDurableObject (see docs/do-proposal.md). The plain-Worker
+      # singleton experiment failed (workerd#2721, error 1101) — never return to
+      # it; the proven rollback path is DB_CLIENT_MODE=per-request.
       - name: Deploy backend to Cloudflare Workers
         working-directory: server
         run: >-
-          npx wrangler deploy --var DB_CLIENT_MODE:per-request --var ENVIRONMENT:production --var
+          npx wrangler deploy --var DB_CLIENT_MODE:durable --var ENVIRONMENT:production --var
           ALLOWED_ORIGINS:https://${{ vars.PROJECT_NAME }}.pages.dev --var FRONTEND_URL:https://${{ vars.PROJECT_NAME
           }}.pages.dev
         env:

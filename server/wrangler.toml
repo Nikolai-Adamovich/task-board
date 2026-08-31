@@ -16,10 +16,25 @@ compatibility_flags = ["nodejs_compat"]
 # cf-placement local-WAW on every request (Smart never routed —
 # INSUFFICIENT_INVOCATIONS with single-user traffic).
 region = "aws:eu-central-1"
+
 # Minify the bundle (~3.2 MB → ~1.5 MB). Isolate cold start is dominated by
 # parsing the bundled MongoDB driver; minification measurably reduces the
 # ~2.9 s first-request latency observed on the deployed Worker.
+# NOTE: must stay ABOVE the [[migrations]] table — in TOML a bare key after
+# a table header belongs to that table (wrangler rejected migrations.minify).
 minify = true
+
+# Durable Object holding the Hono app + persistent MongoClient. Only used
+# when DB_CLIENT_MODE=durable; the production default stays per-request.
+[durable_objects]
+bindings = [{ name = "MONGO_DO", class_name = "MongoHonoDurableObject" }]
+
+# SQLite-backed DO (the only backend available on the Workers Free plan).
+# The DO stores no application state — it is a durable holder for the Mongo
+# client/pool; storage stays empty.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MongoHonoDurableObject"]
 
 [vars]
 # MONGODB_URI / JWT_SECRET are deliberately NOT defined here: on `wrangler deploy`

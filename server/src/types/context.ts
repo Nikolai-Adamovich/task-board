@@ -5,6 +5,7 @@
 
 import type { User, TenantRole, ProjectRole } from '@task-board/shared';
 import type { Services } from '../container.js';
+import type { MongoHonoDurableObject } from '../do/mongo-do.js';
 
 /** Hono environment type for the Task Board API */
 export interface AppEnv {
@@ -18,8 +19,10 @@ export interface AppEnv {
     LOG_LEVEL?: string;
     RESEND_API_KEY?: string;
     FRONTEND_URL?: string;
-    /** Mongo client lifecycle: 'singleton' (default) | 'per-request' (rollback switch) */
+    /** Mongo client lifecycle: 'per-request' (production) | 'durable' (DO) | 'singleton' (broken experiment) */
     DB_CLIENT_MODE?: string;
+    /** Durable Object holding the Hono app + persistent MongoClient (DB_CLIENT_MODE=durable) */
+    MONGO_DO: DurableObjectNamespace<MongoHonoDurableObject>;
   };
   Variables: {
     /** Correlation id for this request (set by requestIdMiddleware, M-10) */
