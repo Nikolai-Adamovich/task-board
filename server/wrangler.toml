@@ -2,6 +2,12 @@ name = "task-board-api"
 main = "src/index.ts"
 compatibility_date = "2025-07-01"
 compatibility_flags = ["nodejs_compat"]
+# Minify the bundle. Isolate cold start is dominated by parsing the bundled
+# MongoDB driver; minification measurably reduces first-request latency.
+# NOTE: this MUST stay above every [table] header — in TOML a bare key after
+# a table header belongs to that table (it silently became placement.minify
+# and was ignored, leaving the bundle unminified).
+minify = true
 
 # Smart Placement: moves execution next to the busiest upstream (MongoDB
 # Atlas) so every Mongo round trip — handshake AND queries — drops to
@@ -16,13 +22,6 @@ compatibility_flags = ["nodejs_compat"]
 # cf-placement local-WAW on every request (Smart never routed —
 # INSUFFICIENT_INVOCATIONS with single-user traffic).
 region = "aws:eu-central-1"
-
-# Minify the bundle (~3.2 MB → ~1.5 MB). Isolate cold start is dominated by
-# parsing the bundled MongoDB driver; minification measurably reduces the
-# ~2.9 s first-request latency observed on the deployed Worker.
-# NOTE: must stay ABOVE the [[migrations]] table — in TOML a bare key after
-# a table header belongs to that table (wrangler rejected migrations.minify).
-minify = true
 
 # Durable Object holding the Hono app + persistent MongoClient. Only used
 # when DB_CLIENT_MODE=durable; the production default stays per-request.
