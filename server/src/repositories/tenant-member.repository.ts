@@ -35,7 +35,8 @@ export interface TenantMemberDocument {
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
-function toDomain(doc: TenantMemberDocument): TenantMember {
+/** Exported for the tenant-context middleware (pre-resolved membership reuse). */
+export function toDomain(doc: TenantMemberDocument): TenantMember {
   return {
     id: doc.id,
     tenantId: doc.tenantId,

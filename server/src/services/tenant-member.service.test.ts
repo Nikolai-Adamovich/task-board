@@ -4,6 +4,7 @@
  * only explicit acceptance flips them to ACTIVE.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { TenantMember } from '@task-board/shared';
 import { MemberStatus, InvitationStatus } from '@task-board/shared';
 import { TenantMemberService } from './tenant-member.service.js';
 import { ConflictError } from '../errors/app-error.js';
@@ -499,5 +500,54 @@ describe('TenantMemberService (DEC-018 semantics)', () => {
 
       expect(memberRepo.update).not.toHaveBeenCalled();
     });
+  });
+});
+
+// ─── precheckedMembership (tenant-context reuse) ─────────────────────────────
+
+describe('TenantMemberService — precheckedMembership reuse', () => {
+  let tenantRepo: ReturnType<typeof createMockTenantRepo>;
+  let memberRepo: ReturnType<typeof createMockTenantMemberRepo>;
+  let userRepo: ReturnType<typeof createMockUserRepo>;
+  let emailService: ReturnType<typeof createMockEmailService>;
+  let service: TenantMemberService;
+
+  beforeEach(() => {
+    tenantRepo = createMockTenantRepo();
+    memberRepo = createMockTenantMemberRepo();
+    userRepo = createMockUserRepo();
+    emailService = createMockEmailService();
+    service = new TenantMemberService(
+      tenantRepo as never,
+      memberRepo as never,
+      userRepo as never,
+      emailService as never,
+    );
+    memberRepo.findByUserAndTenant.mockResolvedValue(makeMember());
+    memberRepo.findByTenant.mockResolvedValue([makeMember()]);
+    userRepo.findByIds.mockResolvedValue([makeMember()]);
+  });
+
+  it('skips the membership lookup when the prechecked membership matches', async () => {
+    const prechecked = makeMember() as TenantMember;
+    const members = await service.getTenantMembers('user-1', 'tenant-1', prechecked);
+
+    expect(memberRepo.findByUserAndTenant).not.toHaveBeenCalled();
+    expect(memberRepo.findByTenant).toHaveBeenCalledWith('tenant-1');
+    expect(members.length).toBe(1);
+  });
+
+  it('performs the lookup when the prechecked membership is for another tenant', async () => {
+    const prechecked = makeMember({ tenantId: 'tenant-OTHER' }) as TenantMember;
+
+    await service.getTenantMembers('user-1', 'tenant-1', prechecked);
+
+    expect(memberRepo.findByUserAndTenant).toHaveBeenCalledWith('user-1', 'tenant-1');
+  });
+
+  it('performs the lookup when no prechecked membership is provided (standalone invocation)', async () => {
+    await service.getTenantMembers('user-1', 'tenant-1');
+
+    expect(memberRepo.findByUserAndTenant).toHaveBeenCalledWith('user-1', 'tenant-1');
   });
 });

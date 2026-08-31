@@ -107,8 +107,8 @@ export class TenantService {
    * IDOR guard: `GET /tenants/:tenantId` must not expose arbitrary tenants
    * to any authenticated user.
    */
-  async getTenantForUser(userId: string, id: string): Promise<Tenant> {
-    await this.requireMembership(userId, id);
+  async getTenantForUser(userId: string, id: string, precheckedMembership?: TenantMember): Promise<Tenant> {
+    await this.requireMembership(userId, id, precheckedMembership);
 
     return this.getTenant(id);
   }
@@ -127,8 +127,13 @@ export class TenantService {
     return !(await this.tenantRepo.slugExists(slug));
   }
 
-  async updateTenant(userId: string, id: string, input: UpdateTenant): Promise<Tenant> {
-    const membership = await this.requireMembership(userId, id);
+  async updateTenant(
+    userId: string,
+    id: string,
+    input: UpdateTenant,
+    precheckedMembership?: TenantMember,
+  ): Promise<Tenant> {
+    const membership = await this.requireMembership(userId, id, precheckedMembership);
 
     if (membership.role !== TenantRole.OWNER && membership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can update the tenant');
@@ -147,8 +152,8 @@ export class TenantService {
 
   // ─── Tenant Lifecycle ─────────────────────────────────────────────────────
 
-  async deleteTenant(userId: string, id: string): Promise<void> {
-    const membership = await this.requireMembership(userId, id);
+  async deleteTenant(userId: string, id: string, precheckedMembership?: TenantMember): Promise<void> {
+    const membership = await this.requireMembership(userId, id, precheckedMembership);
 
     if (membership.role !== TenantRole.OWNER) {
       throw new ForbiddenError('Only the owner can delete the tenant');
@@ -164,8 +169,8 @@ export class TenantService {
     });
   }
 
-  async archiveTenant(userId: string, id: string): Promise<void> {
-    const membership = await this.requireMembership(userId, id);
+  async archiveTenant(userId: string, id: string, precheckedMembership?: TenantMember): Promise<void> {
+    const membership = await this.requireMembership(userId, id, precheckedMembership);
 
     if (membership.role !== TenantRole.OWNER && membership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can archive the tenant');
@@ -193,8 +198,8 @@ export class TenantService {
     }
   }
 
-  async restoreTenant(userId: string, id: string): Promise<void> {
-    const membership = await this.requireMembership(userId, id);
+  async restoreTenant(userId: string, id: string, precheckedMembership?: TenantMember): Promise<void> {
+    const membership = await this.requireMembership(userId, id, precheckedMembership);
 
     if (membership.role !== TenantRole.OWNER && membership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can restore the tenant');
@@ -220,8 +225,8 @@ export class TenantService {
     }
   }
 
-  async cancelDeletion(userId: string, id: string): Promise<void> {
-    const membership = await this.requireMembership(userId, id);
+  async cancelDeletion(userId: string, id: string, precheckedMembership?: TenantMember): Promise<void> {
+    const membership = await this.requireMembership(userId, id, precheckedMembership);
 
     if (membership.role !== TenantRole.OWNER) {
       throw new ForbiddenError('Only the owner can cancel deletion');
@@ -353,7 +358,15 @@ export class TenantService {
     }
   }
 
-  private async requireMembership(userId: string, tenantId: string): Promise<TenantMember> {
+  private async requireMembership(
+    userId: string,
+    tenantId: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<TenantMember> {
+    if (precheckedMembership && precheckedMembership.userId === userId && precheckedMembership.tenantId === tenantId) {
+      return precheckedMembership;
+    }
+
     const membership = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
 
     if (!membership || membership.status !== MemberStatus.ACTIVE) {

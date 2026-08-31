@@ -83,12 +83,6 @@ app.use('*', async (c, next) => {
   return corsMiddleware(c, next);
 });
 
-// ── TEMPORARY perf instrumentation (remove after the singleton experiment) ──
-
-const perfLog = createLogger({ scope: 'perf-tmp' });
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 // ── Liveness + no-DB baselines (mounted BEFORE the DB middleware on purpose) ──
 // `/api/health` is liveness: it must answer even when the database is down or
 // unconfigured, so it must not sit behind the DB middleware. `/api/ping` is a
@@ -129,12 +123,7 @@ app.use('/api/*', async (c, next) => {
 
   const rawMode = c.env.DB_CLIENT_MODE ?? 'per-request';
   const clientMode = rawMode === 'per-request' ? 'per-request' : 'singleton';
-  const clientStartedAt = Date.now();
   const client = await getMongoClient(uri, clientMode);
-
-  perfLog.info(`client acquisition (${rawMode}): ${Date.now() - clientStartedAt}ms`);
-
-  const dbPhaseStartedAt = Date.now();
 
   try {
     await runWithDb(client.db(), () => next());
@@ -145,7 +134,6 @@ app.use('/api/*', async (c, next) => {
     // MongoDB/network errors must not churn the pool.
     if (isIoContextError(err)) {
       resetSharedClient();
-      perfLog.error('I/O context error — shared Mongo client reset');
     }
     throw err;
   } finally {
@@ -157,7 +145,6 @@ app.use('/api/*', async (c, next) => {
         /* swallow — socket may already be dead */
       });
     }
-    perfLog.info(`request db phase (${rawMode}): ${Date.now() - dbPhaseStartedAt}ms`);
   }
 
   // noImplicitReturns: the early DB_UNAVAILABLE path returns a Response; this

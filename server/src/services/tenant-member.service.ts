@@ -44,9 +44,13 @@ export class TenantMemberService {
 
   // ─── Member Management ─────────────────────────────────────────────────────
 
-  async getTenantMembers(requesterId: string, tenantId: string): Promise<TenantMember[]> {
+  async getTenantMembers(
+    requesterId: string,
+    tenantId: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<TenantMember[]> {
     // IDOR guard: only tenant members may list the tenant's members
-    await this.requireMembership(requesterId, tenantId);
+    await this.requireMembership(requesterId, tenantId, precheckedMembership);
 
     const members = await this.tenantMemberRepo.findByTenant(tenantId);
     const effectiveMembers: TenantMember[] = [];
@@ -77,8 +81,14 @@ export class TenantMemberService {
     }));
   }
 
-  async inviteUser(requesterId: string, tenantId: string, email: string, role: string): Promise<TenantMember> {
-    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+  async inviteUser(
+    requesterId: string,
+    tenantId: string,
+    email: string,
+    role: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<TenantMember> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId, precheckedMembership);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can invite members');
@@ -261,8 +271,13 @@ export class TenantMemberService {
     return { ...updated, displayName: freshUser?.displayName ?? null, email: freshUser?.email ?? null };
   }
 
-  async removeMember(requesterId: string, tenantId: string, userId: string): Promise<void> {
-    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+  async removeMember(
+    requesterId: string,
+    tenantId: string,
+    userId: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<void> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId, precheckedMembership);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can remove members');
@@ -369,8 +384,13 @@ export class TenantMemberService {
     });
   }
 
-  async reinviteUser(requesterId: string, tenantId: string, userId: string): Promise<void> {
-    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+  async reinviteUser(
+    requesterId: string,
+    tenantId: string,
+    userId: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<void> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId, precheckedMembership);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can reinvite users');
@@ -412,8 +432,13 @@ export class TenantMemberService {
     }
   }
 
-  async restoreMembership(requesterId: string, tenantId: string, userId: string): Promise<void> {
-    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+  async restoreMembership(
+    requesterId: string,
+    tenantId: string,
+    userId: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<void> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId, precheckedMembership);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can restore memberships');
@@ -436,8 +461,13 @@ export class TenantMemberService {
     await this.tenantMemberRepo.update(member.id, { status: MemberStatus.ACTIVE, expiresAt: null });
   }
 
-  async revokeAccess(requesterId: string, tenantId: string, userId: string): Promise<void> {
-    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+  async revokeAccess(
+    requesterId: string,
+    tenantId: string,
+    userId: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<void> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId, precheckedMembership);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can revoke access');
@@ -452,8 +482,13 @@ export class TenantMemberService {
     await this.tenantMemberRepo.update(membership.id, { status: MemberStatus.ACCESS_REVOKED });
   }
 
-  async hardDeleteMember(requesterId: string, tenantId: string, userId: string): Promise<void> {
-    const requesterMembership = await this.requireMembership(requesterId, tenantId);
+  async hardDeleteMember(
+    requesterId: string,
+    tenantId: string,
+    userId: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<void> {
+    const requesterMembership = await this.requireMembership(requesterId, tenantId, precheckedMembership);
 
     if (requesterMembership.role !== TenantRole.OWNER && requesterMembership.role !== TenantRole.ADMIN) {
       throw new ForbiddenError('Only owner or admin can permanently remove members');
@@ -531,7 +566,21 @@ export class TenantMemberService {
     return tenant;
   }
 
-  private async requireMembership(userId: string, tenantId: string): Promise<TenantMember> {
+  /**
+   * `precheckedMembership`: the membership already resolved by the
+   * tenant-context middleware for THIS request (same user + tenant, ACTIVE,
+   * not expired — the middleware enforces all of that). When provided and
+   * matching, the repeated `findOne` is skipped.
+   */
+  private async requireMembership(
+    userId: string,
+    tenantId: string,
+    precheckedMembership?: TenantMember,
+  ): Promise<TenantMember> {
+    if (precheckedMembership && precheckedMembership.userId === userId && precheckedMembership.tenantId === tenantId) {
+      return precheckedMembership;
+    }
+
     const membership = await this.tenantMemberRepo.findByUserAndTenant(userId, tenantId);
 
     if (!membership) {

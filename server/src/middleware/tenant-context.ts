@@ -1,19 +1,12 @@
 import { createMiddleware } from 'hono/factory';
 import { MemberStatus, TenantRole } from '@task-board/shared';
+import type { TenantMember } from '@task-board/shared';
 import { ForbiddenError, ValidationError } from './error-handler.js';
 import { getCollection } from '../db/mongo.js';
+import type { TenantMemberDocument } from '../repositories/tenant-member.repository.js';
 import type { AppEnv } from '../types/context.js';
 
 // ─── Document Shapes ─────────────────────────────────────────────────────────
-
-interface TenantMemberDocument {
-  userId: string;
-  tenantId: string;
-  role: string;
-  status: string;
-  /** DEC-055: membership expiration (null/undefined = never expires) */
-  expiresAt?: Date | string | null;
-}
 
 interface ProjectMemberDocument {
   userId: string;
@@ -53,6 +46,35 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  * This middleware should be applied per-route, not globally,
  * so that auth and invitation routes can skip it.
  */
+/**
+ * Resolve the membership document for `userId` in the tenant referenced by
+ * `tenantRef` (id or slug). Exported so the auth middleware can start this
+ * lookup IN PARALLEL with the user lookup (they are independent: membership
+ * needs only the JWT `sub` claim, not the user document).
+ */
+export async function resolveTenantMembership(userId: string, tenantRef: string): Promise<TenantMemberDocument | null> {
+  const tenantMembers = getCollection<TenantMemberDocument>('tenant_members');
+
+  if (UUID_PATTERN.test(tenantRef)) {
+    // Id path — a UUID can never be a slug, so a single lookup suffices.
+    return tenantMembers.findOne({ userId, tenantId: tenantRef });
+  }
+
+  // S-14 slug path: probe the raw value as an id (backward compatible with
+  // legacy non-UUID ids) and resolve the slug CONCURRENTLY — one parallel
+  // round-trip instead of two sequential ones. The membership query for the
+  // resolved tenant id is inherently dependent and stays sequential.
+  const tenants = getCollection<{ id: string; slug: string }>('tenants');
+  const [byRef, tenant] = await Promise.all([
+    tenantMembers.findOne({ userId, tenantId: tenantRef }),
+    tenants.findOne({ slug: tenantRef }),
+  ]);
+
+  if (byRef) return byRef;
+  if (tenant) return tenantMembers.findOne({ userId, tenantId: tenant.id });
+  return null;
+}
+
 export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const tenantRef = c.req.header('X-Tenant-Id');
 
@@ -66,33 +88,13 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
     throw new ForbiddenError('Authentication required for tenant context');
   }
 
-  // Query the tenant_members collection to verify membership.
-  // First try the raw value as a tenant id (backward compatible); if no
-  // membership matches, treat the value as a slug and resolve the tenant id.
-  const tenantMembers = getCollection<TenantMemberDocument>('tenant_members');
-  let membership: TenantMemberDocument | null;
+  // The auth middleware may have already resolved the membership in parallel
+  // with the user lookup (they are independent). Reuse it; otherwise resolve
+  // here (standalone invocation / direct service calls).
+  let membership: TenantMemberDocument | null | undefined = c.get('tenantMembershipDoc');
 
-  if (UUID_PATTERN.test(tenantRef)) {
-    // Id path — a UUID can never be a slug, so a single lookup suffices.
-    membership = await tenantMembers.findOne({ userId, tenantId: tenantRef });
-  } else {
-    // S-14 slug path: probe the raw value as an id (backward compatible with
-    // legacy non-UUID ids) and resolve the slug CONCURRENTLY — one parallel
-    // round-trip instead of two sequential ones. The membership query for the
-    // resolved tenant id is inherently dependent and stays sequential.
-    const tenants = getCollection<{ id: string; slug: string }>('tenants');
-    const [byRef, tenant] = await Promise.all([
-      tenantMembers.findOne({ userId, tenantId: tenantRef }),
-      tenants.findOne({ slug: tenantRef }),
-    ]);
-
-    if (byRef) {
-      membership = byRef;
-    } else if (tenant) {
-      membership = await tenantMembers.findOne({ userId, tenantId: tenant.id });
-    } else {
-      membership = null;
-    }
+  if (membership === undefined) {
+    membership = await resolveTenantMembership(userId, tenantRef);
   }
 
   if (!membership) {
@@ -105,7 +107,7 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
 
   if (membership.status === MemberStatus.ACTIVE && expiresAtMs !== null && expiresAtMs <= Date.now()) {
     // Best-effort: flip the stored status so the members list reflects it too
-    await tenantMembers.updateOne(
+    await getCollection<TenantMemberDocument>('tenant_members').updateOne(
       { userId, tenantId: membership.tenantId },
       { $set: { status: MemberStatus.ACCESS_REVOKED, updatedAt: new Date() } },
     );
@@ -121,7 +123,26 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
     throw new ForbiddenError('Your membership is not active');
   }
 
-  // Set tenant context for downstream handlers
+  // Set tenant context for downstream handlers. The resolved membership is
+  // shared with services so requireMembership() does not repeat the query.
+  // (Local mapping — the middleware's document may be a partial projection;
+  // services only consume role/status/userId/tenantId from it.)
+  const now = new Date().toISOString();
+  const membershipDomain: TenantMember = {
+    id: membership.id ?? '',
+    tenantId: membership.tenantId,
+    userId: membership.userId,
+    role: membership.role as TenantMember['role'],
+    status: membership.status as TenantMember['status'],
+    expiresAt: membership.expiresAt ? new Date(membership.expiresAt).toISOString() : null,
+    invitation: null,
+    displayName: null,
+    email: null,
+    createdAt: membership.createdAt ? new Date(membership.createdAt).toISOString() : now,
+    updatedAt: membership.updatedAt ? new Date(membership.updatedAt).toISOString() : now,
+  };
+
+  c.set('tenantMembership', membershipDomain);
   c.set('tenantId', membership.tenantId);
   c.set('tenantRole', membership.role as TenantRole);
 

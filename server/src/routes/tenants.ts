@@ -54,7 +54,7 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     const body = c.req.valid('json');
-    const tenant = await c.get('svc').tenants.updateTenant(userId, tenantId, body);
+    const tenant = await c.get('svc').tenants.updateTenant(userId, tenantId, body, c.get('tenantMembership'));
 
     return c.json({ data: tenant });
   });
@@ -65,7 +65,7 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
 
-    await c.get('svc').tenants.deleteTenant(userId, tenantId);
+    await c.get('svc').tenants.deleteTenant(userId, tenantId, c.get('tenantMembership'));
 
     return c.json({ data: { success: true } });
   });
@@ -74,7 +74,7 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
 
-    await c.get('svc').tenants.archiveTenant(userId, tenantId);
+    await c.get('svc').tenants.archiveTenant(userId, tenantId, c.get('tenantMembership'));
 
     return c.json({ data: { success: true } });
   });
@@ -83,7 +83,7 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
 
-    await c.get('svc').tenants.restoreTenant(userId, tenantId);
+    await c.get('svc').tenants.restoreTenant(userId, tenantId, c.get('tenantMembership'));
 
     return c.json({ data: { success: true } });
   });
@@ -92,7 +92,7 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
 
-    await c.get('svc').tenants.cancelDeletion(userId, tenantId);
+    await c.get('svc').tenants.cancelDeletion(userId, tenantId, c.get('tenantMembership'));
 
     return c.json({ data: { success: true } });
   });
@@ -103,7 +103,7 @@ export function createTenantRoutes(): Hono<AppEnv> {
     const userId = c.get('userId');
     const tenantId = c.req.param('tenantId');
     // Membership check inside the service (IDOR guard)
-    const members = await c.get('svc').tenantMembers.getTenantMembers(userId, tenantId);
+    const members = await c.get('svc').tenantMembers.getTenantMembers(userId, tenantId, c.get('tenantMembership'));
 
     return c.json({ data: members });
   });

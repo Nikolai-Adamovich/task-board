@@ -1,8 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { authMiddleware } from './auth.js';
 import { errorHandler } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';
+
+// Mock Mongo: the auth middleware starts the tenant membership lookup in
+// parallel when X-Tenant-Id is present (perf optimization).
+const mockMemberFindOne = vi.fn().mockResolvedValue(null);
+
+vi.mock('../db/mongo.js', () => ({
+  getCollection: vi.fn(() => ({ findOne: mockMemberFindOne })),
+}));
 
 const TEST_SECRET = 'test-secret-key-for-jwt-signing';
 
@@ -178,5 +186,44 @@ describe('authMiddleware', () => {
     const json = (await res.json()) as { error: { code: string } };
 
     expect(json.error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('starts the tenant membership lookup in parallel when X-Tenant-Id is present', async () => {
+    mockMemberFindOne.mockResolvedValueOnce(null);
+    activeUsers.set('user-1', fakeUser('user-1', 'u@example.com', 'U'));
+
+    const token = await createTestToken({ sub: 'user-1', email: 'u@example.com' });
+    const res = await requestWithEnv(app, '/protected/me', {
+      headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Id': '0f0e0d0c-1111-2222-3333-444455556666' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockMemberFindOne).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', tenantId: '0f0e0d0c-1111-2222-3333-444455556666' }),
+    );
+  });
+
+  it('does not start the membership lookup without X-Tenant-Id', async () => {
+    mockMemberFindOne.mockClear();
+    activeUsers.set('user-1', fakeUser('user-1', 'u@example.com', 'U'));
+
+    const token = await createTestToken({ sub: 'user-1', email: 'u@example.com' });
+    const res = await requestWithEnv(app, '/protected/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockMemberFindOne).not.toHaveBeenCalled();
+  });
+
+  it('still returns 401 when the user is missing even if membership lookup succeeded', async () => {
+    mockMemberFindOne.mockResolvedValueOnce({ userId: 'user-1', tenantId: 't-1', role: 'OWNER', status: 'ACTIVE' });
+
+    const token = await createTestToken({ sub: 'deleted-user', email: 'gone@example.com' });
+    const res = await requestWithEnv(app, '/protected/me', {
+      headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Id': '0f0e0d0c-1111-2222-3333-444455556666' },
+    });
+
+    expect(res.status).toBe(401);
   });
 });

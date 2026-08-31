@@ -381,4 +381,38 @@ describe('tenantContextMiddleware', () => {
 
     expect(body.tenantRole).toBe('MEMBER');
   });
+
+  it('exposes the resolved membership on the context for service reuse', async () => {
+    const app = new Hono<AppEnv>();
+
+    app.onError(errorHandler);
+    app.use('/tenant-protected/*', async (c, next) => {
+      c.set('userId', 'user-1');
+      await next();
+    });
+    app.use('/tenant-protected/*', tenantContextMiddleware);
+    app.get('/tenant-protected/resource', (c) => c.json({ membership: c.get('tenantMembership') }));
+
+    mockMemberFindOne.mockResolvedValue({
+      id: 'member-1',
+      userId: 'user-1',
+      tenantId: 'tenant-1',
+      role: 'OWNER',
+      status: 'ACTIVE',
+      expiresAt: null,
+      invitation: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await app.request('/tenant-protected/resource', {
+      headers: { 'X-Tenant-Id': 'tenant-1' },
+    });
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { membership: { userId: string; tenantId: string; role: string } };
+
+    expect(body.membership).toMatchObject({ userId: 'user-1', tenantId: 'tenant-1', role: 'OWNER' });
+  });
 });

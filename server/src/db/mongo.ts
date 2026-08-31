@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { ClientSession, Collection, CommandSucceededEvent, Db, MongoClient } from 'mongodb';
-import { createLogger } from '../utils/logger.js';
+import type { ClientSession, Collection, Db, MongoClient } from 'mongodb';
 
 /**
  * MongoDB client lifecycle for Cloudflare Workers.
@@ -32,19 +31,6 @@ export type MongoClientMode = 'singleton' | 'per-request';
 
 // ── TEMPORARY perf instrumentation (remove after the singleton experiment) ──
 
-const perfLog = createLogger({ scope: 'perf-tmp' });
-
-/** Attach TEMP command-duration listeners (driver 7: monitorCommands + events). */
-function attachPerfListeners(client: MongoClient): void {
-  client.on('commandSucceeded', (event: CommandSucceededEvent) => {
-    perfLog.info(`mongo ${event.commandName}: ${event.duration}ms`);
-  });
-  client.on('commandFailed', (event) => {
-    perfLog.error(`mongo ${event.commandName} FAILED after ${event.duration}ms`);
-  });
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * Detect workerd I/O-context failures — signals that the cached client's
  * sockets were created in a request context that has since ended, so the
@@ -68,7 +54,7 @@ export function resetSharedClient(): void {
   sharedClientPromise = undefined;
 }
 
-async function createConnectedClient(uri: string, mode: MongoClientMode): Promise<MongoClient> {
+async function createConnectedClient(uri: string): Promise<MongoClient> {
   // Dynamic import required — MongoDB's BSON module calls crypto.randomBytes()
   // at module load time, which Cloudflare Workers forbids at global scope.
   const { MongoClient: MC } = await import('mongodb');
@@ -78,16 +64,9 @@ async function createConnectedClient(uri: string, mode: MongoClientMode): Promis
     maxIdleTimeMS: 30_000,
     connectTimeoutMS: 5_000,
     serverSelectionTimeoutMS: 5_000,
-    // TEMP perf instrumentation — remove after the singleton experiment.
-    monitorCommands: true,
   });
 
-  attachPerfListeners(client);
-
-  const startedAt = Date.now();
-
   await client.connect();
-  perfLog.info(`mongo client connect (${mode}): ${Date.now() - startedAt}ms`);
   return client;
 }
 
@@ -101,10 +80,10 @@ async function createConnectedClient(uri: string, mode: MongoClientMode): Promis
  */
 export async function getMongoClient(uri: string, mode: MongoClientMode = 'singleton'): Promise<MongoClient> {
   if (mode === 'per-request') {
-    return createConnectedClient(uri, mode);
+    return createConnectedClient(uri);
   }
 
-  sharedClientPromise ??= createConnectedClient(uri, mode).catch((err: unknown) => {
+  sharedClientPromise ??= createConnectedClient(uri).catch((err: unknown) => {
     sharedClientPromise = undefined;
     throw err;
   });
@@ -117,7 +96,7 @@ export async function getMongoClient(uri: string, mode: MongoClientMode = 'singl
  * The caller is responsible for closing the client.
  */
 export async function connectMongo(uri: string): Promise<{ client: MongoClient; db: Db }> {
-  const client = await createConnectedClient(uri, 'per-request');
+  const client = await createConnectedClient(uri);
 
   return { client, db: client.db() };
 }

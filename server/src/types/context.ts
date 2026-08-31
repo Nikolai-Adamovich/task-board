@@ -27,6 +27,12 @@ export interface AppEnv {
   Variables: {
     /** Correlation id for this request (set by requestIdMiddleware, M-10) */
     requestId: string;
+    /** TEMPORARY perf: user lookup started by auth middleware, resolved by resolveUser */
+    userPromise?: Promise<User | null>;
+    /** TEMPORARY perf: membership document pre-resolved in parallel by auth middleware */
+    tenantMembershipDoc?: import('../repositories/tenant-member.repository.js').TenantMemberDocument;
+    /** Membership resolved by tenantContextMiddleware — reused by services (no repeat query) */
+    tenantMembership?: import('@task-board/shared').TenantMember;
     /** Authenticated user's ID (from JWT `sub` claim) */
     userId: string;
     /** Full authenticated user object */
