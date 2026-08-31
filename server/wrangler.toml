@@ -11,7 +11,11 @@ compatibility_flags = ["nodejs_compat"]
 # `host = "<atlas-cluster-host>:27017"` — the hostname is part of the
 # MONGODB_URI secret and is deliberately NOT hardcoded here.
 [placement]
-mode = "smart"
+# A/B experiment B: explicit region placement next to MongoDB Atlas
+# (eu-central-1, Frankfurt). Baseline A (mode=smart) recorded 2026-08-31:
+# cf-placement local-WAW on every request (Smart never routed —
+# INSUFFICIENT_INVOCATIONS with single-user traffic).
+region = "aws:eu-central-1"
 # Minify the bundle (~3.2 MB → ~1.5 MB). Isolate cold start is dominated by
 # parsing the bundled MongoDB driver; minification measurably reduces the
 # ~2.9 s first-request latency observed on the deployed Worker.
