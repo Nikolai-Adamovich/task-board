@@ -50,6 +50,22 @@ jobs:
       - name: Build shared package
         run: npm run build --workspace=shared
 
+      # The UI calls the Workers API directly (no Pages Functions proxy):
+      # environment.prod.ts ships a relative '/api' placeholder that is replaced
+      # at build time with the absolute Worker URL from the API_URL variable
+      # (e.g. https://task-board-api.<subdomain>.workers.dev/api). The Worker's
+      # CORS (ALLOWED_ORIGINS --var below) already allows the Pages origin.
+      - name: Inject production API URL
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "GitHub variable API_URL is not set (expected e.g. https://task-board-api.<subdomain>.workers.dev/api)"
+            exit 1
+          fi
+          sed -i "s|apiBaseUrl: '/api'|apiBaseUrl: '$API_URL'|" ui/src/environments/environment.prod.ts
+          grep apiBaseUrl ui/src/environments/environment.prod.ts
+
       - name: Build frontend
         run: npm run build --workspace=@task-board/ui
 
@@ -67,20 +83,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
 
-      # TEMPORARY diagnostics: CI hashes 869 files while a local build of the
-      # same sources produces 241 — show what is actually in the deploy dir.
-      - name: Debug — list deploy directory contents
-        working-directory: ui/dist/ui/browser
-        run: |
-          echo "total files: $(find . -type f | wc -l)"
-          echo "by extension:"
-          find . -type f | sed 's/.*\.//' | sort | uniq -c | sort -rn
-          echo "non-js files (first 40):"
-          find . -type f ! -name '*.js' | head -40
-
-      # Run from the build output: wrangler resolves the Pages Functions
-      # directory relative to the CWD (./functions), not the deployed directory.
-      #
       # --skip-caching: the project's Pages asset store got corrupted (the
       # differential-upload API reported hashes as "already uploaded" while the
       # assets 404 in production — cf. cloudflare/workers-sdk#14021, #12586).
