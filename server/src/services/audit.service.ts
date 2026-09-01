@@ -41,6 +41,41 @@ export class AuditService {
     });
   }
 
+  /**
+   * TOP-3 №2: log a batch of events with ONE actor lookup and ONE insert.
+   * The actor is identical across the batch (e.g. every task of a single
+   * bulk update). Each event keeps its own `changes` and `createdAt`.
+   * No-op for an empty batch — no DB operations.
+   */
+  async logMany(
+    actorId: string,
+    events: {
+      tenantId: string;
+      projectId: string | null;
+      entityType: AuditEntityType;
+      entityId: string;
+      action: AuditAction;
+      changes?: AuditChange[];
+    }[],
+  ): Promise<void> {
+    if (events.length === 0) return;
+
+    const actor = await this.captureActor(actorId);
+
+    await this.auditRepo.createMany(
+      events.map((event) => ({
+        tenantId: event.tenantId,
+        projectId: event.projectId,
+        entityType: event.entityType,
+        entityId: event.entityId,
+        action: event.action,
+        actor,
+        changes: event.changes ?? [],
+        createdAt: new Date(),
+      })),
+    );
+  }
+
   async queryByProject(projectId: string, options: AuditQueryOptions = {}): Promise<PaginatedResult<AuditEvent>> {
     const result = await this.auditRepo.findByProject(projectId, options);
 

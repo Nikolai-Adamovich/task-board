@@ -74,6 +74,38 @@ export class AuditEventRepository {
     return toDomain(doc);
   }
 
+  /**
+   * TOP-3 №2: persist a batch of audit events in ONE `insertMany`.
+   *
+   * Same document shape as {@link create}; every event keeps its own UUID and
+   * its own `createdAt` (the caller captures timestamps individually — for a
+   * single bulk operation the sibling events are interchangeable, so no
+   * ordering contract beyond `createdAt` is required). `ordered: false` keeps
+   * per-event independence without introducing an ordering mechanism.
+   */
+  async createMany(
+    inputs: {
+      tenantId: string;
+      projectId: string | null;
+      entityType: string;
+      entityId: string;
+      action: string;
+      actor: AuditActor;
+      changes: AuditChange[];
+      createdAt?: Date;
+    }[],
+  ): Promise<void> {
+    if (inputs.length === 0) return;
+
+    const docs: AuditEventDocument[] = inputs.map((input) => ({
+      id: randomUUID(),
+      ...input,
+      createdAt: input.createdAt ?? new Date(),
+    }));
+
+    await this.collection.insertMany(docs, { ordered: false });
+  }
+
   async findByProject(projectId: string, options: AuditQueryOptions = {}): Promise<PaginatedResult<AuditEvent>> {
     const { page = 1, limit = 20 } = options;
     const query: Record<string, unknown> = { projectId };

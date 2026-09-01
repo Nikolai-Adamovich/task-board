@@ -113,6 +113,8 @@ describe('TaskService', () => {
 
     auditService = createMock<AuditService>({
       log: vi.fn().mockResolvedValue({}),
+      // TOP-3 №2: batched audit writes
+      logMany: vi.fn().mockResolvedValue(undefined),
       queryByProject: vi.fn(),
       queryByTenant: vi.fn(),
     });
@@ -484,6 +486,54 @@ describe('TaskService', () => {
         sprintId: null,
         sprintName: null,
       });
+    });
+
+    it('TOP-3 №2: persists audit events as ONE batch (logMany), not per-task log()', async () => {
+      const t1 = makeAssignedTask('t1', 1);
+      const t2 = makeAssignedTask('t2', 2);
+
+      taskRepo.findByIds = vi.fn().mockResolvedValue([t1, t2]);
+      taskRepo.bulkUpdateWithVersion = vi.fn().mockResolvedValue([
+        { ...t1, version: 2, statusId: 'status-2' },
+        { ...t2, version: 3, statusId: 'status-2' },
+      ]);
+
+      await service.bulkUpdateTasks('project-1', ['t1', 't2'], { statusId: 'status-2' }, 'user-1');
+
+      expect(auditService.log).not.toHaveBeenCalled();
+      expect(auditService.logMany).toHaveBeenCalledTimes(1);
+      expect(auditService.logMany).toHaveBeenCalledWith('user-1', [
+        expect.objectContaining({
+          projectId: 'project-1',
+          entityType: 'TASK',
+          entityId: 't1',
+          action: 'UPDATED',
+          changes: [{ field: 'statusId', oldValue: 'status-old', newValue: 'status-2' }],
+        }),
+        expect.objectContaining({
+          entityId: 't2',
+          changes: [{ field: 'statusId', oldValue: 'status-old', newValue: 'status-2' }],
+        }),
+      ]);
+    });
+
+    it('TOP-3 №2: creates no audit event for a task that was not updated (version conflict)', async () => {
+      const t1 = makeAssignedTask('t1', 1);
+      const t2 = makeAssignedTask('t2', 5);
+
+      taskRepo.findByIds = vi.fn().mockResolvedValue([t1, t2]);
+      // t2 conflicts — absent from the bulkWrite result
+      taskRepo.bulkUpdateWithVersion = vi.fn().mockResolvedValue([{ ...t1, version: 2, statusId: 'status-2' }]);
+
+      await service.bulkUpdateTasks('project-1', ['t1', 't2'], { statusId: 'status-2' }, 'user-1');
+
+      const logManyMock = auditService.logMany as unknown as ReturnType<typeof vi.fn>;
+      const events = (logManyMock.mock.calls.at(0)?.[1] ?? []) as {
+        entityId: string;
+      }[];
+
+      expect(events).toHaveLength(1);
+      expect(events[0]?.entityId).toBe('t1');
     });
   });
 });

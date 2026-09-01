@@ -16,9 +16,10 @@ function createMockAuditRepo() {
         createdAt: new Date().toISOString(),
       }),
     ),
+    createMany: vi.fn().mockResolvedValue(undefined),
     findByProject: vi.fn(),
     findByTenant: vi.fn(),
-  } as unknown as AuditEventRepository;
+  } as unknown as AuditEventRepository & { createMany: ReturnType<typeof vi.fn> };
 }
 
 function createMockUserRepo(): AuditServiceUserRepo {
@@ -50,6 +51,53 @@ describe('AuditService (DEC-028 actor snapshot at write time)', () => {
         actor: { userId: 'user-1', displayName: 'Alice' },
       }),
     );
+  });
+
+  it('TOP-3 №2: logMany resolves the actor ONCE and persists all events in ONE createMany', async () => {
+    const auditRepo = createMockAuditRepo();
+    const userRepo = createMockUserRepo();
+    const service = new AuditService(auditRepo, userRepo);
+
+    await service.logMany('user-1', [
+      {
+        tenantId: 'tenant-1',
+        projectId: 'project-1',
+        entityType: 'TASK',
+        entityId: 'task-1',
+        action: 'UPDATED',
+        changes: [{ field: 'statusId', oldValue: 's1', newValue: 's2' }],
+      },
+      { tenantId: 'tenant-1', projectId: 'project-1', entityType: 'TASK', entityId: 'task-2', action: 'UPDATED' },
+    ]);
+
+    expect(userRepo.findById).toHaveBeenCalledTimes(1);
+    expect(userRepo.findById).toHaveBeenCalledWith('user-1');
+    expect(auditRepo.createMany).toHaveBeenCalledTimes(1);
+
+    const events = auditRepo.createMany.mock.calls.at(0)?.[0] ?? [];
+
+    expect(events).toHaveLength(2);
+    // actor snapshot identical across the batch
+    expect(
+      events.every((e: { actor: { userId: string; displayName: string } }) => e.actor.displayName === 'Alice'),
+    ).toBe(true);
+    // per-event changes preserved
+    expect(events[0].changes).toEqual([{ field: 'statusId', oldValue: 's1', newValue: 's2' }]);
+    expect(events[1].changes).toEqual([]);
+    // per-event identity preserved (UUIDs are minted by the repository)
+    expect(events[0].entityId).toBe('task-1');
+    expect(events[1].entityId).toBe('task-2');
+  });
+
+  it('TOP-3 №2: logMany is a no-op for an empty batch — no DB operations', async () => {
+    const auditRepo = createMockAuditRepo();
+    const userRepo = createMockUserRepo();
+    const service = new AuditService(auditRepo, userRepo);
+
+    await service.logMany('user-1', []);
+
+    expect(userRepo.findById).not.toHaveBeenCalled();
+    expect(auditRepo.createMany).not.toHaveBeenCalled();
   });
 
   it('falls back to "Unknown User" when the actor cannot be resolved', async () => {

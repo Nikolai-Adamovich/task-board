@@ -422,6 +422,14 @@ export class TaskService {
     }
 
     let updated = 0;
+    const auditEvents: {
+      tenantId: string;
+      projectId: string | null;
+      entityType: 'TASK';
+      entityId: string;
+      action: 'UPDATED';
+      changes: AuditChange[];
+    }[] = [];
 
     for (const task of valid) {
       if (!updatedIds.has(task.id)) {
@@ -430,7 +438,7 @@ export class TaskService {
       }
       updated++;
 
-      // Audit side effect per updated task (same shape as single updateTask)
+      // Per-task audit event — persisted as ONE batch after the loop (TOP-3 №2)
       if (this.auditService && userId) {
         const changes: AuditChange[] = [];
 
@@ -441,16 +449,20 @@ export class TaskService {
         if (data.sprintId !== undefined)
           changes.push({ field: 'sprintId', oldValue: task.sprintId, newValue: data.sprintId });
 
-        await this.auditService.log({
+        auditEvents.push({
           tenantId: project?.tenantId ?? '',
           projectId,
           entityType: 'TASK',
           entityId: task.id,
           action: 'UPDATED',
-          actorId: userId,
           changes,
         });
       }
+    }
+
+    // One batched audit write instead of N sequential inserts.
+    if (this.auditService && userId && auditEvents.length > 0) {
+      await this.auditService.logMany(userId, auditEvents);
     }
 
     return { updated, ...(failed.length > 0 ? { failed } : {}) };
