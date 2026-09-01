@@ -10,7 +10,7 @@ import { AuthStore } from './auth-store';
 import { ThemeLoader } from '@services/theme-loader';
 import { ThemeRegistry } from '@services/theme-registry';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { ThemeManifestItem, User, UserPreferences } from '@task-board/shared';
+import type { ThemeManifestItem, User, UserPreferences, UserProjectBoardPreference } from '@task-board/shared';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 describe('PreferencesStore (theme mode model)', () => {
@@ -368,5 +368,191 @@ describe('PreferencesStore (theme mode model)', () => {
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual({ language: 'de' });
     req.flush({} as UserPreferences);
+  });
+});
+
+// ─── Per-project preferences cache (dedupe + invalidation) ───────────────────
+
+describe('PreferencesStore (per-project preferences cache)', () => {
+  let httpMock: HttpTestingController;
+
+  async function createModule() {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: API_BASE_URL, useValue: 'http://localhost/api' },
+        importProvidersFrom(
+          TranslocoTestingModule.forRoot({
+            preloadLangs: true,
+            langs: { en: {} },
+            translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          }),
+        ),
+        { provide: ThemeLoader, useValue: { loadTheme: vi.fn() } },
+        { provide: ThemeRegistry, useValue: { load: vi.fn(async () => undefined), findById: vi.fn() } },
+      ],
+    });
+    await firstValueFrom(TestBed.inject(TranslocoService).load('en'));
+
+    httpMock = TestBed.inject(HttpTestingController);
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.style.removeProperty('font-size');
+  });
+
+  afterEach(() => {
+    httpMock?.verify();
+    localStorage.clear();
+    document.documentElement.style.removeProperty('font-size');
+  });
+
+  const prefsUrl = (projectId: string): string => `http://localhost/api/projects/${projectId}/preferences`;
+  const makePrefs = (projectId: string, defaultBoardId: string | null): UserProjectBoardPreference => ({
+    id: `pref-${projectId}`,
+    userId: 'user-1',
+    projectId,
+    defaultBoardId,
+    taskTableColumns: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  it('should dedupe two concurrent loadProjectPreferences calls into ONE HTTP request', async () => {
+    await createModule();
+
+    const store = TestBed.inject(PreferencesStore);
+    const first = store.loadProjectPreferences('p1');
+    const second = store.loadProjectPreferences('p1');
+    const req = httpMock.expectOne(prefsUrl('p1'));
+
+    expect(req.request.method).toBe('GET');
+    req.flush({ data: makePrefs('p1', 'board-1') });
+
+    await Promise.all([first, second]);
+
+    expect(store.getDefaultBoardId('p1')).toBe('board-1');
+  });
+
+  it('should NOT issue a new request when the project was already loaded (cache hit)', async () => {
+    await createModule();
+
+    const store = TestBed.inject(PreferencesStore);
+    const initial = store.loadProjectPreferences('p1');
+
+    httpMock.expectOne(prefsUrl('p1')).flush({ data: makePrefs('p1', 'board-1') });
+    await initial;
+
+    await store.loadProjectPreferences('p1');
+    await store.loadProjectPreferences('p1');
+
+    httpMock.expectNone(prefsUrl('p1'));
+    expect(store.getDefaultBoardId('p1')).toBe('board-1');
+  });
+
+  it('should cache `data: null` as a VALID result, not a cache miss', async () => {
+    await createModule();
+
+    const store = TestBed.inject(PreferencesStore);
+    const initial = store.loadProjectPreferences('p1');
+
+    httpMock.expectOne(prefsUrl('p1')).flush({ data: null });
+    await initial;
+
+    expect(store.getDefaultBoardId('p1')).toBeNull();
+
+    // Repeat read must be served from cache — no second request.
+    await store.loadProjectPreferences('p1');
+    httpMock.expectNone(prefsUrl('p1'));
+  });
+
+  it('should keep independent cache entries for different projectIds', async () => {
+    await createModule();
+
+    const store = TestBed.inject(PreferencesStore);
+    const p1 = store.loadProjectPreferences('p1');
+    const p2 = store.loadProjectPreferences('p2');
+
+    httpMock.expectOne(prefsUrl('p1')).flush({ data: makePrefs('p1', 'board-1') });
+    httpMock.expectOne(prefsUrl('p2')).flush({ data: makePrefs('p2', 'board-2') });
+
+    await Promise.all([p1, p2]);
+
+    // Repeated reads for BOTH projects stay cached.
+    await store.loadProjectPreferences('p1');
+    await store.loadProjectPreferences('p2');
+    httpMock.expectNone(prefsUrl('p1'));
+    httpMock.expectNone(prefsUrl('p2'));
+
+    expect(store.getDefaultBoardId('p1')).toBe('board-1');
+    expect(store.getDefaultBoardId('p2')).toBe('board-2');
+  });
+
+  it('should refresh the cache after a successful setDefaultBoard mutation (no refetch)', async () => {
+    await createModule();
+
+    const store = TestBed.inject(PreferencesStore);
+    const initial = store.loadProjectPreferences('p1');
+
+    httpMock.expectOne(prefsUrl('p1')).flush({ data: makePrefs('p1', 'board-1') });
+    await initial;
+
+    const mutation = store.setDefaultBoard('p1', 'board-9');
+    const patch = httpMock.expectOne(prefsUrl('p1'));
+
+    expect(patch.request.method).toBe('PATCH');
+    expect(patch.request.body).toEqual({ defaultBoardId: 'board-9' });
+    patch.flush({ data: makePrefs('p1', 'board-9') });
+    await mutation;
+
+    expect(store.getDefaultBoardId('p1')).toBe('board-9');
+
+    // The mutation refreshed the cache — a reload makes no request.
+    await store.loadProjectPreferences('p1');
+    httpMock.expectNone(prefsUrl('p1'));
+  });
+
+  it('should refresh the cache after a successful setTaskTableColumns mutation', async () => {
+    await createModule();
+
+    const store = TestBed.inject(PreferencesStore);
+    const initial = store.loadProjectPreferences('p1');
+
+    httpMock.expectOne(prefsUrl('p1')).flush({ data: makePrefs('p1', null) });
+    await initial;
+
+    const mutation = store.setTaskTableColumns('p1', ['title', 'status']);
+    const patch = httpMock.expectOne(prefsUrl('p1'));
+
+    expect(patch.request.method).toBe('PATCH');
+    patch.flush({ data: { ...makePrefs('p1', null), taskTableColumns: ['title', 'status'] } });
+    await mutation;
+
+    expect(store.getTaskTableColumns('p1')).toEqual(['title', 'status']);
+
+    await store.loadProjectPreferences('p1');
+    httpMock.expectNone(prefsUrl('p1'));
+  });
+
+  it('should NOT cache failures — a later call retries the request', async () => {
+    await createModule();
+
+    const store = TestBed.inject(PreferencesStore);
+    const failed = store.loadProjectPreferences('p1');
+
+    httpMock.expectOne(prefsUrl('p1')).flush(null, { status: 500, statusText: 'Server Error' });
+    await failed; // silently ignored
+
+    // The failed entry was dropped — the next call issues a fresh request.
+    const retry = store.loadProjectPreferences('p1');
+
+    httpMock.expectOne(prefsUrl('p1')).flush({ data: makePrefs('p1', 'board-1') });
+    await retry;
+
+    expect(store.getDefaultBoardId('p1')).toBe('board-1');
   });
 });

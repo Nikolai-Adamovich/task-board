@@ -9,6 +9,7 @@ import type {
   TimeFormatPreference,
   UpdateUserPreferences,
   UserPreferences,
+  UserProjectBoardPreference,
 } from '@task-board/shared';
 import { toDatePipeDateFormat, toDatePipeDateTimeFormat } from '@app/utils/date-format';
 import { UserPreferencesClient } from '@services/user-preferences-client';
@@ -106,6 +107,14 @@ export class PreferencesStore {
   private readonly projectBoardPreferences = signal<Record<string, string | null>>({});
   /** R3-P4: per-project visible task-table columns. Map of projectId → column keys (or null = default). */
   private readonly projectTaskTableColumns = signal<Record<string, TaskTableColumnKey[] | null>>({});
+  /**
+   * Per-project preferences cache: projectId → resolved request promise.
+   * A `null` payload (the user never saved prefs for this project — the server
+   * answers `{ data: null }`) is a VALID cached result, not a cache miss.
+   * Failures are NOT cached — the entry is dropped so a later call retries.
+   * Refreshed in place by the mutation methods below.
+   */
+  private readonly projectPrefsCache = new Map<string, Promise<UserProjectBoardPreference | null>>();
   /** Tracks the last zoom applied locally but not yet persisted to the backend. */
   private pendingZoom: number | null = null;
   /** Tracks the pending theme-preferences partial to be flushed to the backend on commit. */
@@ -133,6 +142,12 @@ export class PreferencesStore {
     effect(() => {
       if (this.authStore.isAuthenticated()) {
         this.loadPreferences();
+      } else {
+        // Session isolation: drop all per-user project preference state on logout
+        // so a subsequent login as another user never sees the previous session's cache.
+        this.projectPrefsCache.clear();
+        this.projectBoardPreferences.set({});
+        this.projectTaskTableColumns.set({});
       }
     });
   }
@@ -142,23 +157,49 @@ export class PreferencesStore {
     return this.projectBoardPreferences()[projectId] ?? null;
   }
 
-  /** Load project-scoped board preferences from the backend */
+  /**
+   * Load project-scoped board preferences from the backend.
+   * Deduped + cached per project: concurrent callers share one HTTP request,
+   * and a repeated call for an already-loaded project makes NO request at all.
+   */
   async loadProjectPreferences(projectId: string): Promise<void> {
-    try {
-      const prefs = await firstValueFrom(this.client.getProjectPreferences(projectId));
+    if (!projectId) return;
 
-      this.projectBoardPreferences.update((map) => ({
-        ...map,
-        [projectId]: prefs?.defaultBoardId ?? null,
-      }));
-      // R3-P4: task-table column visibility lives in the same per-project document
-      this.projectTaskTableColumns.update((map) => ({
-        ...map,
-        [projectId]: prefs?.taskTableColumns ?? null,
-      }));
-    } catch {
-      // Silently ignore — preferences are non-critical.
+    const existing = this.projectPrefsCache.get(projectId);
+
+    if (existing) {
+      await existing;
+      return;
     }
+
+    const request = firstValueFrom(this.client.getProjectPreferences(projectId)).then(
+      (prefs) => {
+        this.applyProjectPreferences(projectId, prefs);
+        return prefs;
+      },
+      () => {
+        // Silently ignore — preferences are non-critical. Failures are NOT
+        // cached: drop the entry so a later call retries.
+        this.projectPrefsCache.delete(projectId);
+        return null;
+      },
+    );
+
+    this.projectPrefsCache.set(projectId, request);
+    await request;
+  }
+
+  /** Write a fetched/updated per-project preference document into the signal maps. */
+  private applyProjectPreferences(projectId: string, prefs: UserProjectBoardPreference | null): void {
+    this.projectBoardPreferences.update((map) => ({
+      ...map,
+      [projectId]: prefs?.defaultBoardId ?? null,
+    }));
+    // R3-P4: task-table column visibility lives in the same per-project document
+    this.projectTaskTableColumns.update((map) => ({
+      ...map,
+      [projectId]: prefs?.taskTableColumns ?? null,
+    }));
   }
 
   /** Get the persisted visible task-table columns for a project (null = default set) */
@@ -184,8 +225,11 @@ export class PreferencesStore {
         ...map,
         [projectId]: prefs.taskTableColumns,
       }));
+      // Refresh the cache with the server response (no invalidation needed).
+      this.projectPrefsCache.set(projectId, Promise.resolve(prefs));
     } catch {
-      // Revert on failure — reload from server
+      // Revert on failure — drop the cache entry and reload from server.
+      this.projectPrefsCache.delete(projectId);
       this.loadProjectPreferences(projectId);
     }
   }
@@ -206,8 +250,11 @@ export class PreferencesStore {
         ...map,
         [projectId]: prefs.defaultBoardId,
       }));
+      // Refresh the cache with the server response (no invalidation needed).
+      this.projectPrefsCache.set(projectId, Promise.resolve(prefs));
     } catch {
-      // Revert on failure — reload from server
+      // Revert on failure — drop the cache entry and reload from server.
+      this.projectPrefsCache.delete(projectId);
       this.loadProjectPreferences(projectId);
     }
   }
