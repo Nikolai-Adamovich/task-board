@@ -192,10 +192,23 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
 - statusId/sprintId sorts are plain indexed sorts on denormalized names (2.10). The labelIds sort keeps its `$lookup`
   pipeline on purpose: the fan-out cost of the alphabetically-first label was judged too high for the benefit. The
   assignee/reporter sorts never needed it (identity snapshots).
+- **labelIds audit (2026-09-01, benchmark on Mongo 8, 30% no-labels / 40% one / 30% two-four labels, 10 labels):** the
+  `$lookup` pipeline (semantics: sort key = `$min(label names)`, no-label tasks = `\uffff` sentinel → last in ASC, first
+  in DESC; blocking `$sort` over all matched docs, no index possible) measured **92 ms explain / 57 ms wall at 5k
+  tasks** and **904 ms / 559 ms at 50k** (linear scaling, docsExamined = full match set). Variant B (multikey index over
+  a denormalized `labelNames[]` array) is fast (<1 ms) but **semantically wrong on both ends**: multikey ASC sorts
+  no-label docs first (pipeline: last) and DESC sorts by the _max_ element (pipeline: min). Variant C (scalar
+  `labelSortName = min(names)` + `{projectId, labelSortName, number: -1}`) is **order-identical to the pipeline for ASC
+  and DESC** (verified by exact id-order comparison) and costs <1 ms (24 ms deep-page at 50k). Deferral rationale: the
+  only trigger is a manual click on the table's Labels column (default flows never sort by labels), 57-92 ms at
+  realistic project sizes is acceptable, and variant C's rename/delete fan-out requires a _per-task_ min recompute (find
+  affected → batched label names → bulkWrite) unlike TOP-2's constant-value `updateMany`. Revisit if label sort p95
+  exceeds ~200 ms on production projects or projects >20k tasks actively sort by labels.
 - Remaining candidate in the same area: a list DTO that drops `createdBySnapshot`/`createdById`/`version` from list
-  responses (~15-25% payload on top of the shipped `excludeDescription` flag, F5) — only after a consumer grep.
+  responses — audited 2026-09-01, see 4.9 (DEFER).
 - Dead code removed: `TaskRepository.search` / `TaskService.searchTasks` had no consumers (verified by grep, 2026-09-01)
-  and were deleted in the cleanup commit; task search lives solely in `findByProject`'s `search` query parameter.
+  and were deleted in the cleanup commit (152b0ec); task search lives solely in `findByProject`'s `search` query
+  parameter.
 
 ### 4.6 maxIdleTimeMS interplay
 
@@ -212,6 +225,66 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
 
 - Rare edge jitter ≤190ms outside Worker execution (ping probes clean on keep-alive) — platform-level; only addressable
   via Cloudflare plan/architecture.
+
+### 4.9 Task list DTO / payload trimming — audited, DEFER (2026-09-01)
+
+- Per-field accounting over a real 200-task page (CAP MAIN, 5 000 tasks): full response **210 395 B raw / 15 043 B gzip
+  wire** (≈93% compression). Fields with zero UI consumers in any list: `createdById` + `createdBySnapshot` +
+  `statusName` + `sprintName` (TOP-2 fields are server-internal sort keys; UI resolves display names via
+  ProjectRefStore) → dropping them saves 15.1% raw (~1.5 KB wire). `version` is needed by board DnD and sprint mutations
+  and costs 1 B/task. `labelIds` (10.3%) is used only by the task table; `reporterId`/`assigneeId` raw values are never
+  rendered (snapshots are).
+- Latency isolation by limit: limit=1 (+37 ms over ping) ≈ limit=20 (+43) ≪ limit=200 (+87) → payload costs ≈ **0.2
+  ms/KB** (BSON transfer Atlas→Worker + JSON + gzip). Crucially, the existing `excludeDescription` flag (−43 KB raw)
+  showed **no measurable latency gain** (136 vs 127 ms median — noise): payload trimming is a bytes-only optimization.
+- DB side: exclusion projections do not change `docsExamined` (non-covered query, WiredTiger returns whole documents).
+- Verdict DEFER: the heaviest list page is ~15 KB on the wire; the default response must stay backward-compatible, so
+  the gain requires an opt-in flag + 4 client call sites for ~10% wire bytes and <1 ms. Revisit with any future task-DTO
+  change, mobile/slow-network complaints, or payload monitoring showing list responses dominating. (Related: 4.4 board
+  projection DTO, same conclusion.)
+- Micro-inconsistency noted for a future cleanup: `toDomain` materializes `statusName ?? null` / `sprintName ?? null`,
+  so even projected DTOs (`/tasks/my`) carry these two keys, unlike the absent-key pattern of `excludeDescription`.
+
+### 4.10 Cloudflare Worker / Durable Object request-path audit — NO ACTION (2026-09-01)
+
+- **Path (verified in code):** Browser → Worker ([`index.ts`](../server/src/index.ts): URL parse →
+  `shouldProxyToDurable`, ping/health stay Worker-side) → `idFromName('mongo')` — **one global DO for everything** — →
+  `get(id, { locationHint: 'weur' })` → ONE `stub.fetch` (no retries/redirects, no serial pre-work) →
+  `MongoHonoDurableObject` runs the same Hono app (requestId → CORS → mongo-mode → provideServices → auth with user ∥
+  membership in parallel → tenant-context (F3) → RBAC) → module-cached MongoClient singleton inside the DO isolate
+  (`maxPoolSize: 5`). 135 tail events show a single `durableObjectId` — hot reuse, no pool-explosion risk.
+- **Placement:** Smart Placement OFF (experiment A never converged — INSUFFICIENT_INVOCATIONS at single-user traffic);
+  explicit `[placement] region = "aws:eu-central-1"` instead, **live-verified `cf-placement: remote-FRA`** on requests
+  entering at WAW. DO locationHint `weur` is consistent with it. Atlas region: eu-central-1 _claimed_ in code comments —
+  UNKNOWN factually (MONGODB_URI is a secret, not read); handler timings (~5 ms/op) support proximity.
+- **Latency (50 keep-alive requests/endpoint):** ping p50 40 / max 46; 1-op endpoints 76-80; `limit=1` 80; `limit=200`
+  p50 139 but p75 271 / p95 343 / max 761. Decomposition via `wrangler tail` (83 handler logs + client series): DO
+  handler = p50 19 ms (`limit=1`) / p50 32 ms, **max 51 ms** (`limit=200`), i.e. ~5 ms per Mongo op; the `limit=200`
+  tail is body transfer of 210 KB **uncompressed** (bench clients without `Accept-Encoding`; a browser receives ~15 KB
+  gzip ≈ 3-5 ms — not user-facing) plus rare TTFB spikes (ping max 238, `limit=200` TTFB max 738) with handler ≤51 ms —
+  platform variance, confirming 4.1.
+- **Methodology note:** DO `wallTime` from `wrangler tail` (p50 265 ms) includes response-stream flush and must NOT be
+  used for latency decomposition; the Hono request logs (`--> ... Xms`) are the correct handler-time source.
+- **Cold vs warm:** deterministic DO eviction cannot be triggered safely; cold path from code = DO isolate start +
+  mongodb dynamic import (~1.86 MB minified bundle) + client handshake ~300 ms, paid once per DO lifetime. Eviction
+  frequency UNKNOWN (no restart instrumentation). Cheap future improvement: one log line in the DO constructor to count
+  cold starts.
+
+### 4.11 GET read-path / N+1 audit — NO ACTION (2026-09-01)
+
+- Full inventory of hot GET paths (route → service → repo → Mongo ops) + keep-alive round-robin against production (15
+  rounds, ping baseline 40 ms): 1-op endpoints (statuses/sprints/board/auth-me/my-tasks) sit +35-40 ms over ping;
+  2-parallel-op task list +108 ms (payload, see 4.9); serial two-hop reads (task detail 86 ms, members 87 ms) +46-47.
+  Effective Mongo RTT ≈ 10-18 ms per serial hop.
+- **No N+1 anywhere in GET paths:** list enrichment uses `$lookup`/batched `findByIds` (project/tenant members), audit
+  enrichment runs 3 dependent waves + 8 collections in `Promise.all` (R3-P7/V7-4), snapshots are denormalized, read-only
+  paths run no permission lookups (F3), no duplicate fetches within a request. Auth middleware resolves user ∥
+  tenant-membership in parallel and reuses the doc in tenant-context.
+- Residual candidates (all small): (a) fuse the M-02 tenant-assert second hop (entity → project) into one `$lookup`
+  aggregation in `getTask`/comments/`getSprint` — ~10-12 ms per task-detail open, medium complexity; (b)
+  `getProjectMembers` runs `getProject` (404 gate) then the members aggregate sequentially — independent, could be
+  `Promise.all`, ~10 ms on a rare admin page; (c) task-list payload — see 4.9. None passes the frequency ×
+  avoidable-latency bar; the dominant costs (40 ms platform overhead, Mongo RTT) are not addressable in code (4.1, 4.7).
 
 ## 5. Tooling
 
