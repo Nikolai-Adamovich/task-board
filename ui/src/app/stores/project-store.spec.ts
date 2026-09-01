@@ -12,6 +12,7 @@ import { provideHttpClientTesting, HttpTestingController } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { ProjectStore } from './project-store';
 import { AuthStore } from '@stores/auth-store';
+import { TenantStore } from '@stores/tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { Project, ProjectMember, User } from '@task-board/shared';
 
@@ -210,5 +211,147 @@ describe('ProjectStore — background members + reactive projectRole', () => {
     expect(store.activeProject()).toBeNull();
     expect(store.members()).toEqual([]);
     expect(store.projectRole()).toBeNull();
+  });
+
+  // ── F4: shared tenant-scoped project-list cache ─────────────────────────────
+
+  function tenantProject(tenantId: string, id: string): Project {
+    return { ...makeProject(id), tenantId } as unknown as Project;
+  }
+
+  describe('F4: project-list cache', () => {
+    it('dedupes concurrent ensureProjectList calls into ONE HTTP request', async () => {
+      setup();
+
+      const first = store.ensureProjectList('t1');
+      const second = store.ensureProjectList('t1');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('t1', 'p1')] });
+
+      const [a, b] = await Promise.all([first, second]);
+
+      expect(a).toHaveLength(1);
+      expect(b).toHaveLength(1);
+      expect(store.projectList('t1')).toHaveLength(1);
+    });
+
+    it('serves repeated reads from the cache without another HTTP request', async () => {
+      setup();
+
+      const first = store.ensureProjectList('t1');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('t1', 'p1')] });
+      await first;
+
+      const second = await store.ensureProjectList('t1');
+
+      expect(second).toHaveLength(1);
+      httpMock.expectNone(`${BASE}/projects`);
+    });
+
+    it('keeps tenants isolated (tenant A ≠ tenant B)', async () => {
+      setup();
+
+      const a = store.ensureProjectList('tA');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('tA', 'pA')] });
+      await a;
+
+      const b = store.ensureProjectList('tB');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('tB', 'pB')] });
+      await b;
+
+      expect(store.projectList('tA').map((p) => p.id)).toEqual(['pA']);
+      expect(store.projectList('tB').map((p) => p.id)).toEqual(['pB']);
+    });
+
+    it('does not cache failures — a later ensure retries the request', async () => {
+      setup();
+
+      const failing = store.ensureProjectList('t1');
+
+      httpMock.expectOne(`${BASE}/projects`).flush('boom', { status: 500, statusText: 'Server Error' });
+
+      await expect(failing).rejects.toBeTruthy();
+      expect(store.projectList('t1')).toEqual([]);
+
+      const retried = store.ensureProjectList('t1');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('t1', 'p1')] });
+      await retried;
+
+      expect(store.projectList('t1')).toHaveLength(1);
+    });
+
+    it('upserts mutations into the cached list (create appends, update replaces)', async () => {
+      setup();
+
+      const first = store.ensureProjectList('t1');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('t1', 'p1')] });
+      await first;
+
+      // Create: a project with an unknown id is appended.
+      store.upsertProject(tenantProject('t1', 'p2'));
+      expect(store.projectList('t1').map((p) => p.id)).toEqual(['p1', 'p2']);
+
+      // Update: the same id replaces the entry instead of duplicating it.
+      store.upsertProject({ ...tenantProject('t1', 'p1'), name: 'Renamed' } as unknown as Project);
+
+      const list = store.projectList('t1');
+
+      expect(list).toHaveLength(2);
+      expect(list.find((p) => p.id === 'p1')?.name).toBe('Renamed');
+    });
+
+    it('invalidates one tenant without touching the others', async () => {
+      setup();
+
+      const a = store.ensureProjectList('tA');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('tA', 'pA')] });
+      await a;
+
+      const b = store.ensureProjectList('tB');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('tB', 'pB')] });
+      await b;
+
+      store.invalidateProjectList('tA');
+
+      expect(store.projectList('tA')).toEqual([]);
+      expect(store.projectList('tB')).toHaveLength(1);
+
+      // The next ensure for tA refetches; tB stays cached.
+      const refetch = store.ensureProjectList('tA');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('tA', 'pA2')] });
+      await refetch;
+
+      httpMock.expectNone(`${BASE}/projects`);
+      expect(store.projectList('tA').map((p) => p.id)).toEqual(['pA2']);
+    });
+
+    it('clears ALL cached lists and the active project on logout (active tenant → null)', async () => {
+      setup();
+      TestBed.inject(TenantStore).setActiveTenant({ id: 't1', slug: 'acme', name: 'Acme' } as never);
+      // Flush the session-isolation effect so the tenant was "seen" as active.
+      TestBed.tick();
+
+      const first = store.ensureProjectList('t1');
+
+      httpMock.expectOne(`${BASE}/projects`).flush({ data: [tenantProject('t1', 'p1')] });
+      await first;
+      expect(store.projectList('t1')).toHaveLength(1);
+
+      // Simulate logout: AuthStore.logout() calls TenantStore.clear(), which
+      // nulls the active tenant — the store must drop every cached list.
+      TestBed.inject(TenantStore).activeTenant.set(null);
+      TestBed.tick();
+
+      expect(store.projectList('t1')).toEqual([]);
+      expect(store.activeProject()).toBeNull();
+    });
   });
 });

@@ -122,6 +122,13 @@ export class ProjectDangerZone {
         this.showDeleteConfirm.set(false);
         this.deleteConfirmText.set('');
         this.notify.success('toasts.deleted');
+        // F1: the overview no longer re-fetches the project, so the store must
+        // reflect the new status BEFORE navigating back (the read-only banner
+        // reads ProjectStore.activeProject). The server only returns
+        // { success: true } here — the status is derived client-side, same as
+        // archiveProject/restoreProject above.
+        this.project.update((current) => (current ? { ...current, status: ProjectStatus.DELETION_PENDING } : current));
+        this.syncStore();
         // Navigate back to the overview so the read-only banner is visible
         this.router.navigate(['/w', this.tenantSlug(), 'projects', this.projectKey()]);
       },
@@ -150,12 +157,13 @@ export class ProjectDangerZone {
     }
   }
 
-  /** Keep the shared project context in sync after a lifecycle change */
+  /** Keep the shared project context (and the F4 tenant list cache) in sync */
   private syncStore(): void {
     const p = this.project();
 
     if (p) {
       this.projectStore.activeProject.set(p);
+      this.projectStore.upsertProject(p);
     }
   }
 }

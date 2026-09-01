@@ -69,6 +69,8 @@ async function setup(projectStatus: Project['status'] = 'ACTIVE') {
         useValue: {
           activeProject: Object.assign(() => project, { set: vi.fn(), update: vi.fn() }),
           projectRole: vi.fn().mockReturnValue(null),
+          // F4: lifecycle mutations patch the shared tenant project-list cache
+          upsertProject: vi.fn(),
         },
       },
       { provide: TenantStore, useValue: { activeTenant: vi.fn().mockReturnValue({ slug: 'ws' }) } },
@@ -156,6 +158,24 @@ describe('ProjectDangerZone', () => {
       expect(projectClientMock.delete).toHaveBeenCalledWith(makeProject().id);
       expect(component.showDeleteConfirm()).toBe(false);
       expect(component.deleteConfirmText()).toBe('');
+    });
+
+    it('should sync DELETION_PENDING into ProjectStore before navigating back (F1: overview has no refetch)', async () => {
+      await setup();
+      vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      component.requestDeleteProject();
+      component.deleteConfirmText.set('TP');
+      component.confirmDeleteProject();
+      await Promise.resolve();
+
+      const store = TestBed.inject(ProjectStore) as unknown as {
+        activeProject: { set: ReturnType<typeof vi.fn> };
+      };
+
+      // F1: the overview reads ProjectStore.activeProject() without re-fetching,
+      // so the read-only banner would stay stale unless the store is updated here.
+      expect(store.activeProject.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'DELETION_PENDING' }));
     });
 
     it('should surface an error when delete fails', async () => {

@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, untracked, viewChild } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
-import { toSignal, rxResource } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -10,9 +10,9 @@ import { HlmDropdownMenuImports, HlmDropdownMenuTrigger } from '@spartan-ng/helm
 import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { TenantRole } from '@task-board/shared';
 import type { Project } from '@task-board/shared';
-import { ProjectClient } from '@services/project-client';
 import { AuthStore } from '@stores/auth-store';
 import { TenantStore } from '@stores/tenant-store';
+import { ProjectStore } from '@stores/project-store';
 import { hasMinTenantRole } from '@app/shared/utils/role-utils';
 import { KeyboardShortcuts } from '../../shared/keyboard-shortcuts/keyboard-shortcuts';
 
@@ -32,18 +32,19 @@ export class ProjectSwitcher {
   protected readonly tenantStore = inject(TenantStore);
   private readonly authStore = inject(AuthStore);
   private readonly sidebarService = inject(HlmSidebarService);
-  private readonly projectClient = inject(ProjectClient);
+  private readonly projectStore = inject(ProjectStore);
   private readonly router = inject(Router);
   /** P13 (item 31b): `p` hotkey coordination — see the effect below. */
   private readonly shortcuts = inject(KeyboardShortcuts);
   private readonly menuTrigger = viewChild(HlmDropdownMenuTrigger);
-  /** Projects of the active tenant — refetched when the active tenant changes */
-  private readonly projectsResource = rxResource({
-    params: () => ({ tenantId: this.tenantStore.activeTenant()?.id ?? null }),
-    stream: () => this.projectClient.list(),
-    defaultValue: [] as Project[],
-  });
-  protected readonly projects = computed(() => (this.projectsResource.hasValue() ? this.projectsResource.value() : []));
+  /**
+   * F4: projects of the active tenant come from the SHARED tenant-scoped cache
+   * in ProjectStore (same cache as TenantHome — one GET /projects per tenant
+   * session, no duplicate fetch, and create/update mutations are visible here
+   * immediately via upsertProject).
+   */
+  private readonly activeTenantId = computed(() => this.tenantStore.activeTenant()?.id ?? '');
+  protected readonly projects = computed(() => this.projectStore.projectList(this.activeTenantId()));
   /** Reactive signal of the current URL for active-project detection */
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
@@ -72,6 +73,20 @@ export class ProjectSwitcher {
   }
 
   constructor() {
+    // F4: load the project list through the shared cache. Reading
+    // projectList() keeps the effect reactive — after invalidateProjectList()
+    // the effect re-runs and refetches.
+    effect(() => {
+      const tenantId = this.activeTenantId();
+
+      if (!tenantId) return;
+
+      this.projectStore.projectList(tenantId);
+      void this.projectStore.ensureProjectList(tenantId).catch(() => {
+        // Non-critical: the switcher just shows an empty list; a later open retries.
+      });
+    });
+
     // P13 (item 31b) / P13b: the global `p` hotkey bumps `projectMenuToggle`.
     // React STATE-AWARE: read the trigger's actual `isOpen()` and call
     // `openFocused()`/`close()` explicitly — a blind `toggle()` double-fired

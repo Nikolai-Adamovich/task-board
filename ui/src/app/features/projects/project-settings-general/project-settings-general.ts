@@ -88,6 +88,11 @@ export class ProjectSettingsGeneral {
             this.projectClient.update(this.projectId(), { name: m.name, description: m.description }).subscribe({
               next: (updated) => {
                 this.projectStore.activeProject.update((p) => (p ? { ...p, ...updated } : p));
+
+                // F4: keep the shared tenant project-list cache in sync
+                const merged = this.projectStore.activeProject();
+
+                if (merged) this.projectStore.upsertProject(merged);
                 this.notify.success('toasts.updated');
                 resolve();
               },
