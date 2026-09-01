@@ -58,11 +58,17 @@ async function createConnectedClient(uri: string): Promise<MongoClient> {
   // Dynamic import required — MongoDB's BSON module calls crypto.randomBytes()
   // at module load time, which Cloudflare Workers forbids at global scope.
   const { MongoClient: MC } = await import('mongodb');
+  // NOTE: do NOT set a non-default connectTimeoutMS here. In driver 7.6.0 it is
+  // applied as `socket.setTimeout(connectTimeoutMS)` (cmap/connect.js), i.e. it
+  // acts as an IDLE-socket timeout: with the previous value of 5_000 every
+  // connection idle ≥5s was killed (reason='error') and the next request paid a
+  // full TLS+auth reconnect (~90-190ms, outliers to 2.4s) — the root cause of
+  // the periodic latency spikes (see product-analysis/100-performance.md).
+  // Driver default (30_000) covers all interactive idle gaps.
   const client = new MC(uri, {
     maxPoolSize: 5,
     minPoolSize: 0,
     maxIdleTimeMS: 30_000,
-    connectTimeoutMS: 5_000,
     serverSelectionTimeoutMS: 5_000,
   });
 
