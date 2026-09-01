@@ -3,11 +3,6 @@ import { type CanActivateFn, Router } from '@angular/router';
 import { TenantStore } from '@stores/tenant-store';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
-import { TenantRole } from '@task-board/shared';
-import type { TenantRole as TenantRoleType, ProjectRole } from '@task-board/shared';
-
-/** Tenant-level roles that can bypass project membership checks */
-const BYPASS_TENANT_ROLES: TenantRoleType[] = [TenantRole.OWNER, TenantRole.ADMIN];
 
 /**
  * Functional route guard that ensures the user has access to a project.
@@ -15,11 +10,15 @@ const BYPASS_TENANT_ROLES: TenantRoleType[] = [TenantRole.OWNER, TenantRole.ADMI
  * The tenant is resolved by slug from the `/w/:tenantSlug` URL prefix (DEC-032);
  * the project is resolved by its human-readable key.
  *
- * Access is granted when:
- * 1. The user's tenant role is OWNER or ADMIN (bypass — stores PROJECT_ADMIN), OR
- * 2. The user has a project membership with PROJECT_ADMIN, EDITOR, or VIEWER role.
+ * The navigation decision NEVER depends on the members list:
+ * - Tenant OWNER/ADMIN bypass project membership checks (the effective
+ *   PROJECT_ADMIN role is derived reactively by ProjectStore).
+ * - Tenant MEMBERs are allowed through — the API enforces 403 when the user
+ *   has no project membership. The membership role is derived reactively by
+ *   ProjectStore once the background members request completes.
  *
- * The guard also loads the project context and resolves the project role.
+ * This keeps the deep-link critical path at one sequential request
+ * (`/projects/by-key/:key`); members load in the background.
  */
 export const projectGuard: CanActivateFn = async (route) => {
   const tenantStore = inject(TenantStore);
@@ -39,7 +38,8 @@ export const projectGuard: CanActivateFn = async (route) => {
     return router.parseUrl('/');
   }
 
-  // Load project context by key within the active tenant
+  // Load the project context by key within the active tenant. Members are
+  // kicked off in the background by loadProjectByKey() — not awaited here.
   try {
     await projectStore.loadProjectByKey(activeTenant.id, projectKey);
   } catch {
@@ -48,29 +48,11 @@ export const projectGuard: CanActivateFn = async (route) => {
     return router.parseUrl('/');
   }
 
-  // Tenant OWNER/ADMIN can access any project within their tenant
-  const tenantRole = authStore.tenantRole();
-
-  if (tenantRole && BYPASS_TENANT_ROLES.includes(tenantRole)) {
-    projectStore.setProjectRole('PROJECT_ADMIN' as ProjectRole);
-    return true;
-  }
-
-  // For tenant MEMBERS, the project role is resolved from the members list
-  // already loaded by loadProjectByKey(). If the user has no project
-  // membership, allow through — the API will return 403.
-  if (tenantRole === TenantRole.MEMBER) {
-    const userId = authStore.currentUser()?.id;
-    const membership = userId ? projectStore.members().find((member) => member.userId === userId) : undefined;
-
-    if (membership) {
-      projectStore.setProjectRole(membership.role);
-    }
-
-    return true;
-  }
-
   // No valid tenant role — redirect
-  projectStore.clearProject();
-  return router.parseUrl('/');
+  if (!authStore.tenantRole()) {
+    projectStore.clearProject();
+    return router.parseUrl('/');
+  }
+
+  return true;
 };

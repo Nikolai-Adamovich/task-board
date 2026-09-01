@@ -12,6 +12,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { ProjectRefStore } from './project-ref-store';
+import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from './project-store';
 import { StatusClient } from '@services/status-client';
 import { TaskTypeClient } from '@services/task-type-client';
@@ -36,6 +37,9 @@ describe('ProjectRefStore', () => {
         { provide: SprintClient, useValue: { list: (sprintList = vi.fn().mockReturnValue(of([]))) } },
         { provide: LabelClient, useValue: { list: (labelList = vi.fn().mockReturnValue(of([]))) } },
         { provide: ProjectClient, useValue: { listMembers: (listMembers = vi.fn().mockReturnValue(of([]))) } },
+        // ProjectStore now derives the project role from the AuthStore state —
+        // mock it so no HTTP providers are needed in this spec.
+        { provide: AuthStore, useValue: { tenantRole: () => null, currentUser: () => null } },
       ],
     });
   }
