@@ -106,6 +106,10 @@ describe('SprintDetail', () => {
   const refStoreMock = {
     ensure: vi.fn(),
     invalidate: vi.fn(),
+    // F2: full-DTO layer — the disposition dialog's "Move to…" targets
+    sprintEntities: vi.fn(() => []),
+    statusEntities: vi.fn(() => []),
+    upsertEntity: vi.fn(),
     options: vi.fn((_pid: string, kind: string) =>
       kind === 'statuses'
         ? [
@@ -192,8 +196,12 @@ describe('SprintDetail', () => {
       expect(component.sprint().name).toBe('Sprint 1');
     });
 
-    it('should load sprint tasks via taskClient.list', () => {
-      expect(taskClientMock.list).toHaveBeenCalledWith(mockSprint.projectId, { sprintId: mockSprint.id, limit: 200 });
+    it('should load sprint tasks via taskClient.list (F5: without description)', () => {
+      expect(taskClientMock.list).toHaveBeenCalledWith(mockSprint.projectId, {
+        sprintId: mockSprint.id,
+        limit: 200,
+        excludeDescription: true,
+      });
       expect(component.sprintTasks()).toHaveLength(2);
     });
 

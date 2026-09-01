@@ -529,6 +529,8 @@ export class TaskTable {
     sort: this.sortField() ? `${this.sortField()}:${this.sortDirection()}` : undefined,
     page: this.safePage(),
     limit: this.pageSize(),
+    // F5: the table never renders the description — drop it from the payload
+    excludeDescription: true,
   }));
   /**
    * P8-12: identity of the current query scope — everything that changes WHICH

@@ -8,11 +8,13 @@
  * - options()/nameMap()/nameOf(): reactive reads with id⇄name resolution
  * - error handling: a failed fetch stays uncached so a later ensure() retries
  */
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { ProjectRefStore } from './project-ref-store';
 import { AuthStore } from '@stores/auth-store';
+import { TenantStore } from '@stores/tenant-store';
 import { ProjectStore } from './project-store';
 import { StatusClient } from '@services/status-client';
 import { TaskTypeClient } from '@services/task-type-client';
@@ -40,6 +42,9 @@ describe('ProjectRefStore', () => {
         // ProjectStore now derives the project role from the AuthStore state —
         // mock it so no HTTP providers are needed in this spec.
         { provide: AuthStore, useValue: { tenantRole: () => null, currentUser: () => null } },
+        // F4: ProjectStore watches TenantStore for session isolation — a stub
+        // (never-logged-in state) keeps the DI chain free of HTTP providers.
+        { provide: TenantStore, useValue: { activeTenant: signal(null) } },
       ],
     });
   }
@@ -284,6 +289,88 @@ describe('ProjectRefStore', () => {
 
       expect(() => store.invalidate('p1', 'sprints')).not.toThrow();
       expect(store.options('p1', 'sprints')).toEqual([]);
+    });
+  });
+
+  // ── F2: full-DTO entity cache ─────────────────────────────────────────────
+
+  describe('F2: full-DTO entity cache', () => {
+    it('exposes full DTOs via statusEntities()/sprintEntities() and derives options from them', async () => {
+      sprintList.mockReturnValue(of([{ id: 'sp1', name: 'Sprint 1', status: 'ACTIVE' }]));
+
+      const store = createStore();
+
+      store.ensure('p1', ['sprints']);
+      await flush();
+
+      expect(store.sprintEntities('p1')).toEqual([{ id: 'sp1', name: 'Sprint 1', status: 'ACTIVE' }]);
+      expect(store.options('p1', 'sprints')).toEqual([{ id: 'sp1', name: 'Sprint 1' }]);
+    });
+
+    it('Overview → Board → Tasks: repeated ensure() across pages hits the cache (0 new requests)', async () => {
+      statusList.mockReturnValue(of([{ id: 's1', name: 'TODO' }]));
+      sprintList.mockReturnValue(of([{ id: 'sp1', name: 'Sprint 1', status: 'FUTURE' }]));
+
+      const store = createStore();
+
+      // "Overview" page
+      store.ensure('p1', ['sprints', 'statuses']);
+      await flush();
+      expect(statusList).toHaveBeenCalledTimes(1);
+      expect(sprintList).toHaveBeenCalledTimes(1);
+
+      // "Board" page — same kinds, same project
+      store.ensure('p1', ['statuses', 'sprints', 'members']);
+      // "Tasks" page — full reference set; statuses/sprints already cached
+      store.ensure('p1', ['statuses', 'types', 'sprints', 'labels', 'members']);
+      await flush();
+
+      expect(statusList).toHaveBeenCalledTimes(1);
+      expect(sprintList).toHaveBeenCalledTimes(1);
+    });
+
+    it('upsertEntity appends a new sprint and replaces an updated one', async () => {
+      sprintList.mockReturnValue(of([{ id: 'sp1', name: 'Sprint 1', status: 'FUTURE' }]));
+
+      const store = createStore();
+
+      store.ensure('p1', ['sprints']);
+      await flush();
+
+      // Create: appended
+      store.upsertEntity('p1', 'sprints', { id: 'sp2', name: 'Sprint 2', status: 'FUTURE' });
+      expect(store.sprintEntities('p1').map((s) => s.id)).toEqual(['sp1', 'sp2']);
+
+      // Update: replaced in place (no duplicate)
+      store.upsertEntity('p1', 'sprints', { id: 'sp1', name: 'Renamed', status: 'FUTURE' });
+
+      const list = store.sprintEntities('p1');
+
+      expect(list).toHaveLength(2);
+      expect(list.find((s) => s.id === 'sp1')?.name).toBe('Renamed');
+    });
+
+    it('upsertEntity is a no-op for a kind that is not cached yet', () => {
+      const store = createStore();
+
+      expect(() => store.upsertEntity('p1', 'sprints', { id: 'sp9', name: 'X' })).not.toThrow();
+      expect(store.sprintEntities('p1')).toEqual([]);
+    });
+
+    it('tracks the in-flight state per kind', async () => {
+      statusList.mockReturnValue(of([{ id: 's1', name: 'TODO' }]));
+
+      const store = createStore();
+
+      store.ensure('p1', ['statuses']);
+      // Loading flag is set SYNCHRONOUSLY when the fetch starts...
+      expect(store.isLoading('p1', 'statuses')).toBe(true);
+
+      await flush();
+
+      // ...and cleared once the response is cached.
+      expect(store.isLoading('p1', 'statuses')).toBe(false);
+      expect(store.statusEntities('p1')).toEqual([{ id: 's1', name: 'TODO' }]);
     });
   });
 });

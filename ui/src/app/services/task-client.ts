@@ -25,6 +25,12 @@ export interface TaskQuery {
   createdTo?: string;
   updatedFrom?: string;
   updatedTo?: string;
+  /**
+   * F5 (perf audit #2): omit `description` from the response (~40% smaller
+   * payload for lists). Only views that render the description (the board's
+   * task-card preview) must NOT set this.
+   */
+  excludeDescription?: boolean;
 }
 
 /** Paginated list response shape */
@@ -62,6 +68,7 @@ export class TaskClient {
     if (query.page) params = params.set('page', query.page.toString());
     if (query.limit) params = params.set('limit', query.limit.toString());
     if (query.sort) params = params.set('sort', query.sort);
+    if (query.excludeDescription) params = params.set('excludeDescription', 'true');
     return this.http.get<PaginatedResponse<Task>>(`${this.baseUrl}/projects/${projectId}/tasks`, { params });
   }
 

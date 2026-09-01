@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -11,6 +11,7 @@ import { TaskClient } from '@services/task-client';
 import { isSprintOverdue } from '@app/shared/utils/sprint-utils';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
+import { ProjectRefStore } from '@stores/project-ref-store';
 import { PreferencesStore } from '@stores/preferences-store';
 import { TenantStore } from '@stores/tenant-store';
 import { statusBadgeVariant } from '@app/constants/priority';
@@ -86,18 +87,36 @@ export class SprintList {
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
   private readonly tenantStore = inject(TenantStore);
+  /** F2: shared ProjectRefStore cache — sprints are shared with board/overview */
+  private readonly refStore = inject(ProjectRefStore);
   /** Current tenant slug for building sprint-detail links (DEC-032) */
   protected readonly tenantSlug = computed(() => this.tenantStore.activeTenant()?.slug ?? '');
   /** Bound via withComponentInputBinding() — now receives project key from route */
   readonly projectKey = input<string>('');
   /** Resolved project UUID from the store */
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
-  private readonly sprintsResource = rxResource({
-    params: () => ({ projectId: this.projectId() ?? '' }),
-    stream: ({ params }) => this.sprintClient.list(params.projectId),
-    defaultValue: [],
-  });
-  protected readonly sprints = computed(() => (this.sprintsResource.hasValue() ? this.sprintsResource.value() : []));
+  // F2: the sprint list comes from the shared ProjectRefStore cache
+  protected readonly sprints = computed(() => this.refStore.sprintEntities(this.projectId()));
+
+  constructor() {
+    // F2: kick off the sprint fetch EAGERLY (like the previous rxResource did)
+    // so the first render already has data loading without waiting for the
+    // first effect flush.
+    const initialPid = this.projectId();
+
+    if (initialPid) this.refStore.ensure(initialPid, ['sprints']);
+
+    // Reactive ensure: reading entities keeps the effect tracking the cache —
+    // after an invalidate() (sprint mutations elsewhere) it re-runs/refetches.
+    effect(() => {
+      const pid = this.projectId();
+
+      if (!pid) return;
+
+      this.refStore.sprintEntities(pid);
+      this.refStore.ensure(pid, ['sprints']);
+    });
+  }
   /** Number of unassigned (backlog) tasks — powers the Backlog group count (DEC-039) */
   private readonly backlogCountResource = rxResource<number, { projectId: string }>({
     params: () => ({ projectId: this.projectId() ?? '' }),
@@ -108,15 +127,9 @@ export class SprintList {
   protected readonly backlogCount = computed(() =>
     this.backlogCountResource.hasValue() ? this.backlogCountResource.value() : 0,
   );
-  protected readonly loading = computed(() => this.sprintsResource.isLoading());
+  protected readonly loading = computed(() => this.refStore.isLoading(this.projectId(), 'sprints'));
   private readonly actionError = signal('');
-  protected readonly error = computed(() => {
-    if (this.actionError()) return this.actionError();
-
-    const err = this.sprintsResource.error();
-
-    return err ? getErrorMessage(err) : '';
-  });
+  protected readonly error = computed(() => this.actionError());
   protected readonly showCreateModal = signal(false);
   protected readonly expandedGroups = signal<Record<string, boolean>>({});
   private readonly model = signal<CreateSprintForm>({
@@ -144,11 +157,9 @@ export class SprintList {
             })
             .subscribe({
               next: (sprint) => {
-                if (this.sprintsResource.hasValue()) {
-                  this.sprintsResource.value.update((list) => [...list, sprint]);
-                } else {
-                  this.sprintsResource.reload();
-                }
+                // F2: patch the SHARED cache — board/overview see the new sprint
+                // immediately without any extra GET.
+                this.refStore.upsertEntity(this.projectId(), 'sprints', sprint);
                 this.showCreateModal.set(false);
                 f().reset({ name: '', startDate: '', endDate: '' });
                 this.notify.success('toasts.created');

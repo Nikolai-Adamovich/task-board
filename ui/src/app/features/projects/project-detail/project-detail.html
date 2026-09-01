@@ -2,11 +2,6 @@
   <div class="flex items-center justify-center py-12">
     <hlm-spinner /> <span class="ml-2 text-sm text-muted-foreground">{{ 'projectDetail.loading' | transloco }}</span>
   </div>
-} @else if (error()) {
-  <!-- V4-4: error() holds a transloco key from getErrorMessage — translate it -->
-  <hlm-alert variant="destructive" class="mx-auto max-w-6xl">
-    <div hlmAlertDescription>{{ error() | transloco }}</div>
-  </hlm-alert>
 } @else if (project(); as p) {
   <div class="mx-auto max-w-6xl">
     <!-- Read-only banner for archived / deletion-pending projects -->

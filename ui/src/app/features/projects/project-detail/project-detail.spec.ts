@@ -2,7 +2,8 @@
  * Tests for the ProjectDetail overview (spec S9, DEC-034).
  *
  * Covers:
- * - Loading project/boards/sprints/statuses/tasks resources
+ * - Project from ProjectStore (guard-loaded; NO duplicate getById request — F1)
+ * - Loading sprints/statuses/summary/recent-tasks resources
  * - Active-sprint computed
  * - Status-count computation from per-status totals
  * - Recent-tasks selection
@@ -125,6 +126,8 @@ async function until(condition: () => boolean): Promise<void> {
 async function setup(options: { tenantRole?: string; projectStatus?: Project['status'] } = {}) {
   const project = options.projectStatus ? { ...mockProject, status: options.projectStatus } : mockProject;
 
+  // F1: the overview does NOT fetch the project itself — getById is asserted
+  // to stay untouched; the store (fed by projectGuard) is the single source.
   projectClientMock = { getById: vi.fn().mockReturnValue(of(project)) };
   sprintClientMock = { list: vi.fn().mockReturnValue(of(mockSprints)) };
   statusClientMock = { list: vi.fn().mockReturnValue(of(mockStatuses)) };
@@ -170,6 +173,7 @@ async function setup(options: { tenantRole?: string; projectStatus?: Project['st
         provide: ProjectStore,
         useValue: {
           activeProject: vi.fn().mockReturnValue(project),
+          hasProject: vi.fn().mockReturnValue(true),
           projectRole: vi.fn().mockReturnValue(null),
           members: vi.fn().mockReturnValue([
             { userId: 'u1', role: 'PROJECT_ADMIN', displayName: 'Ada Lovelace' },
@@ -189,12 +193,14 @@ async function setup(options: { tenantRole?: string; projectStatus?: Project['st
 }
 
 describe('ProjectDetail (overview)', () => {
-  it('should load the project overview (single-board model: no board-list fetch)', async () => {
+  it('should use the guard-loaded project from ProjectStore WITHOUT a duplicate getById request (F1)', async () => {
     await setup();
     await until(() => component.project() !== null);
 
-    expect(projectClientMock.getById).toHaveBeenCalledWith(mockProject.id);
+    expect(projectClientMock.getById).not.toHaveBeenCalled();
     expect(component.project()?.name).toBe('Test Project');
+    // The loading state resolves from the store (guard already resolved it)
+    expect(component.loading()).toBe(false);
   });
 
   it('should expose the ACTIVE sprint', async () => {
@@ -221,7 +227,11 @@ describe('ProjectDetail (overview)', () => {
     await setup();
     await until(() => component.recentTasks().length > 0);
 
-    expect(taskClientMock.list).toHaveBeenCalledWith(mockProject.id, { limit: 5, sort: 'updatedAt:desc' });
+    expect(taskClientMock.list).toHaveBeenCalledWith(mockProject.id, {
+      limit: 5,
+      sort: 'updatedAt:desc',
+      excludeDescription: true,
+    });
     expect(component.recentTasks()).toEqual(mockRecentTasks);
   });
 

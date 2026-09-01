@@ -94,6 +94,34 @@ describe('TaskRepository', () => {
       expect(result.data).toHaveLength(1);
       expect(result.pagination.total).toBe(1);
     });
+
+    it('F5: requests NO projection by default (description included)', async () => {
+      const toArray = vi.fn().mockResolvedValue([makeDoc()]);
+      const limit = vi.fn().mockReturnValue({ toArray });
+      const skip = vi.fn().mockReturnValue({ limit });
+      const sort = vi.fn().mockReturnValue({ skip });
+
+      collection.find.mockReturnValue({ sort });
+      collection.countDocuments.mockResolvedValue(1);
+
+      await repo.findByProject('project-1', {});
+
+      expect(collection.find).toHaveBeenCalledWith({ projectId: 'project-1' }, undefined);
+    });
+
+    it('F5: projects description out when excludeDescription is set', async () => {
+      const toArray = vi.fn().mockResolvedValue([makeDoc()]);
+      const limit = vi.fn().mockReturnValue({ toArray });
+      const skip = vi.fn().mockReturnValue({ limit });
+      const sort = vi.fn().mockReturnValue({ skip });
+
+      collection.find.mockReturnValue({ sort });
+      collection.countDocuments.mockResolvedValue(1);
+
+      await repo.findByProject('project-1', { excludeDescription: true });
+
+      expect(collection.find).toHaveBeenCalledWith({ projectId: 'project-1' }, { projection: { description: 0 } });
+    });
   });
 
   describe('create', () => {

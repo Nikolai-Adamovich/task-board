@@ -6,6 +6,7 @@ import { finalize, tap } from 'rxjs';
 import { StatusClient } from '@services/status-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
+import { ProjectRefStore } from '@stores/project-ref-store';
 import { canManageProject } from '@app/shared/utils/role-utils';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -53,6 +54,8 @@ export class StatusManager implements OnInit {
   private readonly statusClient = inject(StatusClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
+  /** F2: status mutations must invalidate the shared reference-data cache */
+  private readonly refStore = inject(ProjectRefStore);
   protected readonly canManage = computed(() =>
     canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole()),
   );
@@ -87,6 +90,7 @@ export class StatusManager implements OnInit {
           this.statusClient.create(this.projectId(), data).subscribe({
             next: (status) => {
               this.statuses.update((list) => [...list, status]);
+              this.refStore.invalidate(this.projectId(), 'statuses');
               this.showCreateDialog.set(false);
               f().reset({ name: '' });
               this.error.set(''); // V2-8: state changed — dismiss stale alerts
@@ -131,6 +135,7 @@ export class StatusManager implements OnInit {
       .subscribe({
         next: (updated) => {
           this.statuses.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
+          this.refStore.invalidate(this.projectId(), 'statuses');
           this.cancelEdit();
           this.error.set(''); // V2-8: state changed — dismiss stale alerts
           this.notify.success('toasts.updated');
@@ -181,6 +186,7 @@ export class StatusManager implements OnInit {
           const updatedById = new Map(updated.map((s) => [s.id, s]));
 
           this.statuses.update((list) => list.map((s) => updatedById.get(s.id) ?? s));
+          this.refStore.invalidate(this.projectId(), 'statuses');
           this.saving.set(false);
           this.error.set(''); // V2-8: state changed — dismiss stale alerts
         },
@@ -215,6 +221,7 @@ export class StatusManager implements OnInit {
       .subscribe({
         next: () => {
           this.statuses.update((list) => list.filter((s) => s.id !== status.id));
+          this.refStore.invalidate(this.projectId(), 'statuses');
           this.showDeleteDialog.set(false);
           this.deletingStatus.set(null);
           this.error.set('');
@@ -224,9 +231,12 @@ export class StatusManager implements OnInit {
           this.notify.successWithUndo('toasts.deleted', () => {
             const maxPosition = this.statuses().reduce((max, s) => Math.max(max, s.position), -1);
 
-            return this.statusClient
-              .create(this.projectId(), { name: status.name, position: maxPosition + 1 })
-              .pipe(tap((created) => this.statuses.update((list) => [...list, created])));
+            return this.statusClient.create(this.projectId(), { name: status.name, position: maxPosition + 1 }).pipe(
+              tap((created) => {
+                this.statuses.update((list) => [...list, created]);
+                this.refStore.invalidate(this.projectId(), 'statuses');
+              }),
+            );
           });
         },
         error: (err) => {

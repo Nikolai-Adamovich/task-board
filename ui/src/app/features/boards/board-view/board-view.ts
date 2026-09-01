@@ -9,7 +9,6 @@ import { rxResource } from '@angular/core/rxjs-interop';
 import { map, of } from 'rxjs';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
-import { SprintClient } from '@services/sprint-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { ProjectRefStore } from '@stores/project-ref-store';
@@ -20,7 +19,7 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { NgIcon } from '@ng-icons/core';
-import type { BoardColumn, BoardConfig, Sprint, Task } from '@task-board/shared';
+import type { BoardColumn, BoardConfig, Task } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { priorityLabelKey } from '@app/constants/priority';
@@ -53,7 +52,6 @@ export class BoardView {
   private readonly notify = injectToasts();
   private readonly boardClient = inject(BoardClient);
   private readonly taskClient = inject(TaskClient);
-  private readonly sprintClient = inject(SprintClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
   private readonly refStore = inject(ProjectRefStore);
@@ -152,13 +150,11 @@ export class BoardView {
   protected readonly selectedPriorityLabel = computed(() =>
     this.priority() ? this.priorityLabel(this.priority() as string) : '',
   );
-  /** Sprints of the board's project — powers the sprint selector (DEC-038) */
-  private readonly sprintsResource = rxResource<Sprint[], { projectId: string }>({
-    params: () => ({ projectId: this.effectiveProjectId() }),
-    stream: ({ params }) => this.sprintClient.list(params.projectId),
-    defaultValue: [],
-  });
-  protected readonly sprints = computed(() => (this.sprintsResource.hasValue() ? this.sprintsResource.value() : []));
+  /**
+   * Sprints of the board's project — powers the sprint selector (DEC-038).
+   * F2: shared ProjectRefStore cache — no per-page duplicate request.
+   */
+  protected readonly sprints = computed(() => this.refStore.sprintEntities(this.effectiveProjectId()));
   /** Display name of the currently scoped sprint (falls back to the raw id) */
   protected readonly selectedSprintName = computed(() => {
     const id = this.sprintId();
@@ -178,7 +174,15 @@ export class BoardView {
 
   constructor() {
     effect(() => {
-      this.refStore.ensure(this.effectiveProjectId(), ['statuses', 'members']);
+      const pid = this.effectiveProjectId();
+
+      if (!pid) return;
+
+      // Track the entity lists so an invalidate() (sprint/status mutations)
+      // re-runs this effect and refetches through ensure().
+      this.refStore.sprintEntities(pid);
+      this.refStore.statusEntities(pid);
+      this.refStore.ensure(pid, ['statuses', 'sprints', 'members']);
     });
   }
 

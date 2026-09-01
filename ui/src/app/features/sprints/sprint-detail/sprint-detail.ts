@@ -97,8 +97,13 @@ export class SprintDetail implements OnInit {
   protected readonly editEndDate = signal('');
   protected readonly savingDates = signal(false);
   // ─── V1-7: completion disposition ─────────────────────────────────────────
-  /** Future sprints offered as "Move to…" targets when completing with unfinished tasks. */
-  protected readonly futureSprints = signal<Sprint[]>([]);
+  /**
+   * Future sprints offered as "Move to…" targets when completing with
+   * unfinished tasks. F2: derived from the shared ProjectRefStore cache.
+   */
+  protected readonly futureSprints = computed(() =>
+    this.refStore.sprintEntities(this.projectId()).filter((sp) => sp.status === SprintStatus.FUTURE),
+  );
   protected readonly showDispositionDialog = signal(false);
   /** `''` = Move to Backlog (default); otherwise the target sprint id. */
   protected readonly dispositionTarget = signal('');
@@ -207,6 +212,8 @@ export class SprintDetail implements OnInit {
         this.sprintClient.update(s.id, { status }).subscribe({
           next: (sprint) => {
             this.sprint.set(sprint);
+            // F2: keep the shared reference-data cache in sync
+            this.refStore.upsertEntity(s.projectId, 'sprints', sprint);
             this.loadSprintTasks(s.projectId); // reflect the moves in the task list
           },
           error: (err) => {
@@ -268,6 +275,8 @@ export class SprintDetail implements OnInit {
         next: (updated) => {
           this.savingDates.set(false);
           this.sprint.set(updated);
+          // F2: keep the shared reference-data cache in sync
+          this.refStore.upsertEntity(updated.projectId, 'sprints', updated);
           this.showEditDates.set(false);
           this.notify.success('toasts.updated');
         },
@@ -291,6 +300,9 @@ export class SprintDetail implements OnInit {
 
     this.sprintClient.delete(s.id).subscribe({
       next: () => {
+        // F2: drop the deleted sprint from the shared reference-data cache
+        this.refStore.invalidate(s.projectId, 'sprints');
+
         const projectKey = this.projectStore.activeProject()?.key ?? s.projectId;
 
         this.router.navigate(['/w', getTenantSlug(this.route), 'projects', projectKey]);
@@ -328,15 +340,14 @@ export class SprintDetail implements OnInit {
   private loadSprintTasks(projectId: string): void {
     // V1-7: statuses reference data drives the final/DONE detection
     this.refStore.ensure(projectId, ['statuses', 'sprints']);
-    this.taskClient.list(projectId, { sprintId: this.sprintId(), limit: 200 }).subscribe({
+    // F5: the sprint task list never renders the description — omit it from the payload
+    this.taskClient.list(projectId, { sprintId: this.sprintId(), limit: 200, excludeDescription: true }).subscribe({
       next: (res) => this.sprintTasks.set(res.data),
       error: (err) => this.notify.error(getErrorMessage(err)),
     });
-    // Future sprints are the "Move to…" targets of the disposition dialog
-    this.sprintClient.list(projectId).subscribe({
-      next: (sprints) => this.futureSprints.set(sprints.filter((sp) => sp.status === SprintStatus.FUTURE)),
-      error: (err) => this.notify.error(getErrorMessage(err)),
-    });
+    // F2: future sprints (the "Move to…" targets of the disposition dialog)
+    // are derived from the shared ProjectRefStore cache — ensure() above
+    // loads them; no separate request needed.
   }
 
   protected removeTaskFromSprint(task: Task): void {

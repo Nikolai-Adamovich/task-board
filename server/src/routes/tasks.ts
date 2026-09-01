@@ -22,6 +22,8 @@ export function createTaskRoutes(): Hono<AppEnv> {
     const options: TaskQueryOptions = {
       page: q.page,
       limit: q.limit,
+      // F5: tables/widgets omit the (potentially large) markdown description
+      excludeDescription: q.excludeDescription,
       search: q.search,
       statusId: q.statusId,
       priority: q.priority,

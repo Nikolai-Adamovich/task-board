@@ -93,4 +93,14 @@ export const TaskQuerySchema = z.object({
   createdTo: z.iso.date().optional(),
   updatedFrom: z.iso.date().optional(),
   updatedTo: z.iso.date().optional(),
+  /**
+   * F5 (perf audit #2): omit `description` from list responses. No list consumer
+   * renders it (only the board's task-card preview needs it — that view simply
+   * does not send this flag), so tables/widget callers can cut ~40% of payload.
+   * `description` search/filtering stays server-side and is unaffected.
+   */
+  excludeDescription: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 });

@@ -81,6 +81,14 @@ export interface TaskQueryOptions {
   createdTo?: string;
   updatedFrom?: string;
   updatedTo?: string;
+  /**
+   * F5 (perf audit #2): omit `description` from the returned documents.
+   * List consumers that never render the description (task table, widgets)
+   * use this to cut ~40% of the response payload. The board's task-card
+   * preview DOES render it, so the board request simply omits the flag.
+   * Server-side description search/filtering is unaffected.
+   */
+  excludeDescription?: boolean;
 }
 
 export interface PaginatedResult<T> {
@@ -159,6 +167,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       createdTo,
       updatedFrom,
       updatedTo,
+      excludeDescription,
     } = options;
     const query: Record<string, unknown> = { projectId };
 
@@ -205,6 +214,9 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     // Semantic sorts resolve relation names / priority rank instead of raw ids.
     if (sort && SEMANTIC_SORT_FIELDS.has(sort.field)) {
       const pipeline = this.buildSemanticSortPipeline(query, sort.field, sortDir, skip, limit);
+
+      if (excludeDescription) pipeline.push({ $unset: 'description' });
+
       const [docs, total] = await Promise.all([
         this.collection.aggregate<TaskDocument>(pipeline).toArray(),
         this.collection.countDocuments(query),
@@ -221,9 +233,10 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       };
     }
 
+    const findOptions = excludeDescription ? ({ projection: { description: 0 } } as const) : undefined;
     const [docs, total] = await Promise.all([
       this.collection
-        .find(query)
+        .find(query, findOptions)
         .sort({ [sortField]: sortDir })
         .skip(skip)
         .limit(limit)

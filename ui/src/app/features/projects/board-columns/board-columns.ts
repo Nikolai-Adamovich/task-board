@@ -6,7 +6,7 @@ import { lucideArrowDown, lucideArrowUp, lucidePlus, lucideTrash2 } from '@ng-ic
 import { rxResource } from '@angular/core/rxjs-interop';
 import { firstValueFrom, of } from 'rxjs';
 import { BoardClient } from '@services/board-client';
-import { StatusClient } from '@services/status-client';
+import { ProjectRefStore } from '@stores/project-ref-store';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -17,7 +17,6 @@ import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmCheckboxImports } from '@spartan-ng/helm/checkbox';
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 import { canManageProject } from '@app/shared/utils/role-utils';
-import type { Status } from '@task-board/shared';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 
@@ -52,10 +51,11 @@ interface EditableColumn {
 })
 export class BoardColumns {
   private readonly boardClient = inject(BoardClient);
-  private readonly statusClient = inject(StatusClient);
   private readonly authStore = inject(AuthStore);
   private readonly projectStore = inject(ProjectStore);
   private readonly notify = injectToasts();
+  /** F2: statuses come from the shared ProjectRefStore cache */
+  private readonly refStore = inject(ProjectRefStore);
   /** Bound via withComponentInputBinding() — receives project key from route */
   readonly projectKey = input.required<string>();
   /** Resolved project UUID from the store */
@@ -75,13 +75,10 @@ export class BoardColumns {
   protected readonly loading = computed(() => this.boardResource.isLoading());
   private readonly loadError = signal('');
   protected readonly error = computed(() => (this.loadError() ? this.loadError() : ''));
-  private readonly statusesResource = rxResource({
-    params: () => ({ projectId: this.projectId() }),
-    stream: ({ params }) => this.statusClient.list(params.projectId),
-    defaultValue: [] as Status[],
-  });
+  // F2: shared cache — no per-page duplicate request
   protected readonly statuses = computed(() =>
-    (this.statusesResource.hasValue() ? this.statusesResource.value() : [])
+    this.refStore
+      .statusEntities(this.projectId())
       .slice()
       .sort((a, b) => a.position - b.position),
   );
@@ -109,6 +106,17 @@ export class BoardColumns {
       if (this.boardResource.error()) {
         this.loadError.set(getErrorMessage(this.boardResource.error()));
       }
+    });
+
+    // F2: load statuses through the shared cache; reading entities keeps the
+    // effect reactive — after an invalidate() (status mutations) it re-runs.
+    effect(() => {
+      const pid = this.projectId();
+
+      if (!pid) return;
+
+      this.refStore.statusEntities(pid);
+      this.refStore.ensure(pid, ['statuses']);
     });
   }
 

@@ -129,15 +129,17 @@ describe('SprintList', () => {
     });
   });
 
-  describe('ngOnInit - tenant-level', () => {
+  describe('ngOnInit - tenant-level (no project context)', () => {
     beforeEach(() => setup());
 
-    it('should call sprintClient.list when no projectId', () => {
-      expect(sprintClientMock.list).toHaveBeenCalled();
+    // F2: without an active project there is nothing to fetch — the old
+    // component issued a bogus `GET /projects//tasks`-style request here.
+    it('should NOT call sprintClient.list when no projectId', () => {
+      expect(sprintClientMock.list).not.toHaveBeenCalled();
     });
 
-    it('should populate sprints signal', () => {
-      expect(component.sprints()).toEqual(mockSprints);
+    it('should leave sprints empty when no projectId', () => {
+      expect(component.sprints()).toEqual([]);
     });
 
     it('should set loading to false', () => {
@@ -234,7 +236,10 @@ describe('SprintList', () => {
       expect(sprintClientMock.create).not.toHaveBeenCalled();
     });
 
-    it('should create sprint and add to list', () => {
+    it('should create sprint and add to list (F2: upsert into the shared cache)', () => {
+      // The real server returns a NEW id for the created sprint — the default
+      // mock reuses sp1, which the F2 upsert would (correctly) treat as an update.
+      sprintClientMock.create.mockReturnValueOnce(of({ ...mockSprints[0], id: 'sp3', name: 'New Sprint' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, name: 'New Sprint' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, startDate: '2025-01-01' }));
       component.model.update((m: CreateSprintForm) => ({ ...m, endDate: '2025-02-01' }));
@@ -242,6 +247,7 @@ describe('SprintList', () => {
 
       expect(sprintClientMock.create).toHaveBeenCalled();
       expect(component.sprints()).toHaveLength(3);
+      expect(component.sprints().find((s: Sprint) => s.id === 'sp3')?.name).toBe('New Sprint');
       expect(component.showCreateModal()).toBe(false);
     });
 
