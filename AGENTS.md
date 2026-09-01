@@ -136,6 +136,19 @@ Full rationale in [`docs/architecture.md`](docs/architecture.md) §Decisions.
   verification is needed, the ORCHESTRATING agent must delegate it to a subagent — never run it in the main agent's
   context (it bloats context with screenshots/snapshots). Unit tests (`npm test`) are fine to run directly.
 
+## Performance forensics
+
+- Latency investigation results and the techniques used:
+  [`product-analysis/100-performance-optimizations.md`](product-analysis/100-performance-optimizations.md).
+- Diagnostic scripts (keep-alive request series, `wrangler tail` DBEV event parser, curl timing):
+  [`tools/README.md`](tools/README.md).
+- **Gotcha (mongodb driver 7.6.0):** `connectTimeoutMS` is applied as `socket.setTimeout()` — i.e. it acts as a
+  connection IDLE timeout, not just a connect timeout. Never set non-default values (a value of 5000 killed connections
+  after 5s idle → periodic reconnect spikes of 200-700ms; root cause proven via driver events + driver sources, see
+  product-analysis/100 §2.7).
+- **Known unresolved findings:** Class 2 pre-DB stall of 140-320ms before the first Mongo checkout (edge/DO layer, not
+  Mongo) and a rare post-deploy transient hang of 75-90s — both documented, causes not established.
+
 ## Where to dig deeper
 
 - [`docs/architecture.md`](docs/architecture.md) — layers, request lifecycle, DI, RBAC matrix, data model summary,
