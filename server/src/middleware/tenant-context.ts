@@ -150,9 +150,19 @@ export const tenantContextMiddleware = createMiddleware<AppEnv>(async (c, next) 
   // requirePermission(action, true) / ensurePermission() see the real role.
   // Tenant Owner/Admin bypass happens inside the RBAC matrix, so no special
   // casing here — but we can skip the lookup entirely for them.
+  //
+  // F3 (perf audit #2): the resolved projectRole is consumed ONLY by
+  // `requirePermission(action, true)` coarse gates, and every such gate sits on
+  // a POST/PATCH route (create_task, manage_statuses, manage_labels,
+  // edit_project_config, create_sprint, manage_boards). No GET/HEAD handler or
+  // service reads `projectRole` from the context (comment/task services resolve
+  // roles themselves from the addressed resource). So for read-only requests
+  // the `project_members.findOne` is pure overhead — skip it (saves one Mongo
+  // round-trip on every project-scoped GET for tenant MEMBERs).
+  const isReadRequest = c.req.method === 'GET' || c.req.method === 'HEAD';
   const tenantRole = membership.role as TenantRole;
 
-  if (tenantRole !== TenantRole.OWNER && tenantRole !== TenantRole.ADMIN) {
+  if (!isReadRequest && tenantRole !== TenantRole.OWNER && tenantRole !== TenantRole.ADMIN) {
     const projectMatch = PROJECT_PATH_PATTERN.exec(c.req.path);
 
     if (projectMatch) {

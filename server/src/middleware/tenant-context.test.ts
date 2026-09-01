@@ -9,13 +9,15 @@ import type { AppEnv } from '../types/context.js';
 const mockMemberFindOne = vi.fn();
 const mockMemberUpdateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
 const mockTenantFindOne = vi.fn();
+const mockProjectMemberFindOne = vi.fn();
 
 vi.mock('../db/mongo.js', () => ({
-  getCollection: vi.fn((name: string) =>
-    name === 'tenants'
-      ? { findOne: mockTenantFindOne }
-      : { findOne: mockMemberFindOne, updateOne: mockMemberUpdateOne },
-  ),
+  getCollection: vi.fn((name: string) => {
+    if (name === 'tenants') return { findOne: mockTenantFindOne };
+    if (name === 'project_members') return { findOne: mockProjectMemberFindOne };
+
+    return { findOne: mockMemberFindOne, updateOne: mockMemberUpdateOne };
+  }),
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ describe('tenantContextMiddleware', () => {
   beforeEach(() => {
     mockMemberFindOne.mockReset();
     mockTenantFindOne.mockReset();
+    mockProjectMemberFindOne.mockReset();
     mockMemberUpdateOne.mockClear();
   });
 
@@ -414,5 +417,129 @@ describe('tenantContextMiddleware', () => {
     const body = (await res.json()) as { membership: { userId: string; tenantId: string; role: string } };
 
     expect(body.membership).toMatchObject({ userId: 'user-1', tenantId: 'tenant-1', role: 'OWNER' });
+  });
+
+  // ── F3 (perf audit #2): project_members lookup only for WRITE requests ────
+  //
+  // The context `projectRole` is consumed exclusively by requirePermission(...)
+  // coarse gates, all of which sit on POST/PATCH routes. GET/HEAD handlers and
+  // services resolve project roles themselves, so the middleware must skip the
+  // `project_members.findOne` for read-only requests.
+
+  function createProjectScopedTestApp() {
+    const app = new Hono<AppEnv>();
+
+    app.onError(errorHandler);
+    app.use('/api/*', async (c, next) => {
+      c.set('userId', 'user-1');
+      await next();
+    });
+    app.use('/api/*', tenantContextMiddleware);
+
+    const echoRole = (c: { get: (key: 'projectRole') => string | undefined }) => c.get('projectRole');
+
+    app.get('/api/projects/:projectId/tasks', (c) => c.json({ projectRole: echoRole(c) ?? null }));
+    app.post('/api/projects/:projectId/tasks', (c) => c.json({ projectRole: echoRole(c) ?? null }));
+
+    return app;
+  }
+
+  const ACTIVE_MEMBER = { userId: 'user-1', tenantId: 'tenant-1', role: 'MEMBER', status: 'ACTIVE' };
+
+  describe('F3: project role lookup by request method', () => {
+    it('skips the project_members lookup for a MEMBER GET on a project-scoped path', async () => {
+      mockMemberFindOne.mockResolvedValue(ACTIVE_MEMBER);
+
+      const app = createProjectScopedTestApp();
+      const res = await app.request('/api/projects/p1/tasks', { headers: { 'X-Tenant-Id': 'tenant-1' } }, TEST_ENV);
+
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as { projectRole: string | null };
+
+      expect(mockProjectMemberFindOne).not.toHaveBeenCalled();
+      expect(body.projectRole).toBeNull();
+    });
+
+    it('skips the project_members lookup for a HEAD request', async () => {
+      mockMemberFindOne.mockResolvedValue(ACTIVE_MEMBER);
+
+      const app = createProjectScopedTestApp();
+      const res = await app.request(
+        '/api/projects/p1/tasks',
+        { method: 'HEAD', headers: { 'X-Tenant-Id': 'tenant-1' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockProjectMemberFindOne).not.toHaveBeenCalled();
+    });
+
+    it('performs the project_members lookup for a MEMBER POST and exposes the role', async () => {
+      mockMemberFindOne.mockResolvedValue(ACTIVE_MEMBER);
+      mockProjectMemberFindOne.mockResolvedValue({ userId: 'user-1', projectId: 'p1', role: 'EDITOR' });
+
+      const app = createProjectScopedTestApp();
+      const res = await app.request(
+        '/api/projects/p1/tasks',
+        { method: 'POST', headers: { 'X-Tenant-Id': 'tenant-1' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockProjectMemberFindOne).toHaveBeenCalledWith({ userId: 'user-1', projectId: 'p1' });
+
+      const body = (await res.json()) as { projectRole: string | null };
+
+      expect(body.projectRole).toBe('EDITOR');
+    });
+
+    it('keeps the current behavior for a MEMBER POST without project membership (role stays unset)', async () => {
+      mockMemberFindOne.mockResolvedValue(ACTIVE_MEMBER);
+      mockProjectMemberFindOne.mockResolvedValue(null);
+
+      const app = createProjectScopedTestApp();
+      const res = await app.request(
+        '/api/projects/p1/tasks',
+        { method: 'POST', headers: { 'X-Tenant-Id': 'tenant-1' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockProjectMemberFindOne).toHaveBeenCalledWith({ userId: 'user-1', projectId: 'p1' });
+
+      const body = (await res.json()) as { projectRole: string | null };
+
+      // Authorization is left to requirePermission downstream — unchanged.
+      expect(body.projectRole).toBeNull();
+    });
+
+    it('does not look up project membership for a tenant ADMIN POST (RBAC bypass, unchanged)', async () => {
+      mockMemberFindOne.mockResolvedValue({ ...ACTIVE_MEMBER, role: 'ADMIN' });
+
+      const app = createProjectScopedTestApp();
+      const res = await app.request(
+        '/api/projects/p1/tasks',
+        { method: 'POST', headers: { 'X-Tenant-Id': 'tenant-1' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockProjectMemberFindOne).not.toHaveBeenCalled();
+    });
+
+    it('does not look up project membership for a tenant OWNER POST (RBAC bypass, unchanged)', async () => {
+      mockMemberFindOne.mockResolvedValue({ ...ACTIVE_MEMBER, role: 'OWNER' });
+
+      const app = createProjectScopedTestApp();
+      const res = await app.request(
+        '/api/projects/p1/tasks',
+        { method: 'POST', headers: { 'X-Tenant-Id': 'tenant-1' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockProjectMemberFindOne).not.toHaveBeenCalled();
+    });
   });
 });
