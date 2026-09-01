@@ -124,6 +124,75 @@ describe('TaskRepository', () => {
     });
   });
 
+  describe('findAssignedTo (audit #3: /tasks/my)', () => {
+    function chain(docs: TaskDocument[]) {
+      const toArray = vi.fn().mockResolvedValue(docs);
+      const limit = vi.fn().mockReturnValue({ toArray });
+      const sort = vi.fn().mockReturnValue({ limit });
+
+      collection.find.mockReturnValue({ sort });
+
+      return { toArray, limit, sort };
+    }
+
+    it('filters by assigneeId, sorts by updatedAt desc and applies the minimal projection', async () => {
+      const { sort, limit } = chain([makeDoc()]);
+
+      await repo.findAssignedTo('user-9');
+
+      expect(collection.find).toHaveBeenCalledWith(
+        { assigneeId: 'user-9' },
+        {
+          projection: {
+            id: 1,
+            projectId: 1,
+            number: 1,
+            title: 1,
+            priority: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      );
+      expect(sort).toHaveBeenCalledWith({ updatedAt: -1 });
+      expect(limit).toHaveBeenCalledWith(50);
+    });
+
+    it('maps projected documents — fields outside the projection are simply absent', async () => {
+      const projected = {
+        id: 'task-123',
+        projectId: 'project-1',
+        number: 7,
+        title: 'Widget Task',
+        priority: 'HIGH',
+        createdAt: new Date('2025-01-01T00:00:00Z'),
+        updatedAt: new Date('2025-01-02T00:00:00Z'),
+      } as unknown as TaskDocument;
+
+      chain([projected]);
+
+      const result = await repo.findAssignedTo('user-9');
+
+      expect(result).toHaveLength(1);
+
+      const [task] = result;
+
+      expect(task?.title).toBe('Widget Task');
+      expect(task?.priority).toBe('HIGH');
+      // Excluded fields (description, snapshots, …) are not part of the response.
+      expect(task?.description).toBeUndefined();
+      expect(task?.assigneeSnapshot).toBeUndefined();
+    });
+
+    it('honours a custom limit', async () => {
+      const { limit } = chain([]);
+
+      await repo.findAssignedTo('user-9', 10);
+
+      expect(limit).toHaveBeenCalledWith(10);
+    });
+  });
+
   describe('create', () => {
     it('creates a task with version 1', async () => {
       collection.insertOne.mockResolvedValue({ acknowledged: true } as InsertOneResult);

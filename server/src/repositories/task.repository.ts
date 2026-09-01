@@ -15,6 +15,7 @@ import { escapeRegExp } from '../utils/regex.js';
 // - { projectId: 1, reporterId: 1, number: -1 }
 // - { projectId: 1, priority: 1, number: -1 }
 // - { projectId: 1, typeId: 1, number: -1 }
+// - { assigneeId: 1, updatedAt: -1 } (cross-project /tasks/my — audit #3)
 
 /** Sort fields that require resolving relation names / snapshots / priority rank before sorting. */
 const SEMANTIC_SORT_FIELDS = new Set(['statusId', 'sprintId', 'labelIds', 'priority', 'assigneeId', 'reporterId']);
@@ -134,9 +135,37 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     return toDomain(doc);
   }
 
-  /** Tasks assigned to a user across all projects, newest update first. */
+  /**
+   * Tasks assigned to a user across all projects, newest update first.
+   *
+   * Audit #3: the only consumer is the tenant-home "My Tasks" widget, which
+   * renders `id`, `number`, `title`, `priority` and resolves the project via
+   * `projectId`. An inclusion projection keeps the payload minimal (description
+   * and snapshots are the bulk of a full task document); the server-side sort
+   * by `updatedAt` is unchanged. Requires the `{ assigneeId: 1, updatedAt: -1 }`
+   * index (see migrations) — without it this query is a COLLSCAN.
+   */
   async findAssignedTo(userId: string, limit = 50): Promise<Task[]> {
-    const docs = await this.collection.find({ assigneeId: userId }).sort({ updatedAt: -1 }).limit(limit).toArray();
+    const docs = await this.collection
+      // createdAt/updatedAt are required by toDomain (toISOString) — and
+      // updatedAt is the sort key anyway.
+      .find(
+        { assigneeId: userId },
+        {
+          projection: {
+            id: 1,
+            projectId: 1,
+            number: 1,
+            title: 1,
+            priority: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      )
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .toArray();
 
     return docs.map(toDomain);
   }

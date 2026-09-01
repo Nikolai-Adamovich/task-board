@@ -222,6 +222,11 @@ const CORE_INDEXES: IndexDefinition[] = [
   { collection: 'tasks', spec: { projectId: 1, statusId: 1 } },
   { collection: 'tasks', spec: { projectId: 1, sprintId: 1 } },
   { collection: 'tasks', spec: { projectId: 1, assigneeId: 1 } },
+  // Audit #3: /tasks/my (`findAssignedTo`) filters by {assigneeId} alone and
+  // sorts by {updatedAt} — the compound {projectId, assigneeId} index does not
+  // apply (projectId is its prefix). Covers the cross-project "My Tasks"
+  // query as an IXSCAN without a blocking SORT.
+  { collection: 'tasks', spec: { assigneeId: 1, updatedAt: -1 } },
   // S-15: label filter queries (`labelIds` array) — multikey index
   { collection: 'tasks', spec: { projectId: 1, labelIds: 1 } },
   // Capacity experiment 2026-08-31: title sort (task-table) — covers
