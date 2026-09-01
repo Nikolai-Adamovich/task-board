@@ -20,8 +20,6 @@ export {
   MemberStatusValues,
   InvitationStatus,
   InvitationStatusValues,
-  BoardType,
-  BoardTypeValues,
   TaskRelationshipType,
   TaskRelationshipTypeValues,
   TenantStatus,
@@ -87,7 +85,7 @@ export type {
 
 export type { Project, CreateProject, UpdateProject, ProjectMember } from './types/project.js';
 
-export type { Board, BoardColumn, CreateBoard, UpdateBoard } from './types/board.js';
+export type { BoardConfig, BoardColumn, UpdateBoardColumns } from './types/board.js';
 
 export type {
   Task,

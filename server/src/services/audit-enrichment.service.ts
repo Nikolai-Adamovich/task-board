@@ -55,7 +55,6 @@ export interface AuditEnrichmentRepos {
   statuses: AuditLabelRepo<NamedRef>;
   labels: AuditLabelRepo<NamedRef>;
   taskTypes: AuditLabelRepo<NamedRef>;
-  boards: AuditLabelRepo<NamedRef>;
   projects: AuditLabelRepo<ProjectRef>;
   users: AuditLabelRepo<UserRef>;
   comments: AuditLabelRepo<CommentRef>;
@@ -70,7 +69,6 @@ interface AuditIdSets {
   statuses: Set<string>;
   labels: Set<string>;
   taskTypes: Set<string>;
-  boards: Set<string>;
   projects: Set<string>;
   users: Set<string>;
   comments: Set<string>;
@@ -96,7 +94,6 @@ export class AuditEnrichmentService {
       statuses: new Set<string>(),
       labels: new Set<string>(),
       taskTypes: new Set<string>(),
-      boards: new Set<string>(),
       projects: new Set<string>(),
       users: new Set<string>(),
       comments: new Set<string>(),
@@ -128,13 +125,15 @@ export class AuditEnrichmentService {
       if (task.projectId) ids.projects.add(task.projectId);
     }
 
-    const [sprintRows, statusRows, labelRows, typeRows, boardRows, projectRows, userRows, tenantRows, memberRows] =
+    // Single-board model (doc 102): BOARD audit events carry the projectId as
+    // entityId, so board labels resolve through the projects lookup below —
+    // there is no separate boards repo anymore.
+    const [sprintRows, statusRows, labelRows, typeRows, projectRows, userRows, tenantRows, memberRows] =
       await Promise.all([
         this.repos.sprints.findByIds([...ids.sprints]),
         this.repos.statuses.findByIds([...ids.statuses]),
         this.repos.labels.findByIds([...ids.labels]),
         this.repos.taskTypes.findByIds([...ids.taskTypes]),
-        this.repos.boards.findByIds([...ids.boards]),
         this.repos.projects.findByIds([...ids.projects]),
         this.repos.users.findByIds([...ids.users]),
         this.repos.tenants.findByIds([...ids.tenants]),
@@ -152,7 +151,6 @@ export class AuditEnrichmentService {
       statusNameById: new Map(statusRows.map((s) => [s.id, s.name])),
       labelNameById,
       typeNameById: new Map(typeRows.map((t) => [t.id, t.name])),
-      boardNameById: new Map(boardRows.map((b) => [b.id, b.name])),
       projectNameById: new Map(projectRows.map((p) => [p.id, p.name])),
       userNameById: new Map(userRows.map((u) => [u.id, u.displayName || u.email])),
       commentTaskById: new Map(commentRows.map((c) => [c.id, c.taskId])),
@@ -188,7 +186,8 @@ export class AuditEnrichmentService {
     else if (entityType === 'STATUS') ids.statuses.add(entityId);
     else if (entityType === 'LABEL') ids.labels.add(entityId);
     else if (entityType === 'TASK_TYPE') ids.taskTypes.add(entityId);
-    else if (entityType === 'BOARD') ids.boards.add(entityId);
+    // Single-board model: the board is identified by its projectId.
+    else if (entityType === 'BOARD') ids.projects.add(entityId);
     else if (entityType === 'PROJECT') ids.projects.add(entityId);
     else if (entityType === 'TENANT') ids.tenants.add(entityId);
     else if (entityType === 'MEMBERSHIP') ids.tenantMembers.add(entityId);
@@ -220,7 +219,6 @@ export class AuditEnrichmentService {
       statusNameById: Map<string, string>;
       labelNameById: Map<string, string>;
       typeNameById: Map<string, string>;
-      boardNameById: Map<string, string>;
       projectNameById: Map<string, string>;
       userNameById: Map<string, string>;
       commentTaskById: Map<string, string>;
@@ -233,7 +231,7 @@ export class AuditEnrichmentService {
     if (entityType === 'STATUS') return maps.statusNameById.get(entityId) ?? UNKNOWN_LABEL;
     if (entityType === 'LABEL') return maps.labelNameById.get(entityId) ?? UNKNOWN_LABEL;
     if (entityType === 'TASK_TYPE') return maps.typeNameById.get(entityId) ?? UNKNOWN_LABEL;
-    if (entityType === 'BOARD') return maps.boardNameById.get(entityId) ?? UNKNOWN_LABEL;
+    if (entityType === 'BOARD') return maps.projectNameById.get(entityId) ?? UNKNOWN_LABEL;
     if (entityType === 'PROJECT') return maps.projectNameById.get(entityId) ?? UNKNOWN_LABEL;
     if (entityType === 'TENANT') return maps.tenantNameById.get(entityId) ?? UNKNOWN_LABEL;
 

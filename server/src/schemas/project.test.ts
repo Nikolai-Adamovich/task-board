@@ -29,7 +29,6 @@ describe('project description limit (120 chars)', () => {
       name: 'Proj',
       status: 'ACTIVE',
       defaultStatusId: 's1',
-      defaultBoardId: 'b1',
       archiveReason: null,
       deletionScheduledAt: null,
       createdAt: NOW,

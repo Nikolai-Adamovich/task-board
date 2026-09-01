@@ -16,8 +16,6 @@ export interface Project {
   status: ProjectStatus;
   /** Default status ID assigned to new tasks */
   defaultStatusId: string;
-  /** Default board ID for the project */
-  defaultBoardId: string;
   /** Reason for archival (null if not archived) */
   archiveReason: ArchiveReason | null;
   /** Scheduled deletion timestamp (ISO 8601, null if not scheduled) */

@@ -29,7 +29,6 @@ const mockProject = {
   description: null,
   status: 'ACTIVE',
   defaultStatusId: 'status-1',
-  defaultBoardId: 'board-1',
   archiveReason: null,
   deletionScheduledAt: null,
   createdAt: '2025-01-01T00:00:00.000Z',

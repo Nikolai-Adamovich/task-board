@@ -9,6 +9,7 @@ import {
   ensureTenantSlugUniqueIndex,
   ensureTenantSlugIntegrity,
   backfillMemberExpiresAt,
+  migrateToSingleBoardPerProject,
 } from './migrations.js';
 
 describe('migrateInvitedMembershipsToRevoked', () => {
@@ -193,5 +194,109 @@ describe('backfillMemberExpiresAt (DEC-055)', () => {
     const count = await backfillMemberExpiresAt(db);
 
     expect(count).toBe(0);
+  });
+});
+
+// ─── Single-board migration (doc 102) ────────────────────────────────────────
+
+function createBoardMigrationDb(boards: unknown[], projects: unknown[]) {
+  const boardsCollection = {
+    find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue(boards) }),
+    findOne: vi.fn(),
+    deleteMany: vi.fn().mockResolvedValue({ deletedCount: 1 }),
+    updateOne: vi.fn().mockResolvedValue({ modifiedCount: 1 }),
+    dropIndex: vi.fn().mockResolvedValue(undefined),
+    indexes: vi.fn().mockResolvedValue([]),
+  };
+  const projectsCollection = {
+    findOne: vi.fn().mockResolvedValue(null),
+    find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue(projects) }),
+    updateMany: vi.fn().mockResolvedValue({ modifiedCount: 0 }),
+  };
+  const prefsCollection = { updateMany: vi.fn().mockResolvedValue({ modifiedCount: 0 }) };
+  const collections: Record<string, unknown> = {
+    boards: boardsCollection,
+    projects: projectsCollection,
+    user_preferences: prefsCollection,
+  };
+  const db = {
+    collection: vi.fn((name: string) => collections[name]),
+  };
+
+  return { db, boardsCollection, projectsCollection, prefsCollection };
+}
+
+describe('migrateToSingleBoardPerProject (doc 102)', () => {
+  const columns = [{ id: 'col-1', statusIds: ['s1'], position: 0 }];
+
+  it('keeps the board referenced by project.defaultBoardId and drops the extras', async () => {
+    const boards = [
+      { _id: 'oid-1', id: 'board-old', projectId: 'p1', name: 'Old', type: 'KANBAN', columns, createdAt: new Date(1) },
+      {
+        _id: 'oid-2',
+        id: 'board-default',
+        projectId: 'p1',
+        name: 'Default',
+        type: 'KANBAN',
+        columns,
+        createdAt: new Date(2),
+      },
+    ];
+    const { db, boardsCollection, projectsCollection } = createBoardMigrationDb(boards, [
+      { id: 'p1', defaultBoardId: 'board-default' },
+    ]);
+
+    projectsCollection.findOne.mockResolvedValue({ id: 'p1', defaultBoardId: 'board-default' });
+
+    await migrateToSingleBoardPerProject(db as never);
+
+    expect(boardsCollection.deleteMany).toHaveBeenCalledWith({ _id: { $in: ['oid-1'] } });
+    // The survivor is normalized: dead fields stripped, projectId preserved
+    expect(boardsCollection.updateOne).toHaveBeenCalledWith(
+      { _id: 'oid-2' },
+      expect.objectContaining({
+        $set: expect.objectContaining({ projectId: 'p1', columns }),
+        $unset: { id: '', name: '', type: '' },
+      }),
+    );
+  });
+
+  it('falls back to the OLDEST board when the project has no defaultBoardId', async () => {
+    const boards = [
+      { _id: 'oid-2', projectId: 'p1', columns, createdAt: new Date(2) },
+      { _id: 'oid-1', projectId: 'p1', columns, createdAt: new Date(1) },
+    ];
+    const { db, boardsCollection } = createBoardMigrationDb(boards, [{ id: 'p1', defaultBoardId: 'gone' }]);
+
+    boardsCollection.findOne.mockResolvedValue(null);
+
+    await migrateToSingleBoardPerProject(db as never);
+
+    expect(boardsCollection.deleteMany).toHaveBeenCalledWith({ _id: { $in: ['oid-2'] } });
+    expect(boardsCollection.updateOne).toHaveBeenCalledWith({ _id: 'oid-1' }, expect.anything());
+  });
+
+  it('unsets dead defaultBoardId fields on projects and user_preferences', async () => {
+    const { db, projectsCollection, prefsCollection } = createBoardMigrationDb([], [{ id: 'p1' }]);
+
+    await migrateToSingleBoardPerProject(db as never);
+
+    expect(projectsCollection.updateMany).toHaveBeenCalledWith(
+      { defaultBoardId: { $exists: true } },
+      { $unset: { defaultBoardId: '' } },
+    );
+    expect(prefsCollection.updateMany).toHaveBeenCalledWith(
+      { defaultBoardId: { $exists: true } },
+      { $unset: { defaultBoardId: '' } },
+    );
+  });
+
+  it('is idempotent — a conformed database is a no-op', async () => {
+    const boards = [{ _id: 'oid-1', projectId: 'p1', columns, createdAt: new Date(1) }];
+    const { db, boardsCollection } = createBoardMigrationDb(boards, [{ id: 'p1' }]);
+
+    await migrateToSingleBoardPerProject(db as never);
+
+    expect(boardsCollection.deleteMany).not.toHaveBeenCalled();
   });
 });

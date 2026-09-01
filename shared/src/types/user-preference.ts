@@ -1,6 +1,6 @@
 import type { TaskTableColumnKey } from '../constants/task-table.js';
 
-/** Per-user, per-project board selection preference */
+/** Per-user, per-project board preference */
 export interface UserProjectBoardPreference {
   /** Unique preference identifier (UUID v4) */
   id: string;
@@ -8,8 +8,6 @@ export interface UserProjectBoardPreference {
   userId: string;
   /** Project ID */
   projectId: string;
-  /** Default board ID for this project (null if not set) */
-  defaultBoardId: string | null;
   /**
    * Visible task-table columns for this project (R3-P4). Null = default set.
    * `key`/`title` are always part of the effective set regardless of this value.
@@ -23,6 +21,5 @@ export interface UserProjectBoardPreference {
 
 /** Update user project board preference request body type (partial update) */
 export interface UpdateUserProjectBoardPreference {
-  defaultBoardId?: string | null;
   taskTableColumns?: TaskTableColumnKey[] | null;
 }

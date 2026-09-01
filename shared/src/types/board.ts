@@ -1,5 +1,3 @@
-import type { BoardType } from '../constants/roles.js';
-
 /** Board column — maps statuses to a visual column */
 export interface BoardColumn {
   /** Unique column identifier (UUID v4) */
@@ -10,17 +8,18 @@ export interface BoardColumn {
   position: number;
 }
 
-/** Board entity type */
-export interface Board {
-  /** Unique board identifier (UUID v4) */
-  id: string;
-  /** Parent project ID */
+/**
+ * The project's single board (workflow/view configuration).
+ * A project owns EXACTLY one board and the board is identified by its
+ * `projectId` — there is no separate board id, no per-board name/type, and no
+ * board CRUD: the board is created with the project and deleted with it.
+ * Sprint scoping is a URL query filter (`?sprintId=`) on the frontend, never
+ * a property of the board.
+ */
+export interface BoardConfig {
+  /** Owning project ID (unique — the board's natural identifier) */
   projectId: string;
-  /** Board name */
-  name: string;
-  /** Board type (KANBAN or SPRINT) */
-  type: BoardType;
-  /** Embedded columns */
+  /** Ordered workflow columns; each groups one or more statuses */
   columns: BoardColumn[];
   /** Creation timestamp (ISO 8601) */
   createdAt: string;
@@ -28,15 +27,7 @@ export interface Board {
   updatedAt: string;
 }
 
-/** Create board request body type */
-export interface CreateBoard {
-  name: string;
-  type: BoardType;
-  columns: { statusIds: string[]; position: number }[];
-}
-
-/** Update board request body type */
-export interface UpdateBoard {
-  name?: string;
-  columns?: { id?: string; statusIds: string[]; position: number }[];
+/** Update-board request body type (columns/workflow only) */
+export interface UpdateBoardColumns {
+  columns: { id?: string; statusIds: string[]; position: number }[];
 }

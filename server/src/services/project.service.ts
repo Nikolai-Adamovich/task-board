@@ -145,16 +145,13 @@ export class ProjectService {
       project = await withTransaction(async (session) => {
         const created = await this.projectRepo.create(tenantId, input, { session });
         const statusMap = await this.seedStatuses(created.id, session);
-        const boardId = await this.seedBoard(created.id, statusMap, session);
+
+        await this.seedBoard(created.id, statusMap, session);
 
         await this.seedTaskTypes(created.id, session);
 
-        // Link default references on the project (still inside the transaction)
-        await this.projectRepo.update(
-          created.id,
-          { defaultStatusId: statusMap.get('TODO') ?? '', defaultBoardId: boardId },
-          { session },
-        );
+        // Link the default status on the project (still inside the transaction)
+        await this.projectRepo.update(created.id, { defaultStatusId: statusMap.get('TODO') ?? '' }, { session });
 
         // Add creator as PROJECT_ADMIN
         await this.projectMemberRepo.create(
@@ -461,8 +458,11 @@ export class ProjectService {
     }
   }
 
-  private async seedBoard(projectId: string, statusMap: Map<string, string>, session?: ClientSession): Promise<string> {
-    const boardId = randomUUID();
+  /**
+   * Seed the project's single board (single-board model, doc 102): identified
+   * by projectId, no name/type, created atomically with the project.
+   */
+  private async seedBoard(projectId: string, statusMap: Map<string, string>, session?: ClientSession): Promise<void> {
     const columns = SEED_BOARD_COLUMNS.map((col) => ({
       id: randomUUID(),
       statusIds: col.statusRefs.map((ref) => statusMap.get(ref) ?? ''),
@@ -471,18 +471,13 @@ export class ProjectService {
 
     await this.collections.boards.insertOne(
       {
-        id: boardId,
         projectId,
-        name: 'Default Board',
-        type: 'KANBAN',
         columns,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
       { session },
     );
-
-    return boardId;
   }
 
   /**
@@ -502,14 +497,12 @@ export class ProjectService {
     try {
       const statusMap = await this.seedStatuses(project.id);
       const todoStatusId = statusMap.get('TODO') ?? '';
-      const boardId = await this.seedBoard(project.id, statusMap);
+
+      await this.seedBoard(project.id, statusMap);
 
       await this.seedTaskTypes(project.id);
 
-      await this.projectRepo.update(project.id, {
-        defaultStatusId: todoStatusId,
-        defaultBoardId: boardId,
-      });
+      await this.projectRepo.update(project.id, { defaultStatusId: todoStatusId });
 
       await this.projectMemberRepo.create({
         userId,

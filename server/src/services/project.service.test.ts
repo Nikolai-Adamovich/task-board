@@ -69,7 +69,6 @@ function makeProject(overrides: Record<string, unknown> = {}) {
     description: null,
     status: 'ACTIVE',
     defaultStatusId: 'status-todo',
-    defaultBoardId: 'board-1',
     archiveReason: null,
     deletionScheduledAt: null,
     createdAt: NOW,
@@ -125,7 +124,7 @@ describe('ProjectService', () => {
   describe('createProject', () => {
     it('creates a project with seed data and adds the creator as PROJECT_ADMIN', async () => {
       projectRepo.findByTenantAndKey.mockResolvedValue(null);
-      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '', defaultBoardId: '' }));
+      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '' }));
       projectRepo.findById.mockResolvedValue(makeProject());
       memberRepo.create.mockResolvedValue(makeProjectMember());
 
@@ -158,7 +157,7 @@ describe('ProjectService', () => {
 
     it('runs the whole seed inside one transaction bound to its session', async () => {
       projectRepo.findByTenantAndKey.mockResolvedValue(null);
-      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '', defaultBoardId: '' }));
+      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '' }));
       projectRepo.findById.mockResolvedValue(makeProject());
       memberRepo.create.mockResolvedValue(makeProjectMember());
 
@@ -177,7 +176,7 @@ describe('ProjectService', () => {
       expect(collections.boards.insertOne.mock.calls[0]?.[1]).toEqual({ session: txSession });
       expect(projectRepo.update).toHaveBeenCalledWith(
         'proj-1',
-        { defaultStatusId: expect.any(String), defaultBoardId: expect.any(String) },
+        { defaultStatusId: expect.any(String) },
         { session: txSession },
       );
     });
@@ -199,7 +198,7 @@ describe('ProjectService', () => {
 
     it('falls back to compensating-cleanup seed when transactions are unsupported', async () => {
       projectRepo.findByTenantAndKey.mockResolvedValue(null);
-      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '', defaultBoardId: '' }));
+      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '' }));
       projectRepo.findById.mockResolvedValue(makeProject());
       memberRepo.create.mockResolvedValue(makeProjectMember());
       vi.mocked(withTransaction).mockRejectedValue(new TransactionsUnsupportedError());
@@ -227,7 +226,7 @@ describe('ProjectService', () => {
 
     it('fallback path deletes the project when seeding fails midway', async () => {
       projectRepo.findByTenantAndKey.mockResolvedValue(null);
-      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '', defaultBoardId: '' }));
+      projectRepo.create.mockResolvedValue(makeProject({ defaultStatusId: '' }));
       collections.statuses.insertOne.mockRejectedValue(new Error('write failed'));
       vi.mocked(withTransaction).mockRejectedValue(new TransactionsUnsupportedError());
 

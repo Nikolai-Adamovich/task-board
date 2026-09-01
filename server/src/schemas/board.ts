@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { BoardTypeValues } from '@task-board/shared';
-import { uuid, nonEmptyString } from '../validators/common.js';
+import { uuid } from '../validators/common.js';
 
 /**
  * Board column schema — embedded value object.
@@ -12,19 +11,10 @@ const BoardColumnSchema = z.object({
 });
 
 /**
- * Schema for creating a new board with embedded columns.
+ * Schema for updating the project's single board (columns/workflow).
+ * The board itself cannot be created/deleted/renamed via the API — it is
+ * created with the project and dies with it (single-board model, doc 102).
  */
-export const CreateBoardSchema = z.object({
-  name: nonEmptyString(200, 'Board name'),
-  type: z.enum(BoardTypeValues),
+export const UpdateBoardColumnsSchema = z.object({
   columns: z.array(BoardColumnSchema).min(1, 'Board must have at least one column'),
-});
-
-/**
- * Schema for updating an existing board.
- * All fields are optional (partial update).
- */
-export const UpdateBoardSchema = z.object({
-  name: nonEmptyString(200, 'Board name').optional(),
-  columns: z.array(BoardColumnSchema).optional(),
 });

@@ -16,7 +16,6 @@ export interface UserPreferencesDocument {
   id: string;
   userId: string;
   projectId: string;
-  defaultBoardId: string | null;
   /** R3-P4: visible task-table columns; null/absent = default set. */
   taskTableColumns?: TaskTableColumnKey[] | null;
   createdAt: Date;
@@ -30,7 +29,6 @@ function toDomain(doc: UserPreferencesDocument): UserProjectBoardPreference {
     id: doc.id,
     userId: doc.userId,
     projectId: doc.projectId,
-    defaultBoardId: doc.defaultBoardId ?? null,
     taskTableColumns: doc.taskTableColumns ?? null,
     // Tolerate legacy docs persisted before createdAt/updatedAt were set on insert (V7-3).
     createdAt: (doc.createdAt ?? new Date(0)).toISOString(),
@@ -55,13 +53,9 @@ export class UserPreferencesRepository {
     data: UpdateUserProjectBoardPreference,
   ): Promise<UserProjectBoardPreference> {
     const now = new Date();
-    // Partial update: only $set the fields the request actually carried so a
-    // PATCH of one preference never wipes the other (R3-P4).
+    // Partial update: only $set the fields the request actually carried.
     const $set: Record<string, unknown> = { updatedAt: now };
 
-    if (data.defaultBoardId !== undefined) {
-      $set['defaultBoardId'] = data.defaultBoardId;
-    }
     if (data.taskTableColumns !== undefined) {
       $set['taskTableColumns'] = data.taskTableColumns;
     }

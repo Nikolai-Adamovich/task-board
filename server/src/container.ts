@@ -107,7 +107,6 @@ export function buildServices(env: ContainerEnv): Services {
     statuses: statusRepo,
     labels: labelRepo,
     taskTypes: taskTypeRepo,
-    boards: boardRepo,
     projects: projectRepo,
     users: userRepo,
     comments: commentRepo,
@@ -148,7 +147,6 @@ export function buildServices(env: ContainerEnv): Services {
     labels: new LabelService(labelRepo, taskRepo, projectRepo, auditService, projectMemberRepo),
     preferences: new UserPreferencesService(
       new UserPreferencesRepository(getCollection<UserPreferencesDocument>('user_preferences')),
-      boardRepo,
       new UserSettingsRepository(getCollection('user_settings')),
     ),
     projects: new ProjectService(projectRepo, projectMemberRepo, {

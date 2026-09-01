@@ -67,15 +67,6 @@ export const InvitationStatus = {
 export type InvitationStatus = (typeof InvitationStatus)[keyof typeof InvitationStatus];
 export const InvitationStatusValues = valuesOf(InvitationStatus);
 
-// ─── BoardType ───────────────────────────────────────────────────────────────
-export const BoardType = {
-  KANBAN: 'KANBAN',
-  SPRINT: 'SPRINT',
-} as const;
-
-export type BoardType = (typeof BoardType)[keyof typeof BoardType];
-export const BoardTypeValues = valuesOf(BoardType);
-
 // ─── TaskRelationshipType ────────────────────────────────────────────────────
 export const TaskRelationshipType = {
   BLOCKS: 'BLOCKS',

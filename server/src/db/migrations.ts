@@ -253,9 +253,9 @@ const CORE_INDEXES: IndexDefinition[] = [
   // task_types
   { collection: 'task_types', spec: { id: 1 }, options: { unique: true } },
   { collection: 'task_types', spec: { projectId: 1, key: 1 }, options: { unique: true } },
-  // boards
-  { collection: 'boards', spec: { id: 1 }, options: { unique: true } },
-  { collection: 'boards', spec: { projectId: 1 } },
+  // boards — single-board model (102 proposal): projectId is the natural
+  // unique key; there is no separate board id anymore.
+  { collection: 'boards', spec: { projectId: 1 }, options: { unique: true } },
   // sprints
   { collection: 'sprints', spec: { id: 1 }, options: { unique: true } },
   { collection: 'sprints', spec: { projectId: 1, status: 1 } },
@@ -284,6 +284,126 @@ export async function ensureCoreIndexes(db: Db): Promise<void> {
   );
 }
 
+// ─── Single-Board Migration (102 proposal) ───────────────────────────────────
+
+interface LegacyBoardDocument {
+  _id: import('mongodb').ObjectId;
+  id?: string;
+  projectId: string;
+  name?: string;
+  type?: string;
+  columns?: { id?: string; statusIds: string[]; position: number }[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/**
+ * Guarantee exactly one board per project, keyed by `projectId`, and strip the
+ * dead multi-board fields. Idempotent — an already-conformed database is a
+ * no-op. MUST run before the unique `{projectId:1}` index is created (it
+ * removes the duplicates the index would reject).
+ *
+ * 1. Dedupe: when a project has >1 board, keep the one referenced by the
+ *    project's `defaultBoardId` (fallback: the oldest by createdAt) and delete
+ *    the rest.
+ * 2. Normalize the survivor to `{projectId, columns, createdAt, updatedAt}` —
+ *    drop `id`/`name`/`type`.
+ * 3. `$unset` the dead `projects.defaultBoardId` and
+ *    `user_preferences.defaultBoardId` fields.
+ * 4. Drop the obsolete `{id:1}` unique index (superseded by `{projectId:1}`).
+ */
+export async function migrateToSingleBoardPerProject(db: Db): Promise<void> {
+  const boards = db.collection<LegacyBoardDocument>('boards');
+  const projects = db.collection('projects');
+  const prefs = db.collection('user_preferences');
+  const now = new Date();
+
+  // ── 4 — obsolete legacy index MUST be dropped FIRST: the unique {id:1}
+  // index rejects the second normalized doc (id: null) once a project's
+  // boards are being stripped of their legacy `id` field.
+  try {
+    await boards.dropIndex('id_1');
+  } catch {
+    // Already dropped (or never created) — nothing to do.
+  }
+
+  // Also drop the legacy NON-unique {projectId:1} index: it occupies the
+  // auto-generated name `projectId_1`, which would collide with the UNIQUE
+  // index created by ensureCoreIndexes below.
+  const indexes = await boards.indexes();
+  const legacyProjectIdIndex = indexes.find((index) => index.name === 'projectId_1' && !index.unique);
+
+  if (legacyProjectIdIndex) {
+    await boards.dropIndex('projectId_1');
+  }
+
+  // ── 1+2 — one normalized board per project ────────────────────────────────
+  const legacy = await boards.find({}).toArray();
+  const byProject = new Map<string, LegacyBoardDocument[]>();
+
+  for (const board of legacy) {
+    const list = byProject.get(board.projectId) ?? [];
+
+    list.push(board);
+    byProject.set(board.projectId, list);
+  }
+
+  for (const [projectId, list] of byProject) {
+    const project = await projects.findOne({ id: projectId }, { projection: { defaultBoardId: 1 } });
+    const preferredId: string | undefined = project?.defaultBoardId;
+    let survivor = preferredId ? list.find((b) => b.id === preferredId) : undefined;
+
+    if (!survivor) {
+      survivor = [...list].sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0))[0];
+    }
+
+    const doomed = list.filter((b) => b !== survivor);
+
+    if (doomed.length > 0) {
+      await boards.deleteMany({ _id: { $in: doomed.map((b) => b._id) } });
+      log.warn('single-board: dropped extra board(s) for project', { projectId, count: doomed.length });
+    }
+
+    if (survivor) {
+      await boards.updateOne(
+        { _id: survivor._id },
+        {
+          $set: {
+            projectId,
+            columns: survivor.columns ?? [],
+            createdAt: survivor.createdAt ?? now,
+            updatedAt: survivor.updatedAt ?? now,
+          },
+          $unset: { id: '', name: '', type: '' },
+        },
+      );
+    }
+  }
+
+  const projectIds = await projects.find({}, { projection: { id: 1 } }).toArray();
+  const withoutBoard = projectIds.filter((p) => !byProject.has(p.id));
+
+  if (withoutBoard.length > 0) {
+    // Should never happen (the seed always creates a board) — surface it, the
+    // board endpoint will 404 for these projects until they are reseeded.
+    log.warn('single-board: projects without any board', { count: withoutBoard.length });
+  }
+
+  // ── 3 — dead per-project/per-user default-board references ────────────────
+  const projectUnset = await projects.updateMany(
+    { defaultBoardId: { $exists: true } },
+    { $unset: { defaultBoardId: '' } },
+  );
+  const prefUnset = await prefs.updateMany({ defaultBoardId: { $exists: true } }, { $unset: { defaultBoardId: '' } });
+
+  if (projectUnset.modifiedCount > 0 || prefUnset.modifiedCount > 0) {
+    log.info('single-board: unset defaultBoardId fields', {
+      projects: projectUnset.modifiedCount,
+      preferences: prefUnset.modifiedCount,
+    });
+  }
+}
+
 /**
  * Idempotent data migrations, executed by `server/scripts/migrate.ts` (from
  * CD before the Worker deploy, or locally) — NEVER in the Worker request
@@ -296,5 +416,6 @@ export async function runMigrations(db: Db): Promise<void> {
   await renameSeedStatusNames(db); // DR-1 — raw seed-status keys → display names
   await ensureTenantSlugIntegrity(db); // DEC-032 — backfill + unique index back-to-back
   await backfillMemberExpiresAt(db); // DEC-055 — expiresAt: null on legacy members
+  await migrateToSingleBoardPerProject(db); // 102 — dedupe boards, strip dead fields (before the unique index)
   await ensureCoreIndexes(db); // create every repository-documented index (idempotent)
 }

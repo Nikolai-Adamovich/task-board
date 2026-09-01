@@ -1,10 +1,9 @@
-import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
-import type { Board } from '@task-board/shared';
+import type { Collection } from 'mongodb';
+import type { BoardConfig } from '@task-board/shared';
 
 // Required MongoDB indexes:
-// - { id: 1 } (unique)
-// - { projectId: 1 }
+// - { projectId: 1 } (unique) — the board's natural identifier (single-board model)
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
@@ -16,10 +15,8 @@ export interface BoardColumnDocument {
 
 export interface BoardDocument {
   _id?: import('mongodb').ObjectId;
-  id: string;
+  /** Owning project ID — unique; there is no separate board id */
   projectId: string;
-  name: string;
-  type: string;
   columns: BoardColumnDocument[];
   createdAt: Date;
   updatedAt: Date;
@@ -27,12 +24,9 @@ export interface BoardDocument {
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
-function toDomain(doc: BoardDocument): Board {
+function toDomain(doc: BoardDocument): BoardConfig {
   return {
-    id: doc.id,
     projectId: doc.projectId,
-    name: doc.name,
-    type: doc.type as Board['type'],
     columns: doc.columns.map((col) => ({
       id: col.id,
       statusIds: col.statusIds,
@@ -45,32 +39,26 @@ function toDomain(doc: BoardDocument): Board {
 
 // ─── Board Repository ────────────────────────────────────────────────────────
 
-export class BoardRepository extends BaseRepository<BoardDocument, Board> {
-  protected toDomain(doc: BoardDocument): Board {
-    return toDomain(doc);
+export class BoardRepository {
+  constructor(private readonly collection: Collection<BoardDocument>) {}
+
+  /** The project's single board (null when missing — should never happen post-seed). */
+  async findByProject(projectId: string): Promise<BoardConfig | null> {
+    const doc = await this.collection.findOne({ projectId });
+
+    return doc ? toDomain(doc) : null;
   }
 
-  async findByProject(projectId: string): Promise<Board[]> {
-    const docs = await this.collection.find({ projectId }).toArray();
-
-    return docs.map(toDomain);
-  }
-
-  async create(
-    projectId: string,
-    input: {
-      name: string;
-      type: string;
-      columns: { id: string; statusIds: string[]; position: number }[];
-    },
-  ): Promise<Board> {
+  /** Create the project's board (called once from the project seed). */
+  async create(projectId: string, columns: { statusIds: string[]; position: number }[]): Promise<BoardConfig> {
     const now = new Date();
     const doc: BoardDocument = {
-      id: randomUUID(),
       projectId,
-      name: input.name,
-      type: input.type,
-      columns: input.columns,
+      columns: columns.map((col) => ({
+        id: randomUUID(),
+        statusIds: col.statusIds,
+        position: col.position,
+      })),
       createdAt: now,
       updatedAt: now,
     };
@@ -79,10 +67,23 @@ export class BoardRepository extends BaseRepository<BoardDocument, Board> {
     return toDomain(doc);
   }
 
-  async update(id: string, input: Partial<Pick<BoardDocument, 'name' | 'columns'>>): Promise<Board | null> {
+  /** Replace the board's columns (workflow edit). */
+  async updateColumns(
+    projectId: string,
+    columns: { id?: string; statusIds: string[]; position: number }[],
+  ): Promise<BoardConfig | null> {
     const result = await this.collection.findOneAndUpdate(
-      { id },
-      { $set: { ...input, updatedAt: new Date() } },
+      { projectId },
+      {
+        $set: {
+          columns: columns.map((col) => ({
+            id: col.id ?? randomUUID(),
+            statusIds: col.statusIds,
+            position: col.position,
+          })),
+          updatedAt: new Date(),
+        },
+      },
       { returnDocument: 'after' },
     );
 
@@ -90,7 +91,7 @@ export class BoardRepository extends BaseRepository<BoardDocument, Board> {
   }
 
   /**
-   * Replace a status ID in all columns across all boards in a project.
+   * Replace a status ID in the board's columns.
    * Used when deleting a status with a replacement.
    */
   async replaceStatusInColumns(projectId: string, oldStatusId: string, newStatusId: string): Promise<void> {
@@ -102,7 +103,8 @@ export class BoardRepository extends BaseRepository<BoardDocument, Board> {
   }
 
   /**
-   * Delete all entities belonging to a project. Used for cascade delete.
+   * Delete the board(s) belonging to a project. Used for cascade delete —
+   * the board dies with its project, never independently.
    */
   async deleteByProject(projectId: string): Promise<void> {
     await this.collection.deleteMany({ projectId });

@@ -47,7 +47,6 @@ const mockGlobalSettings = {
 const mockProjectPreference = {
   userId: USER_ID,
   projectId: PROJECT_ID,
-  defaultBoardId: 'board-1',
   taskTableColumns: null,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
@@ -232,11 +231,11 @@ describe('GET /api/projects/:projectId/preferences', () => {
 
 // ─── PATCH /api/projects/:projectId/preferences ──────────────────────────────
 
-describe('PATCH /api/projects/:projectId/preferences', () => {
+describe('PATCH /api/projects/:projectId/preferences (taskTableColumns only — single-board model)', () => {
   it('returns 200 with the updated project preferences', async () => {
     const app = createTestApp();
     const res = await patchJson(app, `/api/projects/${PROJECT_ID}/preferences`, {
-      defaultBoardId: '550e8400-e29b-41d4-a716-446655440091',
+      taskTableColumns: ['key', 'title', 'status'],
     });
 
     expect(res.status).toBe(200);
@@ -246,9 +245,9 @@ describe('PATCH /api/projects/:projectId/preferences', () => {
     expect(body.data.projectId).toBe(PROJECT_ID);
   });
 
-  it('returns 200 when clearing defaultBoardId with null', async () => {
+  it('returns 200 when clearing taskTableColumns with null', async () => {
     const app = createTestApp();
-    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/preferences`, { defaultBoardId: null });
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/preferences`, { taskTableColumns: null });
 
     expect(res.status).toBe(200);
   });
@@ -264,9 +263,9 @@ describe('PATCH /api/projects/:projectId/preferences', () => {
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('returns 400 for an invalid defaultBoardId (not a uuid)', async () => {
+  it('returns 400 for an unknown column key', async () => {
     const app = createTestApp();
-    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/preferences`, { defaultBoardId: 'not-a-uuid' });
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/preferences`, { taskTableColumns: ['bogus'] });
 
     expect(res.status).toBe(400);
 

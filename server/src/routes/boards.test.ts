@@ -1,5 +1,5 @@
 /**
- * Tests for board CRUD HTTP routes.
+ * Tests for single-board HTTP routes (doc 102).
  *
  * Follows the established route-test pattern (see projects.test.ts):
  * - `vi.mock` for the service layer
@@ -34,10 +34,7 @@ const TENANT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const PROJECT_ID = '550e8400-e29b-41d4-a716-446655440010';
 const USER_ID = '550e8400-e29b-41d4-a716-446655440002';
 const mockBoard = {
-  id: 'board-1',
   projectId: PROJECT_ID,
-  name: 'Main Board',
-  type: 'KANBAN',
   columns: [{ id: 'col-1', statusIds: ['status-1'], position: 0 }],
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
@@ -45,19 +42,14 @@ const mockBoard = {
 
 vi.mock('../services/board.service.js', () => ({
   BoardService: vi.fn().mockImplementation(() => ({
-    getBoardsByProject: vi.fn().mockResolvedValue([mockBoard]),
-    createBoard: vi.fn().mockResolvedValue(mockBoard),
-    getBoard: vi
+    getBoardByProject: vi
       .fn()
-      .mockImplementation((id: string) =>
-        id === 'missing-board' ? Promise.reject(new NotFoundError('Board not found')) : Promise.resolve(mockBoard),
+      .mockImplementation((projectId: string) =>
+        projectId === 'missing-project'
+          ? Promise.reject(new NotFoundError('Board not found'))
+          : Promise.resolve(mockBoard),
       ),
-    updateBoard: vi.fn().mockResolvedValue(mockBoard),
-    deleteBoard: vi
-      .fn()
-      .mockImplementation((id: string) =>
-        id === 'missing-board' ? Promise.reject(new NotFoundError('Board not found')) : Promise.resolve(undefined),
-      ),
+    updateColumns: vi.fn().mockResolvedValue(mockBoard),
   })),
 }));
 
@@ -115,18 +107,6 @@ async function getJson(app: Hono<AppEnv>, path: string) {
   return app.request(path, { method: 'GET' }, TEST_ENV);
 }
 
-async function postJson(app: Hono<AppEnv>, path: string, body: unknown) {
-  return app.request(
-    path,
-    {
-      method: 'POST',
-      body: JSON.stringify(body),
-      headers: { 'Content-Type': 'application/json' },
-    },
-    TEST_ENV,
-  );
-}
-
 async function patchJson(app: Hono<AppEnv>, path: string, body: unknown) {
   return app.request(
     path,
@@ -139,200 +119,172 @@ async function patchJson(app: Hono<AppEnv>, path: string, body: unknown) {
   );
 }
 
-async function deleteJson(app: Hono<AppEnv>, path: string) {
-  return app.request(path, { method: 'DELETE' }, TEST_ENV);
-}
+// ─── GET /api/projects/:projectId/board ──────────────────────────────────────
 
-const STATUS_ID = '550e8400-e29b-41d4-a716-446655440091';
-const validCreateBody = {
-  name: 'Sprint Board',
-  type: 'KANBAN',
-  columns: [{ statusIds: [STATUS_ID], position: 0 }],
-};
-
-// ─── GET /api/projects/:projectId/boards ─────────────────────────────────────
-
-describe('GET /api/projects/:projectId/boards', () => {
+describe('GET /api/projects/:projectId/board', () => {
   const app = createTestApp();
 
-  it('returns 200 with { data } envelope containing boards', async () => {
-    const res = await getJson(app, `/api/projects/${PROJECT_ID}/boards`);
+  it('returns 200 with { data } envelope containing the project board', async () => {
+    const res = await getJson(app, `/api/projects/${PROJECT_ID}/board`);
 
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const json = (await res.json()) as { data: typeof mockBoard };
 
-    expect(body).toHaveProperty('data');
-    expect(Array.isArray(body.data)).toBe(true);
-    expect((body.data as { name: string }[])[0]?.name).toBe('Main Board');
-  });
-});
-
-// ─── POST /api/projects/:projectId/boards ────────────────────────────────────
-
-describe('POST /api/projects/:projectId/boards', () => {
-  it('returns 201 with the created board for an owner', async () => {
-    const app = createTestApp('OWNER');
-    const res = await postJson(app, `/api/projects/${PROJECT_ID}/boards`, validCreateBody);
-
-    expect(res.status).toBe(201);
-
-    const body = (await res.json()) as Record<string, unknown>;
-
-    expect(body).toHaveProperty('data');
-    expect((body.data as { name: string }).name).toBe('Main Board');
-  });
-
-  it('returns 201 for a project admin (project-level permission)', async () => {
-    const app = createTestApp('MEMBER', 'PROJECT_ADMIN');
-    const res = await postJson(app, `/api/projects/${PROJECT_ID}/boards`, validCreateBody);
-
-    expect(res.status).toBe(201);
-  });
-
-  it('returns 403 for a member without a project role (requirePermission gate)', async () => {
-    const app = createTestApp('MEMBER', null);
-    const res = await postJson(app, `/api/projects/${PROJECT_ID}/boards`, validCreateBody);
-
-    expect(res.status).toBe(403);
-
-    const body = (await res.json()) as { error: { code: string } };
-
-    expect(body.error.code).toBe('FORBIDDEN');
-  });
-
-  it('returns 400 with error envelope for an invalid body', async () => {
-    const app = createTestApp('OWNER');
-    const res = await postJson(app, `/api/projects/${PROJECT_ID}/boards`, { name: '', type: 'KANBAN', columns: [] });
-
-    expect(res.status).toBe(400);
-
-    const body = (await res.json()) as { error: { code: string; details: unknown } };
-
-    expect(body.error.code).toBe('VALIDATION_ERROR');
-    expect(body.error.details).toBeDefined();
-  });
-});
-
-// ─── GET /api/boards/:boardId ────────────────────────────────────────────────
-
-describe('GET /api/boards/:boardId', () => {
-  const app = createTestApp();
-
-  it('returns 200 with the board', async () => {
-    const res = await getJson(app, '/api/boards/board-1');
-
-    expect(res.status).toBe(200);
-
-    const body = (await res.json()) as { data: { id: string } };
-
-    expect(body.data.id).toBe('board-1');
-  });
-
-  it('returns 404 with error envelope when the board does not exist', async () => {
-    const res = await getJson(app, '/api/boards/missing-board');
-
-    expect(res.status).toBe(404);
-
-    const body = (await res.json()) as { error: { code: string } };
-
-    expect(body.error.code).toBe('NOT_FOUND');
-  });
-});
-
-// ─── PATCH /api/boards/:boardId ──────────────────────────────────────────────
-
-describe('PATCH /api/boards/:boardId', () => {
-  const app = createTestApp();
-
-  it('returns 200 with the updated board', async () => {
-    const res = await patchJson(app, '/api/boards/board-1', { name: 'Renamed Board' });
-
-    expect(res.status).toBe(200);
-
-    const body = (await res.json()) as { data: { name: string } };
-
-    expect(body.data.name).toBe('Main Board');
-  });
-
-  it('returns 400 for an invalid body (empty name)', async () => {
-    const res = await patchJson(app, '/api/boards/board-1', { name: '' });
-
-    expect(res.status).toBe(400);
-
-    const body = (await res.json()) as { error: { code: string } };
-
-    expect(body.error.code).toBe('VALIDATION_ERROR');
-  });
-});
-
-// ─── DELETE /api/boards/:boardId ─────────────────────────────────────────────
-
-describe('DELETE /api/boards/:boardId', () => {
-  const app = createTestApp();
-
-  it('returns 200 with success envelope', async () => {
-    const res = await deleteJson(app, '/api/boards/board-1');
-
-    expect(res.status).toBe(200);
-
-    const body = (await res.json()) as { data: { success: boolean } };
-
-    expect(body.data.success).toBe(true);
+    expect(json.data.projectId).toBe(PROJECT_ID);
+    expect(json.data.columns).toHaveLength(1);
   });
 
   it('returns 404 when the board does not exist', async () => {
-    const res = await deleteJson(app, '/api/boards/missing-board');
+    const res = await getJson(app, '/api/projects/missing-project/board');
 
     expect(res.status).toBe(404);
 
-    const body = (await res.json()) as { error: { code: string } };
+    const json = (await res.json()) as { error: { code: string } };
 
-    expect(body.error.code).toBe('NOT_FOUND');
+    expect(json.error.code).toBe('NOT_FOUND');
+  });
+
+  it('returns 401 without an Authorization header', async () => {
+    const authApp = createAuthTestApp();
+    const res = await getJson(authApp, `/api/projects/${PROJECT_ID}/board`);
+
+    expect(res.status).toBe(401);
   });
 });
 
-// ─── Auth (401) ──────────────────────────────────────────────────────────────
+// ─── PATCH /api/projects/:projectId/board ────────────────────────────────────
 
-describe('auth', () => {
-  it('returns 401 with error envelope when no Authorization header is present', async () => {
-    const app = createAuthTestApp();
-    const res = await getJson(app, `/api/projects/${PROJECT_ID}/boards`);
+describe('PATCH /api/projects/:projectId/board', () => {
+  it('returns 200 with the updated board', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/board`, {
+      columns: [{ statusIds: [VALID_UUID], position: 0 }],
+    });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+
+    const json = (await res.json()) as { data: typeof mockBoard };
+
+    expect(json.data.projectId).toBe(PROJECT_ID);
+  });
+
+  it('returns 400 for an empty columns array', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/board`, { columns: [] });
+
+    expect(res.status).toBe(400);
 
     const body = (await res.json()) as { error: { code: string } };
 
-    expect(body.error.code).toBe('UNAUTHORIZED');
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 400 for a column without statusIds', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/board`, {
+      columns: [{ statusIds: [], position: 0 }],
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a non-uuid statusId', async () => {
+    const app = createTestApp();
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/board`, {
+      columns: [{ statusIds: ['not-a-uuid'], position: 0 }],
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a missing body', async () => {
+    const app = createTestApp();
+    const res = await app.request(
+      `/api/projects/${PROJECT_ID}/board`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' } },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('denies an EDITOR project role via the RBAC matrix (manage_boards)', async () => {
+    const app = createTestApp('MEMBER', 'EDITOR');
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/board`, {
+      columns: [{ statusIds: [VALID_UUID], position: 0 }],
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('denies a tenant MEMBER without a project role', async () => {
+    const app = createTestApp('MEMBER', null);
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/board`, {
+      columns: [{ statusIds: [VALID_UUID], position: 0 }],
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('allows a tenant ADMIN (RBAC bypass)', async () => {
+    const app = createTestApp('ADMIN', null);
+    const res = await patchJson(app, `/api/projects/${PROJECT_ID}/board`, {
+      columns: [{ statusIds: [VALID_UUID], position: 0 }],
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 401 without an Authorization header', async () => {
+    const authApp = createAuthTestApp();
+    const res = await patchJson(authApp, `/api/projects/${PROJECT_ID}/board`, {
+      columns: [{ statusIds: [VALID_UUID], position: 0 }],
+    });
+
+    expect(res.status).toBe(401);
   });
 
   it('returns 401 for an invalid token', async () => {
-    const app = createAuthTestApp();
-    const res = await app.request(
-      `/api/projects/${PROJECT_ID}/boards`,
-      { method: 'GET', headers: { Authorization: 'Bearer not-a-jwt' } },
+    const authApp = createAuthTestApp();
+    const res = await authApp.request(
+      `/api/projects/${PROJECT_ID}/board`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer not-a-jwt', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columns: [{ statusIds: [VALID_UUID], position: 0 }] }),
+      },
       TEST_ENV,
     );
 
     expect(res.status).toBe(401);
-
-    const body = (await res.json()) as { error: { code: string } };
-
-    expect(body.error.code).toBe('UNAUTHORIZED');
   });
+});
 
-  it('allows requests with a valid Bearer token', async () => {
-    const app = createAuthTestApp();
-    const token = await sign(
-      { sub: USER_ID, email: 'user@test.dev', exp: Math.floor(Date.now() / 1000) + 3600 },
-      'test-secret',
-    );
+// ─── Removed multi-board routes must NOT exist ───────────────────────────────
+
+describe('removed multi-board routes', () => {
+  const app = createTestApp();
+  const tokenPromise = sign({ sub: USER_ID, email: 't@t', exp: Math.floor(Date.now() / 1000) + 600 }, 'test-secret');
+
+  it.each([
+    ['GET', `/api/projects/${PROJECT_ID}/boards`],
+    ['POST', `/api/projects/${PROJECT_ID}/boards`],
+    ['GET', `/api/boards/board-1`],
+    ['PATCH', `/api/boards/board-1`],
+    ['DELETE', `/api/boards/board-1`],
+  ] as const)('%s %s is gone (404, not handled by board routes)', async (method, path) => {
+    const token = await tokenPromise;
     const res = await app.request(
-      `/api/projects/${PROJECT_ID}/boards`,
-      { method: 'GET', headers: { Authorization: `Bearer ${token}` } },
+      path,
+      {
+        method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: method === 'GET' || method === 'DELETE' ? undefined : JSON.stringify({ name: 'X' }),
+      },
       TEST_ENV,
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
   });
 });

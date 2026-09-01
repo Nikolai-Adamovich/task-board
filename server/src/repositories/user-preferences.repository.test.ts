@@ -18,7 +18,6 @@ function makeDoc(overrides: Partial<UserPreferencesDocument> = {}): UserPreferen
     id: 'pref-123',
     userId: 'user-1',
     projectId: 'project-1',
-    defaultBoardId: 'board-1',
     createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
@@ -36,12 +35,12 @@ describe('UserPreferencesRepository', () => {
 
   describe('findByUserAndProject', () => {
     it('returns preferences when found', async () => {
-      collection.findOne.mockResolvedValue(makeDoc());
+      collection.findOne.mockResolvedValue(makeDoc({ taskTableColumns: ['key', 'title'] }));
 
       const result = await repo.findByUserAndProject('user-1', 'project-1');
 
       expect(collection.findOne).toHaveBeenCalledWith({ userId: 'user-1', projectId: 'project-1' });
-      expect(result?.defaultBoardId).toBe('board-1');
+      expect(result?.taskTableColumns).toEqual(['key', 'title']);
     });
 
     it('returns null when not found', async () => {
@@ -54,26 +53,8 @@ describe('UserPreferencesRepository', () => {
   });
 
   describe('upsert', () => {
-    it('upserts preferences', async () => {
-      collection.findOneAndUpdate.mockResolvedValue(makeDoc({ defaultBoardId: 'board-2' }));
-
-      const result = await repo.upsert('user-1', 'project-1', { defaultBoardId: 'board-2' });
-
-      expect(result.defaultBoardId).toBe('board-2');
-      expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
-        { userId: 'user-1', projectId: 'project-1' },
-        expect.objectContaining({
-          $set: expect.objectContaining({ defaultBoardId: 'board-2' }),
-        }),
-        { upsert: true, returnDocument: 'after' },
-      );
-    });
-
-    // R3-P4: taskTableColumns is stored alongside defaultBoardId
     it('persists taskTableColumns when provided', async () => {
-      collection.findOneAndUpdate.mockResolvedValue(
-        makeDoc({ defaultBoardId: null, taskTableColumns: ['key', 'title', 'priority'] }),
-      );
+      collection.findOneAndUpdate.mockResolvedValue(makeDoc({ taskTableColumns: ['key', 'title', 'priority'] }));
 
       const result = await repo.upsert('user-1', 'project-1', { taskTableColumns: ['key', 'title', 'priority'] });
 
@@ -87,38 +68,39 @@ describe('UserPreferencesRepository', () => {
       );
     });
 
-    // R3-P4: a PATCH of one preference must never wipe the other
-    it('does not $set defaultBoardId when only taskTableColumns is sent', async () => {
+    it('persists a null taskTableColumns reset', async () => {
       collection.findOneAndUpdate.mockResolvedValue(makeDoc());
 
-      await repo.upsert('user-1', 'project-1', { taskTableColumns: ['key', 'title'] });
+      const result = await repo.upsert('user-1', 'project-1', { taskTableColumns: null });
 
-      const call = collection.findOneAndUpdate.mock.calls[0]?.[1] as { $set?: Record<string, unknown> };
-
-      expect(call?.$set).not.toHaveProperty('defaultBoardId');
+      expect(result.taskTableColumns).toBeNull();
+      expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
+        { userId: 'user-1', projectId: 'project-1' },
+        expect.objectContaining({
+          $set: expect.objectContaining({ taskTableColumns: null }),
+        }),
+        { upsert: true, returnDocument: 'after' },
+      );
     });
 
-    it('does not $set taskTableColumns when only defaultBoardId is sent', async () => {
+    it('sets id/userId/projectId/createdAt via $setOnInsert', async () => {
       collection.findOneAndUpdate.mockResolvedValue(makeDoc());
 
-      await repo.upsert('user-1', 'project-1', { defaultBoardId: 'board-2' });
+      await repo.upsert('user-1', 'project-1', { taskTableColumns: ['key'] });
 
-      const call = collection.findOneAndUpdate.mock.calls[0]?.[1] as { $set?: Record<string, unknown> };
+      const call = collection.findOneAndUpdate.mock.calls[0]?.[1] as { $setOnInsert?: Record<string, unknown> };
 
-      expect(call?.$set).not.toHaveProperty('taskTableColumns');
+      expect(call?.$setOnInsert).toEqual(
+        expect.objectContaining({ userId: 'user-1', projectId: 'project-1', createdAt: expect.any(Date) }),
+      );
     });
 
     it('maps missing document fields to null in the domain object', async () => {
-      // Legacy documents created before R3-P4 have neither field persisted
-      collection.findOneAndUpdate.mockResolvedValue({
-        ...makeDoc(),
-        defaultBoardId: undefined,
-        taskTableColumns: undefined,
-      });
+      // Legacy documents created before R3-P4 have the field missing entirely
+      collection.findOneAndUpdate.mockResolvedValue({ ...makeDoc(), taskTableColumns: undefined });
 
       const result = await repo.upsert('user-1', 'project-1', { taskTableColumns: ['key', 'title'] });
 
-      expect(result.defaultBoardId).toBeNull();
       expect(result.taskTableColumns).toBeNull();
     });
   });

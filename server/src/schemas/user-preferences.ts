@@ -1,20 +1,15 @@
 import { z } from 'zod';
 import { isValidDateFormat, TIME_FORMAT_PREFERENCES, TASK_TABLE_COLUMN_KEYS } from '@task-board/shared';
-import { uuid } from '../validators/common.js';
 
 /**
  * Schema for updating user project preferences (partial update).
- * Both fields are optional so a PATCH only touches what it sends.
+ * Single-board model (doc 102): only the task-table columns preference
+ * remains — the per-user default-board choice no longer exists.
  */
-export const UpdateUserProjectBoardPreferenceSchema = z
-  .object({
-    defaultBoardId: uuid().nullable().optional(),
-    /** R3-P4: visible task-table columns; validated against the allowed column names. */
-    taskTableColumns: z.array(z.enum(TASK_TABLE_COLUMN_KEYS)).nullable().optional(),
-  })
-  .refine((data) => data.defaultBoardId !== undefined || data.taskTableColumns !== undefined, {
-    message: 'At least one preference field must be provided',
-  });
+export const UpdateUserProjectBoardPreferenceSchema = z.object({
+  /** R3-P4: visible task-table columns; validated against the allowed column names. */
+  taskTableColumns: z.array(z.enum(TASK_TABLE_COLUMN_KEYS)).nullable(),
+});
 
 /**
  * Schema for updating global (user-level) preferences — partial update (R3-P8).

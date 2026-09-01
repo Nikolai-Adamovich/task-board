@@ -19,7 +19,6 @@ export interface ProjectDocument {
   description: string | null;
   status: string;
   defaultStatusId: string;
-  defaultBoardId: string;
   archiveReason: string | null;
   deletionScheduledAt: Date | null;
   createdAt: Date;
@@ -37,7 +36,6 @@ function toDomain(doc: ProjectDocument): Project {
     description: doc.description,
     status: doc.status as Project['status'],
     defaultStatusId: doc.defaultStatusId,
-    defaultBoardId: doc.defaultBoardId,
     archiveReason: doc.archiveReason as Project['archiveReason'],
     deletionScheduledAt: doc.deletionScheduledAt ? doc.deletionScheduledAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
@@ -84,7 +82,6 @@ export class ProjectRepository extends BaseRepository<ProjectDocument, Project> 
       description: input.description ?? null,
       status: ProjectStatus.ACTIVE,
       defaultStatusId: '',
-      defaultBoardId: '',
       archiveReason: null,
       deletionScheduledAt: null,
       createdAt: now,
@@ -100,13 +97,7 @@ export class ProjectRepository extends BaseRepository<ProjectDocument, Project> 
     input: Partial<
       Pick<
         ProjectDocument,
-        | 'name'
-        | 'description'
-        | 'status'
-        | 'defaultStatusId'
-        | 'defaultBoardId'
-        | 'archiveReason'
-        | 'deletionScheduledAt'
+        'name' | 'description' | 'status' | 'defaultStatusId' | 'archiveReason' | 'deletionScheduledAt'
       >
     >,
     options?: { session?: ClientSession },

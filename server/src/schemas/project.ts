@@ -23,7 +23,6 @@ export const ProjectSchema = z.object({
   description: nullableOptionalString(120),
   status: z.enum(ProjectStatusValues),
   defaultStatusId: z.string(),
-  defaultBoardId: z.string(),
   archiveReason: z.string().nullable(),
   deletionScheduledAt: z.iso.datetime().nullable(),
   createdAt: isoDateTime(),
