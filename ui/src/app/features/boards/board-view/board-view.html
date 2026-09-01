@@ -8,7 +8,7 @@
     <!-- Q6 (F-13): header wraps on mobile instead of overflowing -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div class="flex min-w-0 flex-wrap items-center gap-3">
-        <h2 class="text-xl font-bold text-foreground">{{ b.name }}</h2>
+        <h2 class="text-xl font-bold text-foreground">{{ projectName() }}</h2>
         <!-- Sprint scope chip (DEC-038) -->
         @if (sprintId()) {
           <span hlmBadge variant="secondary" class="gap-1 py-1 pl-2">

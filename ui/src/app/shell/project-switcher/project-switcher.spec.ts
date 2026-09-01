@@ -27,7 +27,6 @@ function makeProject(key: string, name: string): Project {
     description: null,
     status: 'ACTIVE' as Project['status'],
     defaultStatusId: '',
-    defaultBoardId: '',
     archiveReason: null,
     deletionScheduledAt: null,
     createdAt: '',

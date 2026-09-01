@@ -100,36 +100,21 @@
                   <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.tasks' | transloco }}</span>
                 </a>
               </li>
-              <!-- Board is ALWAYS visible in project context: preferred/default board,
-                     else the project's first board; with no boards it links to the manager -->
+              <!-- Board is ALWAYS visible in project context. Single-board model (doc 102):
+                     the project has exactly one board — no resolution, no fetch. -->
               <li hlmSidebarMenuItem>
-                @if (boardId(); as boardTargetId) {
-                  <a
-                    hlmSidebarMenuButton
-                    [routerLink]="['/w', tenant.slug, 'projects', projectId, 'boards', boardTargetId]"
-                    routerLinkActive
-                    #rlaBoard="routerLinkActive"
-                    [isActive]="rlaBoard.isActive"
-                    [tooltip]="'sidebar.board' | transloco"
-                    size="default"
-                  >
-                    <ng-icon name="lucideLayoutDashboard" />
-                    <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.board' | transloco }}</span>
-                  </a>
-                } @else {
-                  <a
-                    hlmSidebarMenuButton
-                    [routerLink]="['/w', tenant.slug, 'projects', projectId, 'settings', 'boards']"
-                    routerLinkActive
-                    #rlaBoardsManager="routerLinkActive"
-                    [isActive]="rlaBoardsManager.isActive"
-                    [tooltip]="'sidebar.board' | transloco"
-                    size="default"
-                  >
-                    <ng-icon name="lucideLayoutDashboard" />
-                    <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.board' | transloco }}</span>
-                  </a>
-                }
+                <a
+                  hlmSidebarMenuButton
+                  [routerLink]="['/w', tenant.slug, 'projects', projectId, 'board']"
+                  routerLinkActive
+                  #rlaBoard="routerLinkActive"
+                  [isActive]="rlaBoard.isActive"
+                  [tooltip]="'sidebar.board' | transloco"
+                  size="default"
+                >
+                  <ng-icon name="lucideLayoutDashboard" />
+                  <span class="group-data-[collapsible=icon]:hidden">{{ 'sidebar.board' | transloco }}</span>
+                </a>
               </li>
               <li hlmSidebarMenuItem>
                 <a

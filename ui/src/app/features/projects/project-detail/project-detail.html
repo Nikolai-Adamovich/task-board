@@ -219,40 +219,28 @@
       </hlm-card>
     </div>
 
-    <!-- Board shortcuts -->
+    <!-- Board shortcut — single-board model (doc 102): the project has exactly one board -->
     <section class="mb-8">
       <div class="mb-4 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-foreground">{{ 'projectDetail.boards' | transloco }}</h3>
+        <h3 class="text-lg font-semibold text-foreground">{{ 'projectDetail.board' | transloco }}</h3>
         @if (isAdmin()) {
-          <a [routerLink]="['settings', 'boards']" class="text-sm text-primary hover:underline">
-            {{ 'projectDetail.manageBoards' | transloco }}
+          <a [routerLink]="['settings', 'board']" class="text-sm text-primary hover:underline">
+            {{ 'projectDetail.manageBoard' | transloco }}
           </a>
         }
       </div>
-      @if (boards().length === 0) {
-        <hlm-empty>
-          <hlm-empty-header>
-            <div hlmEmptyTitle>{{ 'projectDetail.noBoards' | transloco }}</div>
-          </hlm-empty-header>
-        </hlm-empty>
-      } @else {
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          @for (board of boards(); track board.id) {
-            <a
-              [routerLink]="['boards', board.id]"
-              class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-            >
-              <div class="flex items-center justify-between">
-                <h4 class="flex items-center gap-2 font-medium text-foreground group-hover:text-primary">
-                  <ng-icon name="lucideLayoutDashboard" class="size-4 text-muted-foreground" />
-                  {{ board.name }}
-                </h4>
-                <span hlmBadge variant="secondary" class="text-xs">{{ board.type }}</span>
-              </div>
-            </a>
-          }
+      <a
+        [routerLink]="['board']"
+        class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+      >
+        <div class="flex items-center justify-between">
+          <h4 class="flex items-center gap-2 font-medium text-foreground group-hover:text-primary">
+            <ng-icon name="lucideLayoutDashboard" class="size-4 text-muted-foreground" />
+            {{ project()?.name }}
+          </h4>
+          <span hlmBadge variant="secondary" class="text-xs">{{ totalTasks() }}</span>
         </div>
-      }
+      </a>
     </section>
   </div>
 }

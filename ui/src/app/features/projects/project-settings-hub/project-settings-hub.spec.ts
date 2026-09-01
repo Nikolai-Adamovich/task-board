@@ -45,7 +45,7 @@ describe('ProjectSettingsHub', () => {
 
     const segments = component.adminLinks().map((l: { segment: string }) => l.segment);
 
-    expect(segments).toEqual(['general', 'task-types', 'statuses', 'labels', 'boards', 'danger-zone']);
+    expect(segments).toEqual(['general', 'task-types', 'statuses', 'labels', 'board', 'danger-zone']);
     expect(component.isAdmin()).toBe(true);
   });
 

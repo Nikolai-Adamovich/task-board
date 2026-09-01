@@ -83,10 +83,10 @@ export class ProjectSettingsHub {
       descriptionKey: 'projectSettings.labelsDesc',
     },
     {
-      segment: 'boards',
+      segment: 'board',
       icon: 'lucideLayoutDashboard',
-      labelKey: 'projectSettings.boards',
-      descriptionKey: 'projectSettings.boardsDesc',
+      labelKey: 'projectSettings.board',
+      descriptionKey: 'projectSettings.boardDesc',
     },
     {
       segment: 'danger-zone',

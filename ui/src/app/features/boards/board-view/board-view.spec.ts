@@ -23,17 +23,14 @@ import { ProjectClient } from '@services/project-client';
 import { ProjectStore } from '@stores/project-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Board, Task } from '@task-board/shared';
+import type { BoardConfig, Task } from '@task-board/shared';
 import { settle } from '@app/shared/testing/zoneless';
 
 // ── Test fixtures ───────────────────────────────────────────
 
 const NOW = new Date().toISOString();
-const mockBoard: Board = {
-  id: 'b0000000-0000-0000-0000-000000000001',
+const mockBoard: BoardConfig = {
   projectId: 'p0000000-0000-0000-0000-000000000001',
-  name: 'Sprint Board',
-  type: 'KANBAN',
   columns: [
     { id: 'col1', statusIds: ['s1', 's2'], position: 0 },
     { id: 'col2', statusIds: ['s3'], position: 1 },
@@ -98,9 +95,9 @@ const mockSprints = [
 
 // ── Mock factories ──────────────────────────────────────────
 
-function createBoardClientMock(board: Board = mockBoard) {
+function createBoardClientMock(board: BoardConfig = mockBoard) {
   return {
-    getById: vi.fn().mockReturnValue(of(board)),
+    getForProject: vi.fn().mockReturnValue(of(board)),
   };
 }
 
@@ -132,7 +129,7 @@ describe('BoardView', () => {
   async function setup(
     inputOverrides: Record<string, unknown> = {},
     statuses: { id: string; name: string }[] = [],
-    board: Board = mockBoard,
+    board: BoardConfig = mockBoard,
     tasks: Task[] = mockTasks,
     authUser: { id: string } | null = null,
   ) {
@@ -186,7 +183,6 @@ describe('BoardView', () => {
     const fixture = TestBed.createComponent(BoardView);
 
     // Set required input before detectChanges
-    fixture.componentRef.setInput('boardId', 'b0000000-0000-0000-0000-000000000001');
     fixture.componentRef.setInput('projectKey', 'proj-key');
     Object.entries(inputOverrides).forEach(([key, value]) => {
       fixture.componentRef.setInput(key, value);
@@ -258,8 +254,6 @@ describe('BoardView', () => {
 
       const fixture = TestBed.createComponent(BoardView);
 
-      fixture.componentRef.setInput('boardId', 'b0000000-0000-0000-0000-000000000001');
-
       // Before detectChanges, loading should be true
       component = fixture.componentInstance;
       expect(component.loading()).toBe(true);
@@ -273,7 +267,7 @@ describe('BoardView', () => {
 
     it('should set loading to false when board fetch fails', async () => {
       boardClientMock = createBoardClientMock();
-      boardClientMock.getById.mockReturnValue(throwError(() => new Error('Network error')));
+      boardClientMock.getForProject.mockReturnValue(throwError(() => new Error('Network error')));
       taskClientMock = createTaskClientMock();
       sprintClientMock = createSprintClientMock();
       routerMock = { navigate: vi.fn().mockResolvedValue(true) };
@@ -321,7 +315,6 @@ describe('BoardView', () => {
 
       const fixture = TestBed.createComponent(BoardView);
 
-      fixture.componentRef.setInput('boardId', 'b0000000-0000-0000-0000-000000000001');
       component = fixture.componentInstance;
       await settle(fixture);
 
@@ -334,8 +327,8 @@ describe('BoardView', () => {
   describe('ngOnInit', () => {
     beforeEach(() => setup());
 
-    it('should call boardClient.getById with the boardId input', () => {
-      expect(boardClientMock.getById).toHaveBeenCalledWith('b0000000-0000-0000-0000-000000000001');
+    it('should call boardClient.getForProject with the active project id', () => {
+      expect(boardClientMock.getForProject).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001');
     });
 
     it('should populate the board signal', () => {
@@ -634,7 +627,7 @@ describe('BoardView', () => {
      * Overlapping board like the one observed in V4-12: a combined
      * "In Progress / Reopened" column sits next to a pure "In Progress" column.
      */
-    const overlapBoard: Board = {
+    const overlapBoard: BoardConfig = {
       ...mockBoard,
       columns: [
         { id: 'col-todo', statusIds: ['s1'], position: 0 }, // To Do

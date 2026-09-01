@@ -43,7 +43,6 @@ const mockProjects: Project[] = [
     status: 'ACTIVE',
     deletionScheduledAt: null,
     defaultStatusId: 's1',
-    defaultBoardId: 'b1',
     archiveReason: null,
     createdAt: NOW,
     updatedAt: NOW,

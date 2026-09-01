@@ -14,11 +14,11 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { Component } from '@angular/core';
 import { BrnTooltip } from '@spartan-ng/brain/tooltip';
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { TenantRole } from '@task-board/shared';
-import type { Board, Project } from '@task-board/shared';
+import type { Project } from '@task-board/shared';
 import type { TenantWithRole } from '@app/types/frontend';
 import { API_BASE_URL } from '@app/api-url.token';
 import { Sidebar } from './sidebar';
@@ -50,24 +50,11 @@ function makeProject(key = 'PROJ'): Project {
     description: null,
     status: 'ACTIVE' as Project['status'],
     defaultStatusId: '',
-    defaultBoardId: '',
     archiveReason: null,
     deletionScheduledAt: null,
     createdAt: '',
     updatedAt: '',
   };
-}
-
-function makeBoard(id: string): Board {
-  return {
-    id,
-    projectId: 'project-1',
-    name: `Board ${id}`,
-    description: null,
-    isDefault: false,
-    createdAt: '',
-    updatedAt: '',
-  } as unknown as Board;
 }
 
 describe('Sidebar', () => {
@@ -100,23 +87,11 @@ describe('Sidebar', () => {
   async function enterProjectContext(
     fixture: ReturnType<typeof TestBed.createComponent<Sidebar>>,
     deps: Awaited<ReturnType<typeof setup>>,
-    boards: Board[],
   ): Promise<void> {
-    vi.spyOn(deps.boardClient, 'list').mockReturnValue(of(boards));
     deps.tenantStore.setActiveTenant(makeTenant());
     deps.authStore.setTenantRole(TenantRole.OWNER);
     deps.projectStore.activeProject.set(makeProject());
     await deps.router.navigateByUrl('/w/acme/projects/PROJ');
-
-    // Poll until the async resources resolve (see AGENTS.md testing notes).
-    // Time-bounded: when the project has NO boards, boardId() never populates.
-    const sidebar = fixture.componentInstance as unknown as { boardId(): string | null };
-    const deadline = Date.now() + 2000;
-
-    for (let i = 0; i < 100 && !sidebar.boardId() && Date.now() < deadline; i++) {
-      await settle(fixture);
-      await new Promise((r) => setTimeout(r, 10));
-    }
     await settle(fixture);
   }
 
@@ -156,39 +131,18 @@ describe('Sidebar', () => {
     expect(hrefs.some((h) => h?.includes('/settings'))).toBe(false);
   });
 
-  it('shows the Board item linking to the first board when no preference is set', async () => {
+  it('links the Board item straight to the project board (single-board, no fetch)', async () => {
     const deps = await setup();
     const fixture = TestBed.createComponent(Sidebar);
+    const boardSpy = vi.spyOn(deps.boardClient, 'getForProject');
 
-    await enterProjectContext(fixture, deps, [makeBoard('board-1'), makeBoard('board-2')]);
+    await enterProjectContext(fixture, deps);
 
     const hrefs = queryAnchors(fixture.nativeElement as HTMLElement).map((a) => a.getAttribute('href'));
 
-    expect(hrefs.some((h) => h?.includes('/projects/PROJ/boards/board-1'))).toBe(true);
-  });
-
-  it('prefers the user default board over the first board', async () => {
-    const deps = await setup();
-    const fixture = TestBed.createComponent(Sidebar);
-
-    vi.spyOn(deps.preferencesStore, 'getDefaultBoardId').mockReturnValue('board-2');
-
-    await enterProjectContext(fixture, deps, [makeBoard('board-1'), makeBoard('board-2')]);
-
-    const hrefs = queryAnchors(fixture.nativeElement as HTMLElement).map((a) => a.getAttribute('href'));
-
-    expect(hrefs.some((h) => h?.includes('/projects/PROJ/boards/board-2'))).toBe(true);
-  });
-
-  it('falls back to the board manager when the project has no boards', async () => {
-    const deps = await setup();
-    const fixture = TestBed.createComponent(Sidebar);
-
-    await enterProjectContext(fixture, deps, []);
-
-    const hrefs = queryAnchors(fixture.nativeElement as HTMLElement).map((a) => a.getAttribute('href'));
-
-    expect(hrefs.some((h) => h?.endsWith('/projects/PROJ/settings/boards'))).toBe(true);
+    expect(hrefs.some((h) => h?.endsWith('/projects/PROJ/board'))).toBe(true);
+    // Single-board model: the sidebar never resolves a board id via HTTP.
+    expect(boardSpy).not.toHaveBeenCalled();
   });
 
   it('renders compact icon triggers for both switchers in collapsed-icon mode', async () => {

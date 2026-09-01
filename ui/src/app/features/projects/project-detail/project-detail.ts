@@ -16,7 +16,6 @@ import {
 import { rxResource } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { ProjectClient } from '@services/project-client';
-import { BoardClient } from '@services/board-client';
 import { SprintClient } from '@services/sprint-client';
 import { StatusClient } from '@services/status-client';
 import { TaskClient } from '@services/task-client';
@@ -34,7 +33,7 @@ import { SprintStatus, ProjectStatus } from '@task-board/shared';
 import { statusBadgeVariant } from '@app/constants/priority';
 import { canManageProject } from '@app/shared/utils/role-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
-import type { Board, Project, Sprint, Status, Task } from '@task-board/shared';
+import type { Project, Sprint, Status, Task } from '@task-board/shared';
 
 /** Per-status task count row */
 interface StatusCount {
@@ -81,7 +80,6 @@ export class ProjectDetail {
   /** Shared badge-class helper (see constants/priority.ts) */
   protected readonly statusBadgeVariant = statusBadgeVariant;
   private readonly projectClient = inject(ProjectClient);
-  private readonly boardClient = inject(BoardClient);
   private readonly sprintClient = inject(SprintClient);
   private readonly statusClient = inject(StatusClient);
   private readonly taskClient = inject(TaskClient);
@@ -108,12 +106,7 @@ export class ProjectDetail {
   protected readonly project = computed<Project | null>(() =>
     this.projectResource.hasValue() ? this.projectResource.value() : null,
   );
-  private readonly boardsResource = rxResource({
-    params: () => ({ projectId: this.projectId() }),
-    stream: ({ params }) => this.boardClient.list(params.projectId),
-    defaultValue: [] as Board[],
-  });
-  protected readonly boards = computed(() => (this.boardsResource.hasValue() ? this.boardsResource.value() : []));
+  // Single-board model (doc 102): no board-list fetch — the project has one board.
   private readonly sprintsResource = rxResource({
     params: () => ({ projectId: this.projectId() }),
     stream: ({ params }) => this.sprintClient.list(params.projectId),

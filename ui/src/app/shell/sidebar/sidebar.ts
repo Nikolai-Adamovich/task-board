@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, untracked } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
-import { rxResource, toSignal } from '@angular/core/rxjs-interop';
-import { filter, map, of, startWith } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map, startWith } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -21,11 +21,8 @@ import {
   lucideUserCog,
 } from '@ng-icons/lucide';
 import { TenantRole } from '@task-board/shared';
-import type { Board } from '@task-board/shared';
 import { AuthStore } from '@stores/auth-store';
 import { canManageProject, hasMinTenantRole } from '@app/shared/utils/role-utils';
-import { resolveBoardId } from '@app/shared/utils/board-utils';
-import { BoardClient } from '@services/board-client';
 import { TenantStore } from '@stores/tenant-store';
 import { ProjectStore } from '@stores/project-store';
 import { PreferencesStore } from '@stores/preferences-store';
@@ -71,7 +68,6 @@ export class Sidebar {
   private readonly projectStore = inject(ProjectStore);
   private readonly router = inject(Router);
   private readonly preferencesStore = inject(PreferencesStore);
-  private readonly boardClient = inject(BoardClient);
   /** Spartan sidebar state service — single source of truth for expanded/collapsed */
   protected readonly sidebarService = inject(HlmSidebarService);
   /** Whether the desktop sidebar is currently collapsed (icon mode) */
@@ -90,25 +86,6 @@ export class Sidebar {
     const match = this.currentUrl().match(/\/projects\/([^/?#]+)/);
 
     return match?.[1] ?? null;
-  });
-  /**
-   * Boards of the current project — fetched reactively only while a project
-   * context is active (cheap: empty stream when no project).
-   */
-  private readonly boardsResource = rxResource({
-    params: () => ({ projectId: this.currentProjectKey() ? (this.projectStore.activeProject()?.id ?? null) : null }),
-    stream: ({ params }) => (params.projectId ? this.boardClient.list(params.projectId) : of([] as Board[])),
-    defaultValue: [] as Board[],
-  });
-  /** The sidebar Board link target: preferred/default board id, else first board, else null */
-  protected readonly boardId = computed<string | null>(() => {
-    const projectId = this.projectStore.activeProject()?.id;
-
-    if (!projectId || !this.currentProjectKey()) return null;
-
-    const boards = this.boardsResource.hasValue() ? this.boardsResource.value() : [];
-
-    return resolveBoardId(boards, this.preferencesStore.getDefaultBoardId(projectId));
   });
   /**
    * Whether the current user can manage project settings (PROJECT_ADMIN+).

@@ -17,7 +17,6 @@ import { firstValueFrom, of } from 'rxjs';
 import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { ProjectDetail } from './project-detail';
 import { ProjectClient } from '@services/project-client';
-import { BoardClient } from '@services/board-client';
 import { SprintClient } from '@services/sprint-client';
 import { StatusClient } from '@services/status-client';
 import { TaskClient } from '@services/task-client';
@@ -26,7 +25,7 @@ import { ProjectStore } from '@stores/project-store';
 import { PreferencesStore } from '@stores/preferences-store';
 import { TenantStore } from '@stores/tenant-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Project, Board, Sprint, Status, Task } from '@task-board/shared';
+import type { Project, Sprint, Status, Task } from '@task-board/shared';
 import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -38,16 +37,11 @@ const mockProject: Project = {
   description: 'A project for testing',
   status: 'ACTIVE',
   defaultStatusId: 's1',
-  defaultBoardId: 'b1',
   archiveReason: null,
   deletionScheduledAt: null,
   createdAt: NOW,
   updatedAt: NOW,
 };
-const mockBoards: Board[] = [
-  { id: 'b1', projectId: mockProject.id, name: 'Board 1', type: 'KANBAN', columns: [], createdAt: NOW, updatedAt: NOW },
-  { id: 'b2', projectId: mockProject.id, name: 'Board 2', type: 'SPRINT', columns: [], createdAt: NOW, updatedAt: NOW },
-];
 const mockSprints: Sprint[] = [
   {
     id: 'sp1',
@@ -111,7 +105,6 @@ let component: any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let fixture: any;
 let projectClientMock: Record<string, ReturnType<typeof vi.fn>>;
-let boardClientMock: Record<string, ReturnType<typeof vi.fn>>;
 let sprintClientMock: Record<string, ReturnType<typeof vi.fn>>;
 let statusClientMock: Record<string, ReturnType<typeof vi.fn>>;
 let taskClientMock: Record<string, ReturnType<typeof vi.fn>>;
@@ -133,7 +126,6 @@ async function setup(options: { tenantRole?: string; projectStatus?: Project['st
   const project = options.projectStatus ? { ...mockProject, status: options.projectStatus } : mockProject;
 
   projectClientMock = { getById: vi.fn().mockReturnValue(of(project)) };
-  boardClientMock = { list: vi.fn().mockReturnValue(of(mockBoards)) };
   sprintClientMock = { list: vi.fn().mockReturnValue(of(mockSprints)) };
   statusClientMock = { list: vi.fn().mockReturnValue(of(mockStatuses)) };
   taskClientMock = {
@@ -160,7 +152,6 @@ async function setup(options: { tenantRole?: string; projectStatus?: Project['st
       provideRouter([]),
       { provide: API_BASE_URL, useValue: 'http://localhost/api' },
       { provide: ProjectClient, useValue: projectClientMock },
-      { provide: BoardClient, useValue: boardClientMock },
       { provide: SprintClient, useValue: sprintClientMock },
       { provide: StatusClient, useValue: statusClientMock },
       { provide: TaskClient, useValue: taskClientMock },
@@ -198,14 +189,12 @@ async function setup(options: { tenantRole?: string; projectStatus?: Project['st
 }
 
 describe('ProjectDetail (overview)', () => {
-  it('should load the project and boards', async () => {
+  it('should load the project overview (single-board model: no board-list fetch)', async () => {
     await setup();
     await until(() => component.project() !== null);
 
     expect(projectClientMock.getById).toHaveBeenCalledWith(mockProject.id);
     expect(component.project()?.name).toBe('Test Project');
-    expect(boardClientMock.list).toHaveBeenCalledWith(mockProject.id);
-    expect(component.boards()).toHaveLength(2);
   });
 
   it('should expose the ACTIVE sprint', async () => {

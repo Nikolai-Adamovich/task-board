@@ -1,16 +1,12 @@
 import { DOCUMENT, Service, inject, signal } from '@angular/core';
 import { ActivatedRouteSnapshot, Router } from '@angular/router';
-import { fromEvent, firstValueFrom } from 'rxjs';
+import { fromEvent } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 // Deep import: the `@spartan-ng/helm/sidebar` barrel re-exports every sidebar
 // component (and, transitively, `helm/input` → `brain/field` → `@angular/forms`).
 // This root-provided service only needs the service file itself, keeping the
 // sidebar component library out of the initial bundle.
 import { HlmSidebarService } from '@spartan-ng/helm/sidebar/service';
-import { BoardClient } from '@services/board-client';
-import { resolveBoardId } from '@app/shared/utils/board-utils';
-import { PreferencesStore } from '@stores/preferences-store';
-import { ProjectStore } from '@stores/project-store';
 
 /**
  * Q9 (RQ-04 ②) / P13 (item 31): global keyboard shortcuts for the
@@ -105,9 +101,6 @@ export class KeyboardShortcuts {
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly sidebarService = inject(HlmSidebarService);
-  private readonly projectStore = inject(ProjectStore);
-  private readonly preferencesStore = inject(PreferencesStore);
-  private readonly boardClient = inject(BoardClient);
   /** Bound to the shell's help dialog (`[state]`). */
   readonly helpOpen = signal(false);
   /**
@@ -223,7 +216,7 @@ export class KeyboardShortcuts {
 
         if (ctx) {
           event.preventDefault();
-          void this.navigateToBoard(ctx);
+          this.navigateToBoard(ctx);
         }
         break;
       }
@@ -267,35 +260,10 @@ export class KeyboardShortcuts {
   }
 
   /**
-   * `b` — resolve the board target like the sidebar does (preferences default
-   * board → first board; else the board manager). The resolution RULE is
-   * shared with the sidebar via `resolveBoardId`; the shortcut resolves
-   * on-demand (async fetch) instead of reactively.
+   * `b` — navigate straight to the project board. Single-board model (doc 102):
+   * the project has exactly one board, so no fetch, no resolution.
    */
-  private async navigateToBoard(ctx: { tenantSlug: string; projectKey: string }): Promise<void> {
-    const fallback = ['/w', ctx.tenantSlug, 'projects', ctx.projectKey, 'settings', 'boards'] as const;
-    const projectId = this.projectStore.activeProject()?.id;
-
-    if (!projectId) {
-      this.router.navigate([...fallback]);
-      return;
-    }
-
-    try {
-      // Ensure the default-board preference is loaded before resolving
-      await this.preferencesStore.loadProjectPreferences(projectId);
-
-      const boards = await firstValueFrom(this.boardClient.list(projectId));
-      const boardId = resolveBoardId(boards, this.preferencesStore.getDefaultBoardId(projectId));
-
-      if (boardId) {
-        this.router.navigate(['/w', ctx.tenantSlug, 'projects', ctx.projectKey, 'boards', boardId]);
-      } else {
-        this.router.navigate([...fallback]);
-      }
-    } catch {
-      // Board resolution failed (offline, 401, …) — land on the board manager
-      this.router.navigate([...fallback]);
-    }
+  private navigateToBoard(ctx: { tenantSlug: string; projectKey: string }): void {
+    this.router.navigate(['/w', ctx.tenantSlug, 'projects', ctx.projectKey, 'board']);
   }
 }

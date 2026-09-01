@@ -1,0 +1,107 @@
+<div class="mx-auto max-w-6xl">
+  <!-- Page header -->
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold text-foreground">{{ 'projectSettings.board' | transloco }}</h2>
+    <p class="mt-1 text-sm text-muted-foreground">{{ 'projectSettings.boardDesc' | transloco }}</p>
+  </div>
+
+  @if (loading()) {
+    <div class="flex items-center justify-center py-12">
+      <hlm-spinner />
+      <span class="ml-2 text-sm text-muted-foreground">{{ 'projectSettings.loading' | transloco }}</span>
+    </div>
+  } @else if (error()) {
+    <hlm-alert variant="destructive" class="mb-4">
+      <div hlmAlertDescription>{{ error() | transloco }}</div>
+    </hlm-alert>
+  } @else {
+    <div class="flex flex-col gap-3">
+      @for (col of columns(); track col.id; let i = $index) {
+        <div class="rounded-lg border bg-card p-4 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span hlmBadge variant="secondary" class="text-xs">
+                {{ 'projectSettings.columnIndex' | transloco: { index: i + 1 } }}
+              </span>
+              @if (col.statusIds.length === 0) {
+                <span hlmBadge variant="destructive" class="text-xs">
+                  {{ 'projectSettings.emptyColumnHint' | transloco }}
+                </span>
+              }
+            </div>
+            @if (isAdmin()) {
+              <div class="flex items-center gap-1">
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  [disabled]="i === 0"
+                  [hlmTooltip]="'projectSettings.moveUp' | transloco"
+                  (click)="moveColumn(i, -1)"
+                >
+                  <ng-icon name="lucideArrowUp" />
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  [disabled]="i === columns().length - 1"
+                  [hlmTooltip]="'projectSettings.moveDown' | transloco"
+                  (click)="moveColumn(i, 1)"
+                >
+                  <ng-icon name="lucideArrowDown" />
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  [disabled]="columns().length <= 1"
+                  [hlmTooltip]="'projectSettings.removeColumn' | transloco"
+                  (click)="removeColumn(i)"
+                >
+                  <ng-icon name="lucideTrash2" />
+                </button>
+              </div>
+            }
+          </div>
+
+          <div class="mt-3 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+            @for (status of statuses(); track status.id) {
+              <div class="flex items-center gap-2 rounded px-1 py-1 text-sm">
+                <hlm-checkbox
+                  [checked]="hasStatus(col, status.id)"
+                  [disabled]="!isAdmin()"
+                  [aria-label]="status.name"
+                  (checkedChange)="toggleStatus(i, status.id, $event)"
+                />
+                <span>{{ status.name }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (isAdmin()) {
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button hlmBtn variant="outline" size="sm" (click)="addColumn()">
+          <ng-icon name="lucidePlus" class="mr-1" />
+          {{ 'projectSettings.addColumn' | transloco }}
+        </button>
+        <button hlmBtn size="sm" [disabled]="!canSave()" (click)="save()">
+          {{ 'projectSettings.saveColumns' | transloco }}
+        </button>
+        @if (unassignedStatuses().length > 0) {
+          <span class="text-xs text-muted-foreground">
+            {{ 'projectSettings.unassignedStatuses' | transloco: { names: unassignedStatusNames() } }}
+          </span>
+        }
+      </div>
+    }
+  }
+
+  <!-- V1-9/V3-5: one level up lands on the settings hub -->
+  <a [routerLink]="['..']" class="mt-4 inline-block text-sm text-primary hover:underline">
+    {{ 'projectSettings.backToHub' | transloco }}
+  </a>
+</div>

@@ -98,8 +98,15 @@ export const routes: Routes = [
               import('./features/projects/project-detail/project-detail').then((m) => m.ProjectDetail),
           },
           {
-            path: 'boards/:boardId',
+            // Single-board model (doc 102): the project has exactly one board.
+            path: 'board',
             loadComponent: () => import('./features/boards/board-view/board-view').then((m) => m.BoardView),
+          },
+          {
+            // Transitional redirect from the old multi-board deep links.
+            path: 'boards/:boardId',
+            redirectTo: 'board',
+            pathMatch: 'full',
           },
           {
             path: 'tasks',
@@ -142,8 +149,15 @@ export const routes: Routes = [
               ),
           },
           {
+            // Single-board model: settings edit the one board's columns/workflow.
+            path: 'settings/board',
+            loadComponent: () => import('./features/projects/board-columns/board-columns').then((m) => m.BoardColumns),
+          },
+          {
+            // Transitional redirect from the old settings path.
             path: 'settings/boards',
-            loadComponent: () => import('./features/projects/board-manager/board-manager').then((m) => m.BoardManager),
+            redirectTo: 'settings/board',
+            pathMatch: 'full',
           },
           {
             path: 'settings/danger-zone',

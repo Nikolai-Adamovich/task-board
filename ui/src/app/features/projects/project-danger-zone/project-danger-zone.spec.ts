@@ -33,7 +33,6 @@ function makeProject(status: Project['status'] = 'ACTIVE'): Project {
     description: null,
     status,
     defaultStatusId: 's1',
-    defaultBoardId: 'b1',
     archiveReason: null,
     deletionScheduledAt: null,
     createdAt: NOW,

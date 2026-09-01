@@ -103,8 +103,6 @@ export class PreferencesStore {
   readonly datePipeFormat = computed(() => toDatePipeDateFormat(this.dateFormat()));
   /** DatePipe token for timestamp rendering, derived from both preferences. */
   readonly dateTimePipeFormat = computed(() => toDatePipeDateTimeFormat(this.dateFormat(), this.timeFormat()));
-  /** Per-project default board ID. Map of projectId → boardId (or null). */
-  private readonly projectBoardPreferences = signal<Record<string, string | null>>({});
   /** R3-P4: per-project visible task-table columns. Map of projectId → column keys (or null = default). */
   private readonly projectTaskTableColumns = signal<Record<string, TaskTableColumnKey[] | null>>({});
   /**
@@ -146,15 +144,9 @@ export class PreferencesStore {
         // Session isolation: drop all per-user project preference state on logout
         // so a subsequent login as another user never sees the previous session's cache.
         this.projectPrefsCache.clear();
-        this.projectBoardPreferences.set({});
         this.projectTaskTableColumns.set({});
       }
     });
-  }
-
-  /** Get the default board ID for a specific project */
-  getDefaultBoardId(projectId: string): string | null {
-    return this.projectBoardPreferences()[projectId] ?? null;
   }
 
   /**
@@ -189,13 +181,9 @@ export class PreferencesStore {
     await request;
   }
 
-  /** Write a fetched/updated per-project preference document into the signal maps. */
+  /** Write a fetched/updated per-project preference document into the signal map. */
   private applyProjectPreferences(projectId: string, prefs: UserProjectBoardPreference | null): void {
-    this.projectBoardPreferences.update((map) => ({
-      ...map,
-      [projectId]: prefs?.defaultBoardId ?? null,
-    }));
-    // R3-P4: task-table column visibility lives in the same per-project document
+    // R3-P4: task-table column visibility lives in the per-project document
     this.projectTaskTableColumns.update((map) => ({
       ...map,
       [projectId]: prefs?.taskTableColumns ?? null,
@@ -224,31 +212,6 @@ export class PreferencesStore {
       this.projectTaskTableColumns.update((map) => ({
         ...map,
         [projectId]: prefs.taskTableColumns,
-      }));
-      // Refresh the cache with the server response (no invalidation needed).
-      this.projectPrefsCache.set(projectId, Promise.resolve(prefs));
-    } catch {
-      // Revert on failure — drop the cache entry and reload from server.
-      this.projectPrefsCache.delete(projectId);
-      this.loadProjectPreferences(projectId);
-    }
-  }
-
-  /** Set and persist the default board for a project */
-  async setDefaultBoard(projectId: string, boardId: string | null): Promise<void> {
-    // Optimistic update
-    this.projectBoardPreferences.update((map) => ({
-      ...map,
-      [projectId]: boardId,
-    }));
-
-    try {
-      const prefs = await firstValueFrom(this.client.updateProjectPreferences(projectId, { defaultBoardId: boardId }));
-
-      // Sync with server response
-      this.projectBoardPreferences.update((map) => ({
-        ...map,
-        [projectId]: prefs.defaultBoardId,
       }));
       // Refresh the cache with the server response (no invalidation needed).
       this.projectPrefsCache.set(projectId, Promise.resolve(prefs));

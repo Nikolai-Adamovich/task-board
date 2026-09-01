@@ -31,7 +31,6 @@ const mockProject: Project = {
   description: 'A project for testing',
   status: 'ACTIVE',
   defaultStatusId: 's1',
-  defaultBoardId: 'b1',
   archiveReason: null,
   deletionScheduledAt: null,
   createdAt: NOW,

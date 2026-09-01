@@ -13,11 +13,8 @@
  */
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { of } from 'rxjs';
 import { vi } from 'vitest';
 import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
-import { BoardClient } from '@services/board-client';
-import { PreferencesStore } from '@stores/preferences-store';
 import { ProjectStore } from '@stores/project-store';
 import {
   KeyboardShortcuts,
@@ -59,29 +56,13 @@ describe('KeyboardShortcuts', () => {
   let service: KeyboardShortcuts;
   let router: Router;
   let sidebarService: HlmSidebarService;
-  let preferencesStore: {
-    loadProjectPreferences: ReturnType<typeof vi.fn>;
-    getDefaultBoardId: ReturnType<typeof vi.fn>;
-  };
-  let boardClient: { list: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     localStorage.clear();
 
-    preferencesStore = {
-      loadProjectPreferences: vi.fn().mockResolvedValue(undefined),
-      getDefaultBoardId: vi.fn().mockReturnValue(null),
-    };
-    boardClient = { list: vi.fn().mockReturnValue(of([])) };
-
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'proj-1' }) } },
-        { provide: PreferencesStore, useValue: preferencesStore },
-        { provide: BoardClient, useValue: boardClient },
-      ],
+      providers: [provideRouter([]), { provide: ProjectStore, useValue: { activeProject: () => ({ id: 'proj-1' }) } }],
     });
 
     router = TestBed.inject(Router);
@@ -221,53 +202,28 @@ describe('KeyboardShortcuts', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  // ── P13 (item 31b): `b` — go to board ──────────────────────────
+  // ── P13 (item 31b) / doc 102: `b` — go to the project's single board ──
 
-  it('should navigate to the preferred board on "b" when one exists', async () => {
+  it('should navigate straight to the project board on "b" (no board fetch)', async () => {
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     stubProjectRoute(router);
-    preferencesStore.getDefaultBoardId.mockReturnValue('board-default');
-    boardClient.list.mockReturnValue(of([{ id: 'board-default' }, { id: 'board-2' }]));
 
     keydown('b');
     await flushMicrotasks();
 
-    expect(preferencesStore.loadProjectPreferences).toHaveBeenCalledWith('proj-1');
-    expect(boardClient.list).toHaveBeenCalledWith('proj-1');
-    expect(navigate).toHaveBeenCalledWith(['/w', 'acme', 'projects', 'proj', 'boards', 'board-default']);
+    expect(navigate).toHaveBeenCalledWith(['/w', 'acme', 'projects', 'proj', 'board']);
   });
 
-  it('should fall back to the first board when no default board is set', async () => {
+  it('should navigate straight to the project board on "B" (uppercase)', async () => {
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     stubProjectRoute(router);
-    boardClient.list.mockReturnValue(of([{ id: 'board-first' }]));
 
     keydown('B');
     await flushMicrotasks();
 
-    expect(navigate).toHaveBeenCalledWith(['/w', 'acme', 'projects', 'proj', 'boards', 'board-first']);
-  });
-
-  it('should navigate to the board manager when the project has no boards', async () => {
-    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-
-    stubProjectRoute(router);
-    boardClient.list.mockReturnValue(of([]));
-
-    keydown('b');
-    await flushMicrotasks();
-
-    expect(navigate).toHaveBeenCalledWith(['/w', 'acme', 'projects', 'proj', 'settings', 'boards']);
-  });
-
-  it('should not resolve boards on "b" without an active project context', () => {
-    vi.spyOn(router, 'navigate');
-
-    keydown('b');
-
-    expect(boardClient.list).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith(['/w', 'acme', 'projects', 'proj', 'board']);
   });
 
   // ── P13 (item 31b): `m` / `w` / `p` — dropdown toggle counters ──

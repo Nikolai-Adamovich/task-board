@@ -6,7 +6,7 @@ import { provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideX } from '@ng-icons/lucide';
 import { CdkDragDrop, CdkDrag, CdkDropList } from '@angular/cdk/drag-drop';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { map, of } from 'rxjs';
 import { BoardClient } from '@services/board-client';
 import { TaskClient } from '@services/task-client';
 import { SprintClient } from '@services/sprint-client';
@@ -20,7 +20,7 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { NgIcon } from '@ng-icons/core';
-import type { Board, BoardColumn, Sprint, Task } from '@task-board/shared';
+import type { BoardColumn, BoardConfig, Sprint, Task } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { priorityLabelKey } from '@app/constants/priority';
@@ -59,8 +59,6 @@ export class BoardView {
   private readonly refStore = inject(ProjectRefStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  /** Bound via withComponentInputBinding() */
-  readonly boardId = input.required<string>();
   readonly projectKey = input<string>('');
   /** Optional sprint filter from query params (`?sprintId=…`) */
   readonly sprintId = input<string | null>(null);
@@ -73,13 +71,15 @@ export class BoardView {
   /** F-08: optional priority filter from query params (`?priority=…`) */
   readonly priority = input<string | null>(null);
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
+  /** Board page header shows the project name — the board itself has no name (single-board model). */
+  protected readonly projectName = computed(() => this.projectStore.activeProject()?.name ?? '');
   private readonly i18n = inject(TranslocoService);
-  /** Tasks live under the board's project — fall back to the active project */
-  private readonly effectiveProjectId = computed(() => this.board()?.projectId ?? this.projectId());
+  /** Tasks live under the active project */
+  private readonly effectiveProjectId = this.projectId;
   // ─── Reads (rxResource — auto refetch/cancel when params change) ──────────
-  private readonly boardResource = rxResource<Board | null, { boardId: string }>({
-    params: () => ({ boardId: this.boardId() }),
-    stream: ({ params }) => this.boardClient.getById(params.boardId),
+  private readonly boardResource = rxResource<BoardConfig | null, { projectId: string }>({
+    params: () => ({ projectId: this.projectId() }),
+    stream: ({ params }) => (params.projectId ? this.boardClient.getForProject(params.projectId) : of(null)),
     defaultValue: null,
   });
   protected readonly board = computed(() => (this.boardResource.hasValue() ? this.boardResource.value() : null));
