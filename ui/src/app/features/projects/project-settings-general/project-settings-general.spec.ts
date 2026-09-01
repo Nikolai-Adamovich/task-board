@@ -83,6 +83,8 @@ async function setup(options: { tenantRole?: string; projectRole?: string } = {}
         useValue: {
           activeProject: activeProjectMock,
           projectRole: vi.fn().mockReturnValue(options.projectRole ?? null),
+          // F4: the save handler patches the shared tenant project-list cache
+          upsertProject: vi.fn(),
         },
       },
     ],
