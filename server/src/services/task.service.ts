@@ -405,12 +405,26 @@ export class TaskService {
       }
     }
 
+    // TOP-3 №1: ONE bulkWrite with per-task `{ id, version }` filters — per-task
+    // optimistic concurrency and per-task failures preserved without N
+    // sequential round-trips. Returns only the tasks whose version matched
+    // (and was incremented); the rest are conflicts.
+    const updatedTasks = await this.taskRepo.bulkUpdateWithVersion(
+      valid.map((task) => ({ id: task.id, version: task.version })),
+      update,
+    );
+    const updatedIds = new Set(updatedTasks.map((t) => t.id));
+    // Hoisted: one project lookup serves the audit events of every updated task.
+    let project: Awaited<ReturnType<ProjectRepository['findById']>> | null = null;
+
+    if (this.auditService && userId) {
+      project = await this.projectRepo.findById(projectId);
+    }
+
     let updated = 0;
 
     for (const task of valid) {
-      const result = await this.taskRepo.updateWithVersion(task.id, task.version, update);
-
-      if (!result) {
+      if (!updatedIds.has(task.id)) {
         failed.push({ taskId: task.id, reason: 'VERSION_CONFLICT' });
         continue;
       }
@@ -418,7 +432,6 @@ export class TaskService {
 
       // Audit side effect per updated task (same shape as single updateTask)
       if (this.auditService && userId) {
-        const project = await this.projectRepo.findById(projectId);
         const changes: AuditChange[] = [];
 
         if (data.statusId !== undefined)

@@ -64,6 +64,7 @@ describe('TaskService', () => {
       findByProject: vi.fn(),
       create: vi.fn(),
       updateWithVersion: vi.fn(),
+      bulkUpdateWithVersion: vi.fn().mockResolvedValue([]),
       delete: vi.fn(),
       countByStatus: vi.fn(),
       updateManyByStatus: vi.fn(),
@@ -84,8 +85,8 @@ describe('TaskService', () => {
     });
 
     statusRepo = createMock<StatusRepository>({
-      findById: vi.fn().mockResolvedValue({ id: 'status-1', projectId: 'project-1' }),
-      findByIds: vi.fn().mockResolvedValue([{ id: 'status-1', projectId: 'project-1' }]),
+      findById: vi.fn().mockResolvedValue({ id: 'status-1', projectId: 'project-1', name: 'Todo' }),
+      findByIds: vi.fn().mockResolvedValue([{ id: 'status-1', projectId: 'project-1', name: 'Todo' }]),
     });
 
     taskTypeRepo = createMock<TaskTypeRepository>({
@@ -98,8 +99,8 @@ describe('TaskService', () => {
     };
 
     sprintRepo = {
-      findById: vi.fn().mockResolvedValue({ id: 'sprint-1', projectId: 'project-1' }),
-      findByIds: vi.fn().mockResolvedValue([{ id: 'sprint-1', projectId: 'project-1' }]),
+      findById: vi.fn().mockResolvedValue({ id: 'sprint-1', projectId: 'project-1', name: 'Sprint 1' }),
+      findByIds: vi.fn().mockResolvedValue([{ id: 'sprint-1', projectId: 'project-1', name: 'Sprint 1' }]),
     };
 
     commentRepo = {
@@ -396,6 +397,93 @@ describe('TaskService', () => {
       await service.deleteTask('task-1', 'user-1', 'MEMBER');
 
       expect(taskRepo.delete).toHaveBeenCalledWith('task-1');
+    });
+  });
+
+  // ─── TOP-3 №1: bulkUpdateTasks via ONE bulkWrite ──────────────────────────
+
+  describe('bulkUpdateTasks (TOP-3 №1: single bulkWrite)', () => {
+    function makeAssignedTask(id: string, version: number) {
+      return makeTask({ id, version, statusId: 'status-old' });
+    }
+
+    it('updates several tasks via one bulkWrite and reports per-task success', async () => {
+      const t1 = makeAssignedTask('t1', 1);
+      const t2 = makeAssignedTask('t2', 3);
+
+      taskRepo.findByIds = vi.fn().mockResolvedValue([t1, t2]);
+      taskRepo.bulkUpdateWithVersion = vi.fn().mockResolvedValue([
+        { ...t1, version: 2, statusId: 'status-2', statusName: 'Done' },
+        { ...t2, version: 4, statusId: 'status-2', statusName: 'Done' },
+      ]);
+
+      const result = await service.bulkUpdateTasks('project-1', ['t1', 't2'], { statusId: 'status-2' });
+
+      expect(result.updated).toBe(2);
+      expect(result.failed).toBeUndefined();
+      // TOP-2 semantics preserved: the denormalized name travels with the change
+      expect(taskRepo.bulkUpdateWithVersion).toHaveBeenCalledWith(
+        [
+          { id: 't1', version: 1 },
+          { id: 't2', version: 3 },
+        ],
+        { statusId: 'status-2', statusName: 'Todo' },
+      );
+    });
+
+    it('reports VERSION_CONFLICT per task when the version did not match', async () => {
+      const t1 = makeAssignedTask('t1', 1);
+      const t2 = makeAssignedTask('t2', 5);
+
+      taskRepo.findByIds = vi.fn().mockResolvedValue([t1, t2]);
+      // bulkWrite applies only matching versions → t2 is absent from the result
+      taskRepo.bulkUpdateWithVersion = vi.fn().mockResolvedValue([{ ...t1, version: 2, statusId: 'status-2' }]);
+
+      const result = await service.bulkUpdateTasks('project-1', ['t1', 't2'], { statusId: 'status-2' });
+
+      expect(result.updated).toBe(1);
+      expect(result.failed).toEqual([{ taskId: 't2', reason: 'VERSION_CONFLICT' }]);
+    });
+
+    it('keeps TASK_NOT_FOUND and TASK_NOT_IN_PROJECT per-id failures', async () => {
+      // belongs to another project → must be rejected as TASK_NOT_IN_PROJECT
+      const foreign = { ...makeAssignedTask('t-foreign', 1), projectId: 'project-other' };
+
+      taskRepo.findByIds = vi.fn().mockResolvedValue([foreign, makeAssignedTask('t1', 1)]);
+      taskRepo.bulkUpdateWithVersion = vi.fn().mockResolvedValue([{ ...makeAssignedTask('t1', 1), version: 2 }]);
+
+      const result = await service.bulkUpdateTasks('project-1', ['t-missing', 't-foreign', 't1'], {
+        statusId: 'status-2',
+      });
+
+      expect(result.updated).toBe(1);
+      expect(result.failed).toEqual([
+        { taskId: 't-missing', reason: 'TASK_NOT_FOUND' },
+        { taskId: 't-foreign', reason: 'TASK_NOT_IN_PROJECT' },
+      ]);
+    });
+
+    it('keeps the sprint denormalized name in the payload and nulls it when clearing', async () => {
+      const t1 = makeAssignedTask('t1', 1);
+
+      taskRepo.findByIds = vi.fn().mockResolvedValue([t1]);
+      taskRepo.bulkUpdateWithVersion = vi
+        .fn()
+        .mockResolvedValue([{ ...t1, version: 2, sprintId: 'sprint-1', sprintName: 'Sprint 1' }]);
+
+      await service.bulkUpdateTasks('project-1', ['t1'], { sprintId: 'sprint-1' });
+
+      expect(taskRepo.bulkUpdateWithVersion).toHaveBeenCalledWith([{ id: 't1', version: 1 }], {
+        sprintId: 'sprint-1',
+        sprintName: 'Sprint 1',
+      });
+
+      await service.bulkUpdateTasks('project-1', ['t1'], { sprintId: null });
+
+      expect(taskRepo.bulkUpdateWithVersion).toHaveBeenLastCalledWith([{ id: 't1', version: 1 }], {
+        sprintId: null,
+        sprintName: null,
+      });
     });
   });
 });

@@ -495,6 +495,39 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     );
   }
 
+  /**
+   * TOP-3 №1: bulk optimistic-concurrency update in ONE `bulkWrite`.
+   *
+   * Every task gets an individual filter `{ id, version }` — an operation
+   * applies only when the task's version still matches, and `$inc` bumps it,
+   * exactly like the per-task `updateWithVersion`. `ordered: false` keeps the
+   * per-task independence of the former sequential loop (a conflict on one
+   * task never blocks the others).
+   *
+   * Returns the tasks that were ACTUALLY updated (version = entry.version+1);
+   * entries missing from the result are version conflicts. One round-trip for
+   * the writes + one for the result mapping — independent of batch size.
+   */
+  async bulkUpdateWithVersion(entries: { id: string; version: number }[], update: TaskUpdatePayload): Promise<Task[]> {
+    if (entries.length === 0) return [];
+
+    const now = new Date();
+    const ops = entries.map((entry) => ({
+      updateOne: {
+        filter: { id: entry.id, version: entry.version },
+        update: { $set: { ...update, updatedAt: now }, $inc: { version: 1 } },
+      },
+    }));
+
+    await this.collection.bulkWrite(ops, { ordered: false });
+
+    const updatedDocs = await this.collection
+      .find({ $or: entries.map((entry) => ({ id: entry.id, version: entry.version + 1 })) })
+      .toArray();
+
+    return updatedDocs.map(toDomain);
+  }
+
   /** TOP-2: propagate a status rename to all tasks holding the status. */
   async setStatusNameForTasks(projectId: string, statusId: string, statusName: string): Promise<void> {
     await this.collection.updateMany({ projectId, statusId }, { $set: { statusName, updatedAt: new Date() } });

@@ -12,6 +12,7 @@ function createMockCollection() {
     deleteOne: vi.fn(),
     updateMany: vi.fn(),
     countDocuments: vi.fn(),
+    bulkWrite: vi.fn(),
   } as unknown as Collection<TaskDocument> & {
     findOne: ReturnType<typeof vi.fn>;
     find: ReturnType<typeof vi.fn>;
@@ -20,6 +21,7 @@ function createMockCollection() {
     deleteOne: ReturnType<typeof vi.fn>;
     updateMany: ReturnType<typeof vi.fn>;
     countDocuments: ReturnType<typeof vi.fn>;
+    bulkWrite: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -123,6 +125,72 @@ describe('TaskRepository', () => {
       await repo.findByProject('project-1', { excludeDescription: true });
 
       expect(collection.find).toHaveBeenCalledWith({ projectId: 'project-1' }, { projection: { description: 0 } });
+    });
+  });
+
+  describe('bulkUpdateWithVersion (TOP-3 №1)', () => {
+    it('issues exactly ONE bulkWrite (ordered:false) with per-task {id, version} filters and $inc — no findOneAndUpdate', async () => {
+      const toArray = vi.fn().mockResolvedValue([makeDoc({ version: 2 })]);
+
+      collection.find.mockReturnValue({ toArray });
+      collection.bulkWrite.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+
+      await repo.bulkUpdateWithVersion(
+        [
+          { id: 'task-123', version: 1 },
+          { id: 'task-456', version: 4 },
+        ],
+        { statusId: 'status-2', statusName: 'Done' },
+      );
+
+      expect(collection.bulkWrite).toHaveBeenCalledTimes(1);
+      expect(collection.findOneAndUpdate).not.toHaveBeenCalled();
+
+      const [ops, options] = collection.bulkWrite.mock.calls[0] ?? [];
+
+      expect(options).toEqual({ ordered: false });
+      expect(ops).toHaveLength(2);
+      expect(ops[0]).toEqual({
+        updateOne: {
+          filter: { id: 'task-123', version: 1 },
+          update: {
+            $set: { statusId: 'status-2', statusName: 'Done', updatedAt: expect.any(Date) },
+            $inc: { version: 1 },
+          },
+        },
+      });
+    });
+
+    it('returns only the tasks whose version was incremented (conflicts are absent)', async () => {
+      // $or filter by {id, version+1}: only the incremented doc comes back
+      const toArray = vi.fn().mockResolvedValue([makeDoc({ id: 'task-123', version: 2 })]);
+
+      collection.find.mockReturnValue({ toArray });
+      collection.bulkWrite.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+
+      const result = await repo.bulkUpdateWithVersion(
+        [
+          { id: 'task-123', version: 1 },
+          { id: 'task-conflict', version: 5 },
+        ],
+        { priority: 'HIGH' },
+      );
+
+      expect(collection.find).toHaveBeenCalledWith({
+        $or: [
+          { id: 'task-123', version: 2 },
+          { id: 'task-conflict', version: 6 },
+        ],
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0]?.version).toBe(2);
+    });
+
+    it('is a no-op for an empty batch — no bulkWrite issued', async () => {
+      const result = await repo.bulkUpdateWithVersion([], { priority: 'HIGH' });
+
+      expect(result).toEqual([]);
+      expect(collection.bulkWrite).not.toHaveBeenCalled();
     });
   });
 
