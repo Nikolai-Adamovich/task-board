@@ -1,4 +1,5 @@
 import type { TenantRole, InvitationStatus } from '../constants/roles.js';
+import type { Tenant } from './tenant.js';
 import type { User } from './user.js';
 
 /** Login request body type */
@@ -20,6 +21,22 @@ export interface AuthResponse {
   token: string;
   /** Authenticated user */
   user: User;
+}
+
+/** Tenant enriched with the caller's role (shape returned by GET /tenants) */
+export type TenantWithRole = Tenant & { role: TenantRole };
+
+/**
+ * Session bootstrap payload (GET /auth/bootstrap): the authenticated user and
+ * the tenant list in ONE round-trip, so cold loads don't pay the sequential
+ * /auth/me → /tenants waterfall. Pure composition of the two existing
+ * endpoints — semantics are identical to /auth/me + /tenants.
+ */
+export interface AuthBootstrap {
+  /** Authenticated user (same shape as GET /auth/me) */
+  user: User;
+  /** Active memberships with tenant documents (same shape as GET /tenants) */
+  tenants: TenantWithRole[];
 }
 
 /** Schema for accepting an invitation to join a tenant */

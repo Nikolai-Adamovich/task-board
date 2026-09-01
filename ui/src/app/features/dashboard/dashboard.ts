@@ -44,13 +44,16 @@ export class Dashboard implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    // After page reload the token is restored from localStorage but
-    // currentUser is not loaded yet. Fetch it before checking auth state.
-    if (!this.authStore.currentUser() && this.authStore.token()) {
+    // Cold load: the token is restored from localStorage but the session is
+    // not initialized. bootstrap() fetches the user AND the tenant list in
+    // ONE round-trip (replaces the sequential /auth/me → /tenants chain).
+    // Post-login (user already set) only the tenant list may be missing —
+    // bootstrap covers that too, so no separate /tenants call is needed.
+    if (this.authStore.token() && (!this.authStore.currentUser() || !this.tenantStore.tenantsLoaded())) {
       try {
-        await this.authStore.fetchCurrentUser();
+        await this.authStore.bootstrap();
       } catch {
-        // 401 → fetchCurrentUser calls logout(); other errors → still not authenticated
+        // 401 → bootstrap triggers logout(); other errors → still not authenticated
         this.loading.set(false);
         return;
       }
@@ -61,18 +64,25 @@ export class Dashboard implements OnInit {
       return;
     }
 
-    // Load tenants (with roles); TenantStore restores the last selection
-    try {
-      const tenants = await this.tenantStore.loadTenants();
+    // Fallback: session initialized without the tenant list (should not
+    // normally happen — bootstrap seeds both stores).
+    if (!this.tenantStore.tenantsLoaded()) {
+      try {
+        await this.tenantStore.loadTenants();
+      } catch {
+        this.loading.set(false);
+        return;
+      }
+    }
+
+    // Redirect to the last-selected (or first) tenant home
+    {
       const active = this.tenantStore.activeTenant();
 
-      if (tenants.length > 0 && active) {
+      if (this.tenantStore.tenants().length > 0 && active) {
         await this.router.navigate(['/w', active.slug], { replaceUrl: true });
         return;
       }
-    } catch {
-      this.loading.set(false);
-      return;
     }
 
     // No tenants — load pending invitations for the welcome/invitation views

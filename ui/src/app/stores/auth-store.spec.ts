@@ -3,6 +3,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { AuthStore } from './auth-store';
+import { TenantStore } from '@stores/tenant-store';
+import { TenantRole, TenantStatus } from '@task-board/shared';
+import type { TenantWithRole } from '@app/types/frontend';
 import { API_BASE_URL } from '@app/api-url.token';
 import type { User } from '@task-board/shared';
 
@@ -175,5 +178,100 @@ describe('AuthStore', () => {
     await promise;
 
     expect(store.currentUser()?.email).toBe('user@test.com');
+  });
+
+  describe('bootstrap', () => {
+    const NOW = '2025-01-01T00:00:00Z';
+    const makeTenant = (id: string, name: string, slug: string, role: string): TenantWithRole => ({
+      id,
+      name,
+      slug,
+      description: null,
+      status: TenantStatus.ACTIVE,
+      deletionScheduledAt: null,
+      role: role as TenantRole,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const bootstrapPayload = {
+      user: { id: 'u1', email: 'user@test.com', displayName: 'User' } as User,
+      tenants: [makeTenant('t1', 'Acme', 'acme', 'OWNER'), makeTenant('t2', 'Beta', 'beta', 'MEMBER')],
+    };
+
+    it('should set the current user AND seed the tenant store in ONE request', async () => {
+      createModule();
+
+      const store = TestBed.inject(AuthStore);
+      const tenantStore = TestBed.inject(TenantStore);
+      const promise = store.bootstrap();
+      const req = httpMock.expectOne('http://localhost/api/auth/bootstrap');
+
+      expect(req.request.method).toBe('GET');
+      req.flush({ data: bootstrapPayload });
+
+      await promise;
+
+      expect(store.currentUser()?.id).toBe('u1');
+      expect(tenantStore.tenants().length).toBe(2);
+      expect(tenantStore.tenantsLoaded()).toBe(true);
+      // Default selection: first tenant becomes active
+      expect(tenantStore.activeTenant()?.id).toBe('t1');
+    });
+
+    it('should REPLACE the previous tenant list (session isolation)', async () => {
+      createModule();
+
+      const store = TestBed.inject(AuthStore);
+      const tenantStore = TestBed.inject(TenantStore);
+
+      // Previous session's tenants
+      tenantStore.seedFromBootstrap([makeTenant('old', 'Old', 'old', 'OWNER')]);
+
+      const promise = store.bootstrap();
+
+      httpMock.expectOne('http://localhost/api/auth/bootstrap').flush({
+        data: { ...bootstrapPayload, tenants: [bootstrapPayload.tenants[0]] },
+      });
+
+      await promise;
+
+      expect(tenantStore.tenants().length).toBe(1);
+      expect(tenantStore.tenants().some((t) => t.id === 'old')).toBe(false);
+    });
+
+    it('should mark tenantsLoaded=true even for an EMPTY tenant list', async () => {
+      createModule();
+
+      const store = TestBed.inject(AuthStore);
+      const tenantStore = TestBed.inject(TenantStore);
+      const promise = store.bootstrap();
+
+      httpMock.expectOne('http://localhost/api/auth/bootstrap').flush({
+        data: { user: bootstrapPayload.user, tenants: [] },
+      });
+
+      await promise;
+
+      expect(tenantStore.tenants()).toEqual([]);
+      expect(tenantStore.tenantsLoaded()).toBe(true);
+      expect(tenantStore.activeTenant()).toBeNull();
+    });
+
+    it('logout() must clear the tenant store — no tenants survive a logout', async () => {
+      createModule();
+
+      const store = TestBed.inject(AuthStore);
+      const tenantStore = TestBed.inject(TenantStore);
+
+      tenantStore.seedFromBootstrap(bootstrapPayload.tenants);
+      expect(tenantStore.tenants().length).toBe(2);
+
+      store.logout();
+
+      expect(tenantStore.tenants()).toEqual([]);
+      expect(tenantStore.activeTenant()).toBeNull();
+      expect(tenantStore.tenantsLoaded()).toBe(false);
+      expect(localStorage.getItem('taskboard_tenant_id')).toBeNull();
+    });
   });
 });

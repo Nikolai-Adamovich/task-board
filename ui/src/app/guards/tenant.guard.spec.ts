@@ -88,7 +88,7 @@ describe('tenantGuard', () => {
     const tenantStore = TestBed.inject(TenantStore);
     const authStore = TestBed.inject(AuthStore);
 
-    tenantStore.tenants.set(mockTenants);
+    tenantStore.seedFromBootstrap(mockTenants);
     tenantStore.setActiveTenant(mockTenants[0] as TenantWithRole);
 
     const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('acme'), mockState));
@@ -97,14 +97,31 @@ describe('tenantGuard', () => {
     expect(authStore.tenantRole()).toBe('OWNER');
   });
 
+  it('should NOT call /tenants when bootstrap already initialized the store (even if empty)', async () => {
+    setup();
+
+    const tenantStore = TestBed.inject(TenantStore);
+    const http = TestBed.inject(HttpTestingController);
+
+    // Bootstrap already ran — the list is legitimately empty.
+    tenantStore.seedFromBootstrap([]);
+
+    const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('acme'), mockState));
+
+    // No match in the (empty) list → redirect, but NO /tenants request.
+    expect(result).toBeInstanceOf(UrlTree);
+    http.verify();
+  });
+
   it('should sync tenantRole when finding a matching tenant by route param', async () => {
     setup();
 
     const tenantStore = TestBed.inject(TenantStore);
     const authStore = TestBed.inject(AuthStore);
 
-    tenantStore.tenants.set(mockTenants);
-    // No active tenant set — guard should find the match and sync the role
+    tenantStore.seedFromBootstrap(mockTenants);
+    // seedFromBootstrap defaults to the first tenant — the guard must still
+    // resolve the route's tenant and sync its role.
 
     const result = await TestBed.runInInjectionContext(() => tenantGuard(makeRoute('beta'), mockState));
 
@@ -120,7 +137,7 @@ describe('tenantGuard', () => {
     const authStore = TestBed.inject(AuthStore);
     const projectStore = TestBed.inject(ProjectStore);
 
-    tenantStore.tenants.set(mockTenants);
+    tenantStore.seedFromBootstrap(mockTenants);
     tenantStore.setActiveTenant(mockTenants[0] as TenantWithRole);
     authStore.setTenantRole('OWNER');
 

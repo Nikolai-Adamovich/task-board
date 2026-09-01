@@ -109,5 +109,26 @@ export function createAuthRoutes(): Hono<AppEnv> {
     return c.json({ data: user }, 200);
   });
 
+  /**
+   * GET /bootstrap — Session initialization payload for cold loads.
+   *
+   * Returns the authenticated user together with the tenant list in ONE
+   * round-trip, removing the sequential /auth/me → /tenants waterfall from
+   * the frontend critical path. Pure composition of the two existing service
+   * methods (auth.me + tenants.listTenantsWithRole) run in parallel — no
+   * business logic is duplicated and semantics are identical to calling
+   * /auth/me and /tenants separately.
+   * Requires Authorization header (authMiddleware).
+   */
+  router.get('/bootstrap', authMiddleware, async (c) => {
+    const userId = c.get('userId');
+    const [user, tenants] = await Promise.all([
+      c.get('svc').auth.me(userId),
+      c.get('svc').tenants.listTenantsWithRole(userId),
+    ]);
+
+    return c.json({ data: { user, tenants } }, 200);
+  });
+
   return router;
 }

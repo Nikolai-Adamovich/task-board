@@ -27,8 +27,10 @@ export const tenantGuard: CanActivateFn = async (route) => {
     return router.parseUrl('/');
   }
 
-  // If tenants haven't been loaded yet (page reload), fetch them first
-  if (tenantStore.tenants().length === 0) {
+  // If tenants haven't been initialized yet (page reload without bootstrap),
+  // fetch them first. `tenantsLoaded` is true even for an empty list, so a
+  // user with no tenants never triggers a redundant /tenants request.
+  if (!tenantStore.tenantsLoaded()) {
     try {
       await tenantStore.loadTenants();
     } catch {

@@ -46,11 +46,14 @@ describe('Dashboard', () => {
     currentUser: ReturnType<typeof vi.fn>;
     token: ReturnType<typeof vi.fn>;
     fetchCurrentUser: ReturnType<typeof vi.fn>;
+    bootstrap: ReturnType<typeof vi.fn>;
   };
   let tenantStoreMock: {
     tenants: ReturnType<typeof vi.fn>;
     activeTenant: ReturnType<typeof vi.fn>;
     loadTenants: ReturnType<typeof vi.fn>;
+    tenantsLoaded: ReturnType<typeof vi.fn>;
+    seedFromBootstrap: ReturnType<typeof vi.fn>;
   };
   let tenantClientMock: { getMyInvitations: ReturnType<typeof vi.fn> };
   let routerNavigateSpy: ReturnType<typeof vi.fn>;
@@ -73,7 +76,24 @@ describe('Dashboard', () => {
       invitations = [],
       fetchCurrentUserMock,
     } = opts;
+    const seedTenants = (seeded: TenantWithRole[]): void => {
+      tenantStoreMock.tenants.mockReturnValue(seeded);
+      tenantStoreMock.activeTenant.mockReturnValue(seeded[0] ?? null);
+      tenantStoreMock.tenantsLoaded.mockReturnValue(true);
+    };
 
+    tenantStoreMock = {
+      tenants: vi.fn().mockReturnValue(tenants),
+      activeTenant: vi.fn().mockReturnValue(tenants[0] ?? null),
+      loadTenants: vi.fn().mockImplementation(async () => {
+        seedTenants(tenants);
+
+        return tenants;
+      }),
+      // Pre-bootstrap state: the list has not been initialized yet
+      tenantsLoaded: vi.fn().mockReturnValue(false),
+      seedFromBootstrap: vi.fn().mockImplementation(seedTenants),
+    };
     authStoreMock = {
       isAuthenticated: vi.fn().mockReturnValue(authenticated),
       currentUser: vi.fn().mockReturnValue(hasUser ? ({ id: 'u1' } as User) : null),
@@ -81,11 +101,11 @@ describe('Dashboard', () => {
       fetchCurrentUser: fetchCurrentUserMock
         ? vi.fn().mockImplementation(fetchCurrentUserMock)
         : vi.fn().mockResolvedValue({ id: 'u1' } as User),
-    };
-    tenantStoreMock = {
-      tenants: vi.fn().mockReturnValue(tenants),
-      activeTenant: vi.fn().mockReturnValue(tenants[0] ?? null),
-      loadTenants: vi.fn().mockResolvedValue(tenants),
+      // Mimics the real AuthStore.bootstrap: one request seeds both stores
+      bootstrap: vi.fn().mockImplementation(async () => {
+        authStoreMock.currentUser.mockReturnValue({ id: 'u1' } as User);
+        seedTenants(tenants);
+      }),
     };
     tenantClientMock = {
       getMyInvitations: vi.fn().mockReturnValue(of(invitations)),
@@ -114,13 +134,15 @@ describe('Dashboard', () => {
     await settle(fixture);
   }
 
-  it('should redirect an authenticated user with tenants to the tenant home', async () => {
+  it('should bootstrap (user + tenants in one request) and redirect to the tenant home', async () => {
     await setup();
 
     // Wait for async tenant loading + navigation
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(tenantStoreMock.loadTenants).toHaveBeenCalled();
+    expect(authStoreMock.bootstrap).toHaveBeenCalled();
+    // No separate /tenants call after bootstrap
+    expect(tenantStoreMock.loadTenants).not.toHaveBeenCalled();
     expect(routerNavigateSpy).toHaveBeenCalledWith(['/w', 'acme'], { replaceUrl: true });
     expect(component.dashboardState()).toBe('redirecting');
   });

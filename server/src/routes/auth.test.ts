@@ -4,7 +4,7 @@
  * Validates that the endpoints correctly enforce Zod schema validation
  * and return proper HTTP status codes and error responses with { data: ... } envelope.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { createAuthRoutes } from './auth.js';
 import { AuthService } from '../services/auth.service.js';
@@ -466,5 +466,148 @@ describe('POST /api/auth/reset-password', () => {
     const res = await postJson(app, '/api/auth/reset-password', {});
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/auth/bootstrap ──────────────────────────────────────────────
+
+/**
+ * Bootstrap tests use the REAL authMiddleware (unlike the login/register
+ * tests above, which never reach it), so a signed JWT and an `auth` service
+ * mock with `findActiveUser` are required.
+ */
+describe('GET /api/auth/bootstrap', () => {
+  const BOOTSTRAP_SECRET = 'bootstrap-test-secret';
+  const mockUser = { id: 'user-1', email: 'test@test', displayName: 'Test', avatarUrl: null, deletedAt: null };
+  const mockTenants = [
+    { id: 't1', name: 'Acme', slug: 'acme', role: 'OWNER' },
+    { id: 't2', name: 'Beta', slug: 'beta', role: 'MEMBER' },
+  ];
+  const meMock = vi.fn();
+  const listTenantsMock = vi.fn();
+
+  function createBootstrapApp() {
+    const bootstrapApp = new Hono<AppEnv>();
+
+    bootstrapApp.onError(errorHandler);
+    bootstrapApp.use('*', async (c, next) => {
+      c.set('svc', {
+        auth: {
+          findActiveUser: vi.fn().mockResolvedValue(mockUser),
+          me: meMock,
+        },
+        tenants: { listTenantsWithRole: listTenantsMock },
+      } as never);
+      await next();
+    });
+    bootstrapApp.route('/api/auth', createAuthRoutes());
+
+    return bootstrapApp;
+  }
+
+  async function createTestToken(payload: Record<string, unknown>, secret = BOOTSTRAP_SECRET): Promise<string> {
+    const encoder = new TextEncoder();
+    const header = { alg: 'HS256', typ: 'JWT' };
+    const now = Math.floor(Date.now() / 1000);
+    const tokenPayload = { ...payload, iat: now, exp: now + 3600 };
+    const headerB64 = btoa(JSON.stringify(header)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const payloadB64 = btoa(JSON.stringify(tokenPayload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
+      'sign',
+    ]);
+    const data = encoder.encode(`${headerB64}.${payloadB64}`);
+    const signature = await crypto.subtle.sign('HMAC', key, data);
+    const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    return `${headerB64}.${payloadB64}.${signatureB64}`;
+  }
+
+  function requestWithToken(app: Hono<AppEnv>, token: string, env: Record<string, string>) {
+    return app.request('/api/auth/bootstrap', { headers: { Authorization: `Bearer ${token}` } }, env as never);
+  }
+
+  beforeEach(() => {
+    meMock.mockReset().mockResolvedValue(mockUser);
+    listTenantsMock.mockReset().mockResolvedValue(mockTenants);
+  });
+
+  it('returns 200 with { user, tenants } for an authenticated request', async () => {
+    const app = createBootstrapApp();
+    const token = await createTestToken({ sub: 'user-1', email: 'test@test' });
+    const res = await requestWithToken(app, token, { JWT_SECRET: BOOTSTRAP_SECRET });
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { user: Record<string, unknown>; tenants: unknown[] } };
+
+    expect(body.data.user).toEqual(mockUser);
+    expect(body.data.tenants).toEqual(mockTenants);
+    expect(meMock).toHaveBeenCalledWith('user-1');
+    expect(listTenantsMock).toHaveBeenCalledWith('user-1');
+  });
+
+  it('returns 401 without an Authorization header', async () => {
+    const app = createBootstrapApp();
+    const res = await app.request('/api/auth/bootstrap', {}, { JWT_SECRET: BOOTSTRAP_SECRET } as never);
+
+    expect(res.status).toBe(401);
+    expect(meMock).not.toHaveBeenCalled();
+    expect(listTenantsMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 for an invalid token', async () => {
+    const app = createBootstrapApp();
+    const res = await requestWithToken(app, 'invalid.token.here', { JWT_SECRET: BOOTSTRAP_SECRET });
+
+    expect(res.status).toBe(401);
+  });
+
+  it('returns an empty tenants array when the user has no memberships', async () => {
+    listTenantsMock.mockResolvedValue([]);
+
+    const app = createBootstrapApp();
+    const token = await createTestToken({ sub: 'user-1', email: 'test@test' });
+    const res = await requestWithToken(app, token, { JWT_SECRET: BOOTSTRAP_SECRET });
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { tenants: unknown[] } };
+
+    expect(body.data.tenants).toEqual([]);
+  });
+
+  it('invokes both service calls in parallel (neither awaited sequentially)', async () => {
+    const invocationOrder: string[] = [];
+    let resolveMe!: (value: unknown) => void;
+    const meGate = new Promise((resolve) => (resolveMe = resolve));
+
+    meMock.mockImplementation(() => {
+      invocationOrder.push('me');
+
+      return meGate;
+    });
+    listTenantsMock.mockImplementation(() => {
+      invocationOrder.push('tenants');
+
+      return Promise.resolve([]);
+    });
+
+    const app = createBootstrapApp();
+    const token = await createTestToken({ sub: 'user-1', email: 'test@test' });
+    const resPromise = requestWithToken(app, token, { JWT_SECRET: BOOTSTRAP_SECRET });
+
+    // The tenants call must start while the me() promise is still pending —
+    // a sequential await would deadlock here and the waitFor would time out.
+    await vi.waitFor(() => expect(invocationOrder).toContain('tenants'));
+    expect(invocationOrder[0]).toBe('me');
+
+    resolveMe(mockUser);
+
+    const res = await resPromise;
+
+    expect(res.status).toBe(200);
   });
 });

@@ -66,6 +66,8 @@ export type {
   LoginRequest,
   RegisterRequest,
   AuthResponse,
+  AuthBootstrap,
+  TenantWithRole,
   AcceptInvitation,
   InvitationDetails,
   ForgotPasswordRequest,

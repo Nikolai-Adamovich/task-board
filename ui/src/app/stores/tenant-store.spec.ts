@@ -332,4 +332,85 @@ describe('TenantStore', () => {
       expect(localStorage.getItem(TENANT_KEY)).toBe('t2');
     });
   });
+
+  // ── seedFromBootstrap / clear ───────────────────────────────────────────
+
+  describe('seedFromBootstrap', () => {
+    it('should populate the list, mark tenantsLoaded and default to the first tenant', () => {
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+
+      store.seedFromBootstrap(mockTenants);
+
+      expect(store.tenants()).toEqual(mockTenants);
+      expect(store.tenantsLoaded()).toBe(true);
+      expect(store.activeTenant()?.id).toBe('t1');
+    });
+
+    it('should REPLACE a previous list (never merge) and drop a stale active tenant', () => {
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+
+      store.seedFromBootstrap(mockTenants);
+      store.seedFromBootstrap([mockTenants[1] as TenantWithRole]);
+
+      expect(store.tenants().length).toBe(1);
+      expect(store.tenants()[0]?.id).toBe('t2');
+      // Previous active (t1) is not in the new list → falls back to the new first
+      expect(store.activeTenant()?.id).toBe('t2');
+    });
+
+    it('should keep the active tenant when it is still present in the new list', () => {
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+
+      store.seedFromBootstrap(mockTenants);
+      store.setActiveTenant(mockTenants[1] as TenantWithRole);
+      store.seedFromBootstrap(mockTenants);
+
+      expect(store.activeTenant()?.id).toBe('t2');
+    });
+
+    it('should restore the active tenant from localStorage', () => {
+      localStorage.setItem(TENANT_KEY, 't2');
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+
+      store.seedFromBootstrap(mockTenants);
+
+      expect(store.activeTenant()?.id).toBe('t2');
+    });
+
+    it('should mark tenantsLoaded=true for an EMPTY list without an active tenant', () => {
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+
+      store.seedFromBootstrap([]);
+
+      expect(store.tenants()).toEqual([]);
+      expect(store.tenantsLoaded()).toBe(true);
+      expect(store.activeTenant()).toBeNull();
+    });
+  });
+
+  describe('clear', () => {
+    it('should reset the whole tenant state including localStorage', () => {
+      createModule();
+
+      const store = TestBed.inject(TenantStore);
+
+      store.seedFromBootstrap(mockTenants);
+      store.clear();
+
+      expect(store.tenants()).toEqual([]);
+      expect(store.activeTenant()).toBeNull();
+      expect(store.tenantsLoaded()).toBe(false);
+      expect(localStorage.getItem(TENANT_KEY)).toBeNull();
+    });
+  });
 });

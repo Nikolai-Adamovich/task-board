@@ -50,7 +50,7 @@ describe('tenantRedirectGuard', () => {
 
     const tenantStore = TestBed.inject(TenantStore);
 
-    tenantStore.tenants.set(mockTenants);
+    tenantStore.seedFromBootstrap(mockTenants);
 
     const result = await TestBed.runInInjectionContext(() => tenantRedirectGuard(makeRoute('tenant-1'), mockState));
 
@@ -63,7 +63,7 @@ describe('tenantRedirectGuard', () => {
 
     const tenantStore = TestBed.inject(TenantStore);
 
-    tenantStore.tenants.set(mockTenants);
+    tenantStore.seedFromBootstrap(mockTenants);
 
     const result = await TestBed.runInInjectionContext(() => tenantRedirectGuard(makeRoute('acme'), mockState));
 
@@ -76,7 +76,7 @@ describe('tenantRedirectGuard', () => {
 
     const tenantStore = TestBed.inject(TenantStore);
 
-    tenantStore.tenants.set(mockTenants);
+    tenantStore.seedFromBootstrap(mockTenants);
 
     const result = await TestBed.runInInjectionContext(() => tenantRedirectGuard(makeRoute('nope'), mockState));
 

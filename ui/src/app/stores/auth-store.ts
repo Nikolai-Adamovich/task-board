@@ -2,6 +2,7 @@ import { Service, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthClient } from '@services/auth-client';
+import { TenantStore } from '@stores/tenant-store';
 import type { User, AuthResponse, LoginRequest, RegisterRequest } from '@task-board/shared';
 import { type TenantRole } from '@task-board/shared';
 
@@ -21,6 +22,7 @@ interface JwtPayload {
 @Service()
 export class AuthStore {
   private readonly authClient = inject(AuthClient);
+  private readonly tenantStore = inject(TenantStore);
   private readonly router = inject(Router);
   readonly currentUser = signal<User | null>(null);
   readonly token = signal<string | null>(null);
@@ -68,12 +70,29 @@ export class AuthStore {
     return user;
   }
 
+  /**
+   * Session bootstrap (cold load): fetches the current user AND the tenant
+   * list in ONE round-trip and initializes both stores. Replaces the
+   * sequential fetchCurrentUser() → loadTenants() waterfall on the critical
+   * path. The tenant list is REPLACED, never merged — a user logging in after
+   * a logout must never see the previous session's tenants.
+   */
+  async bootstrap(): Promise<void> {
+    const res = await firstValueFrom(this.authClient.bootstrap());
+
+    this.currentUser.set(res.user);
+    this.tenantStore.seedFromBootstrap(res.tenants);
+  }
+
   /** Clear all auth state, localStorage, and redirect to login */
   logout(): void {
     this.currentUser.set(null);
     this.token.set(null);
     this.tenantId.set(null);
     this.tenantRole.set(null);
+    // Session isolation: the tenant list belongs to the logged-in user —
+    // it must never survive a logout (logout → login as another user).
+    this.tenantStore.clear();
     localStorage.removeItem(TOKEN_KEY);
     this.router.navigate(['/auth/login']);
   }

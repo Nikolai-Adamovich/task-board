@@ -2,7 +2,14 @@ import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { AuthResponse, ForgotPasswordResponse, LoginRequest, RegisterRequest, User } from '@task-board/shared';
+import type {
+  AuthBootstrap,
+  AuthResponse,
+  ForgotPasswordResponse,
+  LoginRequest,
+  RegisterRequest,
+  User,
+} from '@task-board/shared';
 
 /**
  * Pure HTTP client for auth endpoints — no state management.
@@ -44,5 +51,13 @@ export class AuthClient {
   /** Get the currently authenticated user's profile */
   getCurrentUser(): Observable<User> {
     return this.http.get<{ data: User }>(`${this.apiBaseUrl}/auth/me`).pipe(map((res) => res.data));
+  }
+
+  /**
+   * Session bootstrap (cold load): the current user AND the tenant list in
+   * one round-trip — replaces the sequential /auth/me → /tenants waterfall.
+   */
+  bootstrap(): Observable<AuthBootstrap> {
+    return this.http.get<{ data: AuthBootstrap }>(`${this.apiBaseUrl}/auth/bootstrap`).pipe(map((res) => res.data));
   }
 }

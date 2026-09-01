@@ -17,31 +17,72 @@ export class TenantStore {
   private readonly tenantClient = inject(TenantClient);
   readonly tenants = signal<TenantWithRole[]>([]);
   readonly activeTenant = signal<TenantWithRole | null>(null);
+  /**
+   * Whether the tenant list has been initialized for the CURRENT session
+   * (via /auth/bootstrap or loadTenants). True even when the list is empty —
+   * guards must not re-fetch /tenants for a user who legitimately has no
+   * tenants. Reset to false on logout / session switch.
+   */
+  readonly tenantsLoaded = signal(false);
+
+  /**
+   * Seed the store from the /auth/bootstrap payload. REPLACES any previous
+   * list (never merges) — a user who logs in after a logout must never see
+   * the previous session's tenants.
+   */
+  seedFromBootstrap(tenants: TenantWithRole[]): void {
+    this.tenants.set([...tenants]);
+    this.restoreActiveTenant(tenants);
+    this.tenantsLoaded.set(true);
+  }
 
   /** Load all tenants for the current user and restore active tenant from localStorage. */
   async loadTenants(): Promise<TenantWithRole[]> {
     const tenants = await firstValueFrom(this.tenantClient.listTenants());
 
     this.tenants.set(tenants);
-
-    // Restore active tenant from localStorage
-    const storedId = localStorage.getItem(TENANT_KEY);
-
-    if (storedId) {
-      const match = tenants.find((t) => t.id === storedId);
-
-      if (match) {
-        this.activeTenant.set(match);
-      }
-    }
-    // Default to first tenant if none selected
-    if (!this.activeTenant() && tenants.length > 0) {
-      const first = tenants[0];
-
-      if (first) this.setActiveTenant(first);
-    }
+    this.restoreActiveTenant(tenants);
+    this.tenantsLoaded.set(true);
 
     return tenants;
+  }
+
+  /** Clear all tenant state (logout / session switch). */
+  clear(): void {
+    this.tenants.set([]);
+    this.activeTenant.set(null);
+    this.tenantsLoaded.set(false);
+    localStorage.removeItem(TENANT_KEY);
+  }
+
+  /**
+   * Resolve the active tenant for a freshly loaded list: keep the current
+   * selection if it is still valid, else restore from localStorage, else
+   * default to the first tenant, else none.
+   */
+  private restoreActiveTenant(tenants: TenantWithRole[]): void {
+    const current = this.activeTenant();
+
+    if (current && tenants.some((t) => t.id === current.id)) {
+      return;
+    }
+
+    const storedId = localStorage.getItem(TENANT_KEY);
+    const match = storedId ? tenants.find((t) => t.id === storedId) : undefined;
+
+    if (match) {
+      this.activeTenant.set(match);
+      return;
+    }
+
+    const first = tenants[0];
+
+    if (first) {
+      this.setActiveTenant(first);
+      return;
+    }
+
+    this.activeTenant.set(null);
   }
 
   /** Create a new tenant, add it to the list, and set as active. */

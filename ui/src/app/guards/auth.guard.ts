@@ -6,16 +6,18 @@ import { AuthStore } from '@stores/auth-store';
  * Functional route guard that redirects to /auth/login if not authenticated.
  *
  * After a page reload the JWT token is restored from localStorage
- * synchronously, but the current user still needs to be fetched via
- * /auth/me.  The guard therefore:
+ * synchronously, but the session state (current user + tenant list) still
+ * needs to be fetched.  The guard therefore:
  *
- * 1. If `currentUser` is already loaded → pass immediately.
- * 2. If a token exists (restored from localStorage) but `currentUser`
- *    is not loaded yet → call `fetchCurrentUser()` and **wait** for the
- *    result.  On success → pass.  On 401 → redirect to login.
+ * 1. If the session is already bootstrapped (user loaded AND tenants
+ *    initialized) → pass immediately.
+ * 2. If a token exists (restored from localStorage) but the session is not
+ *    initialized yet → call `bootstrap()` (ONE round-trip for user + tenants,
+ *    replacing the sequential /auth/me → /tenants waterfall) and **wait** for
+ *    the result.  On success → pass.  On 401 → redirect to login.
  * 3. No token at all → redirect to login.
  *
- * This prevents the race condition where `fetchCurrentUser()` fires
+ * This prevents the race condition where the bootstrap call fires
  * from the constructor, returns 401, calls `logout()` (clearing the
  * token), and the error interceptor navigates to /login — all before
  * the guard has finished.
@@ -24,19 +26,20 @@ export const authGuard: CanActivateFn = async () => {
   const authStore = inject(AuthStore);
   const router = inject(Router);
 
-  // Fast path: user already fully loaded (e.g. after login without page reload)
+  // Fast path: session already fully initialized (e.g. after login without
+  // a page reload — bootstrap may still be pending for the tenant list).
   if (authStore.currentUser()) {
     return true;
   }
 
-  // Token restored from localStorage but currentUser not fetched yet.
-  // Call fetchCurrentUser and wait for the result before deciding.
+  // Token restored from localStorage but the session is not bootstrapped yet.
+  // Call bootstrap and wait for the result before deciding.
   if (authStore.token()) {
     try {
-      await authStore.fetchCurrentUser();
+      await authStore.bootstrap();
       return true;
     } catch {
-      // fetchCurrentUser already called logout() on 401 → token cleared.
+      // bootstrap already triggered logout() on 401 → token cleared.
       // For other errors (network, 500) the token is preserved but we
       // still redirect to be safe.
       return router.parseUrl('/auth/login');
