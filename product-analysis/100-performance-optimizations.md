@@ -113,6 +113,23 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
   operations ~400 → 5). Failure semantics (per-task VERSION_CONFLICT / TASK_NOT_FOUND / TASK_NOT_IN_PROJECT) preserved
   and tested.
 
+### 2.12 Zod locale tree-shaking in the Worker bundle (0e989b2)
+
+- `wrangler` bundles with esbuild, which cannot property-shake namespace re-exports (evanw/esbuild#1420).
+  `import { z } from "zod"` therefore pulled **all 63 Zod v4 locale modules** through
+  `export * as locales from "../locales/index.js"` in `zod/v4/classic/external.js` — 249 KB minified / ~36 KB gzip of
+  error-message locales we never use (`z.locales` is not referenced anywhere in server/shared).
+- Upstream fix colinhacks/zod#6384 (shipped in 4.5.4, our version) only covers Rollup/Webpack default exports; the PR
+  explicitly states esbuild remains unaffected. The only bundler-safe form is `import * as z from "zod"`
+  (Zod-documented).
+- Fix (0e989b2): mechanical import-form change in 18 runtime files (+2 test files for uniformity); `error-handler.ts`
+  (`ZodError`), `validation.ts` (`ZodType` type), `tenant.test.ts` (`type { z }`) untouched. Runtime semantics verified
+  by the pre-fix audit: full 886-test suite parity A/B, real-schema smoke (coerce/enum/
+  `instanceof ZodError`/`z.iso`/`z.email`), `tsc --noEmit`.
+- **Measured (`wrangler deploy --dry-run`):** Total Upload 1,859.93 -> **1,514.65 KiB raw (-345.3 KiB, -18.6%)**; gzip
+  337.40 -> **274.20 KiB (-63.2 KiB, -18.7%)**; brotli q11 279.2 -> 228.2 KB (-51.0 KB). Zod locale modules in the
+  graph: 63 -> **1** (`en`, required by `_ensureDefaultLocale()` in classic/schemas.js); zod modules 94 -> 23.
+
 ## 3. Applied optimizations (frontend)
 
 ### 3.1 `/auth/bootstrap` — session init in one request
@@ -285,6 +302,31 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
   `getProjectMembers` runs `getProject` (404 gate) then the members aggregate sequentially — independent, could be
   `Promise.all`, ~10 ms on a rare admin page; (c) task-list payload — see 4.9. None passes the frequency ×
   avoidable-latency bar; the dominant costs (40 ms platform overhead, Mongo RTT) are not addressable in code (4.1, 4.7).
+
+### 4.12 Post-Zod-fix bundle & Worker startup audit — NO ACTION (2026-09-01)
+
+- **Baseline after 2.12 (0e989b2, `wrangler deploy --dry-run`):** 1,514.65 KiB raw / 274.20 KiB gzip / 228.2 KB brotli;
+  wrangler 4.127.1, esbuild 0.28.2. ~10x headroom to the Cloudflare gzip limit.
+- **Exact attribution (source-map mappings + compressed spans):** saslprep 562.1 KB raw (36.3%) but **only 3.7 KB gzip**
+  (Unicode data table, ~150:1 compressible); mongodb 458.5 KB raw / 117.6 KB gz; app code 142.9 KB / 32.9 KB; zod core
+  98.3 KB / 28.6 KB; bson 80.1 KB / 24.4 KB; postal-mime (static dep of resend, MIME parsing we never use) 72.3 KB /
+  22.1 KB; hono 34.9 KB / 13.4 KB; unenv polyfills 29.9 KB / 11.9 KB.
+- **Transitive chains:** saslprep <- static require in mongodb `cmap/auth/scram.js` (SCRAM-SHA-256 normalization;
+  mongodb@7 has no exports map / no workerd entry); postal-mime <- static import in resend (our emails are text/HTML,
+  parser unused); the only dynamic import in the bundle is `@react-email/render` inside resend, left EXTERNAL by esbuild
+  (0 sources bundled) and never executed by us — no bundle cost.
+- **Startup (`wrangler check startup`, local workerd — attribution only, NOT production latency):** Active CPU 41.1 ms
+  (GC 3.2 ms) on the repo bundle; profile is minified into one file (42% `(program)`, ~8% GC) — no dominant module.
+  What-if A/B with real wrangler `[alias]` stubs: saslprep removal -> **-553.55 KiB raw but only -7.15 KiB gzip and ZERO
+  measurable startup-CPU delta** (28.5 vs 27.5 ms, within noise); postal-mime removal -> -71.3 KB raw / -21.4 KB gzip,
+  CPU delta 0.
+- **Module scope is clean:** MongoClient created lazily on first request (`app.ts` via `runWithDb`; singleton promise in
+  `db/mongo.ts`), no top-level await, module scope = 2x `new Hono()` + routeRegistry + ~64 zod schema constructions
+  (ms-scale).
+- **Verdict:** no significant, safely optimizable bundle/startup source remains. Two documented P2 candidates (both
+  wrangler `[alias]` stubs, both zero startup-CPU gain): (1) saslprep — -36.5% raw for -2.6% gzip, but breaks SCRAM
+  normalization for non-ASCII passwords (auth-path risk); (2) postal-mime — -71.3 KB raw / -21.4 KB gzip (~8% of upload)
+  but stubs resend-internal behavior. Both revisit-only-if-needed.
 
 ## 5. Tooling
 
