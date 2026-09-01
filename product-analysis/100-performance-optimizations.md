@@ -194,8 +194,8 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
   assignee/reporter sorts never needed it (identity snapshots).
 - Remaining candidate in the same area: a list DTO that drops `createdBySnapshot`/`createdById`/`version` from list
   responses (~15-25% payload on top of the shipped `excludeDescription` flag, F5) — only after a consumer grep.
-- Dead code note: `TaskRepository.search` / `TaskService.searchTasks` have no consumers (verified by grep, 2026-09-01) —
-  remove in a separate cleanup commit.
+- Dead code removed: `TaskRepository.search` / `TaskService.searchTasks` had no consumers (verified by grep, 2026-09-01)
+  and were deleted in the cleanup commit; task search lives solely in `findByProject`'s `search` query parameter.
 
 ### 4.6 maxIdleTimeMS interplay
 

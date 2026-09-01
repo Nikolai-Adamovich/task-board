@@ -339,10 +339,6 @@ export class TaskService {
     await this.taskRepo.delete(taskId);
   }
 
-  async searchTasks(projectId: string, searchTerm: string): Promise<Task[]> {
-    return this.taskRepo.search(projectId, searchTerm);
-  }
-
   /**
    * Q10 (RQ-04 ③): bulk status/assignee/sprint update.
    * Authorization mirrors single-task `updateTask` (`edit_task` via

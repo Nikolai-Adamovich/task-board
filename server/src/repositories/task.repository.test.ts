@@ -371,18 +371,4 @@ describe('TaskRepository', () => {
       expect(collection.updateMany).toHaveBeenCalled();
     });
   });
-
-  describe('search', () => {
-    it('searches tasks by text', async () => {
-      const toArray = vi.fn().mockResolvedValue([makeDoc()]);
-      const limit = vi.fn().mockReturnValue({ toArray });
-      const sort = vi.fn().mockReturnValue({ limit });
-
-      collection.find.mockReturnValue({ sort });
-
-      const result = await repo.search('project-1', 'test');
-
-      expect(result).toHaveLength(1);
-    });
-  });
 });

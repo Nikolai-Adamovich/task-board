@@ -576,27 +576,6 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
   }
 
   /**
-   * Search tasks by text across number, title, description, and snapshots.
-   */
-  async search(projectId: string, searchTerm: string): Promise<Task[]> {
-    // Escape user input — raw input is compiled as a regex (ReDoS / 500 on invalid patterns)
-    const regex = { $regex: escapeRegExp(searchTerm), $options: 'i' };
-    const query = {
-      projectId,
-      $or: [
-        { title: regex },
-        { description: regex },
-        { 'createdBySnapshot.displayName': regex },
-        { 'assigneeSnapshot.displayName': regex },
-        { 'reporterSnapshot.displayName': regex },
-      ],
-    };
-    const docs = await this.collection.find(query).sort({ number: -1 }).limit(50).toArray();
-
-    return docs.map(toDomain);
-  }
-
-  /**
    * Delete all entities belonging to a project. Used for cascade delete.
    */
   /**
