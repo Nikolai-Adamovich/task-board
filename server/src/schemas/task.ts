@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { TaskPriorityValues } from '@task-board/shared';
 import { uuid, nonEmptyString, optionalString } from '../validators/common.js';
 

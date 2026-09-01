@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { AuditEntityTypeValues } from '@task-board/shared';
 import { uuid } from '../validators/common.js';
 

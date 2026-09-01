@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { nonEmptyString } from '../validators/common.js';
 
 export const CreateCommentSchema = z.object({

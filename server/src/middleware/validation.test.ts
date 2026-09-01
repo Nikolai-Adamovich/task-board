@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { z } from 'zod';
+import * as z from 'zod';
 import { validateBody, validateQuery, validateParams } from './validation.js';
 import { errorHandler } from './error-handler.js';
 import type { AppEnv } from '../types/context.js';

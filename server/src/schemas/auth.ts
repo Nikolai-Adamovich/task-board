@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { TenantRoleValues, MemberStatusValues } from '@task-board/shared';
 import { UserSchema } from './user.js';
 

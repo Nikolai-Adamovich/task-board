@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { isValidDateFormat, TIME_FORMAT_PREFERENCES, TASK_TABLE_COLUMN_KEYS } from '@task-board/shared';
 
 /**

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { TaskRelationshipTypeValues } from '@task-board/shared';
 import { uuid } from '../validators/common.js';
 

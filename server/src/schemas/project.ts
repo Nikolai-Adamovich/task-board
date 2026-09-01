@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { ProjectRoleValues, ProjectStatusValues } from '@task-board/shared';
 import { uuid, nonEmptyString, optionalString, nullableOptionalString, isoDateTime } from '../validators/common.js';
 

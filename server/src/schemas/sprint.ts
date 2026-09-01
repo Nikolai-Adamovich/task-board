@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 import { SprintStatusValues } from '@task-board/shared';
 import { nonEmptyString } from '../validators/common.js';
 
