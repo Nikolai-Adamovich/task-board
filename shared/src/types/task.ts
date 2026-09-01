@@ -29,6 +29,15 @@ export interface Task {
   assigneeSnapshot: IdentitySnapshot | null;
   /** Optional sprint assignment (null if in backlog) */
   sprintId: string | null;
+  /**
+   * Denormalized status name (audit TOP-2) — sort-only display field kept in
+   * sync with statuses.name by the server (rename/delete fan-out). Consumers
+   * still resolve display names via the reference-data store. Optional:
+   * list DTOs with field projections may omit it.
+   */
+  statusName?: string | null;
+  /** Denormalized sprint name — same sync contract as statusName. */
+  sprintName?: string | null;
   /** Label IDs attached to this task */
   labelIds: string[];
   /** User ID of the task creator */

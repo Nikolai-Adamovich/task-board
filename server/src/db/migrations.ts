@@ -222,6 +222,9 @@ const CORE_INDEXES: IndexDefinition[] = [
   { collection: 'tasks', spec: { projectId: 1, statusId: 1 } },
   { collection: 'tasks', spec: { projectId: 1, sprintId: 1 } },
   { collection: 'tasks', spec: { projectId: 1, assigneeId: 1 } },
+  // TOP-2: denormalized sort names — indexed sort without $lookup pipelines
+  { collection: 'tasks', spec: { projectId: 1, statusName: 1, number: -1 } },
+  { collection: 'tasks', spec: { projectId: 1, sprintName: 1, number: -1 } },
   // Audit #3: /tasks/my (`findAssignedTo`) filters by {assigneeId} alone and
   // sorts by {updatedAt} — the compound {projectId, assigneeId} index does not
   // apply (projectId is its prefix). Covers the cross-project "My Tasks"
@@ -416,11 +419,53 @@ export async function migrateToSingleBoardPerProject(db: Db): Promise<void> {
  * — splitting them left a window where a concurrent run could insert a
  * duplicate slug in between.
  */
+/**
+ * TOP-2: backfill the denormalized task.statusName / task.sprintName sort
+ * fields from the authoritative statuses / sprints collections.
+ *
+ * Idempotent: only documents whose stored name differs from (or is missing
+ * from) the source entity are touched; a conformed database yields
+ * modifiedCount 0. Orphaned statusId/sprintId values (entity deleted without
+ * a replacement) get `null`, matching the runtime contract.
+ */
+export async function backfillTaskSortNames(db: Db): Promise<number> {
+  const tasks = db.collection('tasks');
+  let modified = 0;
+
+  for (const [entityCollection, idKey, nameKey] of [
+    ['statuses', 'statusId', 'statusName'],
+    ['sprints', 'sprintId', 'sprintName'],
+  ] as const) {
+    const entities = await db.collection(entityCollection).find({}).toArray();
+    const knownIds = new Set(entities.map((entity) => entity.id));
+
+    for (const entity of entities) {
+      const result = await tasks.updateMany(
+        { [idKey]: entity.id, [nameKey]: { $ne: entity.name } },
+        { $set: { [nameKey]: entity.name } },
+      );
+
+      modified += result.modifiedCount;
+    }
+
+    // Orphans (entity gone): normalize a missing field to null.
+    const orphans = await tasks.updateMany(
+      { [idKey]: { $nin: [...knownIds] }, [nameKey]: { $exists: true, $ne: null } },
+      { $set: { [nameKey]: null } },
+    );
+
+    modified += orphans.modifiedCount;
+  }
+
+  return modified;
+}
+
 export async function runMigrations(db: Db): Promise<void> {
   await migrateInvitedMembershipsToRevoked(db);
   await renameSeedStatusNames(db); // DR-1 — raw seed-status keys → display names
   await ensureTenantSlugIntegrity(db); // DEC-032 — backfill + unique index back-to-back
   await backfillMemberExpiresAt(db); // DEC-055 — expiresAt: null on legacy members
   await migrateToSingleBoardPerProject(db); // 102 — dedupe boards, strip dead fields (before the unique index)
+  await backfillTaskSortNames(db); // TOP-2 — denormalized statusName/sprintName on legacy tasks
   await ensureCoreIndexes(db); // create every repository-documented index (idempotent)
 }

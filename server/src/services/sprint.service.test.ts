@@ -24,6 +24,8 @@ function createMockProjectRepo() {
 function createMockTaskRepo(): SprintServiceTaskRepo {
   return {
     clearSprintFromTasks: vi.fn().mockResolvedValue(undefined),
+    // TOP-2: rename fan-out
+    setSprintNameForTasks: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -171,6 +173,24 @@ describe('SprintService', () => {
       const result = await service.updateSprint('sprint-1', { name: 'Updated' });
 
       expect(result.name).toBe('Updated');
+    });
+
+    it('TOP-2: fans the renamed sprint name out to tasks', async () => {
+      sprintRepo.findById = vi.fn().mockResolvedValue(makeSprint());
+      sprintRepo.update = vi.fn().mockResolvedValue(makeSprint({ name: 'Updated' }));
+
+      await service.updateSprint('sprint-1', { name: 'Updated' });
+
+      expect(taskRepo.setSprintNameForTasks).toHaveBeenCalledWith('project-1', 'sprint-1', 'Updated');
+    });
+
+    it('TOP-2: does not fan out when the name is unchanged', async () => {
+      sprintRepo.findById = vi.fn().mockResolvedValue(makeSprint());
+      sprintRepo.update = vi.fn().mockResolvedValue(makeSprint({ startDate: '2025-02-01T00:00:00.000Z' }));
+
+      await service.updateSprint('sprint-1', { startDate: '2025-02-01T00:00:00.000Z' });
+
+      expect(taskRepo.setSprintNameForTasks).not.toHaveBeenCalled();
     });
 
     it('sets startDate but not endDate when transitioning to ACTIVE without dates (DEC-016)', async () => {

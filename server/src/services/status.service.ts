@@ -9,7 +9,14 @@ import type { AuditService } from './audit.service.js';
 /** Minimal task repository interface needed by StatusService */
 export interface StatusServiceTaskRepo {
   countByStatus(projectId: string, statusId: string): Promise<number>;
-  updateManyByStatus(projectId: string, oldStatusId: string, newStatusId: string): Promise<void>;
+  updateManyByStatus(
+    projectId: string,
+    oldStatusId: string,
+    newStatusId: string,
+    newStatusName?: string | null,
+  ): Promise<void>;
+  /** TOP-2: propagate a status rename to the denormalized task.statusName */
+  setStatusNameForTasks(projectId: string, statusId: string, statusName: string): Promise<void>;
 }
 
 /** Minimal board repository interface needed by StatusService */
@@ -149,6 +156,11 @@ export class StatusService {
       throw new NotFoundError('Status not found');
     }
 
+    // TOP-2: propagate a rename to the denormalized task.statusName (sort-only)
+    if (input.name !== undefined && input.name !== status.name) {
+      await this.taskRepo.setStatusNameForTasks(status.projectId, statusId, input.name);
+    }
+
     // Audit side effect
     if (this.auditService && userId && this.projectRepo) {
       const project = await this.projectRepo.findById(updated.projectId);
@@ -202,8 +214,8 @@ export class StatusService {
         throw new NotFoundError('Replacement status not found in this project');
       }
 
-      // Update all tasks using this status
-      await this.taskRepo.updateManyByStatus(status.projectId, statusId, replacementStatusId);
+      // Update all tasks using this status (carries the replacement's name — TOP-2)
+      await this.taskRepo.updateManyByStatus(status.projectId, statusId, replacementStatusId, replacement.name);
     }
 
     // Replace status in board columns

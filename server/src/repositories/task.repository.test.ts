@@ -32,6 +32,8 @@ function makeDoc(overrides: Partial<TaskDocument> = {}): TaskDocument {
     title: 'Test Task',
     description: 'A test task',
     statusId: 'status-1',
+    statusName: 'Todo',
+    sprintName: null,
     priority: 'MEDIUM',
     reporterId: 'user-1',
     reporterSnapshot: { displayName: 'Reporter' },

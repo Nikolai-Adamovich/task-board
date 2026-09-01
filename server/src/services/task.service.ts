@@ -31,9 +31,9 @@ export interface TaskServiceUserRepo {
 }
 
 export interface TaskServiceSprintRepo {
-  findById(id: string): Promise<{ id: string; projectId: string } | null>;
+  findById(id: string): Promise<{ id: string; projectId: string; name?: string | null } | null>;
   /** M-14: batched lookup used by validateCrossProjectRefs */
-  findByIds(ids: string[]): Promise<{ id: string; projectId: string }[]>;
+  findByIds(ids: string[]): Promise<{ id: string; projectId: string; name?: string | null }[]>;
 }
 
 export interface TaskServiceCommentRepo {
@@ -150,15 +150,15 @@ export class TaskService {
     // Validate EDITOR+ role
     ensurePermission('create_task', userRole, projectRole);
 
-    // Validate cross-project references
-    await this.validateCrossProjectRefs(projectId, {
+    // Validate cross-project references — returns the denormalized sort names
+    // (TOP-2) resolved from the SAME batched lookups (M-14: no extra findById).
+    const { statusName, sprintName } = await this.validateCrossProjectRefs(projectId, {
       typeId: input.typeId,
       statusId: input.statusId,
       assigneeId: input.assigneeId,
       sprintId: input.sprintId,
       labelIds: input.labelIds,
     });
-
     // Get next sequential number
     const number = await this.counterService.getNextTaskNumber(projectId);
     // Capture identity snapshots
@@ -177,6 +177,8 @@ export class TaskService {
       title: input.title,
       description: input.description,
       statusId: input.statusId,
+      statusName,
+      sprintName,
       priority: input.priority,
       reporterId: userId,
       reporterSnapshot,
@@ -234,10 +236,18 @@ export class TaskService {
 
     if (input.title !== undefined) update.title = input.title;
     if (input.description !== undefined) update.description = input.description;
-    if (input.statusId !== undefined) update.statusId = input.statusId;
+    if (input.statusId !== undefined) {
+      update.statusId = input.statusId;
+      // TOP-2: keep the denormalized sort name in sync with the status change
+      update.statusName = (await this.statusRepo.findById(input.statusId))?.name ?? null;
+    }
     if (input.priority !== undefined) update.priority = input.priority;
     if (input.typeId !== undefined) update.typeId = input.typeId;
-    if (input.sprintId !== undefined) update.sprintId = input.sprintId;
+    if (input.sprintId !== undefined) {
+      update.sprintId = input.sprintId;
+      // TOP-2: keep the denormalized sort name in sync with the sprint change
+      update.sprintName = input.sprintId ? ((await this.sprintRepo.findById(input.sprintId))?.name ?? null) : null;
+    }
     if (input.labelIds !== undefined) update.labelIds = input.labelIds;
 
     // Handle assignee change with snapshot
@@ -359,8 +369,16 @@ export class TaskService {
     // Build the shared update payload once (single-field contract is enforced by Zod)
     const update: TaskUpdatePayload = {};
 
-    if (data.statusId !== undefined) update.statusId = data.statusId;
-    if (data.sprintId !== undefined) update.sprintId = data.sprintId;
+    if (data.statusId !== undefined) {
+      update.statusId = data.statusId;
+      // TOP-2: keep the denormalized sort name in sync with the status change
+      update.statusName = (await this.statusRepo.findById(data.statusId))?.name ?? null;
+    }
+    if (data.sprintId !== undefined) {
+      update.sprintId = data.sprintId;
+      // TOP-2: keep the denormalized sort name in sync with the sprint change
+      update.sprintName = data.sprintId ? ((await this.sprintRepo.findById(data.sprintId))?.name ?? null) : null;
+    }
     if (data.assigneeId !== undefined) {
       update.assigneeId = data.assigneeId;
       update.assigneeSnapshot = data.assigneeId ? await this.captureIdentitySnapshot(data.assigneeId) : null;
@@ -455,7 +473,7 @@ export class TaskService {
       sprintId?: string;
       labelIds?: string[];
     },
-  ): Promise<void> {
+  ): Promise<{ statusName: string | null; sprintName: string | null }> {
     const [taskTypes, statuses, sprints] = await Promise.all([
       refs.typeId ? this.taskTypeRepo.findByIds([refs.typeId]) : Promise.resolve([]),
       refs.statusId ? this.statusRepo.findByIds([refs.statusId]) : Promise.resolve([]),
@@ -486,6 +504,11 @@ export class TaskService {
       }
     }
 
+    // TOP-2: the denormalized sort names come from the SAME batched lookups —
+    // no additional round-trips.
+    const statusName = refs.statusId ? (statuses.find((s) => s.id === refs.statusId)?.name ?? null) : null;
+    const sprintName = refs.sprintId ? (sprints.find((s) => s.id === refs.sprintId)?.name ?? null) : null;
+
     if (refs.assigneeId) {
       const member = await this.projectMemberRepo.findByUserAndProject(refs.assigneeId, projectId);
 
@@ -493,5 +516,7 @@ export class TaskService {
         throw new NotFoundError(`User ${refs.assigneeId} is not a member of project ${projectId}`);
       }
     }
+
+    return { statusName, sprintName };
   }
 }

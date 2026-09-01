@@ -16,9 +16,23 @@ import { escapeRegExp } from '../utils/regex.js';
 // - { projectId: 1, priority: 1, number: -1 }
 // - { projectId: 1, typeId: 1, number: -1 }
 // - { assigneeId: 1, updatedAt: -1 } (cross-project /tasks/my — audit #3)
+// - { projectId: 1, statusName: 1, number: -1 } (TOP-2 semantic sort)
+// - { projectId: 1, sprintName: 1, number: -1 } (TOP-2 semantic sort)
 
 /** Sort fields that require resolving relation names / snapshots / priority rank before sorting. */
-const SEMANTIC_SORT_FIELDS = new Set(['statusId', 'sprintId', 'labelIds', 'priority', 'assigneeId', 'reporterId']);
+/**
+ * TOP-2: `statusId`/`sprintId` sorts moved OFF the aggregation pipeline — the
+ * denormalized `statusName`/`sprintName` fields are plain indexed document
+ * keys now (see SEMANTIC_TO_DOC_KEY). Only `labelIds` still needs the
+ * $lookup pipeline (alphabetically-first label of a task's label set is not
+ * denormalized — its fan-out cost was judged too high for the benefit).
+ */
+const SEMANTIC_SORT_FIELDS = new Set(['labelIds']);
+/** API sort field → denormalized document key (plain-indexed sorts). */
+const SEMANTIC_TO_DOC_KEY: Record<string, string> = {
+  statusId: 'statusName',
+  sprintId: 'sprintName',
+};
 
 // ─── MongoDB Document Shape ───────────────────────────────────────────────────
 
@@ -31,6 +45,10 @@ export interface TaskDocument {
   title: string;
   description: string | null;
   statusId: string;
+  /** TOP-2: denormalized status name — sort-only, synced by status mutations */
+  statusName: string | null;
+  /** TOP-2: denormalized sprint name — sort-only, synced by sprint mutations */
+  sprintName: string | null;
   priority: string;
   reporterId: string | null;
   reporterSnapshot: IdentitySnapshot | null;
@@ -52,6 +70,8 @@ export type TaskUpdatePayload = Partial<
     | 'title'
     | 'description'
     | 'statusId'
+    | 'statusName'
+    | 'sprintName'
     | 'priority'
     | 'reporterId'
     | 'reporterSnapshot'
@@ -113,6 +133,8 @@ function toDomain(doc: TaskDocument): Task {
     title: doc.title,
     description: doc.description,
     statusId: doc.statusId,
+    statusName: doc.statusName ?? null,
+    sprintName: doc.sprintName ?? null,
     priority: doc.priority as Task['priority'],
     reporterId: doc.reporterId,
     reporterSnapshot: doc.reporterSnapshot,
@@ -263,10 +285,13 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     }
 
     const findOptions = excludeDescription ? ({ projection: { description: 0 } } as const) : undefined;
+    // TOP-2: statusId/sprintId sorts map to their denormalized name fields —
+    // plain indexed sorts, no aggregation pipeline.
+    const docSortKey = SEMANTIC_TO_DOC_KEY[sortField] ?? sortField;
     const [docs, total] = await Promise.all([
       this.collection
         .find(query, findOptions)
-        .sort({ [sortField]: sortDir })
+        .sort({ [docSortKey]: sortDir, number: -1 })
         .skip(skip)
         .limit(limit)
         .toArray(),
@@ -372,6 +397,8 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     title: string;
     description?: string;
     statusId: string;
+    statusName?: string | null;
+    sprintName?: string | null;
     priority: string;
     reporterId?: string;
     reporterSnapshot?: IdentitySnapshot;
@@ -391,6 +418,8 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       title: input.title,
       description: input.description ?? null,
       statusId: input.statusId,
+      statusName: input.statusName ?? null,
+      sprintName: input.sprintName ?? null,
       priority: input.priority,
       reporterId: input.reporterId ?? null,
       reporterSnapshot: input.reporterSnapshot ?? null,
@@ -451,13 +480,29 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
   }
 
   /**
-   * Bulk update all tasks with a given status to a new status.
+   * Bulk update all tasks with a given status to a new status
+   * (status delete/replacement — carries the replacement's denormalized name).
    */
-  async updateManyByStatus(projectId: string, oldStatusId: string, newStatusId: string): Promise<void> {
+  async updateManyByStatus(
+    projectId: string,
+    oldStatusId: string,
+    newStatusId: string,
+    newStatusName?: string | null,
+  ): Promise<void> {
     await this.collection.updateMany(
       { projectId, statusId: oldStatusId },
-      { $set: { statusId: newStatusId, updatedAt: new Date() } },
+      { $set: { statusId: newStatusId, statusName: newStatusName ?? null, updatedAt: new Date() } },
     );
+  }
+
+  /** TOP-2: propagate a status rename to all tasks holding the status. */
+  async setStatusNameForTasks(projectId: string, statusId: string, statusName: string): Promise<void> {
+    await this.collection.updateMany({ projectId, statusId }, { $set: { statusName, updatedAt: new Date() } });
+  }
+
+  /** TOP-2: propagate a sprint rename to all tasks holding the sprint. */
+  async setSprintNameForTasks(projectId: string, sprintId: string, sprintName: string): Promise<void> {
+    await this.collection.updateMany({ projectId, sprintId }, { $set: { sprintName, updatedAt: new Date() } });
   }
 
   /**
@@ -491,7 +536,10 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
    * Unassign sprint from all tasks with a given sprint.
    */
   async clearSprintFromTasks(projectId: string, sprintId: string): Promise<void> {
-    await this.collection.updateMany({ projectId, sprintId }, { $set: { sprintId: null, updatedAt: new Date() } });
+    await this.collection.updateMany(
+      { projectId, sprintId },
+      { $set: { sprintId: null, sprintName: null, updatedAt: new Date() } },
+    );
   }
 
   /**

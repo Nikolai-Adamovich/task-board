@@ -10,6 +10,7 @@ import {
   ensureTenantSlugIntegrity,
   backfillMemberExpiresAt,
   migrateToSingleBoardPerProject,
+  backfillTaskSortNames,
 } from './migrations.js';
 
 describe('migrateInvitedMembershipsToRevoked', () => {
@@ -298,5 +299,68 @@ describe('migrateToSingleBoardPerProject (doc 102)', () => {
     await migrateToSingleBoardPerProject(db as never);
 
     expect(boardsCollection.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+// ─── TOP-2: denormalized task sort names ─────────────────────────────────────
+
+function createSortNamesDb(statuses: { id: string; name: string }[], sprints: { id: string; name: string }[]) {
+  const updateMany = vi.fn().mockResolvedValue({ modifiedCount: 1 });
+  const entities = (name: string) => ({
+    find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue(name === 'statuses' ? statuses : sprints) }),
+  });
+  const collections: Record<string, unknown> = {
+    statuses: entities('statuses'),
+    sprints: entities('sprints'),
+    tasks: { updateMany },
+  };
+  const db = { collection: vi.fn((n: string) => collections[n]) };
+
+  return { db, updateMany };
+}
+
+describe('backfillTaskSortNames (TOP-2)', () => {
+  it('propagates entity names into the denormalized task fields', async () => {
+    const { db, updateMany } = createSortNamesDb([{ id: 's1', name: 'TODO' }], [{ id: 'sp1', name: 'Sprint 1' }]);
+    const count = await backfillTaskSortNames(db as never);
+
+    expect(updateMany).toHaveBeenCalledWith(
+      { statusId: 's1', statusName: { $ne: 'TODO' } },
+      { $set: { statusName: 'TODO' } },
+    );
+    expect(updateMany).toHaveBeenCalledWith(
+      { sprintId: 'sp1', sprintName: { $ne: 'Sprint 1' } },
+      { $set: { sprintName: 'Sprint 1' } },
+    );
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it('normalizes orphaned references to null', async () => {
+    const { db, updateMany } = createSortNamesDb([], []);
+
+    await backfillTaskSortNames(db as never);
+
+    // No known entities → every task holding a non-null stale name is normalized.
+    expect(updateMany).toHaveBeenCalledWith(
+      { statusId: { $nin: [] }, statusName: { $exists: true, $ne: null } },
+      { $set: { statusName: null } },
+    );
+    expect(updateMany).toHaveBeenCalledWith(
+      { sprintId: { $nin: [] }, sprintName: { $exists: true, $ne: null } },
+      { $set: { sprintName: null } },
+    );
+  });
+
+  it('is idempotent — a conformed database yields modifiedCount 0', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ modifiedCount: 0 });
+    const db = {
+      collection: vi.fn(() => ({
+        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+        updateMany,
+      })),
+    } as never;
+    const count = await backfillTaskSortNames(db);
+
+    expect(count).toBe(0);
   });
 });

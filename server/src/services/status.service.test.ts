@@ -23,6 +23,8 @@ function createMockTaskRepo(): StatusServiceTaskRepo {
   return {
     countByStatus: vi.fn().mockResolvedValue(0),
     updateManyByStatus: vi.fn().mockResolvedValue(undefined),
+    // TOP-2: rename fan-out
+    setStatusNameForTasks: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -188,6 +190,25 @@ describe('StatusService', () => {
       });
     });
 
+    it('TOP-2: fans the renamed status name out to tasks', async () => {
+      statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
+      statusRepo.findByProjectAndNormalizedName = vi.fn().mockResolvedValue(null);
+      statusRepo.update = vi.fn().mockResolvedValue(makeStatus({ name: 'In Progress', normalizedName: 'in progress' }));
+
+      await service.updateStatus('status-1', { name: 'In Progress' });
+
+      expect(taskRepo.setStatusNameForTasks).toHaveBeenCalledWith('project-1', 'status-1', 'In Progress');
+    });
+
+    it('TOP-2: does not fan out when the name is unchanged', async () => {
+      statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
+      statusRepo.update = vi.fn().mockResolvedValue(makeStatus({ position: 3 }));
+
+      await service.updateStatus('status-1', { position: 3 });
+
+      expect(taskRepo.setStatusNameForTasks).not.toHaveBeenCalled();
+    });
+
     it('throws DUPLICATE_STATUS when new name conflicts', async () => {
       statusRepo.findById = vi.fn().mockResolvedValue(makeStatus());
       statusRepo.findByProjectAndNormalizedName = vi.fn().mockResolvedValue(makeStatus({ id: 'status-2' }));
@@ -258,7 +279,8 @@ describe('StatusService', () => {
 
       await service.deleteStatus('status-1', 'status-2');
 
-      expect(taskRepo.updateManyByStatus).toHaveBeenCalledWith('project-1', 'status-1', 'status-2');
+      // TOP-2: the fan-out carries the replacement's denormalized name
+      expect(taskRepo.updateManyByStatus).toHaveBeenCalledWith('project-1', 'status-1', 'status-2', 'IN_PROGRESS');
       expect(boardRepo.replaceStatusInColumns).toHaveBeenCalledWith('project-1', 'status-1', 'status-2');
       expect(statusRepo.delete).toHaveBeenCalledWith('status-1');
     });

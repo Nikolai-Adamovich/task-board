@@ -11,6 +11,8 @@ import type { AuditService } from './audit.service.js';
 
 export interface SprintServiceTaskRepo {
   clearSprintFromTasks(projectId: string, sprintId: string): Promise<void>;
+  /** TOP-2: propagate a sprint rename to the denormalized task.sprintName */
+  setSprintNameForTasks(projectId: string, sprintId: string, sprintName: string): Promise<void>;
 }
 
 /** Minimal project-member repository interface to resolve the caller's project role */
@@ -169,6 +171,11 @@ export class SprintService {
 
     if (!updated) {
       throw new NotFoundError('Sprint not found');
+    }
+
+    // TOP-2: propagate a rename to the denormalized task.sprintName (sort-only)
+    if (input.name !== undefined && input.name !== sprint.name) {
+      await this.taskRepo.setSprintNameForTasks(sprint.projectId, id, input.name);
     }
 
     // Audit side effect
