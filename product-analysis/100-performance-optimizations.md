@@ -68,6 +68,51 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
   size, app CPU, Cloudflare edge (ping clean), per-request client (worse), Atlas-side reap (not needed as an
   explanation).
 
+### 2.8 Audit #2/#4: project_members lookup skipped for read-only requests (F3)
+
+- `tenantContextMiddleware` resolved the caller's `project_members` role on EVERY project-scoped request — but the
+  context value is consumed only by `requirePermission(action, true)` coarse gates, all of which sit on POST/PATCH
+  routes; services resolve project roles themselves. For GET/HEAD the lookup is now skipped (**−1 Mongo op on every read
+  request** for tenant MEMBERs). Write-route authorization unchanged; covered by 6 dedicated middleware tests.
+
+### 2.9 /tasks/my: index + minimal projection (audit #3, 99e6b8e)
+
+- `findAssignedTo` filtered by `{assigneeId}` alone — only the compound `{projectId, assigneeId}` index existed
+  (projectId is its prefix) → **COLLSCAN**; response carried full task documents for a widget that renders
+  number/title/priority.
+- Index `{ assigneeId: 1, updatedAt: -1 }` in `CORE_INDEXES` (idempotent) + inclusion projection
+  `{id, projectId, number, title, priority, createdAt, updatedAt}`. Explain: COLLSCAN (docsExamined = full collection) →
+  IXSCAN (docsExamined = 50 for 50 returned); payload −74.6% (43 960 → 11 160 bytes for 50 tasks).
+
+### 2.10 TOP-2: denormalized semantic sort names (306e618) and the `excludeDescription` flag (8112584, F5)
+
+- Sorting by status/sprint ran an aggregation pipeline (`$lookup` + blocking `$sort` over all matches): measured **110
+  ms** at 5k tasks for `?sort=statusId:desc`, growing linearly with the match set.
+- `Task.statusName`/`Task.sprintName` denormalized (rename/delete fan-out via `setStatusNameForTasks` /
+  `updateManyByStatus(name)` / `setSprintNameForTasks`; task create/update/bulk resolve names from the same batched
+  reference lookups — M-14 preserved). Idempotent backfill `backfillTaskSortNames` + indexes
+  `{projectId, statusName, number: -1}` / `{projectId, sprintName, number: -1}`.
+- Explain after: **1 ms**, LIMIT → IXSCAN, docsExamined 50. **Deliberately NOT denormalized:** labelIds sort (fan-out of
+  the alphabetically-first label was judged too expensive), assignee/reporter (their identity snapshots are already
+  denormalized and stale-tolerant).
+
+- **`excludeDescription` query flag** (same wave): omits `description` from list responses — measured **−41%** payload
+  on a synthetic 400-char dataset and **−21.5%** on real data (200 tasks). Applied to the task table, overview recent
+  tasks and the sprint task list; the board keeps descriptions for its card previews; server-side description search is
+  unaffected.
+
+### 2.11 TOP-3 №1+№2: bulk task updates in ONE bulkWrite + batched audit events (ae6c990, 5660171)
+
+- `bulkUpdateTasks` used to run up to 100 sequential `findOneAndUpdate` (115.5 ms driver-side at 100 tasks, plus ~100
+  Worker→Atlas RTTs) and then 100 sequential audit writes (139.7 ms, 200 ops counting actor lookups).
+- `TaskRepository.bulkUpdateWithVersion`: ONE `bulkWrite` (ordered: false) with per-task optimistic-concurrency filters
+  `{id, version}` + `$inc {version: 1}` — per-task semantics identical to the former loop. Audit phase:
+  `AuditService.logMany` resolves the actor once and persists all events via one `insertMany`
+  (`AuditEventRepository.createMany`, individual UUID/`createdAt` per event, empty batch = no-op).
+- Measured (5050 tasks, bulk of 100): updates 115.5 → 7 ms; audit 139.7 → 4.5 ms; **end-to-end ~450 ms → ~40 ms** (DB
+  operations ~400 → 5). Failure semantics (per-task VERSION_CONFLICT / TASK_NOT_FOUND / TASK_NOT_IN_PROJECT) preserved
+  and tested.
+
 ## 3. Applied optimizations (frontend)
 
 ### 3.1 `/auth/bootstrap` — session init in one request
@@ -90,13 +135,38 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
 - statuses/types/sprints/labels/members cached per project; M-12: members derived from the ProjectStore. Eliminated
   duplicate reference-data requests.
 
+### 3.4 Audit #2: overview without a duplicate project fetch (F1)
+
+- The overview re-fetched `GET /projects/:id` although `projectGuard` had just loaded the same project via
+  `/projects/by-key/:key` into `ProjectStore`. The fetch is removed — the overview reads `ProjectStore.activeProject`;
+  project mutations (settings update, archive/restore/delete) patch the store in place, so the read-only banner stays
+  correct without a refetch. **−1 HTTP / −3 Mongo ops** per overview open.
+
+### 3.5 ProjectRefStore: full-DTO cache (F2)
+
+- The store now caches full DTOs (statuses/sprints/types/labels) per `${projectId}:${kind}`; the `SelectOption` layer is
+  derived from the same cache (one fetch + one invalidation per kind per project session). Overview, board, sprint
+  pages, board columns and the sprint list all read it — cross-page transitions (Overview ↔ Board ↔ Tasks ↔ Sprints) no
+  longer re-fetch statuses/sprints (−2–3 duplicate HTTP per transition). Mutations invalidate/patch the cache; failed
+  fetches stay uncached.
+
+### 3.6 TenantHome + ProjectSwitcher share the project list (F4)
+
+- Both used to issue an independent `GET /projects` on tenant home. A tenant-scoped cache in `ProjectStore`
+  (`ensureProjectList` / `upsertProject` / `invalidateProjectList`) dedupes concurrent calls, patches the cached list on
+  create/update/archive/restore/delete, isolates data per tenantId and drops everything on logout (stale-response guard
+  against a late in-flight reply after logout). **−1 HTTP** per tenant home; the switcher stays consistent without
+  refetching.
+
 ## 4. Future proposals (by expected value)
 
-### 4.1 Class 2: pre-DB stall 140-320ms (edge/DO) — localize
+### 4.1 Class 2: pre-DB stall 140-320ms (edge/DO) — localized to platform level (2026-09-01)
 
-- A measured delay class occurring **before** the first Mongo driver interaction (commands during it are 8-23ms, no new
-  connections). The edge→Worker vs DO scheduling split is not observable with current tooling. Next step: a marker at
-  Worker entry before the proxy + a long series capturing Class-2 episodes.
+- Keep-alive A/B across `/api/ping` (no Mongo, no DO logic) vs Mongo endpoints with `wrangler tail` worker-time
+  decomposition: a **304ms spike occurred on /api/ping with Worker handler time 0ms** — the stall happens entirely
+  outside our code (Cloudflare edge/DO scheduling). Baseline pre-Worker overhead: ~44ms (edge) on ping, ~70-76ms on
+  DO-proxied routes (the DO hop itself ≈ 25-30ms). Frequency ~3-5% of requests. Not addressable in application code —
+  effectively merged into 4.8 (platform-level).
 
 ### 4.2 Post-deploy transient hang 75-90s
 
@@ -104,7 +174,10 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
   idle). Likely DO handoff/connection storm during deploy. Investigate separately — this is worse than the regular
   spikes.
 
-### 4.3 FE dedup: `/projects` and `/projects/:id/boards`
+### 4.3 FE dedup: `/projects` — DONE (F4, 408658e)
+
+- TenantHome + ProjectSwitcher now share a tenant-scoped cache in ProjectStore (dedupe/invalidation/logout clearing);
+  `/projects/:id/boards` no longer exists (single-board model, doc 102).
 
 - `/projects` is requested by TenantHome + ProjectSwitcher simultaneously; `/boards` by Sidebar + ProjectDetail. A
   shared per-tenant/per-project cache removes one duplicate per page.
@@ -114,10 +187,15 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
 - Board payload 199KB raw / 12.8KB gzip (200 tasks); the FE uses ~10 fields. A lightweight DTO saves ~5-15ms and
   traffic. Small gain — bundle with other API changes.
 
-### 4.5 Semantic sort denormalization
+### 4.5 Semantic sort denormalization — DONE for statusName/sprintName (TOP-2, 306e618); labelIds deliberately deferred
 
-- Sorting by name-like fields (assignee/status display) requires a join at read time; denormalizing display fields into
-  the task document removes client-side sorting.
+- statusId/sprintId sorts are plain indexed sorts on denormalized names (2.10). The labelIds sort keeps its `$lookup`
+  pipeline on purpose: the fan-out cost of the alphabetically-first label was judged too high for the benefit. The
+  assignee/reporter sorts never needed it (identity snapshots).
+- Remaining candidate in the same area: a list DTO that drops `createdBySnapshot`/`createdById`/`version` from list
+  responses (~15-25% payload on top of the shipped `excludeDescription` flag, F5) — only after a consumer grep.
+- Dead code note: `TaskRepository.search` / `TaskService.searchTasks` have no consumers (verified by grep, 2026-09-01) —
+  remove in a separate cleanup commit.
 
 ### 4.6 maxIdleTimeMS interplay
 
