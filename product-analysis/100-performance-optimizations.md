@@ -328,6 +328,49 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
   normalization for non-ASCII passwords (auth-path risk); (2) postal-mime — -71.3 KB raw / -21.4 KB gzip (~8% of upload)
   but stubs resend-internal behavior. Both revisit-only-if-needed.
 
+### 4.13 First-request-after-idle Mongo reconnect — CONFIRMED Mongo reconnect, maxIdleTimeMS A/B NO ACTION (2026-09-02)
+
+- **Instrumentation:** temporary diagnostic markers (commit 82afb3a, removed again in the cleanup commit that closed
+  this topic): `DO_CONSTRUCTOR` in the DO constructor and CMAP pool events (`MONGO_POOL_CREATED` /
+  `MONGO_CONNECTION_CREATED` / `MONGO_CONNECTION_READY durationMS` / `MONGO_CONNECTION_CLOSED reason` /
+  `MONGO_POOL_CLEARED`) attached exactly once to the singleton MongoClient only (per-request and readyz clients
+  uninstrumented).
+- **Production finding — CONFIRMED Mongo reconnect:** after an idle pause **>~30 s** the first `tasks?limit=1` pays a
+  reconnect penalty of **~95-160 ms** (warm p50 ~90 ms). At 15 s idle there is no reconnect and latency stays
+  warm-level. On every >30 s cycle the tail shows two new connections (application + monitor) and
+  `connectionReady.durationMS ≈ 90-146 ms`, which explains the extra latency with an **unexplained remainder ≤~35 ms**.
+  A single ~510 ms outlier in one 240 s cycle is platform variance, not baseline.
+- **DO lifecycle:** `DO_CONSTRUCTOR` was observed in 4 of 6 boundary cycles (including 35 s idle); the identical
+  reconnect penalty occurred both with and without it. DO restart/eviction was therefore **not shown to be a material
+  contributor** to the measured latency spike — the measured source is Mongo connection recreation.
+- **maxIdleTimeMS A/B (30 s vs 300 s, everything else identical, isolated via deploy):** at 35/60/240 s idle variant B
+  still showed `connectionClosed(reason=error)` and new connections; extra-latency distribution statistically unchanged
+  (A extra p50 ≈ 140 ms, B ≈ 135 ms; benefit ≈ 0 ms). **NO ACTION** — `maxIdleTimeMS` is not an effective lever for this
+  reconnect path.
+- **connectTimeoutMS — semantics vs implementation (careful wording):** the MongoDB documentation defines
+  `connectTimeoutMS` as the timeout for establishing a connection (and `socketTimeoutMS` as a separate socket-related
+  option). For the installed **mongodb@7.6.0** implementation, source inspection additionally showed that the connection
+  path applies `connectTimeoutMS` to the underlying socket via `socket.setTimeout(...)`
+  ([cmap/connect.js:269,303](../node_modules/mongodb/lib/cmap/connect.js)). In this specific production workload that
+  implementation detail correlates with the ~30 s idle socket closure observed as `connectionClosed(reason=error)`. This
+  is an observed implementation detail of one driver version, not a general statement about the MongoDB API. Changing
+  `connectTimeoutMS` was not investigated as an optimization and is not recommended here (it also governs connection
+  establishment).
+- **Verdict: NO ACTION** — the ~100-150 ms cost occurs only once per idle gap >~30 s (warm request ~90 ms);
+  `maxIdleTimeMS 30 s → 300 s` did not reduce the penalty; for this personal-scale product the measured benefit does not
+  justify changing timeout semantics. A `connectTimeoutMS`-based mitigation remains a possible future hypothesis ONLY if
+  the workload changes and idle reconnects become materially significant.
+- **Operational incident (deploy vars):** the first manual `npx wrangler deploy` during this audit was run WITHOUT the
+  CD `--var` flags; because wrangler vars are deployment-scoped configuration and are not inherited, production
+  temporarily lost `DB_CLIENT_MODE=durable` (requests fell back to per-request mode — visible in tail as stateless-only
+  events with 55-259 ms CPU) as well as `ALLOWED_ORIGINS`, `FRONTEND_URL` and `ENVIRONMENT`. Detected via the tail
+  anomaly and immediately re-deployed with the exact CD command; the restored vars were taken from the previous
+  deployment version (`wrangler versions view`); final production state verified. **Lesson:** production deploys must
+  use the exact deployment command defined by CD ([.github/workflows/cd.yml:93-96](../.github/workflows/cd.yml))
+  including all required `--var` values — never a bare `wrangler deploy` when those vars are supplied by CI.
+- Chain: instrumentation → production confirmation → maxIdleTimeMS A/B → NO ACTION → instrumentation removed (working
+  tree restored to pre-82afb3a for both files).
+
 ## 5. Tooling
 
 Diagnostic scripts used during the investigation: [`tools/README.md`](../tools/README.md) (api-series — keep-alive
