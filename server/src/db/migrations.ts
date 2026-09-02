@@ -206,6 +206,11 @@ const CORE_INDEXES: IndexDefinition[] = [
   { collection: 'tenant_members', spec: { id: 1 }, options: { unique: true } },
   { collection: 'tenant_members', spec: { tenantId: 1, userId: 1 }, options: { unique: true } },
   { collection: 'tenant_members', spec: { tenantId: 1 } },
+  // MongoDB query-plan audit 2026-09-02: the auth/bootstrap path queries by
+  // {userId} alone (findByUser, findByUserWithTenants, countOwnedTenants) —
+  // the {tenantId, userId} index does not apply (tenantId is its prefix),
+  // so those shapes ran as a COLLSCAN.
+  { collection: 'tenant_members', spec: { userId: 1 } },
   { collection: 'tenant_members', spec: { 'invitation.tokenHash': 1 } },
   { collection: 'tenant_members', spec: { 'invitation.invitedEmail': 1 } },
   // projects
@@ -239,6 +244,19 @@ const CORE_INDEXES: IndexDefinition[] = [
   // (task-table status filter + updatedAt:desc) — covers filter+sort in one
   // IXSCAN instead of IXSCAN + blocking SORT over all matching tasks
   { collection: 'tasks', spec: { projectId: 1, statusId: 1, updatedAt: -1 } },
+  // MongoDB query-plan audit 2026-09-02: the repository appends `number: -1`
+  // as the pagination tiebreaker to every sort (task.repository findByProject).
+  // A sort of {createdAt: -1, number: -1} can NOT use {projectId, createdAt: -1}
+  // (the trailing key must also be in the index), so the planner fell back to
+  // IXSCAN on {projectId, number: -1} + a blocking SORT over the ENTIRE
+  // matching set — proven by explain("executionStats") A/B. These four
+  // indexes restore IXSCAN-only plans (keysExamined ≈ nReturned) for the
+  // createdAt/updatedAt/title sort paths and the statusId-filtered
+  // updatedAt sort.
+  { collection: 'tasks', spec: { projectId: 1, createdAt: -1, number: -1 } },
+  { collection: 'tasks', spec: { projectId: 1, updatedAt: -1, number: -1 } },
+  { collection: 'tasks', spec: { projectId: 1, title: 1, number: -1 } },
+  { collection: 'tasks', spec: { projectId: 1, statusId: 1, updatedAt: -1, number: -1 } },
   // comments
   { collection: 'comments', spec: { taskId: 1 } },
   // task_relationships
