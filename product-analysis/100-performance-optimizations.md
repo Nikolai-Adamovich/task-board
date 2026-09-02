@@ -726,9 +726,13 @@ CRITICAL/HIGH/LOW/MEDIUM while the board sorted by severity).
   key `sort=priority:asc|desc` is intentionally PRESERVED and mapped internally to the `priorityLevel` field
   (URL/saved-filter sort semantics unchanged). `PRIORITY_RANK` deleted — the board sorts
   `b.priorityLevel - a.priorityLevel || a.number - b.number`; all UI option arrays are generated from the config.
-- **Verification:** typecheck PASS, 882 tests (server+UI) PASS incl. 5 new migration tests (level mapping, missing →
+- **Verification:** typecheck PASS, 889 tests (server+UI) PASS incl. 5 new migration tests (level mapping, missing →
   throws, unexpected → throws, saved-filter backfill, idempotent re-run), lint clean; no runtime references to the
   legacy model remain (grep).
+- **Follow-up fix (same day):** `npm run typecheck` covers only shared+server `tsc` — the UI's esbuild template
+  type-check (inside `ng test`) caught 15 leftover string-priority usages (column-def `getFilterValue` widening,
+  native-select string binding, `Number()` coercion moved from templates into component methods, spec fixtures). Lesson:
+  UI type correctness is only fully verified by the `ng test` build, not by the repo `typecheck` script.
 
 ## 5. Tooling
 

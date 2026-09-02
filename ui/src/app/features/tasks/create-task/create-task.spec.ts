@@ -23,7 +23,7 @@ import { LabelClient } from '@services/label-client';
 import { ProjectStore } from '@stores/project-store';
 import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Task } from '@task-board/shared';
+import { DEFAULT_TASK_PRIORITY_LEVEL, type Task } from '@task-board/shared';
 import { settle } from '@app/shared/testing/zoneless';
 
 /** Stub keeps the spec independent of the lazy-loaded Milkdown bundle */
@@ -152,7 +152,7 @@ describe('TaskCreate (U1 — unified create-task page)', () => {
 
     expect(component.model().statusId).toBe('st-todo');
     expect(component.model().typeId).toBe('type-task');
-    expect(component.model().priority).toBe('MEDIUM');
+    expect(component.model().priorityLevel).toBe(DEFAULT_TASK_PRIORITY_LEVEL);
   });
 
   // P13b (Fix 4): pending-changes tracking for the canDeactivate guard

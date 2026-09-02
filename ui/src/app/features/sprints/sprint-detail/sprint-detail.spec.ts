@@ -27,7 +27,7 @@ import { AuthStore } from '@stores/auth-store';
 import { ProjectRefStore } from '@stores/project-ref-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { NeutralDotColor } from '@app/constants/priority';
-import type { Sprint, Task, User } from '@task-board/shared';
+import type { Sprint, Task, TaskPriorityLevel, User } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
 const mockSprint: Sprint = {
@@ -310,11 +310,11 @@ describe('SprintDetail', () => {
     beforeEach(() => setup());
 
     it('should return correct dot color for each priority', () => {
-      expect(component.getPriorityDot('LOW')).toBe('bg-primary/40');
-      expect(component.getPriorityDot('MEDIUM')).toBe('bg-primary/70');
-      expect(component.getPriorityDot('HIGH')).toBe('bg-destructive/70');
-      expect(component.getPriorityDot('CRITICAL')).toBe('bg-destructive');
-      expect(component.getPriorityDot('unknown')).toBe(NeutralDotColor);
+      expect(component.getPriorityDot(0)).toBe('bg-primary/40');
+      expect(component.getPriorityDot(1)).toBe('bg-primary/70');
+      expect(component.getPriorityDot(2)).toBe('bg-destructive/70');
+      expect(component.getPriorityDot(3)).toBe('bg-destructive');
+      expect(component.getPriorityDot(99 as TaskPriorityLevel)).toBe(NeutralDotColor);
     });
   });
 
@@ -322,11 +322,11 @@ describe('SprintDetail', () => {
     beforeEach(() => setup());
 
     it('should return correct badge color for each priority', () => {
-      expect(component.getPriorityBadge('LOW')).toBe('outline');
-      expect(component.getPriorityBadge('MEDIUM')).toBe('secondary');
-      expect(component.getPriorityBadge('HIGH')).toBe('default');
-      expect(component.getPriorityBadge('CRITICAL')).toBe('destructive');
-      expect(component.getPriorityBadge('unknown')).toBe('outline');
+      expect(component.getPriorityBadge(0)).toBe('outline');
+      expect(component.getPriorityBadge(1)).toBe('secondary');
+      expect(component.getPriorityBadge(2)).toBe('default');
+      expect(component.getPriorityBadge(3)).toBe('destructive');
+      expect(component.getPriorityBadge(99 as TaskPriorityLevel)).toBe('outline');
     });
   });
 

@@ -294,7 +294,7 @@ describe('TaskTable — W9 polish', () => {
       expect(chips).toEqual([
         { param: 'search', labelKey: 'taskTable.filterSearch', value: 'hello' },
         // P11: priority chips show the translated display label (test dict is empty → the key)
-        { param: 'priority', labelKey: 'taskTable.filterPriority', value: 'priority.high' },
+        { param: 'priorityLevel', labelKey: 'taskTable.filterPriority', value: 'priority.high' },
       ]);
     });
 
@@ -313,12 +313,12 @@ describe('TaskTable — W9 polish', () => {
     beforeEach(() => setup());
 
     it('should remove a single filter via its param', () => {
-      component.removeFilter('priority');
+      component.removeFilter('priorityLevel');
 
       expect(routerMock.navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { priority: null, page: null },
+          queryParams: { priorityLevel: null, page: null },
           queryParamsHandling: 'merge',
           replaceUrl: true,
         }),

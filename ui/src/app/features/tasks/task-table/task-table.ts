@@ -376,10 +376,10 @@ export class TaskTable {
       labelKey: 'taskTable.priority',
       filterType: 'select',
       width: 'w-25',
-      getFilterValue: () => this.priorityLevel(),
+      getFilterValue: () => (this.priorityLevel() === null ? '' : String(this.priorityLevel())),
       setFilterValue: (v) => this.onColumnFilterChange('priorityLevel', v === '' ? '' : String(v)),
       allLabelKey: 'taskTable.allPriorities',
-      staticOptions: PRIORITY_OPTIONS,
+      staticOptions: [...PRIORITY_OPTIONS],
     },
     {
       field: 'assigneeId',
@@ -1288,7 +1288,7 @@ export class TaskTable {
     const criteria = state.filters;
     const params: Record<string, string | number | null> = {
       search: criteria.search ?? null,
-      priority: criteria.priority?.[0] ?? null,
+      priorityLevel: criteria.priorityLevel?.[0] ?? null,
       status: this.idToName('statuses', criteria.statusIds?.[0] ?? ''),
       type: this.idToName('types', criteria.typeIds?.[0] ?? ''),
       assignee: this.idToName('members', criteria.assigneeIds?.[0] ?? ''),

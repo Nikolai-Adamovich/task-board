@@ -35,7 +35,7 @@ const mockFilters: Filter[] = [
     projectId: 'p1',
     userId: 'u1',
     name: 'My High Priority',
-    filters: { priority: ['HIGH', 'CRITICAL'] },
+    filters: { priorityLevel: [2, 3] },
     sort: { field: 'priority', direction: 'desc' },
     createdAt: NOW,
     updatedAt: NOW,
@@ -207,7 +207,7 @@ describe('FilterPanel', () => {
 
     component.applyFilter(view);
     expect(emittedCriteria).toEqual({
-      filters: { priority: ['HIGH', 'CRITICAL'] },
+      filters: { priorityLevel: [2, 3] },
       sort: { field: 'priority', direction: 'desc' },
     });
   });
@@ -228,10 +228,10 @@ describe('FilterPanel', () => {
       await setup(); // draft seeded from currentFilters: { search: 'test' }
       await waitForViews();
       component.setSingle('statusIds', 'st1');
-      component.onDraftPriority('HIGH');
+      component.onDraftPriority(2);
       component.applyDraft();
 
-      expect(emittedCriteria?.filters).toEqual({ search: 'test', statusIds: ['st1'], priority: ['HIGH'] });
+      expect(emittedCriteria?.filters).toEqual({ search: 'test', statusIds: ['st1'], priorityLevel: [2] });
     });
 
     it('should clear a single-value key when set to empty and emit an empty state on clearDraft', async () => {

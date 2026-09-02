@@ -56,7 +56,7 @@
         <label hlmFieldLabel for="filter-field-priority">{{ 'taskTable.filterPriority' | transloco }}</label>
         <hlm-native-select
           id="filter-field-priority"
-          [value]="draft().priorityLevel?.[0] ?? ''"
+          [value]="draftPriorityLevelValue()"
           (valueChange)="onDraftPriority($event ?? '')"
         >
           <option value="">{{ 'taskTable.allPriorities' | transloco }}</option>

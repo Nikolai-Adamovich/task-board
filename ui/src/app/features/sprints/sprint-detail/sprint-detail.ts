@@ -20,7 +20,7 @@ import {
   priorityLabelKey,
   type BadgeVariant,
 } from '@app/constants/priority';
-import { SprintStatus } from '@task-board/shared';
+import { SprintStatus, type TaskPriorityLevel } from '@task-board/shared';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -124,7 +124,7 @@ export class SprintDetail implements OnInit {
   protected getPriorityLabel(priorityLevel: TaskPriorityLevel): string {
     const key = priorityLabelKey(priorityLevel);
 
-    return key ? this.i18n.translate(key) : priority;
+    return key ? this.i18n.translate(key) : String(priorityLevel);
   }
 
   /** Get available status transitions for the current sprint */

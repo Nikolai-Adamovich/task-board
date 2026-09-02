@@ -1,3 +1,4 @@
+import type { TaskPriorityLevel } from '@task-board/shared';
 import { describe, expect, it } from 'vitest';
 import {
   NeutralDotColor,
@@ -11,27 +12,27 @@ import {
 
 describe('priorityBadgeVariant', () => {
   it('should return the mapped variant for each priority', () => {
-    expect(priorityBadgeVariant('LOW')).toBe('outline');
-    expect(priorityBadgeVariant('MEDIUM')).toBe('secondary');
-    expect(priorityBadgeVariant('HIGH')).toBe('default');
-    expect(priorityBadgeVariant('CRITICAL')).toBe('destructive');
+    expect(priorityBadgeVariant(0)).toBe('outline');
+    expect(priorityBadgeVariant(1)).toBe('secondary');
+    expect(priorityBadgeVariant(2)).toBe('default');
+    expect(priorityBadgeVariant(3)).toBe('destructive');
   });
 
   it('should return the neutral fallback for unknown priorities', () => {
-    expect(priorityBadgeVariant('unknown')).toBe('outline');
+    expect(priorityBadgeVariant(99 as TaskPriorityLevel)).toBe('outline');
   });
 });
 
 describe('priorityLabelKey', () => {
   it('should return the i18n key for every priority value', () => {
-    expect(priorityLabelKey('LOW')).toBe('priority.low');
-    expect(priorityLabelKey('MEDIUM')).toBe('priority.medium');
-    expect(priorityLabelKey('HIGH')).toBe('priority.high');
-    expect(priorityLabelKey('CRITICAL')).toBe('priority.critical');
+    expect(priorityLabelKey(0)).toBe('priority.low');
+    expect(priorityLabelKey(1)).toBe('priority.medium');
+    expect(priorityLabelKey(2)).toBe('priority.high');
+    expect(priorityLabelKey(3)).toBe('priority.critical');
   });
 
   it('should return an empty key for unknown priorities so callers fall back to the raw value', () => {
-    expect(priorityLabelKey('unknown')).toBe('');
+    expect(priorityLabelKey(99 as TaskPriorityLevel)).toBe('');
   });
 });
 

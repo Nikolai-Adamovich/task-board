@@ -93,10 +93,7 @@
           <!-- Priority -->
           <hlm-field>
             <label hlmFieldLabel for="create-priority">{{ 'taskCreate.priority' | transloco }}</label>
-            <hlm-select
-              [value]="model().priorityLevel"
-              (valueChange)="onFieldChange('priorityLevel', $any(Number($event)))"
-            >
+            <hlm-select [value]="model().priorityLevel" (valueChange)="onPriorityLevelChange($any($event))">
               <hlm-select-trigger id="create-priority" class="w-full" size="sm">
                 <hlm-select-value />
               </hlm-select-trigger>

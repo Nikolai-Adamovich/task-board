@@ -76,7 +76,7 @@ export class TaskDetail implements OnInit {
   protected priorityLabel(priorityLevel: TaskPriorityLevel): string {
     const key = priorityLabelKey(priorityLevel);
 
-    return key ? this.i18n.translate(key) : priority;
+    return key ? this.i18n.translate(key) : String(priorityLevel);
   }
   private readonly notify = injectToasts();
   private readonly taskClient = inject(TaskClient);

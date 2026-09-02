@@ -26,7 +26,7 @@ import { LabelClient } from '@services/label-client';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
 import { HttpErrorResponse } from '@angular/common/http';
-import type { Task, User } from '@task-board/shared';
+import type { Task, TaskPriorityLevel, User } from '@task-board/shared';
 import { settle } from '@app/shared/testing/zoneless';
 
 const NOW = '2025-01-01T00:00:00Z';
@@ -238,19 +238,19 @@ describe('TaskDetail', () => {
     beforeEach(() => setup());
 
     it('should return correct badge variant per priority', async () => {
-      expect(component.priorityBadgeVariant('LOW')).toBe('outline');
-      expect(component.priorityBadgeVariant('MEDIUM')).toBe('secondary');
-      expect(component.priorityBadgeVariant('HIGH')).toBe('default');
-      expect(component.priorityBadgeVariant('CRITICAL')).toBe('destructive');
+      expect(component.priorityBadgeVariant(0)).toBe('outline');
+      expect(component.priorityBadgeVariant(1)).toBe('secondary');
+      expect(component.priorityBadgeVariant(2)).toBe('default');
+      expect(component.priorityBadgeVariant(3)).toBe('destructive');
       expect(component.priorityBadgeVariant('unknown')).toBe('outline');
     });
 
     it('should return translated display labels (P11); unknown values render verbatim', async () => {
-      expect(component.priorityLabel('LOW')).toBe('priority.low');
-      expect(component.priorityLabel('MEDIUM')).toBe('priority.medium');
-      expect(component.priorityLabel('HIGH')).toBe('priority.high');
-      expect(component.priorityLabel('CRITICAL')).toBe('priority.critical');
-      expect(component.priorityLabel('unknown')).toBe('unknown');
+      expect(component.priorityLabel(0)).toBe('priority.low');
+      expect(component.priorityLabel(1)).toBe('priority.medium');
+      expect(component.priorityLabel(2)).toBe('priority.high');
+      expect(component.priorityLabel(3)).toBe('priority.critical');
+      expect(component.priorityLabel(99 as TaskPriorityLevel)).toBe('99');
     });
   });
 

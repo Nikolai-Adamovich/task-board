@@ -162,6 +162,13 @@ export class FilterPanel {
     this.draft.update((f) => ({ ...f, search: value || undefined }));
   }
 
+  /** Native select binds string values — expose the draft level as a string. */
+  protected draftPriorityLevelValue(): string {
+    const level = this.draft().priorityLevel?.[0];
+
+    return level === undefined ? '' : String(level);
+  }
+
   protected onDraftPriority(value: string | number): void {
     const level = value === '' || value === null ? undefined : (Number(value) as TaskPriorityLevel);
 

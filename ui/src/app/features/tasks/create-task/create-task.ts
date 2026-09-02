@@ -244,6 +244,11 @@ export class TaskCreate implements PendingChanges {
   /** Priority selector options — derived from the shared TASK_PRIORITY_CONFIG. */
   protected readonly PRIORITY_OPTIONS = PRIORITY_OPTIONS;
 
+  /** Select values arrive as strings — coerce to the numeric priority level. */
+  protected onPriorityLevelChange(value: unknown): void {
+    this.onFieldChange('priorityLevel', Number(value) as TaskPriorityLevel);
+  }
+
   protected onFieldChange<K extends keyof CreateTaskFormModel>(field: K, value: CreateTaskFormModel[K]): void {
     this.model.update((m) => ({ ...m, [field]: value }));
   }

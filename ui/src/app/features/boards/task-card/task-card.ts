@@ -1,7 +1,7 @@
 import { Component, input, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { inject } from '@angular/core';
-import type { BoardTask } from '@task-board/shared';
+import type { BoardTask, TaskPriorityLevel } from '@task-board/shared';
 import { priorityBadgeVariant, priorityLabelKey, type BadgeVariant } from '@app/constants/priority';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';

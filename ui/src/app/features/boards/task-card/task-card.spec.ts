@@ -17,7 +17,7 @@ import { firstValueFrom } from 'rxjs';
 import { settle } from '@app/shared/testing/zoneless';
 import { TaskCard } from './task-card';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Task } from '@task-board/shared';
+import type { Task, TaskPriorityLevel } from '@task-board/shared';
 
 const NOW = '2025-01-01T00:00:00Z';
 
@@ -91,7 +91,7 @@ describe('TaskCard', () => {
 
     it('should render unknown priorities verbatim', async () => {
       await setup({ priorityLevel: 99 as TaskPriorityLevel });
-      expect(component.priorityLabel('unknown')).toBe('unknown');
+      expect(component.priorityLabel(99 as TaskPriorityLevel)).toBe('99');
     });
   });
 

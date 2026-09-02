@@ -531,15 +531,15 @@ describe('BoardView', () => {
       );
     });
 
-    it('should write ?priority= to the URL on selection and clear with the empty value', async () => {
+    it('should write ?priorityLevel= to the URL on selection and clear with the empty value', async () => {
       await setup();
 
-      component.onPrioritySelect('HIGH');
+      component.onPrioritySelect(2);
 
       expect(routerMock.navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { priorityLevel: 2 },
+          queryParams: { priorityLevel: '2' },
           queryParamsHandling: 'merge',
           replaceUrl: true,
         }),
@@ -550,7 +550,7 @@ describe('BoardView', () => {
       expect(routerMock.navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { priority: null },
+          queryParams: { priorityLevel: null },
           queryParamsHandling: 'merge',
           replaceUrl: true,
         }),
