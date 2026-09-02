@@ -24,6 +24,7 @@ export function createTaskRoutes(): Hono<AppEnv> {
       limit: q.limit,
       // F5: tables/widgets omit the (potentially large) markdown description
       excludeDescription: q.excludeDescription,
+      view: q.view,
       search: q.search,
       statusId: q.statusId,
       priority: q.priority,
@@ -38,7 +39,12 @@ export function createTaskRoutes(): Hono<AppEnv> {
       updatedTo: q.updatedTo,
       sort: sortField && sortDirection ? { field: sortField, direction: sortDirection as 'asc' | 'desc' } : undefined,
     };
-    const result = await c.get('svc').tasks.getTasksByProject(projectId, options);
+    // Board view: dedicated lightweight BoardTask projection (no description/
+    // reporter/timestamp fields) — the generic list contract is untouched.
+    const result =
+      q.view === 'board'
+        ? await c.get('svc').tasks.getBoardTasks(projectId, options)
+        : await c.get('svc').tasks.getTasksByProject(projectId, options);
 
     return c.json({ data: result.data, pagination: result.pagination });
   });

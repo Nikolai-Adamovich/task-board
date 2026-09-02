@@ -11,10 +11,10 @@ import { escapeRegExp } from '../utils/regex.js';
 // - { projectId: 1, updatedAt: -1 }
 // - { projectId: 1, statusId: 1, number: -1 }
 // - { projectId: 1, sprintId: 1, number: -1 }
-// - { projectId: 1, assigneeId: 1, number: -1 }
-// - { projectId: 1, reporterId: 1, number: -1 }
-// - { projectId: 1, priority: 1, number: -1 }
-// - { projectId: 1, typeId: 1, number: -1 }
+// - { projectId: 1, assigneeId: 1, number: 1 }   (aligned tiebreaker — one index serves both directions)
+// - { projectId: 1, reporterId: 1, number: 1 }   (aligned tiebreaker)
+// - { projectId: 1, priority: 1, number: 1 }     (aligned tiebreaker)
+// - { projectId: 1, typeId: 1, number: 1 }       (aligned tiebreaker)
 // - { assigneeId: 1, updatedAt: -1 } (cross-project /tasks/my — audit #3)
 // - { projectId: 1, statusName: 1, number: -1 } (TOP-2 semantic sort)
 // - { projectId: 1, sprintName: 1, number: -1 } (TOP-2 semantic sort)
@@ -28,6 +28,8 @@ import { escapeRegExp } from '../utils/regex.js';
  * denormalized — its fan-out cost was judged too high for the benefit).
  */
 const SEMANTIC_SORT_FIELDS = new Set(['labelIds']);
+/** Plain-field sorts whose indexes carry an ALIGNED `number` tiebreaker (see findByProject). */
+const ALIGNED_TIEBREAKER_FIELDS = new Set(['priority', 'assigneeId', 'reporterId', 'typeId']);
 /** API sort field → denormalized document key (plain-indexed sorts). */
 const SEMANTIC_TO_DOC_KEY: Record<string, string> = {
   statusId: 'statusName',
@@ -105,12 +107,37 @@ export interface TaskQueryOptions {
   /**
    * F5 (perf audit #2): omit `description` from the returned documents.
    * List consumers that never render the description (task table, widgets)
-   * use this to cut ~40% of the response payload. The board's task-card
-   * preview DOES render it, so the board request simply omits the flag.
-   * Server-side description search/filtering is unaffected.
+   * use this to cut ~40% of the response payload. Server-side description
+   * search/filtering is unaffected.
    */
   excludeDescription?: boolean;
+  /**
+   * Board view: lightweight card projection — the returned documents carry
+   * only the fields the board UI reads (id/number/title/typeId/statusId/
+   * priority/assignee + snapshot, version for optimistic DnD). Exclusion
+   * projection: applied after matching, so filters are unaffected.
+   */
+  view?: 'board';
 }
+
+/**
+ * Fields excluded from board-view responses — nothing a board card renders or
+ * a board interaction needs (see BoardTask in @task-board/shared). Kept as an
+ * exclusion list so newly added Task fields stay visible by default.
+ */
+const BOARD_VIEW_EXCLUDED_FIELDS = [
+  'description',
+  'reporterId',
+  'reporterSnapshot',
+  'statusName',
+  'sprintName',
+  'sprintId',
+  'labelIds',
+  'createdById',
+  'createdBySnapshot',
+  'createdAt',
+  'updatedAt',
+] as const;
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -145,9 +172,13 @@ function toDomain(doc: TaskDocument): Task {
     createdById: doc.createdById,
     createdBySnapshot: doc.createdBySnapshot,
     version: doc.version,
-    createdAt: doc.createdAt.toISOString(),
-    updatedAt: doc.updatedAt.toISOString(),
-  };
+    // Board-view projections omit the timestamps (never read by a card) —
+    // they are spread conditionally so projected documents map without
+    // crashing; board consumers receive the dedicated BoardTask DTO instead
+    // of this Task mapping, so the absent keys are unreachable there.
+    ...(doc.createdAt ? { createdAt: doc.createdAt.toISOString() } : {}),
+    ...(doc.updatedAt ? { updatedAt: doc.updatedAt.toISOString() } : {}),
+  } as Task;
 }
 
 // ─── Task Repository ─────────────────────────────────────────────────────────
@@ -219,6 +250,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       updatedFrom,
       updatedTo,
       excludeDescription,
+      view,
     } = options;
     const query: Record<string, unknown> = { projectId };
 
@@ -266,7 +298,11 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     if (sort && SEMANTIC_SORT_FIELDS.has(sort.field)) {
       const pipeline = this.buildSemanticSortPipeline(query, sort.field, sortDir, skip, limit);
 
-      if (excludeDescription) pipeline.push({ $unset: 'description' });
+      if (view === 'board') {
+        pipeline.push({ $unset: [...BOARD_VIEW_EXCLUDED_FIELDS] } as unknown as Document);
+      } else if (excludeDescription) {
+        pipeline.push({ $unset: 'description' });
+      }
 
       const [docs, total] = await Promise.all([
         this.collection.aggregate<TaskDocument>(pipeline).toArray(),
@@ -284,17 +320,30 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       };
     }
 
-    const findOptions = excludeDescription ? ({ projection: { description: 0 } } as const) : undefined;
+    let findOptions: { projection: Record<string, 0> } | undefined;
+
+    if (view === 'board') {
+      findOptions = { projection: Object.fromEntries(BOARD_VIEW_EXCLUDED_FIELDS.map((field) => [field, 0])) };
+    } else if (excludeDescription) {
+      findOptions = { projection: { description: 0 } };
+    }
+
     // TOP-2: statusId/sprintId sorts map to their denormalized name fields —
     // plain indexed sorts, no aggregation pipeline.
     const docSortKey = SEMANTIC_TO_DOC_KEY[sortField] ?? sortField;
+    // Plain-field sort indexes use an ALIGNED tiebreaker (`number: sortDir`):
+    // `number` is unique within a project, so the tiebreaker direction does not
+    // change which documents come first — only the order WITHIN groups of equal
+    // field values — and one `{projectId, field, number: 1}` index then serves
+    // BOTH sort directions via reverse traversal (4 indexes instead of 8).
+    // All other sorts keep the legacy `number: -1` tiebreaker, which their
+    // existing `… number: -1` indexes are built to match; flipping those would
+    // break index-supported sorting for createdAt/updatedAt/title/statusName.
+    const sortSpec: Record<string, 1 | -1> = ALIGNED_TIEBREAKER_FIELDS.has(sortField)
+      ? { [docSortKey]: sortDir, number: sortDir }
+      : { [docSortKey]: sortDir, number: -1 };
     const [docs, total] = await Promise.all([
-      this.collection
-        .find(query, findOptions)
-        .sort({ [docSortKey]: sortDir, number: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray(),
+      this.collection.find(query, findOptions).sort(sortSpec).skip(skip).limit(limit).toArray(),
       this.collection.countDocuments(query),
     ]);
 

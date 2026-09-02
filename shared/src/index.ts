@@ -89,6 +89,7 @@ export type { BoardConfig, BoardColumn, UpdateBoardColumns } from './types/board
 
 export type {
   Task,
+  BoardTask,
   CreateTask,
   UpdateTask,
   BulkUpdateTasks,

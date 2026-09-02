@@ -2,6 +2,7 @@ import { ProjectStatus } from '@task-board/shared';
 import { ensurePermission } from './rbac.service.js';
 import type {
   Task,
+  BoardTask,
   CreateTask,
   UpdateTask,
   IdentitySnapshot,
@@ -65,6 +66,32 @@ export class TaskService {
 
   async getTasksByProject(projectId: string, options: TaskQueryOptions = {}): Promise<PaginatedResult<Task>> {
     return this.taskRepo.findByProject(projectId, options);
+  }
+
+  /**
+   * Board view: lightweight card projection. The repository applies the
+   * exclusion projection server-side; this mapper guarantees the exact
+   * BoardTask DTO shape (no description/reporter/timestamp leakage) while the
+   * generic list response contract stays untouched.
+   */
+  async getBoardTasks(projectId: string, options: TaskQueryOptions = {}): Promise<PaginatedResult<BoardTask>> {
+    const result = await this.taskRepo.findByProject(projectId, { ...options, view: 'board' });
+
+    return {
+      ...result,
+      data: result.data.map((task) => ({
+        id: task.id,
+        projectId: task.projectId,
+        number: task.number,
+        title: task.title,
+        typeId: task.typeId,
+        statusId: task.statusId,
+        priority: task.priority,
+        assigneeId: task.assigneeId,
+        assigneeSnapshot: task.assigneeSnapshot,
+        version: task.version,
+      })),
+    };
   }
 
   /**

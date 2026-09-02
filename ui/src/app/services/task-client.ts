@@ -2,7 +2,14 @@ import { Service, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { Task, CreateTask, UpdateTask, BulkUpdateTasks, BulkUpdateTasksResult } from '@task-board/shared';
+import type {
+  Task,
+  BoardTask,
+  CreateTask,
+  UpdateTask,
+  BulkUpdateTasks,
+  BulkUpdateTasksResult,
+} from '@task-board/shared';
 import type { MoveTask } from '@app/types/frontend';
 
 /** Query params for filtering tasks */
@@ -20,6 +27,8 @@ export interface TaskQuery {
   limit?: number;
   /** Sort field and direction, e.g. "createdAt:desc" */
   sort?: string;
+  /** Board view: lightweight card projection (dedicated BoardTask DTO) */
+  view?: 'board';
   /** Q13/F-01: inclusive ISO date (`YYYY-MM-DD`) range filters */
   createdFrom?: string;
   createdTo?: string;
@@ -51,6 +60,15 @@ export class TaskClient {
 
   /** List tasks with optional filters (paginated — keep full envelope) */
   list(projectId: string, query: TaskQuery = {}): Observable<PaginatedResponse<Task>> {
+    return this.fetchList<Task>(projectId, query);
+  }
+
+  /** Board view: lightweight BoardTask projection (no description/metadata) */
+  listForBoard(projectId: string, query: TaskQuery = {}): Observable<PaginatedResponse<BoardTask>> {
+    return this.fetchList<BoardTask>(projectId, { ...query, view: 'board' });
+  }
+
+  private fetchList<T>(projectId: string, query: TaskQuery): Observable<PaginatedResponse<T>> {
     let params = new HttpParams();
 
     if (query.sprintId !== undefined) params = params.set('sprintId', query.sprintId ?? '');
@@ -69,7 +87,8 @@ export class TaskClient {
     if (query.limit) params = params.set('limit', query.limit.toString());
     if (query.sort) params = params.set('sort', query.sort);
     if (query.excludeDescription) params = params.set('excludeDescription', 'true');
-    return this.http.get<PaginatedResponse<Task>>(`${this.baseUrl}/projects/${projectId}/tasks`, { params });
+    if (query.view) params = params.set('view', query.view);
+    return this.http.get<PaginatedResponse<T>>(`${this.baseUrl}/projects/${projectId}/tasks`, { params });
   }
 
   /** S-05: per-status task counts for the project overview (one aggregation) */

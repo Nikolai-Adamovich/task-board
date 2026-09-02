@@ -6,6 +6,7 @@
  * - taskLabel helper
  * - onDragStart emitting
  * - taskClick output
+ * - lightweight board-card layout (no description, type name, 2-line title)
  */
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -50,7 +51,7 @@ describe('TaskCard', () => {
   let component: any;
   let fixture: ComponentFixture<TaskCard>;
 
-  async function setup(taskOverrides: Partial<Task> = {}, projectKey = 'PROJ') {
+  async function setup(taskOverrides: Partial<Task> = {}, projectKey = 'PROJ', typeName = 'Bug') {
     TestBed.configureTestingModule({
       imports: [
         TranslocoTestingModule.forRoot({
@@ -73,6 +74,7 @@ describe('TaskCard', () => {
 
     fixture.componentRef.setInput('task', makeTask(taskOverrides));
     fixture.componentRef.setInput('projectKey', projectKey);
+    fixture.componentRef.setInput('typeName', typeName);
 
     component = fixture.componentInstance;
     await settle(fixture);
@@ -166,6 +168,28 @@ describe('TaskCard', () => {
       component.taskClick.emit(component.task());
 
       expect(emitted).toHaveBeenCalled();
+    });
+  });
+
+  // ── lightweight board-card layout (BoardTask projection) ───────────────
+
+  describe('board card layout', () => {
+    it('renders the resolved issue type name in the bottom row', async () => {
+      await setup({}, 'PROJ', 'Story');
+      expect(fixture.nativeElement.textContent).toContain('Story');
+    });
+
+    it('never renders the description — even when it is present on the input object', async () => {
+      await setup({ description: 'SECRET-BOARD-DESCRIPTION' });
+      expect(fixture.nativeElement.textContent).not.toContain('SECRET-BOARD-DESCRIPTION');
+    });
+
+    it('clamps the title to 2 lines', async () => {
+      await setup({ title: 'A very long title that would overflow the card' });
+
+      const title = fixture.nativeElement.querySelector('h4');
+
+      expect(title.classList.contains('line-clamp-2')).toBe(true);
     });
   });
 });

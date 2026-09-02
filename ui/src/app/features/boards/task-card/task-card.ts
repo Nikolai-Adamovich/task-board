@@ -1,7 +1,7 @@
 import { Component, input, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { inject } from '@angular/core';
-import type { Task } from '@task-board/shared';
+import type { BoardTask } from '@task-board/shared';
 import { priorityBadgeVariant, priorityLabelKey, type BadgeVariant } from '@app/constants/priority';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
@@ -17,10 +17,12 @@ import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
   templateUrl: './task-card.html',
 })
 export class TaskCard {
-  readonly task = input.required<Task>();
+  readonly task = input.required<BoardTask>();
   readonly projectKey = input<string>('');
-  readonly taskClick = output<Task>();
-  readonly dragStart = output<{ task: Task; dragEvent: DragEvent }>();
+  /** Resolved issue-type display name (from the shared reference-data store) */
+  readonly typeName = input<string>('');
+  readonly taskClick = output<BoardTask>();
+  readonly dragStart = output<{ task: BoardTask; dragEvent: DragEvent }>();
   private readonly i18n = inject(TranslocoService);
 
   /** Translated priority label (P11); unknown values render verbatim. */

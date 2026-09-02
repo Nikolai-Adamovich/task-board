@@ -257,6 +257,19 @@ const CORE_INDEXES: IndexDefinition[] = [
   { collection: 'tasks', spec: { projectId: 1, updatedAt: -1, number: -1 } },
   { collection: 'tasks', spec: { projectId: 1, title: 1, number: -1 } },
   { collection: 'tasks', spec: { projectId: 1, statusId: 1, updatedAt: -1, number: -1 } },
+  // Jira-like workload audit 2026-09-02: plain-field task-table sorts
+  // (priority/assigneeId/reporterId/typeId) were blocking SORTs over the whole
+  // matching set (measured ~108ms @5k tasks, ~216ms @10k, linear in project
+  // size). These indexes use an ALIGNED `number` tiebreaker so ONE index per
+  // field serves both sort directions via reverse traversal — findByProject
+  // flips the tiebreaker to `number: sortDir` for exactly these fields.
+  // Contract note: for ASC the order WITHIN groups of equal field values
+  // changes (number ASC instead of number DESC); `number` stays unique per
+  // project, so overall ordering remains deterministic. See §4.20.
+  { collection: 'tasks', spec: { projectId: 1, priority: 1, number: 1 } },
+  { collection: 'tasks', spec: { projectId: 1, assigneeId: 1, number: 1 } },
+  { collection: 'tasks', spec: { projectId: 1, reporterId: 1, number: 1 } },
+  { collection: 'tasks', spec: { projectId: 1, typeId: 1, number: 1 } },
   // comments
   { collection: 'comments', spec: { taskId: 1 } },
   // task_relationships

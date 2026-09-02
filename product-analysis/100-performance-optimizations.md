@@ -371,6 +371,335 @@ MongoDB Atlas M0 (replica set, eu-central-1). Typical warm API request ~70-90ms;
 - Chain: instrumentation → production confirmation → maxIdleTimeMS A/B → NO ACTION → instrumentation removed (working
   tree restored to pre-82afb3a for both files).
 
+### 4.14 Task sort gaps: priority / assigneeId / reporterId / typeId plain sorts — DEFER / NO ACTION (2026-09-02)
+
+Read-only audit following the compound-sort-index FIX (§ after 4.12: the four `…number:-1` task indexes +
+`tenant_members.userId_1`, commit a274a46) and the redundant-index audit (6 CLEANUP CANDIDATES identified, all DEFERRED
+pending a `$indexStats` window).
+
+- **The four plain sort paths are real application shapes.**
+  [`task.repository.ts`](../server/src/repositories/task.repository.ts) `findByProject` sorts
+  `{ [docSortKey]: sortDir, number: -1 }` where `docSortKey = SEMANTIC_TO_DOC_KEY[sortField] ?? sortField` and
+  `SEMANTIC_SORT_FIELDS = {labelIds}` — so `priority`, `assigneeId`, `reporterId`, `typeId` are pure plain-field sorts
+  with filter `{ projectId, …filters }`. All four are reachable from the hot task-table header (3-state asc→desc toggle
+  over `SORT_FIELDS`, both directions) and persistable in saved filters.
+- **Explain evidence (mongod 8.2.12, production-like rs0 dataset, largest project = 100 tasks):** for every field, both
+  directions and every limit (1/20/100) the winning plan is `SORT > FETCH > IXSCAN [projectId_1_number_-1]` — a blocking
+  SORT over the ENTIRE matching set: `keysExamined = docsExamined = 100` regardless of limit, 2-6 ms. Cost is O(matching
+  set), not O(limit). The combined shape `{ assigneeId filter + priority sort }` also blocks
+  (`SORT > FETCH > IXSCAN [projectId_1_assigneeId_1]`).
+- **Existing-index reuse:** `assigneeId_1_updatedAt_-1` is NOT a replacement for the task-list sort (second key
+  `updatedAt` ≠ `number`; it stays a KEEP for `/tasks/my`). `projectId_1_assigneeId_1` helps assignee **filtering** but
+  cannot serve the current compound sort with the `number:-1` tiebreaker (a hypothetical `{assigneeId: -1}` sort without
+  the tiebreaker does scan it: `LIMIT > FETCH > IXSCAN`).
+- **Traffic evidence: NOT MEASURABLE.** `$queryStats` is unavailable on the used mongod 8.2.12 (probe failed with
+  InvalidNamespace; config untouched). `$indexStats` is single-node rs0 with a short window (reset at the 2026-09-01
+  server restart; the newest indexes minutes old) — its counters neither prove nor disprove user traffic. Application
+  evidence proves reachability, not frequency.
+- **Why not fix now:** full naive coverage would need up to **8 new indexes** (`{projectId, field: ±1, number: -1}` —
+  the two direction shapes are not reverse scans of each other), on a collection already carrying 18 indexes (960 KB
+  index vs 242 KB data). At the current scale (~100 tasks/project) the SORT costs only a few ms.
+- **Key observation for a future fix:** `number` is UNIQUE within a project, so the tiebreaker's direction does not
+  change the deterministic ordering. If the repository tiebreaker were aligned as `number: sortDir`, then a single
+  `{projectId, field: 1, number: 1}` index per needed field would cover BOTH directions via reverse index traversal — 4
+  indexes instead of 8. This is a future option only; code and indexes are unchanged in this audit.
+- **Verdict: DEFER / NO ACTION for all four.** Revisit trigger: (1) production traffic/query-insights evidence for these
+  sort paths is obtained, or (2) the matching project size grows to ~1k+ tasks; then re-run explain/latency, and if the
+  workload is confirmed, consider the aligned-tiebreaker design instead of the 8-index approach.
+- **2026-09-02 amendment (superseded by §4.20):** the revisit trigger fired via the Jira-like synthetic workload audit —
+  the aligned-tiebreaker design was verified (one index serves both directions via reverse traversal) and IMPLEMENTED
+  with 4 compound indexes. Verdict for the four plain-field sorts is now **FIXED** (see §4.20).
+
+### 4.15 Aggregation & pagination scan paths — NO ACTION (2026-09-02)
+
+- **1. Status-summary (`GET /projects/:projectId/tasks/status-summary` → `countByStatusGrouped`,
+  [task.repository.ts:471](../server/src/repositories/task.repository.ts); consumer: project-detail overview, 1 request
+  per view — count not measurable).** Query shape
+  `[{ $match: { projectId } }, { $group: { _id: '$statusId', count: { $sum: 1 } } }]`. Explain (mongod 8.2.12,
+  production-like rs0): **GROUP > PROJECTION_COVERED > IXSCAN [projectId_1_statusId_1]** — the aggregation is fully
+  covered by the index, **no FETCH stage**, `docsExamined = 0`, `keysExamined` = the matching set (100 / 63 across two
+  projects — inevitable for exact per-status counts), 1-3 ms. **Verdict: NO ACTION** — the plan is already optimal:
+  scanning the matching index keys is unavoidable for an exact count, and no document reads happen.
+- **2. Audit-log deep pagination (`{ projectId }`, sort `{createdAt: -1}`, `skip N, limit 20`).**
+  `projectId_1_createdAt_-1` already supports filter + sort; `keysExamined` grows with the offset (measured skip = 0 /
+  100 / 1000 → keys = 20 / 100 / 100, docs beyond the limit = 0, ~0 ms on the production-like dataset, 1616 events
+  collection-wide). Cost is potentially O(offset) — not a current bottleneck. **Verdict: DEFER.** Trigger:
+  `audit_events` / a project's audit log grows to ~10⁴-10⁵ events, or production measurements show material latency/CPU
+  cost — then re-explain and consider cursor/range pagination (MongoDB recommends range queries over large `skip` when
+  offsets become significant). **No new index proposed: `projectId_1_createdAt_-1` already serves filter + sort
+  optimally — the potential issue is the pagination strategy, not a missing index.**
+- **3. Task-list deep pagination (skip 200, limit 20).** `projectId_1_number_-1` serves the sort; skip is bounded by the
+  project size (~296 tasks collection-wide, largest project 100), so deep pages are unreachable beyond the matching set;
+  ~3 ms. **Verdict: NO ACTION.**
+- **4. Counters (`getNextValue` = `findOneAndUpdate` + upsert by `_id`).** Read-side explain for `{_id}` shows
+  **EXPRESS_IXSCAN [_id_]**, ~0 ms; the write-side explain was deliberately skipped so as not to mutate data. **Verdict:
+  NO ACTION.**
+- **5. Task relationships (`$or {sourceTaskId, targetTaskId}`).** Plan `SUBPLAN > FETCH > OR > IXSCAN [sourceTaskId_1]
+  > IXSCAN [targetTaskId_1]` — both branches index-supported, the expected index-or behavior; the collection is empty on
+  > the current dataset. **Verdict: NO ACTION.**
+- **Extra evidence for the redundant-index audit (§ above):** `projectId_1_statusId_1` has a real consumer — the covered
+  status-summary aggregation scans it (the 3-key `…_updatedAt_-1` variant also produced a covered plan in
+  rejectedPlans). Its cleanup therefore cannot be declared safe on prefix redundancy alone; index unchanged.
+- **Cycle verdict: NO ACTION.** The only scale risk is the audit-log deep skip (DEFER, not FIX).
+
+### 4.16 Residual COLLSCAN edges (auth/recovery/lookup tails) — DEFER passwordReset / NO ACTION (2026-09-02)
+
+Explain sweep over the last unexamined rare-path query shapes (mongod 8.2.12, production-like rs0; frequency evidence
+NOT MEASURABLE — no per-query logs, `$queryStats` unavailable, `$indexStats` windows inconclusive; absence of stats
+evidence is not treated as absence of traffic).
+
+- **`{ "passwordReset.tokenHash": <hash>, deletedAt: null }` — the only real-caller COLLSCAN.** Consumer: password-reset
+  confirmation ([auth.service.ts:350](../server/src/services/auth.service.ts)). Measured: **COLLSCAN, docsExamined =
+  71** (whole `users` collection), latency ~0 ms. No dedicated index exists. Potential fix: single/partial index on
+  `passwordReset.tokenHash` — but traffic frequency is unknown, the flow is inherently rare, and the collection is
+  small. **Verdict: DEFER / NO ACTION.** Trigger: `users` grows to ~10³+, or production evidence shows frequent
+  password-reset confirmations — then re-explain and decide on the index.
+- **`project_members {userId}` (findByUser)** — COLLSCAN, 19 docs, used only on the cascade-delete path; negligible
+  cost. **Verdict: NO ACTION.**
+- **`tenants.findAll()` (`find({})`)** — COLLSCAN over 22 docs, but **no production caller** (source grep: tests only);
+  not a performance issue. Potential dead-code cleanup is separate from performance work. **Verdict: NO ACTION.**
+- **All other auth/invite lookups are already index-supported at ~0 ms:** email (`email_1` unique, EXPRESS/IXSCAN), id
+  (`id_1`), tenant_members `{userId, role}` (covered by the new `userId_1`), `invitation.invitedEmail_1`,
+  `invitation.tokenHash_1`, users `$in` findByIds. The `tenant_members.userId` COLLSCAN from the earlier audit is closed
+  by the index added with the compound-sort FIX.
+- **Cycle verdict: NO ACTION.** The single DEFER is the `passwordReset.tokenHash` COLLSCAN. No
+  index/code/config/migration changes were made.
+
+### 4.17 Write-path / index-maintenance fan-out — NO ACTION (2026-09-02)
+
+Source-inspection-only audit of every repository/service write path (no writes executed, no write-side explains — all
+write-path **latency evidence: UNKNOWN**, no per-write metrics exist; `$indexStats` does not measure write maintenance;
+write frequency UNKNOWN throughout — stated per evidence policy, not treated as absence of workload).
+
+- **Task updates (`findOneAndUpdate {id, version}`,
+  [task.repository.ts:446](../server/src/repositories/task.repository.ts)).** MongoDB maintains only indexes whose keys
+  change. Every logical update bumps `updatedAt` → 4 updatedAt-bearing indexes (`projectId_1_updatedAt_-1`,
+  `…_-1_number_-1`, `projectId_1_statusId_1_updatedAt_-1`, `…_-1_number_-1`); field-specific additions: status change →
+  +3 statusId indexes + the denormalized `statusName` change touches the 316 KB `projectId_1_statusName_1_number_-1`;
+  assignee → `projectId_1_assigneeId_1`; title → 2 title indexes; sprint → 2 sprint indexes; **priority → none
+  (unindexed)**. So ~4-8 index entries per single-task update on an 18-index collection. The fan-out is structural, not
+  a code defect: one round-trip per update plus one batched audit event. **Verdict: NO ACTION** (no measurable impact;
+  at 296 tasks the maintenance cost is negligible). Cross-link: executing the deferred redundant-prefix cleanup (the two
+  `updatedAt`-bearing short indexes from the index-maintenance audit) would cut the per-update fan-out from ~4 to ~2
+  updatedAt indexes — the write-side argument FOR that future cleanup.
+- **Bulk task update** — one `bulkWrite(ordered: false)`
+  ([task.repository.ts:511-522](../server/src/repositories/task.repository.ts)), already single round-trip (TOP-3 №1);
+  per-task index maintenance as above; audit events written as ONE `insertMany` (`logMany`, TOP-3 №2). No residual
+  per-document audit writes anywhere: single-action paths emit exactly one event, bulk paths one batch. **Verdict: NO
+  ACTION — batching is already in place.**
+- **Fan-out `updateMany` admin operations** (status rename/delete → `setStatusNameForTasks` / `updateManyByStatus`
+  `$set {statusId, statusName, updatedAt}`; sprint rename/clear → sprintName/sprintId + `updatedAt`; label delete →
+  `$pull labelIds` + `updatedAt`): each is ONE set-based round-trip over the matching set; per-document index
+  maintenance touches the multikey labelIds index, the 316 KB statusName index and the 4 updatedAt indexes. Rare admin
+  actions. **Verdict: NO ACTION.**
+- **Task creation** — counter `findOneAndUpdate` (atomic, `_id` EXPRESS index) + `insertOne` (maintains all 18 indexes
+  for the new document — unavoidable) + 1 audit event; 3 sequential round-trips by design, no N+1. **Verdict: NO
+  ACTION.**
+- **Task delete cascade** — comments `deleteMany`, relationships `deleteMany $or`, task delete, audit event: 4
+  sequential indexed round-trips (audit event before deletion per DEC). Rare. **Verdict: NO ACTION** (a transaction
+  would add latency without a correctness problem today — the audit trail is written first).
+- **Project delete cascade** — 12 sequential set-based `deleteMany` round-trips
+  ([project.service.ts:328-338](../server/src/services/project.service.ts)); N×1 round-trip pattern (one per
+  collection), not per-document; rare operation. **Verdict: NO ACTION** (parallelizing or transacting is a possible
+  future cleanup, benefit unmeasurable at current scale).
+- **Project creation** — the only transactional write path (`withTransaction`, DEC-025): project + ~5 status seeds +
+  board + task-type seeds + default-status update + creator membership, sequentially inside one transaction (~12
+  round-trips), with a compensating-cleanup fallback for non-replica-set topologies. Rare. Minimal possible fix would be
+  `insertMany` batching of the seed loops. **Verdict: NO ACTION** (write-rare, latency UNKNOWN, correctness path solid).
+- **tenant_members / users / counters mutations** — single-document `insertOne` / `findOneAndUpdate` / `updateOne`; ≤7
+  index entries per membership insert (7 indexes); counters are atomic on `_id`. Rare or already minimal. **Verdict: NO
+  ACTION.**
+- **Cycle verdict: NO ACTION.** No write bottleneck is evidenced anywhere; the only quantified write-side cost remains
+  the index-count/storage figure from the index-maintenance audit (tasks: 18 indexes, 960 KB index vs 242 KB data), and
+  the strongest write-side lever remains the deferred redundant-index cleanup, not any code change.
+
+### 4.18 Long-cycle performance research — 2026-09-02
+
+Single research cycle covering the residual performance surface across 16 directions (A–P): read-query inventory,
+aggregations, endpoint round-trips, deep N+1, payload cost, search/regex, pagination, index-coverage matrix, write
+amplification, cascades, repeated reads, client↔API chatter, render/CD, bundle residuals, Worker/DO residuals, startup
+CPU. **Strictly read-only — no code/index/config changes.** Evidence: production-like rs0 explains, full index
+inventory, BSON size survey, source inspection. Traffic frequency remains NOT MEASURABLE (`$queryStats` unavailable on
+mongod 8.2.12; `$indexStats` window short/single-node) — stated per the evidence policy, not treated as absence of load.
+
+**Executive summary:** 16 directions traversed; 12 candidate findings collected. FIX NOW: **0**. FIX CANDIDATE: **1**
+(task search index strategy at scale). DEFER: **2** (task search, inherited audit deep-skip). NO ACTION / do-not-fix:
+**9**. The system is plan-clean at current scale: every hot read shape is index-supported with `keys ≈ docs ≈ n`, all
+enrichment is batched (`$in` + `Promise.all`), all `@for` loops carry `track`, and Milkdown/highlight.js stay out of
+static chunks.
+
+| Area  | Finding                                                                                                                                                                                                                                   | Evidence                                                                        | Impact                                                           | Scale risk                                                   | Cost/risk                                            | Verdict                                         |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------- |
+| F/A   | Task search: `$or` of 5 case-insensitive `$regex` (title, description, 3 snapshots) over `{projectId}`                                                                                                                                    | explain: `FETCH > IXSCAN {projectId_1_number_-1}`, keys=docs=100, 5 ms          | ~5 ms/project of 100 tasks; O(project size) at FETCH + regex CPU | ~50 ms at 1k tasks/project                                   | Text/Atlas Search = infra change                     | **DEFER**                                       |
+| B     | Semantic `labelIds` sort `$lookup` joins `labels` on foreign field `id`; `labels` has **no `{id}` index** (only `_id`, `projectId`)                                                                                                       | explain: `EQ_LOOKUP > FETCH > IXSCAN {projectId_1_number_-1}`, 3 ms @ 100 tasks | ~0 (tiny collection, rare path)                                  | Only if labels grows AND labelIds sort ships                 | One index on labels `{id}` if ever needed            | **NO ACTION**                                   |
+| C/K   | Write ops re-fetch the project (`projectRepo.findById`) solely for the audit event's `tenantId` — 2 reads of the same project per write, in ~10 call sites (task/status/sprint/label/type/board)                                          | source; each read `EXPRESS_IXSCAN`/`{id}` ~0 ms                                 | ~0-1 ms per write                                                | negligible                                                   | passing tenantId through would touch many signatures | **NO ACTION (do-not-fix)**                      |
+| D     | `tenant.service deleteUser` authorization loop: `findByUserAndTenant` per target-membership (read in loop, early `break`)                                                                                                                 | source; N = target's tenant count (1-3), indexed                                | ~0                                                               | small-N by construction                                      | batching saves nothing real                          | **NO ACTION (do-not-fix)**                      |
+| J     | Per-document delete/update loops in rare admin cascades: `permanentDelete` (project_member.delete per member), `deleteUser` (tenantMember.delete per member), archive/restore tenant (project.update per project)                         | source; set-based alternatives exist (`deleteMany`/`updateMany`)                | ~0 (N small, ops indexed)                                        | rare admin ops                                               | none                                                 | **NO ACTION (do-not-fix)**                      |
+| G     | `comments.findByTask` returns ALL comments of a task, no pagination                                                                                                                                                                       | source; dataset: 4 comments total, avg doc 802 B                                | ~0                                                               | unbounded array response if a task accumulates 100+ comments | trivial skip/limit later                             | **NO ACTION** (trigger: any task >100 comments) |
+| E     | Payload survey: tasks avg 836 B (max 4 689 B), audit_events avg 488 B, comments 802 B, boards 660 B, users 219 B → largest realistic page ≤ ~20 KB JSON before gzip                                                                       | `collStats` + `$bsonSize` top-3                                                 | none                                                             | none at current content sizes                                | —                                                    | **NO ACTION**                                   |
+| A/G   | Remaining per-project reference lists (sprints/statuses/task_types/labels sorted, members)                                                                                                                                                | explains: `SORT > FETCH > IXSCAN` over 0-5 docs, ~0 ms                          | none                                                             | lists bounded by project size                                | —                                                    | **NO ACTION**                                   |
+| H     | Index-coverage matrix (query shape → index → covered?/sort?/FETCH?): every read shape in the repo maps to a supporting index; competing-index question already dispositioned in the redundant-index audit (6 DEFERRED cleanup candidates) | full index inventory + §redundant-audit                                         | —                                                                | —                                                            | —                                                    | **NO ACTION**                                   |
+| I     | Write amplification re-check: index list unchanged since §4.17; tasks still 18 indexes, ~4-8 entries per task update; strongest lever remains the deferred redundant-prefix cleanup                                                       | index inventory                                                                 | —                                                                | —                                                            | —                                                    | **NO ACTION**                                   |
+| L/M   | Client chatter + render: no duplicate/sequential request residuals beyond closed §3.x items; every `@for` in features carries `track` (task-table, board, audit, detail)                                                                  | source sweep of 73 `@for` sites                                                 | —                                                                | —                                                            | —                                                    | **NO ACTION**                                   |
+| N/O/P | Bundle (Milkdown, highlight.js grammars inside dynamic `import()` only), Worker/DO and startup CPU: no new residuals beyond closed §2.12/§4.10/§4.12/§4.13                                                                                | source inspection                                                               | —                                                                | —                                                            | —                                                    | **NO ACTION**                                   |
+
+**TOP backlog (ROI order):**
+
+1. **FIX CANDIDATE — task search at scale.** The only genuinely unindexable shape. Technical fix exists (text index or
+   Atlas Search, or restrict `$or` to title only), but requires one more confirmation: production search frequency +
+   project sizes ≫ 100 tasks. Do NOT act at current scale.
+2. **DEFER — audit-log deep skip** (inherited, §4.15; unchanged).
+3. **DEFER — plain-field task sorts** (inherited, §4.14 with the aligned-tiebreaker design; unchanged).
+4. **DEFER — passwordReset.tokenHash index** (inherited, §4.16; unchanged).
+5. **DEFER — redundant-prefix index cleanup** (inherited; also the best write-side lever per §4.17; needs `$indexStats`
+   window).
+
+**Do not re-research (measured clean):** project-for-audit-tenantId re-read; deleteUser authorization loop; per-member
+delete loops in rare cascades; small-collection reference-list sorts; `counters` `_id` prefix-regex delete (index-served
+`IXSCAN {_id_}`); comments-by-task / user_settings / user_preferences / filters / boards / projects-by-tenant / all
+member `$lookup` joins (all `~0 ms`, index-served — explains on record).
+
+**2026-09-02 amendment:** TOP backlog item "plain-field task sorts" (then DEFER) was upgraded and implemented the same
+day after the 5k synthetic workload confirmed the scale bottleneck — see §4.20 (verdict FIXED).
+
+### 4.19 `labels` missing `{id}` index (for the labelIds semantic-sort `$lookup`) — NO ACTION
+
+Recorded as the single new structural observation of §4.18, kept separate for grep-ability: the `EQ_LOOKUP` join in
+`buildSemanticSortPipeline` (`labels.localField=labelIds → foreignField=id`) cannot use an index because `labels`
+carries only `{_id}` and `{projectId}`. Measured impact ~0 (labels is tiny, the labelIds sort is a deferred feature).
+Trigger to act: labelIds sort ships as a default path AND a project's label count reaches ~10². Then add `{id: 1}`
+(16-32 KB class of storage) — not before.
+
+### 4.20 Plain-field task-table sorts (priority / assigneeId / reporterId / typeId) — FIXED (2026-09-02)
+
+Implementation of the aligned-tiebreaker option first documented in §4.14, triggered by the Jira-like synthetic workload
+audit (5k-task project, no production traffic needed as prerequisite — the workload-model assumption is that task-table
+column sorting is a HIGH-frequency interaction in a Jira-like product).
+
+**Why the previous DEFER was overturned.** §4.14 deferred for lack of traffic evidence. The synthetic 5k dataset turned
+the scale question into a measurement: all four sorts were blocking in-memory SORTs over the ENTIRE matching set —
+measured production e2e 265-319 ms vs ~133 ms baseline, and locally ~20 ms @1k → ~108 ms @5k → ~216 ms @10k (linear ≈ 22
+ms per 1k tasks, limit-independent). `SORT > FETCH > IXSCAN {projectId_1_number_-1}`,
+`keysExamined = docsExamined = project size` regardless of limit 1/20/100.
+
+**Source/semantic audit (Phase 1).**
+
+- The four fields are raw-value plain sorts at [task.repository.ts](../server/src/repositories/task.repository.ts)
+  `findByProject` (`sort({ [docSortKey]: sortDir, number: -1 })`); `SEMANTIC_SORT_FIELDS = {labelIds}` — the
+  `buildSemanticSortPipeline` priority/assignee branches are dead code; `SEMANTIC_TO_DOC_KEY` does not map these four.
+- `number` uniqueness per project is enforced structurally: unique index `{projectId: 1, number: -1}` + atomic counter
+  (`taskNumber:<projectId>`).
+- No test pins tie-group order; saved filters persist the `sort` string, not tie order; pagination is offset-based and
+  stays deterministic.
+- **Explicit contract decision (not "behavior invisible"):** for ASC, the order WITHIN groups of equal field values
+  changes — `number` ascending (new) instead of `number` descending (old). DESC is bit-identical
+  (`{field: -1, number: -1}` is the exact reverse of `{field: 1, number: 1}`). Nulls (`assigneeId`/`reporterId`) keep
+  MongoDB's uniform null-ordering (index and in-memory sort bracket missing/null identically). Overall ordering remains
+  fully deterministic because `number` is unique per project. The four-way tiebreaker change is scoped to exactly these
+  fields: a global flip would break the existing `… number: -1` indexes that serve createdAt/updatedAt/title/statusName
+  sorts.
+
+**Index experiment (Phase 2, synthetic data, temp indexes — dropped after).** One candidate index per field,
+`{ projectId: 1, field: 1, number: 1 }`:
+
+- ALIGNED shape `{ field: dir, number: dir }` — winning plan `LIMIT > FETCH > IXSCAN{projectId_1_field_1_number_1}`
+  **[forward] for ASC and [backward] for DESC** — one index covers BOTH directions, `keys = docs = limit`, 0-3 ms
+  (confirmed by explain, not assumed).
+- OLD-tiebreaker ASC shape `{ field: 1, number: -1 }` still blocks even with the index present — proving the repository
+  change is required, not optional.
+- Filtered shapes: `{statusId} + priority sort` and `{sprintId} + assignee sort` use the new index (2-3 ms);
+  `{assigneeId} filter + priority sort` keeps its pre-existing plan (filter-index IXSCAN + SORT over that filter's
+  matching set — unchanged from before, inherent filter/sort-field mismatch, 22 ms @5k);
+  `{typeId} filter + priority sort` improved (1270 keys vs full scan).
+
+**Benchmark (Phase 3, before → after, winning-plan ms @limit 20):**
+
+| Scale | priority asc/desc          | assigneeId asc/desc | reporterId asc/desc | typeId asc/desc  |
+| ----- | -------------------------- | ------------------- | ------------------- | ---------------- |
+| 1k    | 21-22 → 0-1 ms (both dirs) | 20-21 → 0-1 ms      | 18-21 → 0-1 ms      | 20-21 → 0-1 ms   |
+| 5k    | 103-106 → 0-1 ms           | 100-115 → 0-1 ms    | 99-103 → 0-1 ms     | 96-103 → 0-1 ms  |
+| 10k   | 204-217 → 0-1 ms           | 204-222 → 0-1 ms    | 194-208 → 0-1 ms    | 190-209 → 0-1 ms |
+
+Complexity changed from O(project size) to O(limit), stable across 5k/10k; production e2e expectation: 265-319 ms →
+~baseline (~133 ms), flat at any project size.
+
+**Implementation (Phase 4).**
+
+- [task.repository.ts](../server/src/repositories/task.repository.ts):
+  `ALIGNED_TIEBREAKER_FIELDS = {priority, assigneeId, reporterId, typeId}`; `findByProject` sorts
+  `{ [docSortKey]: sortDir, number: sortDir }` for these four and keeps `{ …, number: -1 }` for every other sort. The
+  `labelIds` pipeline, statusName/sprintName mapping, and all query logic untouched.
+- [migrations.ts](../server/src/db/migrations.ts) `CORE_INDEXES`: +4 — `{projectId, priority, number}`,
+  `{projectId, assigneeId, number}`, `{projectId, reporterId, number}`, `{projectId, typeId, number}` (all `1,1,1`).
+  Pre-checked via `listIndexes` — no name collisions, no equivalent key patterns. Applied via the штатный
+  `scripts/migrate.ts` (889 ms); CD applies the same migration to production before the Worker deploy. `tasks` now
+  carries 22 indexes (~+80-130 KB storage on the 296-task local dataset; proportionally small at 5k).
+- Write-side impact: +4 index entries maintained per task INSERT (now 22); per-field task UPDATES touching
+  priority/assigneeId/reporterId/typeId now maintain one more index each — accepted trade-off (§4.17 fan-out analysis
+  unchanged in spirit; single-document updates are not write-bound).
+
+**Regression (Phases 5-6).**
+
+- `npm run typecheck` PASS; `npm test` 886/886 PASS; `npm run lint` PASS.
+- All 8 paths re-explained on synthetic 5k AND 10k data:
+  `LIMIT > FETCH > IXSCAN{projectId_1_<field>_1_number_1} [forward|backward]`, keys=docs=20, **SORT=false** in every
+  winning plan.
+- Hot-path regression: default `number`, `createdAt`, `updatedAt`, `title`, `statusName`, `sprintName` sorts,
+  `{statusId}`/`{assigneeId}` filters, and the `/tasks/my` shape all keep their previous index-supported plans (keys=20,
+  SORT=false) — no shape regressed.
+
+**Final verdict: FIXED** for the four plain-field sort paths (blocking SORT eliminated, O(limit) plans verified in both
+directions). Deferred siblings stay as documented: search (§4.18), audit deep-skip (§4.15), passwordReset (§4.16),
+redundant-prefix cleanup (index-maintenance audit).
+
+### 4.21 Board-specific lightweight task projection (`view=board`) — DONE (2026-09-02)
+
+Follow-up of the board payload research (§4.18 top-candidates): the board fetched the FULL Task DTO (205.5 KB raw for a
+200-card board on CAP66) although cards read only a subset of fields. Product decision: the card shows key/priority /
+title (2-line clamp) / type + assignee — **no description at all** (task-detail content).
+
+**Implementation** (no index or generic-contract changes):
+
+- [`shared/src/types/task.ts`](../shared/src/types/task.ts): new `BoardTask` DTO —
+  `id, projectId, number, title, typeId, statusId, priority, assigneeId, assigneeSnapshot, version`. `version` is
+  REQUIRED by the board's optimistic drag-and-drop update; `assigneeId` by the client-side "unassigned" filter.
+- [`task.repository.ts`](../server/src/repositories/task.repository.ts): `TaskQueryOptions.view?: 'board'` → exclusion
+  projection
+  (`description, reporterId, reporterSnapshot, statusName, sprintName, sprintId, labelIds, createdById, createdBySnapshot, createdAt, updatedAt`
+  → 0) on the plain-find path and as `$unset` on the semantic pipeline path. `toDomain` maps projected timestamps
+  conditionally (a projected doc no longer crashes the mapper — caught by the live wrangler-dev check).
+- [`task.service.ts`](../server/src/services/task.service.ts): `getBoardTasks` maps the projected result to the exact
+  `BoardTask` shape (no leakage by construction); [`routes/tasks.ts`](../server/src/routes/tasks.ts) branches on the new
+  `view=board` query param (Zod-validated); the generic list contract is untouched.
+- UI: [`task-client.ts`](../ui/src/app/services/task-client.ts) `listForBoard()`; board card redesigned to the
+  key+priority / title (line-clamp-2) / type+assignee layout with the description preview REMOVED;
+  [`board-view.ts`](../ui/src/app/features/boards/board-view/board-view.ts) uses `listForBoard` + `refStore` types
+  (added to `ensure`) and orders cards by severity rank (`PRIORITY_RANK` CRITICAL→LOW, ties by number asc).
+
+**Measured (live wrangler-dev on the local production-like DB, realistic ~350B descriptions):**
+
+- per-task response: full 21 fields → board exactly 10 fields; `description` confirmed ABSENT from the actual HTTP
+  response (not merely unused by Angular); generic list response byte-identical to before.
+- payload: **−67% raw JSON, −39% gzip** on the same tasks; 200-card extrapolation ≈217 KB → ≈72 KB raw (CAP66 real data
+  measured earlier: 205.5 KB → ~68 KB raw, gzip 14.7 KB → ~9 KB). Mongo time unchanged (3 ms) — projection is a
+  materialization/serialization/payload optimization, NOT a DB-scan optimization (explain below).
+
+**Mongo plan (explain, board shape `{projectId}` + sort `{number:-1}` + limit 200 + projection):**
+`IXSCAN {projectId_1_number_-1} > FETCH > PROJECTION_SIMPLE > LIMIT`, keys=docs=limit, no SORT, 3 ms — **no new index
+added**. A `{projectId, statusId, priority, number}` index was deliberately NOT created: `priority` is a semantic enum
+(LOW/MEDIUM/HIGH/CRITICAL — alphabetical order ≠ severity), so an index sort on the raw field cannot produce severity
+order; Mongo-side severity sorting would require a denormalized numeric `priorityRank` field (future option).
+Client-side rank sort over the ≤200 loaded cards is O(200) and negligible.
+
+**Tests:** repository projection test (exact exclusion projection), service DTO-shape test (exact key set — no
+description/reporter/createdAt leakage), card tests (type name rendered, description never rendered even when present on
+the input, title carries `line-clamp-2`), board spec updated to `listForBoard`. typecheck PASS, 889/889 tests PASS, lint
+clean. No commits.
+
+**Remaining board issue (separate, product scope):** the hard `limit: 200` cap — on a 5k-task project 4 800 tasks are
+unreachable from the board (see §4.18 / the board research). Pagination/per-column loading is the next design
+discussion, deliberately not part of this change.
+
 ## 5. Tooling
 
 Diagnostic scripts used during the investigation: [`tools/README.md`](../tools/README.md) (api-series — keep-alive

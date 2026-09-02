@@ -103,7 +103,7 @@ function createBoardClientMock(board: BoardConfig = mockBoard) {
 
 function createTaskClientMock(tasks: Task[] = mockTasks) {
   return {
-    list: vi
+    listForBoard: vi
       .fn()
       .mockReturnValue(of({ data: tasks, pagination: { total: tasks.length, page: 1, limit: 200, totalPages: 1 } })),
     create: vi.fn().mockReturnValue(of(makeTask({ id: 'tk000000-0000-0000-0000-000000000099', title: 'New Task' }))),
@@ -335,8 +335,8 @@ describe('BoardView', () => {
       expect(component.board()).toEqual(mockBoard);
     });
 
-    it('should call taskClient.list with projectId and limit 200', () => {
-      expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', { limit: 200 });
+    it('should call taskClient.listForBoard with projectId and limit 200', () => {
+      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', { limit: 200 });
     });
 
     it('should populate tasks signal', () => {
@@ -411,7 +411,7 @@ describe('BoardView', () => {
       TestBed.resetTestingModule();
       await setup({ sprintId: 'sp1' });
 
-      expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
+      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
         sprintId: 'sp1',
       });
@@ -465,7 +465,7 @@ describe('BoardView', () => {
       TestBed.resetTestingModule();
       await setup({ assignee: 'me' }, [], mockBoard, mockTasks, { id: 'u1' });
 
-      expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
+      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
         assigneeId: 'u1',
       });
@@ -475,7 +475,7 @@ describe('BoardView', () => {
       TestBed.resetTestingModule();
       await setup({ assignee: 'u2' });
 
-      expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
+      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
         assigneeId: 'u2',
       });
@@ -488,7 +488,7 @@ describe('BoardView', () => {
 
       await setup({ assignee: 'unassigned' }, [], mockBoard, [...mockTasks, assigned]);
 
-      const call = taskClientMock.list.mock.calls[0]?.[1] as Record<string, unknown>;
+      const call = taskClientMock.listForBoard.mock.calls[0]?.[1] as Record<string, unknown>;
 
       expect(call.assigneeId).toBeUndefined();
       expect(component.filteredTasks().map((t: Task) => t.id)).not.toContain('tk-assigned');
@@ -499,7 +499,7 @@ describe('BoardView', () => {
       TestBed.resetTestingModule();
       await setup({ priority: 'HIGH' });
 
-      expect(taskClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
+      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
         priority: 'HIGH',
       });

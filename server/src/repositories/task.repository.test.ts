@@ -126,6 +126,37 @@ describe('TaskRepository', () => {
 
       expect(collection.find).toHaveBeenCalledWith({ projectId: 'project-1' }, { projection: { description: 0 } });
     });
+
+    it('view=board projects out every non-card field (description, reporter, timestamps, metadata)', async () => {
+      const toArray = vi.fn().mockResolvedValue([makeDoc()]);
+      const limit = vi.fn().mockReturnValue({ toArray });
+      const skip = vi.fn().mockReturnValue({ limit });
+      const sort = vi.fn().mockReturnValue({ skip });
+
+      collection.find.mockReturnValue({ sort });
+      collection.countDocuments.mockResolvedValue(1);
+
+      await repo.findByProject('project-1', { view: 'board' });
+
+      expect(collection.find).toHaveBeenCalledWith(
+        { projectId: 'project-1' },
+        {
+          projection: {
+            description: 0,
+            reporterId: 0,
+            reporterSnapshot: 0,
+            statusName: 0,
+            sprintName: 0,
+            sprintId: 0,
+            labelIds: 0,
+            createdById: 0,
+            createdBySnapshot: 0,
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        },
+      );
+    });
   });
 
   describe('bulkUpdateWithVersion (TOP-3 №1)', () => {

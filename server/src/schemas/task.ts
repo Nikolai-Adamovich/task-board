@@ -95,12 +95,20 @@ export const TaskQuerySchema = z.object({
   updatedTo: z.iso.date().optional(),
   /**
    * F5 (perf audit #2): omit `description` from list responses. No list consumer
-   * renders it (only the board's task-card preview needs it — that view simply
-   * does not send this flag), so tables/widget callers can cut ~40% of payload.
-   * `description` search/filtering stays server-side and is unaffected.
+   * renders it (the board's task-card preview was removed — cards render only
+   * key/priority/title/type/assignee), so tables/widget callers can cut ~40% of
+   * payload. `description` search/filtering stays server-side and is unaffected.
    */
   excludeDescription: z
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  /**
+   * Board view (`view=board`): lightweight card projection — only the fields the
+   * board UI reads (id/number/title/typeId/statusId/priority/assignee + snapshot,
+   * version for optimistic DnD). Description, reporter, timestamps and other
+   * detail fields are excluded server-side; the route maps the result to the
+   * dedicated BoardTask DTO.
+   */
+  view: z.enum(['board']).optional(),
 });

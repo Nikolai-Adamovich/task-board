@@ -162,7 +162,12 @@
                  column still work and the preview lands at the top (index 0). -->
             @for (task of tasksByColumnId().get(column.id) ?? []; track task.id) {
               <div cdkDrag [cdkDragData]="task">
-                <ui-task-card [task]="task" [projectKey]="projectKey()" (click)="goToTask(task)" />
+                <ui-task-card
+                  [task]="task"
+                  [projectKey]="projectKey()"
+                  [typeName]="typeMap()[task.typeId] ?? task.typeId"
+                  (click)="goToTask(task)"
+                />
               </div>
             }
           </div>

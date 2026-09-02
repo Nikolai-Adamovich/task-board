@@ -147,6 +147,45 @@ describe('TaskService', () => {
     });
   });
 
+  describe('getBoardTasks', () => {
+    it('maps the projected result to the exact BoardTask DTO — no description/reporter/timestamp leakage', async () => {
+      taskRepo.findByProject = vi.fn().mockResolvedValue({
+        data: [makeTask()],
+        pagination: { page: 1, limit: 200, total: 1, totalPages: 1 },
+      });
+
+      const result = await service.getBoardTasks('project-1');
+      const [boardTask] = result.data;
+
+      expect(taskRepo.findByProject).toHaveBeenCalledWith('project-1', { view: 'board' });
+      expect(boardTask).toEqual({
+        id: expect.any(String),
+        projectId: 'project-1',
+        number: expect.any(Number),
+        title: expect.any(String),
+        typeId: expect.any(String),
+        statusId: expect.any(String),
+        priority: expect.any(String),
+        assigneeId: null,
+        assigneeSnapshot: null,
+        version: 1,
+      });
+      // Explicit no-leakage proof: the serialized DTO carries exactly the card fields
+      expect(Object.keys(boardTask ?? {}).sort()).toEqual([
+        'assigneeId',
+        'assigneeSnapshot',
+        'id',
+        'number',
+        'priority',
+        'projectId',
+        'statusId',
+        'title',
+        'typeId',
+        'version',
+      ]);
+    });
+  });
+
   describe('getTask', () => {
     it('returns task when found', async () => {
       taskRepo.findById = vi.fn().mockResolvedValue(makeTask());

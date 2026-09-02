@@ -19,10 +19,10 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { NgIcon } from '@ng-icons/core';
-import type { BoardColumn, BoardConfig, Task } from '@task-board/shared';
+import type { BoardColumn, BoardConfig, BoardTask } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { priorityLabelKey } from '@app/constants/priority';
+import { priorityLabelKey, PRIORITY_RANK } from '@app/constants/priority';
 import { TaskCard } from '../task-card/task-card';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
@@ -107,7 +107,7 @@ export class BoardView {
       if (params.priority) {
         query.priority = params.priority;
       }
-      return this.taskClient.list(params.pid, query).pipe(map((res) => res.data));
+      return this.taskClient.listForBoard(params.pid, query).pipe(map((res) => res.data));
     },
     defaultValue: [],
   });
@@ -169,8 +169,10 @@ export class BoardView {
 
     return err ? getErrorMessage(err) : '';
   });
-  // Reference data (statuses) via the shared store
+  // Reference data (statuses, task types for the card's bottom row) via the shared store
   protected readonly statusMap = computed(() => this.refStore.nameMap(this.effectiveProjectId(), 'statuses'));
+  /** typeId → issue-type display name (board card bottom-left) */
+  protected readonly typeMap = computed(() => this.refStore.nameMap(this.effectiveProjectId(), 'types'));
 
   constructor() {
     effect(() => {
@@ -182,7 +184,7 @@ export class BoardView {
       // re-runs this effect and refetches through ensure().
       this.refStore.sprintEntities(pid);
       this.refStore.statusEntities(pid);
-      this.refStore.ensure(pid, ['statuses', 'sprints', 'members']);
+      this.refStore.ensure(pid, ['statuses', 'sprints', 'members', 'types']);
     });
   }
 
@@ -239,7 +241,7 @@ export class BoardView {
     this.setFilterParam('priority', value);
   }
   protected readonly showStatusSelect = signal(false);
-  protected readonly pendingDrop = signal<{ task: Task; targetColumn: BoardColumn } | null>(null);
+  protected readonly pendingDrop = signal<{ task: BoardTask; targetColumn: BoardColumn } | null>(null);
   /**
    * S-08: display name per column id — computed once per change instead of
    * re-running per column on every CD cycle.
@@ -283,12 +285,18 @@ export class BoardView {
   });
   /**
    * S-08: tasks per owned column (V4-12 ownership semantics preserved via
-   * `columnOwnerByStatusId`), sorted by number — computed once per change
-   * instead of filter+sort per column on every CD cycle.
+   * `columnOwnerByStatusId`) — computed once per change instead of
+   * filter+sort per column on every CD cycle.
+   *
+   * Column order: severity first (CRITICAL → LOW), ties by number ascending.
+   * `priority` is a semantic enum (alphabetical order ≠ severity), so a Mongo
+   * index sort on the raw field cannot produce severity order — this is done
+   * client-side over the ≤200 loaded cards instead (a Mongo-side sort would
+   * require a denormalized numeric priorityRank field; see board payload audit).
    */
   protected readonly tasksByColumnId = computed(() => {
     const owner = this.columnOwnerByStatusId();
-    const map = new Map<string, Task[]>();
+    const map = new Map<string, BoardTask[]>();
 
     for (const col of this.board()?.columns ?? []) map.set(col.id, []);
 
@@ -299,7 +307,9 @@ export class BoardView {
       if (list) list.push(task);
     }
 
-    for (const list of map.values()) list.sort((a, b) => a.number - b.number);
+    const rank = (priority: BoardTask['priority']): number => PRIORITY_RANK[priority] ?? Number.MAX_SAFE_INTEGER;
+
+    for (const list of map.values()) list.sort((a, b) => rank(a.priority) - rank(b.priority) || a.number - b.number);
 
     return map;
   });
@@ -321,7 +331,7 @@ export class BoardView {
   }
 
   /** Handle CDK drag-drop event */
-  protected onTaskDrop(event: CdkDragDrop<Task[], Task[], Task>, column: BoardColumn): void {
+  protected onTaskDrop(event: CdkDragDrop<BoardTask[], BoardTask[], BoardTask>, column: BoardColumn): void {
     const task = event.item.data;
 
     if (!task) return;
@@ -363,7 +373,7 @@ export class BoardView {
   }
 
   /** Move a task to a new status via the API */
-  private moveTaskToStatus(task: Task, statusId: string): void {
+  private moveTaskToStatus(task: BoardTask, statusId: string): void {
     this.taskClient.update(task.id, { statusId, version: task.version }).subscribe({
       next: (updated) => {
         if (this.tasksResource.hasValue()) {
@@ -385,7 +395,7 @@ export class BoardView {
     return `column-${column.id}`;
   }
 
-  protected goToTask(task: Task): void {
+  protected goToTask(task: BoardTask): void {
     const projectKey =
       this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? task.projectId;
 

@@ -12,6 +12,13 @@ export type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 /** Known task priority values (internal enum values unchanged) — used for i18n key lookup. */
 const PriorityValues: readonly string[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
+/**
+ * Severity rank for board-column card ordering — CRITICAL first, LOW last.
+ * The persisted `priority` is a semantic enum (alphabetical order ≠ severity),
+ * so ordering by severity must go through this rank map, not a raw field sort.
+ */
+export const PRIORITY_RANK: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+
 /** Task priority levels mapped to badge variants (ascending severity). */
 export const PriorityVariantMap = {
   LOW: 'outline',
