@@ -21,6 +21,18 @@ import type { AppEnv } from '../types/context.js';
  * server/scripts/migrate.ts executed by CD before the deploy.
  */
 export class MongoHonoDurableObject extends DurableObject<AppEnv> {
+  // DIAGNOSTIC ONLY (remove with the pool-lifecycle logging in db/mongo.ts once
+  // the first-request-after-idle investigation is concluded): a single marker
+  // emitted once per DO instance lifetime. Absence of DO_CONSTRUCTOR in the
+  // tail after an idle period proves the DO survived (only the Mongo
+  // connection was rebuilt); its presence proves the isolate was re-created.
+  // The id prefix is a runtime identifier, not a secret.
+  constructor(ctx: DurableObjectState, env: AppEnv) {
+    super(ctx, env);
+    // eslint-disable-next-line no-console -- diagnostic lifecycle marker (temporary)
+    console.log(`DO_CONSTRUCTOR id=${ctx.id.toString().slice(0, 8)}`);
+  }
+
   override async fetch(request: Request): Promise<Response> {
     // Pass the DO's env (secrets + vars are shared with the Worker) and a
     // Hono-compatible execution context. DurableObjectState provides

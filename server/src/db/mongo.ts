@@ -54,7 +54,40 @@ export function resetSharedClient(): void {
   sharedClientPromise = undefined;
 }
 
-async function createConnectedClient(uri: string): Promise<MongoClient> {
+/**
+ * Attach CMAP pool-lifecycle logging to a client — DIAGNOSTIC ONLY, used to
+ * attribute the first-request-after-idle latency spike to connection pool
+ * expiry (`maxIdleTimeMS`) vs DO eviction. Remove once the investigation is
+ * concluded. Events are rare
+ * (only on pool/socket creation and close), so there is no log spam; no
+ * secrets, URIs or query data are logged. Attached exactly once per client —
+ * the singleton promise guarantees one client per DO isolate, and per-request
+ * / readyz clients are deliberately not instrumented.
+ */
+function attachPoolLifecycleLogging(client: MongoClient): void {
+  client.on('connectionPoolCreated', () => {
+    // eslint-disable-next-line no-console -- diagnostic lifecycle marker (temporary)
+    console.log('MONGO_POOL_CREATED');
+  });
+  client.on('connectionCreated', (event) => {
+    // eslint-disable-next-line no-console -- diagnostic lifecycle marker (temporary)
+    console.log(`MONGO_CONNECTION_CREATED id=${event.connectionId}`);
+  });
+  client.on('connectionReady', (event) => {
+    // eslint-disable-next-line no-console -- diagnostic lifecycle marker (temporary)
+    console.log(`MONGO_CONNECTION_READY id=${event.connectionId} durationMS=${event.durationMS}`);
+  });
+  client.on('connectionClosed', (event) => {
+    // eslint-disable-next-line no-console -- diagnostic lifecycle marker (temporary)
+    console.log(`MONGO_CONNECTION_CLOSED id=${event.connectionId} reason=${event.reason}`);
+  });
+  client.on('connectionPoolCleared', () => {
+    // eslint-disable-next-line no-console -- diagnostic lifecycle marker (temporary)
+    console.log('MONGO_POOL_CLEARED');
+  });
+}
+
+async function createConnectedClient(uri: string, instrument = false): Promise<MongoClient> {
   // Dynamic import required — MongoDB's BSON module calls crypto.randomBytes()
   // at module load time, which Cloudflare Workers forbids at global scope.
   const { MongoClient: MC } = await import('mongodb');
@@ -71,6 +104,10 @@ async function createConnectedClient(uri: string): Promise<MongoClient> {
     maxIdleTimeMS: 30_000,
     serverSelectionTimeoutMS: 5_000,
   });
+
+  if (instrument) {
+    attachPoolLifecycleLogging(client);
+  }
 
   await client.connect();
   return client;
@@ -89,7 +126,7 @@ export async function getMongoClient(uri: string, mode: MongoClientMode = 'singl
     return createConnectedClient(uri);
   }
 
-  sharedClientPromise ??= createConnectedClient(uri).catch((err: unknown) => {
+  sharedClientPromise ??= createConnectedClient(uri, true).catch((err: unknown) => {
     sharedClientPromise = undefined;
     throw err;
   });
