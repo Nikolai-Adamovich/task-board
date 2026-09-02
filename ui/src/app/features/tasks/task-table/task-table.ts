@@ -33,7 +33,7 @@ import { TaskTableHeader } from './task-table-header/task-table-header';
 import { isPinnedColumn, type TaskColumnDef } from './task-column-def';
 import type {
   Task,
-  TaskPriority,
+  TaskPriorityLevel,
   FilterCriteria,
   FilterSort,
   TaskTableColumnKey,
@@ -42,7 +42,13 @@ import type {
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { TASK_TABLE_COLUMN_KEYS, TASK_TABLE_PINNED_COLUMNS, DEFAULT_TASK_TABLE_COLUMNS } from '@task-board/shared';
-import { taskTypeBadgeVariant, priorityBadgeVariant, priorityLabelKey } from '@app/constants/priority';
+import {
+  taskTypeBadgeVariant,
+  priorityBadgeVariant,
+  priorityLabelKey,
+  PRIORITY_OPTIONS,
+  priorityLevelParam,
+} from '@app/constants/priority';
 import {
   AUTO_PAGE_SIZE_SENTINEL,
   computeAutoPageSize,
@@ -129,7 +135,7 @@ export class TaskTable {
   readonly search = input('');
   readonly page = input(1, { transform: safeNumericParam });
   readonly limit = input(this.preferencesStore.pageSize(), { transform: safeNumericParam });
-  readonly priority = input('');
+  readonly priorityLevel = input<TaskPriorityLevel | null>(null, { transform: priorityLevelParam });
   readonly status = input('');
   readonly type = input('');
   readonly assignee = input('');
@@ -230,10 +236,10 @@ export class TaskTable {
   protected readonly priorityBadgeVariant = priorityBadgeVariant;
 
   /** Translated priority label (P11); unknown values render verbatim. */
-  protected priorityLabel(priority: string): string {
-    const key = priorityLabelKey(priority);
+  protected priorityLabel(priorityLevel: TaskPriorityLevel): string {
+    const key = priorityLabelKey(priorityLevel);
 
-    return key ? this.transloco.translate(key) : priority;
+    return key ? this.transloco.translate(key) : String(priorityLevel);
   }
   // ─── Data ──────────────────────────────────────────────────────────────────
   /**
@@ -370,15 +376,10 @@ export class TaskTable {
       labelKey: 'taskTable.priority',
       filterType: 'select',
       width: 'w-25',
-      getFilterValue: () => this.priority(),
-      setFilterValue: (v) => this.onColumnFilterChange('priority', v),
+      getFilterValue: () => this.priorityLevel(),
+      setFilterValue: (v) => this.onColumnFilterChange('priorityLevel', v === '' ? '' : String(v)),
       allLabelKey: 'taskTable.allPriorities',
-      staticOptions: [
-        { value: 'LOW', labelKey: 'priority.low' },
-        { value: 'MEDIUM', labelKey: 'priority.medium' },
-        { value: 'HIGH', labelKey: 'priority.high' },
-        { value: 'CRITICAL', labelKey: 'priority.critical' },
-      ],
+      staticOptions: PRIORITY_OPTIONS,
     },
     {
       field: 'assigneeId',
@@ -495,7 +496,7 @@ export class TaskTable {
     const filters: FilterCriteria = {};
 
     if (this.filterStatus()) filters.statusIds = [this.filterStatus()];
-    if (this.priority()) filters.priority = [this.priority() as TaskPriority];
+    if (this.priorityLevel() !== null) filters.priorityLevel = [this.priorityLevel() as TaskPriorityLevel];
     if (this.filterType()) filters.typeIds = [this.filterType()];
     if (this.filterAssignee()) filters.assigneeIds = [this.filterAssignee()];
     if (this.search()) filters.search = this.search();
@@ -515,7 +516,7 @@ export class TaskTable {
   private readonly taskQuery = computed(() => ({
     search: this.search() || undefined,
     statusId: this.filterStatus() || undefined,
-    priority: this.priority() || undefined,
+    priorityLevel: this.priorityLevel() ?? undefined,
     typeId: this.filterType() || undefined,
     assigneeId: this.filterAssignee() || undefined,
     reporterId: this.filterReporter() || undefined,
@@ -854,7 +855,7 @@ export class TaskTable {
   protected readonly hasActiveFilters = computed(
     () =>
       !!this.search() ||
-      !!this.priority() ||
+      this.priorityLevel() !== null ||
       !!this.status() ||
       !!this.type() ||
       !!this.assignee() ||
@@ -874,12 +875,12 @@ export class TaskTable {
     if (this.search()) {
       chips.push({ param: 'search', labelKey: 'taskTable.filterSearch', value: this.search() });
     }
-    if (this.priority()) {
-      // P11: translated display label instead of the raw enum value
+    if (this.priorityLevel() !== null) {
+      // P11: translated display label instead of the raw level value
       chips.push({
-        param: 'priority',
+        param: 'priorityLevel',
         labelKey: 'taskTable.filterPriority',
-        value: this.priorityLabel(this.priority()),
+        value: this.priorityLabel(this.priorityLevel() as TaskPriorityLevel),
       });
     }
     if (this.filterStatus()) {

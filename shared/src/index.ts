@@ -12,8 +12,6 @@ export {
   TenantRoleValues,
   ProjectRole,
   ProjectRoleValues,
-  TaskPriority,
-  TaskPriorityValues,
   SprintStatus,
   SprintStatusValues,
   MemberStatus,
@@ -33,6 +31,12 @@ export {
   AuditEntityType,
   AuditEntityTypeValues,
 } from './constants/roles.js';
+export {
+  TASK_PRIORITY_CONFIG,
+  TASK_PRIORITY_LEVELS,
+  DEFAULT_TASK_PRIORITY_LEVEL,
+  type TaskPriorityLevel,
+} from './constants/priority.js';
 export { ExpandState } from './constants/expand-state.js';
 export {
   TASK_TABLE_COLUMN_KEYS,

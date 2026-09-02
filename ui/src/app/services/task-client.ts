@@ -19,7 +19,7 @@ export interface TaskQuery {
   assigneeId?: string;
   reporterId?: string;
   statusId?: string;
-  priority?: string;
+  priorityLevel?: number;
   typeId?: string;
   labelId?: string;
   search?: string;
@@ -75,7 +75,7 @@ export class TaskClient {
     if (query.assigneeId) params = params.set('assigneeId', query.assigneeId);
     if (query.reporterId) params = params.set('reporterId', query.reporterId);
     if (query.statusId) params = params.set('statusId', query.statusId);
-    if (query.priority) params = params.set('priority', query.priority);
+    if (query.priorityLevel !== undefined) params = params.set('priorityLevel', String(query.priorityLevel));
     if (query.typeId) params = params.set('typeId', query.typeId);
     if (query.labelId) params = params.set('labelId', query.labelId);
     if (query.search) params = params.set('search', query.search);

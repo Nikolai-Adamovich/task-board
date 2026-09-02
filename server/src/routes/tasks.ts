@@ -27,7 +27,7 @@ export function createTaskRoutes(): Hono<AppEnv> {
       view: q.view,
       search: q.search,
       statusId: q.statusId,
-      priority: q.priority,
+      priorityLevel: q.priorityLevel,
       typeId: q.typeId,
       assigneeId: q.assigneeId,
       reporterId: q.reporterId,

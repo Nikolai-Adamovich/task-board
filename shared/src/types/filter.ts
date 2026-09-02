@@ -1,4 +1,4 @@
-import type { TaskPriority } from '../constants/roles.js';
+import type { TaskPriorityLevel } from '../constants/priority.js';
 
 /** Filter criteria — all fields are optional and combined with AND logic */
 export interface FilterCriteria {
@@ -6,8 +6,8 @@ export interface FilterCriteria {
   search?: string;
   /** Filter by status IDs */
   statusIds?: string[];
-  /** Filter by priority values */
-  priority?: TaskPriority[];
+  /** Filter by priority levels (positions in TASK_PRIORITY_CONFIG) */
+  priorityLevel?: TaskPriorityLevel[];
   /** Filter by task type IDs */
   typeIds?: string[];
   /** Filter by assignee user IDs */

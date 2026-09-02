@@ -22,14 +22,15 @@ import { MilkdownEditor } from '@app/shared/milkdown-editor/milkdown-editor';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import type { PendingChanges } from '@app/shared/pending-changes/pending-changes.guard';
-import { TaskPriority } from '@task-board/shared';
+import { DEFAULT_TASK_PRIORITY_LEVEL, type TaskPriorityLevel } from '@task-board/shared';
+import { PRIORITY_OPTIONS } from '@app/constants/priority';
 import type { CreateTask, Task } from '@task-board/shared';
 
 interface CreateTaskFormModel {
   title: string;
   description: string;
   statusId: string;
-  priority: TaskPriority;
+  priorityLevel: TaskPriorityLevel;
   typeId: string;
   assigneeId: string;
   sprintId: string;
@@ -92,7 +93,7 @@ export class TaskCreate implements PendingChanges {
     title: '',
     description: '',
     statusId: '',
-    priority: TaskPriority.MEDIUM,
+    priorityLevel: DEFAULT_TASK_PRIORITY_LEVEL,
     typeId: '',
     assigneeId: '',
     sprintId: '',
@@ -106,7 +107,7 @@ export class TaskCreate implements PendingChanges {
       maxLength(field.title, 255, { message: 'validation.titleMaxLength' });
       required(field.typeId, { message: 'validation.typeRequired' });
       required(field.statusId, { message: 'validation.statusRequired' });
-      required(field.priority, { message: 'validation.priorityRequired' });
+      required(field.priorityLevel, { message: 'validation.priorityRequired' });
     }),
     {
       submission: {
@@ -125,7 +126,7 @@ export class TaskCreate implements PendingChanges {
               title,
               typeId: m.typeId,
               statusId: m.statusId,
-              priority: m.priority,
+              priorityLevel: m.priorityLevel,
             };
             const description = m.description.trim();
 
@@ -239,6 +240,9 @@ export class TaskCreate implements PendingChanges {
   protected onDescriptionChange(markdown: string): void {
     this.model.update((m) => ({ ...m, description: markdown }));
   }
+
+  /** Priority selector options — derived from the shared TASK_PRIORITY_CONFIG. */
+  protected readonly PRIORITY_OPTIONS = PRIORITY_OPTIONS;
 
   protected onFieldChange<K extends keyof CreateTaskFormModel>(field: K, value: CreateTaskFormModel[K]): void {
     this.model.update((m) => ({ ...m, [field]: value }));

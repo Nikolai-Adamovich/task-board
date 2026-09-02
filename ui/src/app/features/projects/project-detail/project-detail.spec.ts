@@ -85,7 +85,7 @@ function makeTask(number_: number): Task {
     title: `Task ${number_}`,
     description: null,
     statusId: 's1',
-    priority: 'MEDIUM',
+    priorityLevel: 1,
     reporterId: null,
     reporterSnapshot: null,
     assigneeId: null,

@@ -22,8 +22,10 @@ import { NgIcon } from '@ng-icons/core';
 import type { BoardColumn, BoardConfig, BoardTask } from '@task-board/shared';
 import type { TaskQuery } from '@services/task-client';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { priorityLabelKey, PRIORITY_RANK } from '@app/constants/priority';
+import { priorityLabelKey, priorityLevelParam, type TaskPriorityLevel } from '@app/constants/priority';
+import type { TaskPriorityLevel as SharedPriorityLevel } from '@task-board/shared';
 import { TaskCard } from '../task-card/task-card';
+import { PRIORITY_OPTIONS } from '@app/constants/priority';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
@@ -66,8 +68,8 @@ export class BoardView {
    * `unassigned` (client-side post-filter), or a concrete member user id.
    */
   readonly assignee = input<string | null>(null);
-  /** F-08: optional priority filter from query params (`?priority=…`) */
-  readonly priority = input<string | null>(null);
+  /** F-08: optional priority filter from query params (`?priorityLevel=…`) */
+  readonly priorityLevel = input<TaskPriorityLevel | null>(null, { transform: priorityLevelParam });
   protected readonly projectId = computed(() => this.projectStore.activeProject()?.id ?? '');
   /** Board page header shows the project name — the board itself has no name (single-board model). */
   protected readonly projectName = computed(() => this.projectStore.activeProject()?.name ?? '');
@@ -86,7 +88,7 @@ export class BoardView {
       pid: this.effectiveProjectId(),
       sprintId: this.sprintId(),
       assignee: this.assignee(),
-      priority: this.priority(),
+      priorityLevel: this.priorityLevel(),
     }),
     stream: ({ params }) => {
       const query: TaskQuery = { limit: 200 };
@@ -104,8 +106,8 @@ export class BoardView {
       if (resolvedAssignee && resolvedAssignee !== 'unassigned') {
         query.assigneeId = resolvedAssignee;
       }
-      if (params.priority) {
-        query.priority = params.priority;
+      if (params.priorityLevel !== null && params.priorityLevel !== undefined) {
+        query.priorityLevel = params.priorityLevel;
       }
       return this.taskClient.listForBoard(params.pid, query).pipe(map((res) => res.data));
     },
@@ -141,14 +143,14 @@ export class BoardView {
   });
 
   /** Translated priority label (P11); unknown values render verbatim. */
-  protected priorityLabel(priority: string): string {
-    const key = priorityLabelKey(priority);
+  protected priorityLabel(priorityLevel: SharedPriorityLevel): string {
+    const key = priorityLabelKey(priorityLevel);
 
-    return key ? this.i18n.translate(key) : priority;
+    return key ? this.i18n.translate(key) : String(priorityLevel);
   }
   /** Display label of the active priority filter (chip + select trigger) */
   protected readonly selectedPriorityLabel = computed(() =>
-    this.priority() ? this.priorityLabel(this.priority() as string) : '',
+    this.priorityLevel() !== null ? this.priorityLabel(this.priorityLevel() as SharedPriorityLevel) : '',
   );
   /**
    * Sprints of the board's project — powers the sprint selector (DEC-038).
@@ -193,6 +195,7 @@ export class BoardView {
   );
   /** itemToString helper for hlm-select to display human-readable status labels */
   protected readonly statusItemToString = (id: string) => this.statusMap()[id] ?? id;
+  protected readonly priorityOptions = PRIORITY_OPTIONS;
   /** itemToString helper for the sprint selector — name + status badge text */
   protected readonly sprintItemToString = (id: string) => {
     const sprint = this.sprints().find((s) => s.id === id);
@@ -208,13 +211,14 @@ export class BoardView {
       : (this.memberOptions().find((o) => o.id === value)?.name ?? value);
   };
   /** itemToString helper for the priority filter */
-  protected readonly priorityItemToString = (value: string): string => (value ? this.priorityLabel(value) : '');
+  protected readonly priorityItemToString = (value: TaskPriorityLevel | ''): string =>
+    value === '' ? '' : this.priorityLabel(value);
 
   /**
    * Write one board filter to the URL query params (replaceUrl, merged with
    * the other filters). Empty value clears it; the tasks resource refetches.
    */
-  private setFilterParam(name: 'sprintId' | 'assignee' | 'priority', value: string): void {
+  private setFilterParam(name: 'sprintId' | 'assignee' | 'priorityLevel', value: string): void {
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { [name]: value || null },
@@ -237,8 +241,10 @@ export class BoardView {
   }
 
   /** Priority filter change → write `?priority=` */
-  protected onPrioritySelect(value: string): void {
-    this.setFilterParam('priority', value);
+  protected onPrioritySelect(value: string | number): void {
+    const level = value === '' || value === null ? null : Number(value);
+
+    this.setFilterParam('priorityLevel', level === null ? '' : String(level));
   }
   protected readonly showStatusSelect = signal(false);
   protected readonly pendingDrop = signal<{ task: BoardTask; targetColumn: BoardColumn } | null>(null);
@@ -307,9 +313,8 @@ export class BoardView {
       if (list) list.push(task);
     }
 
-    const rank = (priority: BoardTask['priority']): number => PRIORITY_RANK[priority] ?? Number.MAX_SAFE_INTEGER;
-
-    for (const list of map.values()) list.sort((a, b) => rank(a.priority) - rank(b.priority) || a.number - b.number);
+    // severity order is the numeric level itself: DESC puts CRITICAL (3) first
+    for (const list of map.values()) list.sort((a, b) => b.priorityLevel - a.priorityLevel || a.number - b.number);
 
     return map;
   });

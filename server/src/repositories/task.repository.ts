@@ -13,13 +13,13 @@ import { escapeRegExp } from '../utils/regex.js';
 // - { projectId: 1, sprintId: 1, number: -1 }
 // - { projectId: 1, assigneeId: 1, number: 1 }   (aligned tiebreaker — one index serves both directions)
 // - { projectId: 1, reporterId: 1, number: 1 }   (aligned tiebreaker)
-// - { projectId: 1, priority: 1, number: 1 }     (aligned tiebreaker)
+// - { projectId: 1, priorityLevel: 1, number: 1 } (aligned tiebreaker)
 // - { projectId: 1, typeId: 1, number: 1 }       (aligned tiebreaker)
 // - { assigneeId: 1, updatedAt: -1 } (cross-project /tasks/my — audit #3)
 // - { projectId: 1, statusName: 1, number: -1 } (TOP-2 semantic sort)
 // - { projectId: 1, sprintName: 1, number: -1 } (TOP-2 semantic sort)
 
-/** Sort fields that require resolving relation names / snapshots / priority rank before sorting. */
+/** Sort fields that require resolving relation names / snapshots before sorting. */
 /**
  * TOP-2: `statusId`/`sprintId` sorts moved OFF the aggregation pipeline — the
  * denormalized `statusName`/`sprintName` fields are plain indexed document
@@ -51,7 +51,7 @@ export interface TaskDocument {
   statusName: string | null;
   /** TOP-2: denormalized sprint name — sort-only, synced by sprint mutations */
   sprintName: string | null;
-  priority: string;
+  priorityLevel: number;
   reporterId: string | null;
   reporterSnapshot: IdentitySnapshot | null;
   assigneeId: string | null;
@@ -74,7 +74,7 @@ export type TaskUpdatePayload = Partial<
     | 'statusId'
     | 'statusName'
     | 'sprintName'
-    | 'priority'
+    | 'priorityLevel'
     | 'reporterId'
     | 'reporterSnapshot'
     | 'assigneeId'
@@ -92,7 +92,7 @@ export interface TaskQueryOptions {
   limit?: number;
   sort?: { field: string; direction: 'asc' | 'desc' };
   statusId?: string;
-  priority?: string;
+  priorityLevel?: number;
   typeId?: string;
   assigneeId?: string;
   reporterId?: string;
@@ -162,7 +162,7 @@ function toDomain(doc: TaskDocument): Task {
     statusId: doc.statusId,
     statusName: doc.statusName ?? null,
     sprintName: doc.sprintName ?? null,
-    priority: doc.priority as Task['priority'],
+    priorityLevel: doc.priorityLevel,
     reporterId: doc.reporterId,
     reporterSnapshot: doc.reporterSnapshot,
     assigneeId: doc.assigneeId,
@@ -192,7 +192,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
    * Tasks assigned to a user across all projects, newest update first.
    *
    * Audit #3: the only consumer is the tenant-home "My Tasks" widget, which
-   * renders `id`, `number`, `title`, `priority` and resolves the project via
+   * renders `id`, `number`, `title`, `priorityLevel` and resolves the project via
    * `projectId`. An inclusion projection keeps the payload minimal (description
    * and snapshots are the bulk of a full task document); the server-side sort
    * by `updatedAt` is unchanged. Requires the `{ assigneeId: 1, updatedAt: -1 }`
@@ -210,7 +210,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
             projectId: 1,
             number: 1,
             title: 1,
-            priority: 1,
+            priorityLevel: 1,
             createdAt: 1,
             updatedAt: 1,
           },
@@ -238,7 +238,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       limit = 20,
       sort,
       statusId,
-      priority,
+      priorityLevel,
       typeId,
       assigneeId,
       reporterId,
@@ -255,7 +255,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     const query: Record<string, unknown> = { projectId };
 
     if (statusId) query.statusId = statusId;
-    if (priority) query.priority = priority;
+    if (priorityLevel) query.priorityLevel = priorityLevel;
     if (typeId) query.typeId = typeId;
     if (assigneeId) query.assigneeId = assigneeId;
     if (reporterId) query.reporterId = reporterId;
@@ -294,7 +294,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     const sortDir = sort?.direction === 'asc' ? 1 : -1;
     const skip = (page - 1) * limit;
 
-    // Semantic sorts resolve relation names / priority rank instead of raw ids.
+    // Semantic sorts resolve relation names instead of raw ids.
     if (sort && SEMANTIC_SORT_FIELDS.has(sort.field)) {
       const pipeline = this.buildSemanticSortPipeline(query, sort.field, sortDir, skip, limit);
 
@@ -330,7 +330,9 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
 
     // TOP-2: statusId/sprintId sorts map to their denormalized name fields —
     // plain indexed sorts, no aggregation pipeline.
-    const docSortKey = SEMANTIC_TO_DOC_KEY[sortField] ?? sortField;
+    // `priority` remains the public sort key (URL state / saved filters);
+    // it maps to the numeric `priorityLevel` document field.
+    const docSortKey = sortField === 'priority' ? 'priorityLevel' : (SEMANTIC_TO_DOC_KEY[sortField] ?? sortField);
     // Plain-field sort indexes use an ALIGNED tiebreaker (`number: sortDir`):
     // `number` is unique within a project, so the tiebreaker direction does not
     // change which documents come first — only the order WITHIN groups of equal
@@ -362,7 +364,9 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
    * Aggregation pipeline for sorts that cannot be expressed as a plain field sort:
    * - `statusId` / `sprintId` → sort by the related status/sprint **name**
    * - `labelIds` → sort by the alphabetically-first label name (tasks without labels last)
-   * - `priority` → sort by severity rank (LOW < MEDIUM < HIGH < CRITICAL)
+   *
+   * (`priority` no longer needs this pipeline: it is the numeric `priorityLevel`
+   * document field since the priority model migration.)
    */
   private buildSemanticSortPipeline(
     query: Record<string, unknown>,
@@ -374,23 +378,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     const NO_VALUE = '\uffff'; // sorts after any real name
     let addSortKey: Document;
 
-    if (field === 'priority') {
-      const rank: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3 };
-
-      addSortKey = {
-        $addFields: {
-          __sort: {
-            $switch: {
-              branches: Object.entries(rank).map(([priority, value]) => ({
-                case: { $eq: ['$priority', priority] },
-                then: value,
-              })),
-              default: Object.keys(rank).length,
-            },
-          },
-        },
-      };
-    } else if (field === 'labelIds') {
+    if (field === 'labelIds') {
       addSortKey = {
         $addFields: {
           __sort: {
@@ -448,7 +436,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
     statusId: string;
     statusName?: string | null;
     sprintName?: string | null;
-    priority: string;
+    priorityLevel: number;
     reporterId?: string;
     reporterSnapshot?: IdentitySnapshot;
     assigneeId?: string;
@@ -469,7 +457,7 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
       statusId: input.statusId,
       statusName: input.statusName ?? null,
       sprintName: input.sprintName ?? null,
-      priority: input.priority,
+      priorityLevel: input.priorityLevel,
       reporterId: input.reporterId ?? null,
       reporterSnapshot: input.reporterSnapshot ?? null,
       assigneeId: input.assigneeId ?? null,

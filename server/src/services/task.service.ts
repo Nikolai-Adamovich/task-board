@@ -86,7 +86,7 @@ export class TaskService {
         title: task.title,
         typeId: task.typeId,
         statusId: task.statusId,
-        priority: task.priority,
+        priorityLevel: task.priorityLevel,
         assigneeId: task.assigneeId,
         assigneeSnapshot: task.assigneeSnapshot,
         version: task.version,
@@ -206,7 +206,7 @@ export class TaskService {
       statusId: input.statusId,
       statusName,
       sprintName,
-      priority: input.priority,
+      priorityLevel: input.priorityLevel,
       reporterId: userId,
       reporterSnapshot,
       assigneeId: input.assigneeId,
@@ -268,7 +268,7 @@ export class TaskService {
       // TOP-2: keep the denormalized sort name in sync with the status change
       update.statusName = (await this.statusRepo.findById(input.statusId))?.name ?? null;
     }
-    if (input.priority !== undefined) update.priority = input.priority;
+    if (input.priorityLevel !== undefined) update.priorityLevel = input.priorityLevel;
     if (input.typeId !== undefined) update.typeId = input.typeId;
     if (input.sprintId !== undefined) {
       update.sprintId = input.sprintId;
@@ -305,8 +305,8 @@ export class TaskService {
       if (input.title !== undefined) changes.push({ field: 'title', oldValue: task.title, newValue: input.title });
       if (input.statusId !== undefined)
         changes.push({ field: 'statusId', oldValue: task.statusId, newValue: input.statusId });
-      if (input.priority !== undefined)
-        changes.push({ field: 'priority', oldValue: task.priority, newValue: input.priority });
+      if (input.priorityLevel !== undefined)
+        changes.push({ field: 'priorityLevel', oldValue: task.priorityLevel, newValue: input.priorityLevel });
       if (input.assigneeId !== undefined)
         changes.push({ field: 'assigneeId', oldValue: task.assigneeId, newValue: input.assigneeId });
       if (input.typeId !== undefined) changes.push({ field: 'typeId', oldValue: task.typeId, newValue: input.typeId });

@@ -14,7 +14,7 @@
     <div class="flex items-center gap-2 min-w-0">
       <span class="shrink-0 text-xs font-mono text-muted-foreground">{{ taskLabel() }}</span>
       <span hlmBadge class="shrink-0 text-[10px] uppercase" [variant]="priorityVariant()">
-        {{ priorityLabel(task().priority) }}
+        {{ priorityLabel(task().priorityLevel) }}
       </span>
     </div>
   </div>

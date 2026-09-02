@@ -26,16 +26,8 @@ export const ProjectRole = {
 export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole];
 export const ProjectRoleValues = valuesOf(ProjectRole);
 
-// ─── TaskPriority ────────────────────────────────────────────────────────────
-export const TaskPriority = {
-  LOW: 'LOW',
-  MEDIUM: 'MEDIUM',
-  HIGH: 'HIGH',
-  CRITICAL: 'CRITICAL',
-} as const;
-
-export type TaskPriority = (typeof TaskPriority)[keyof typeof TaskPriority];
-export const TaskPriorityValues = valuesOf(TaskPriority);
+// TaskPriority was replaced by TASK_PRIORITY_CONFIG (numeric priorityLevel) —
+// see constants/priority.ts.
 
 // ─── SprintStatus ────────────────────────────────────────────────────────────
 export const SprintStatus = {

@@ -28,7 +28,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     title: 'Test Task',
     description: null,
     statusId: 'status-1',
-    priority: 'MEDIUM',
+    priorityLevel: 1,
     reporterId: 'user-1',
     reporterSnapshot: { displayName: 'Reporter' },
     assigneeId: null,
@@ -165,7 +165,7 @@ describe('TaskService', () => {
         title: expect.any(String),
         typeId: expect.any(String),
         statusId: expect.any(String),
-        priority: expect.any(String),
+        priorityLevel: expect.any(Number),
         assigneeId: null,
         assigneeSnapshot: null,
         version: 1,
@@ -176,7 +176,7 @@ describe('TaskService', () => {
         'assigneeSnapshot',
         'id',
         'number',
-        'priority',
+        'priorityLevel',
         'projectId',
         'statusId',
         'title',
@@ -268,7 +268,7 @@ describe('TaskService', () => {
         typeId: 'type-1',
         title: 'New Task',
         statusId: 'status-1',
-        priority: 'MEDIUM',
+        priorityLevel: 1,
       });
 
       expect(result.title).toBe('Test Task');
@@ -282,7 +282,7 @@ describe('TaskService', () => {
         typeId: 'type-1',
         title: 'New Task',
         statusId: 'status-1',
-        priority: 'MEDIUM',
+        priorityLevel: 1,
         sprintId: 'sprint-1',
       });
 
@@ -304,7 +304,7 @@ describe('TaskService', () => {
         typeId: 'type-1',
         title: 'New Task',
         statusId: 'status-1',
-        priority: 'MEDIUM',
+        priorityLevel: 1,
       });
 
       expect(auditService.log).toHaveBeenCalledWith(

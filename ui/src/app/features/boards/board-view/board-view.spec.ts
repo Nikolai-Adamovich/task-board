@@ -49,7 +49,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     title: 'Test Task',
     description: null,
     statusId: 's1',
-    priority: 'MEDIUM',
+    priorityLevel: 1,
     reporterId: null,
     reporterSnapshot: null,
     assigneeId: null,
@@ -497,11 +497,11 @@ describe('BoardView', () => {
 
     it('should send the priority filter server-side', async () => {
       TestBed.resetTestingModule();
-      await setup({ priority: 'HIGH' });
+      await setup({ priorityLevel: 2 });
 
       expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         limit: 200,
-        priority: 'HIGH',
+        priorityLevel: 2,
       });
     });
 
@@ -539,7 +539,7 @@ describe('BoardView', () => {
       expect(routerMock.navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { priority: 'HIGH' },
+          queryParams: { priorityLevel: 2 },
           queryParamsHandling: 'merge',
           replaceUrl: true,
         }),

@@ -84,7 +84,7 @@ const CREATE_TASK_BODY = {
   typeId: TYPE_ID,
   statusId: STATUS_ID,
   title: 'New task',
-  priority: 'MEDIUM',
+  priorityLevel: 1,
 };
 const CREATE_STATUS_BODY = { name: 'In Review', position: 5 };
 

@@ -700,6 +700,36 @@ clean. No commits.
 unreachable from the board (see §4.18 / the board research). Pagination/per-column loading is the next design
 discussion, deliberately not part of this change.
 
+### 4.22 Priority model migration: `priority: string` → `priorityLevel: number` — DONE (2026-09-02)
+
+Breaking-change model migration following the §4.18/§4.21 finding that the string priority enum
+(LOW/MEDIUM/HIGH/CRITICAL) cannot express severity order in MongoDB (alphabetical ≠ severity — the task table sorted
+CRITICAL/HIGH/LOW/MEDIUM while the board sorted by severity).
+
+- **Single source of truth** ([shared/src/constants/priority.ts](../shared/src/constants/priority.ts)):
+  `TASK_PRIORITY_CONFIG` (`level` + `i18nKey`), with `TaskPriorityLevel` derived via indexed access
+  (`(typeof CONFIG)[number]['level']`), runtime `TASK_PRIORITY_LEVELS`, `DEFAULT_TASK_PRIORITY_LEVEL` (= 1, medium). The
+  string enum `TaskPriority`/`TaskPriorityValues` was removed; all Zod validation derives from the config
+  (`z.literal(TASK_PRIORITY_CONFIG.map(c => c.level))` — no hardcoded `0..3` anywhere).
+- **Data migration** ([migrations.ts](../server/src/db/migrations.ts) `migrateTaskPriorityToLevel`, idempotent): counts
+  → refuse on missing/unexpected legacy values → backfill `priorityLevel` → verify → migrate saved-filter
+  `criteria.priority` arrays → `$unset` the legacy field → drop the legacy index. `audit_events` deliberately NOT
+  migrated (historical records keep `field: 'priority'` with string values; new events use `field: 'priorityLevel'` with
+  numbers). Local run: 296 tasks migrated (distribution 0:81, 1:131, 2:81, 3:3), 0 saved filters affected (collection
+  empty), legacy field absent afterwards.
+- **Index replacement** (not additive): `{projectId: 1, priority: 1, number: 1}` →
+  `{projectId: 1, priorityLevel: 1, number: 1}`; the legacy index is dropped by the migration. Explain after the
+  replacement: ASC `LIMIT > FETCH > IXSCAN{projectId_1_priorityLevel_1_number_1}[forward]` and DESC `[backward]`,
+  keys=docs=limit, no blocking SORT — numeric severity order with the aligned tiebreaker now serves BOTH the board
+  (Critical→Low) and the task table (previously alphabetical).
+- **API/UI**: `?priorityLevel=2` query param (z.coerce + literal pipe), request/response bodies numeric; the public sort
+  key `sort=priority:asc|desc` is intentionally PRESERVED and mapped internally to the `priorityLevel` field
+  (URL/saved-filter sort semantics unchanged). `PRIORITY_RANK` deleted — the board sorts
+  `b.priorityLevel - a.priorityLevel || a.number - b.number`; all UI option arrays are generated from the config.
+- **Verification:** typecheck PASS, 882 tests (server+UI) PASS incl. 5 new migration tests (level mapping, missing →
+  throws, unexpected → throws, saved-filter backfill, idempotent re-run), lint clean; no runtime references to the
+  legacy model remain (grep).
+
 ## 5. Tooling
 
 Diagnostic scripts used during the investigation: [`tools/README.md`](../tools/README.md) (api-series — keep-alive

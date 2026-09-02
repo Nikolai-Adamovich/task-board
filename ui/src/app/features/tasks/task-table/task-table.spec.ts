@@ -285,7 +285,7 @@ describe('TaskTable — W9 polish', () => {
     });
 
     it('should detect active filters and build a chip per filter', async () => {
-      await setup({ search: 'hello', priority: 'HIGH' });
+      await setup({ search: 'hello', priorityLevel: 2 });
 
       expect(component.hasActiveFilters()).toBe(true);
 
@@ -423,7 +423,7 @@ describe('TaskTable — W9 polish', () => {
               id: 't1',
               number: 1,
               title: longTitle,
-              priority: 'HIGH',
+              priorityLevel: 2,
               typeId: 'type1',
               statusId: 'st1',
               labelIds: ['l1'],
@@ -658,7 +658,7 @@ describe('TaskTable — W9 polish', () => {
               id: 't1',
               number: 1,
               title: 'Task A',
-              priority: 'HIGH',
+              priorityLevel: 2,
               typeId: 'type1',
               statusId: 'st1',
               labelIds: ['l1'],
@@ -1123,7 +1123,7 @@ describe('TaskTable — W9 polish', () => {
         title: `Task ${id}`,
         description: null,
         statusId: 'st1',
-        priority: 'LOW',
+        priorityLevel: 0,
         reporterId: null,
         reporterSnapshot: null,
         assigneeId: null,

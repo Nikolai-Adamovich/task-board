@@ -93,16 +93,18 @@
           <!-- Priority -->
           <hlm-field>
             <label hlmFieldLabel for="create-priority">{{ 'taskCreate.priority' | transloco }}</label>
-            <hlm-select [value]="model().priority" (valueChange)="onFieldChange('priority', $any($event))">
+            <hlm-select
+              [value]="model().priorityLevel"
+              (valueChange)="onFieldChange('priorityLevel', $any(Number($event)))"
+            >
               <hlm-select-trigger id="create-priority" class="w-full" size="sm">
                 <hlm-select-value />
               </hlm-select-trigger>
               <hlm-select-content *hlmSelectPortal>
                 <hlm-select-group>
-                  <hlm-select-item value="LOW">{{ 'priority.low' | transloco }}</hlm-select-item>
-                  <hlm-select-item value="MEDIUM">{{ 'priority.medium' | transloco }}</hlm-select-item>
-                  <hlm-select-item value="HIGH">{{ 'priority.high' | transloco }}</hlm-select-item>
-                  <hlm-select-item value="CRITICAL">{{ 'priority.critical' | transloco }}</hlm-select-item>
+                  @for (opt of PRIORITY_OPTIONS; track opt.value) {
+                    <hlm-select-item [value]="opt.value">{{ opt.labelKey | transloco }}</hlm-select-item>
+                  }
                 </hlm-select-group>
               </hlm-select-content>
             </hlm-select>

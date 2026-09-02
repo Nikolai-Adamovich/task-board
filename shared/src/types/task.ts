@@ -1,4 +1,4 @@
-import type { TaskPriority } from '../constants/roles.js';
+import type { TaskPriorityLevel } from '../constants/priority.js';
 import type { IdentitySnapshot } from './tenant.js';
 
 /** Task entity type */
@@ -17,8 +17,8 @@ export interface Task {
   description: string | null;
   /** Status ID (references Status) */
   statusId: string;
-  /** Task priority level */
-  priority: TaskPriority;
+  /** Task priority level (position in TASK_PRIORITY_CONFIG) */
+  priorityLevel: TaskPriorityLevel;
   /** User ID of the reporter */
   reporterId: string | null;
   /** Denormalized reporter identity at time of assignment */
@@ -72,8 +72,8 @@ export interface BoardTask {
   typeId: string;
   /** Status ID — board column grouping / drag-and-drop */
   statusId: string;
-  /** Task priority level */
-  priority: TaskPriority;
+  /** Task priority level (position in TASK_PRIORITY_CONFIG) */
+  priorityLevel: TaskPriorityLevel;
   /** User ID of the assignee (null if unassigned — board "unassigned" filter) */
   assigneeId: string | null;
   /** Denormalized assignee identity — card avatar + display name */
@@ -88,7 +88,7 @@ export interface CreateTask {
   title: string;
   description?: string;
   statusId: string;
-  priority: TaskPriority;
+  priorityLevel: TaskPriorityLevel;
   assigneeId?: string;
   sprintId?: string;
   labelIds?: string[];
@@ -99,7 +99,7 @@ export interface UpdateTask {
   title?: string;
   description?: string;
   statusId?: string;
-  priority?: TaskPriority;
+  priorityLevel?: TaskPriorityLevel;
   assigneeId?: string | null;
   typeId?: string;
   sprintId?: string | null;

@@ -26,14 +26,14 @@ export class TaskCard {
   private readonly i18n = inject(TranslocoService);
 
   /** Translated priority label (P11); unknown values render verbatim. */
-  protected priorityLabel(priority: string): string {
-    const key = priorityLabelKey(priority);
+  protected priorityLabel(priorityLevel: TaskPriorityLevel): string {
+    const key = priorityLabelKey(priorityLevel);
 
-    return key ? this.i18n.translate(key) : priority;
+    return key ? this.i18n.translate(key) : String(priorityLevel);
   }
 
   protected priorityVariant(): BadgeVariant {
-    return priorityBadgeVariant(this.task().priority);
+    return priorityBadgeVariant(this.task().priorityLevel);
   }
 
   protected taskLabel(): string {

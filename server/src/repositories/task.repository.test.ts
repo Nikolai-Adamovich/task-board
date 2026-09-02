@@ -36,7 +36,7 @@ function makeDoc(overrides: Partial<TaskDocument> = {}): TaskDocument {
     statusId: 'status-1',
     statusName: 'Todo',
     sprintName: null,
-    priority: 'MEDIUM',
+    priorityLevel: 1,
     reporterId: 'user-1',
     reporterSnapshot: { displayName: 'Reporter' },
     assigneeId: 'user-2',
@@ -204,7 +204,7 @@ describe('TaskRepository', () => {
           { id: 'task-123', version: 1 },
           { id: 'task-conflict', version: 5 },
         ],
-        { priority: 'HIGH' },
+        { priorityLevel: 2 },
       );
 
       expect(collection.find).toHaveBeenCalledWith({
@@ -218,7 +218,7 @@ describe('TaskRepository', () => {
     });
 
     it('is a no-op for an empty batch — no bulkWrite issued', async () => {
-      const result = await repo.bulkUpdateWithVersion([], { priority: 'HIGH' });
+      const result = await repo.bulkUpdateWithVersion([], { priorityLevel: 2 });
 
       expect(result).toEqual([]);
       expect(collection.bulkWrite).not.toHaveBeenCalled();
@@ -249,7 +249,7 @@ describe('TaskRepository', () => {
             projectId: 1,
             number: 1,
             title: 1,
-            priority: 1,
+            priorityLevel: 1,
             createdAt: 1,
             updatedAt: 1,
           },
@@ -265,7 +265,7 @@ describe('TaskRepository', () => {
         projectId: 'project-1',
         number: 7,
         title: 'Widget Task',
-        priority: 'HIGH',
+        priorityLevel: 2,
         createdAt: new Date('2025-01-01T00:00:00Z'),
         updatedAt: new Date('2025-01-02T00:00:00Z'),
       } as unknown as TaskDocument;
@@ -279,7 +279,7 @@ describe('TaskRepository', () => {
       const [task] = result;
 
       expect(task?.title).toBe('Widget Task');
-      expect(task?.priority).toBe('HIGH');
+      expect(task?.priorityLevel).toBe(2);
       // Excluded fields (description, snapshots, …) are not part of the response.
       expect(task?.description).toBeUndefined();
       expect(task?.assigneeSnapshot).toBeUndefined();
@@ -304,7 +304,7 @@ describe('TaskRepository', () => {
         typeId: 'type-1',
         title: 'New Task',
         statusId: 'status-1',
-        priority: 'HIGH',
+        priorityLevel: 2,
         createdById: 'user-1',
         createdBySnapshot: { displayName: 'Creator' },
       });

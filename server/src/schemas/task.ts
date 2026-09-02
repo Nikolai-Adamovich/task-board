@@ -1,16 +1,22 @@
 import * as z from 'zod';
-import { TaskPriorityValues } from '@task-board/shared';
+import { TASK_PRIORITY_CONFIG } from '@task-board/shared';
 import { uuid, nonEmptyString, optionalString } from '../validators/common.js';
 
 /**
  * Schema for creating a new task.
  */
+/**
+ * Priority-level validation derived from TASK_PRIORITY_CONFIG — a new level in
+ * the config automatically becomes valid, no hardcoded `0..3` anywhere.
+ */
+export const taskPriorityLevelSchema = z.literal(TASK_PRIORITY_CONFIG.map((c) => c.level));
+
 export const CreateTaskSchema = z.object({
   typeId: uuid(),
   title: nonEmptyString(255, 'Task title'),
   description: optionalString(10000),
   statusId: uuid(),
-  priority: z.enum(TaskPriorityValues),
+  priorityLevel: taskPriorityLevelSchema,
   assigneeId: uuid().optional(),
   sprintId: uuid().optional(),
   labelIds: z.array(uuid()).optional(),
@@ -24,7 +30,7 @@ export const UpdateTaskSchema = z.object({
   title: nonEmptyString(255, 'Task title').optional(),
   description: optionalString(10000),
   statusId: uuid().optional(),
-  priority: z.enum(TaskPriorityValues).optional(),
+  priorityLevel: taskPriorityLevelSchema.optional(),
   assigneeId: uuid().nullable().optional(),
   typeId: uuid().optional(),
   sprintId: uuid().nullable().optional(),
@@ -82,7 +88,7 @@ export const TaskQuerySchema = z.object({
     .optional(),
   search: z.string().optional(),
   statusId: uuid().optional(),
-  priority: z.enum(TaskPriorityValues).optional(),
+  priorityLevel: z.coerce.number().pipe(taskPriorityLevelSchema).optional(),
   typeId: uuid().optional(),
   assigneeId: uuid().optional(),
   reporterId: uuid().optional(),

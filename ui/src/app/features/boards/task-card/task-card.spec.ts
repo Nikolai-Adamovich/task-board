@@ -30,7 +30,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     title: 'Test Task',
     description: null,
     statusId: 's1',
-    priority: 'MEDIUM',
+    priorityLevel: 1,
     reporterId: null,
     reporterSnapshot: null,
     assigneeId: null,
@@ -84,13 +84,13 @@ describe('TaskCard', () => {
 
   describe('priorityLabel', () => {
     it('should render the priority label through i18n (P11)', async () => {
-      await setup({ priority: 'MEDIUM' });
+      await setup({ priorityLevel: 1 });
       // Test dictionary is empty → the i18n key renders, proving the badge label is translated
       expect(fixture.nativeElement.textContent).toContain('priority.medium');
     });
 
     it('should render unknown priorities verbatim', async () => {
-      await setup({ priority: 'unknown' as Task['priority'] });
+      await setup({ priorityLevel: 99 as TaskPriorityLevel });
       expect(component.priorityLabel('unknown')).toBe('unknown');
     });
   });
@@ -99,27 +99,27 @@ describe('TaskCard', () => {
 
   describe('priorityVariant', () => {
     it('should return correct color for LOW', async () => {
-      await setup({ priority: 'LOW' });
+      await setup({ priorityLevel: 0 });
       expect(component.priorityVariant()).toBe('outline');
     });
 
     it('should return correct color for MEDIUM', async () => {
-      await setup({ priority: 'MEDIUM' });
+      await setup({ priorityLevel: 1 });
       expect(component.priorityVariant()).toBe('secondary');
     });
 
     it('should return correct color for HIGH', async () => {
-      await setup({ priority: 'HIGH' });
+      await setup({ priorityLevel: 2 });
       expect(component.priorityVariant()).toBe('default');
     });
 
     it('should return correct color for CRITICAL', async () => {
-      await setup({ priority: 'CRITICAL' });
+      await setup({ priorityLevel: 3 });
       expect(component.priorityVariant()).toBe('destructive');
     });
 
     it('should return fallback for unknown priority', async () => {
-      await setup({ priority: 'unknown' as Task['priority'] });
+      await setup({ priorityLevel: 99 as TaskPriorityLevel });
       expect(component.priorityVariant()).toBe('outline');
     });
   });

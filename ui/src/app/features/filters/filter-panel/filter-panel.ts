@@ -14,7 +14,8 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
-import type { Filter, FilterCriteria, FilterSort, CreateFilter, TaskPriority } from '@task-board/shared';
+import type { Filter, FilterCriteria, FilterSort, CreateFilter, TaskPriorityLevel } from '@task-board/shared';
+import { PRIORITY_OPTIONS } from '@app/constants/priority';
 import { injectUndoToasts } from '@app/shared/utils/undo-toast';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
@@ -93,7 +94,7 @@ export class FilterPanel {
     const hasFilters = !!(
       f.search ||
       f.statusIds?.length ||
-      f.priority?.length ||
+      f.priorityLevel?.length ||
       f.typeIds?.length ||
       f.assigneeIds?.length ||
       f.reporterIds?.length ||
@@ -132,12 +133,7 @@ export class FilterPanel {
   protected readonly memberOptions = computed(() => this.refStore.options(this.projectId(), 'members'));
   protected readonly sprintOptions = computed(() => this.refStore.options(this.projectId(), 'sprints'));
   protected readonly labelOptions = computed(() => this.refStore.options(this.projectId(), 'labels'));
-  protected readonly priorityOptions: { value: TaskPriority; labelKey: string }[] = [
-    { value: 'LOW', labelKey: 'priority.low' },
-    { value: 'MEDIUM', labelKey: 'priority.medium' },
-    { value: 'HIGH', labelKey: 'priority.high' },
-    { value: 'CRITICAL', labelKey: 'priority.critical' },
-  ];
+  protected readonly priorityOptions = PRIORITY_OPTIONS;
   /**
    * Working copy of the criteria edited by the panel's fields. Re-seeded from
    * `currentFilters` whenever the parent state changes (e.g. after apply/clear).
@@ -166,8 +162,10 @@ export class FilterPanel {
     this.draft.update((f) => ({ ...f, search: value || undefined }));
   }
 
-  protected onDraftPriority(value: string): void {
-    this.draft.update((f) => ({ ...f, priority: value ? [value as TaskPriority] : undefined }));
+  protected onDraftPriority(value: string | number): void {
+    const level = value === '' || value === null ? undefined : (Number(value) as TaskPriorityLevel);
+
+    this.draft.update((f) => ({ ...f, priorityLevel: level !== undefined ? [level] : undefined }));
   }
 
   /** Emit the edited criteria — the parent maps them onto its URL params */

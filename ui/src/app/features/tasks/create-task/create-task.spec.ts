@@ -49,7 +49,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     title: 'Created Task',
     description: null,
     statusId: 'st-todo',
-    priority: 'MEDIUM',
+    priorityLevel: 1,
     reporterId: null,
     reporterSnapshot: null,
     assigneeId: null,

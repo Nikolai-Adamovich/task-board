@@ -107,7 +107,7 @@
         </hlm-select>
         <!-- F-08: priority filter (All + task priorities) -->
         <hlm-select
-          [value]="priority() ?? ''"
+          [value]="priorityLevel() ?? ''"
           (valueChange)="onPrioritySelect($any($event))"
           [itemToString]="priorityItemToString"
         >
@@ -117,10 +117,9 @@
           <hlm-select-content *hlmSelectPortal>
             <hlm-select-group>
               <hlm-select-item value="">{{ 'boardView.allPriorities' | transloco }}</hlm-select-item>
-              <hlm-select-item value="LOW">{{ 'priority.low' | transloco }}</hlm-select-item>
-              <hlm-select-item value="MEDIUM">{{ 'priority.medium' | transloco }}</hlm-select-item>
-              <hlm-select-item value="HIGH">{{ 'priority.high' | transloco }}</hlm-select-item>
-              <hlm-select-item value="CRITICAL">{{ 'priority.critical' | transloco }}</hlm-select-item>
+              @for (opt of priorityOptions; track opt.value) {
+                <hlm-select-item [value]="opt.value">{{ opt.labelKey | transloco }}</hlm-select-item>
+              }
             </hlm-select-group>
           </hlm-select-content>
         </hlm-select>

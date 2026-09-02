@@ -6,26 +6,39 @@
  * semantic tokens with opacity gradation.
  */
 
+import { TASK_PRIORITY_CONFIG, type TaskPriorityLevel } from '@task-board/shared';
+
 /** Subset of `hlmBadge` variants used across the app. */
 export type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
-/** Known task priority values (internal enum values unchanged) — used for i18n key lookup. */
-const PriorityValues: readonly string[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+/**
+ * Priority-level → badge variant, keyed by the numeric level from
+ * TASK_PRIORITY_CONFIG (0 = lowest … 3 = critical; extends with the config).
+ */
+export const PriorityVariantMap: Record<TaskPriorityLevel, BadgeVariant> = {
+  0: 'outline',
+  1: 'secondary',
+  2: 'default',
+  3: 'destructive',
+};
 
 /**
- * Severity rank for board-column card ordering — CRITICAL first, LOW last.
- * The persisted `priority` is a semantic enum (alphabetical order ≠ severity),
- * so ordering by severity must go through this rank map, not a raw field sort.
+ * Selector options derived from TASK_PRIORITY_CONFIG — every priority
+ * dropdown in the app renders from this one array.
  */
-export const PRIORITY_RANK: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+export const PRIORITY_OPTIONS: readonly { value: TaskPriorityLevel; labelKey: string }[] = TASK_PRIORITY_CONFIG.map(
+  (c) => ({ value: c.level, labelKey: c.i18nKey }),
+);
 
-/** Task priority levels mapped to badge variants (ascending severity). */
-export const PriorityVariantMap = {
-  LOW: 'outline',
-  MEDIUM: 'secondary',
-  HIGH: 'default',
-  CRITICAL: 'destructive',
-} as const;
+/**
+ * URL query param (`?priorityLevel=`) → level. The raw value is always a
+ * string; anything absent/invalid resolves to null (no filter).
+ */
+export function priorityLevelParam(value: unknown): TaskPriorityLevel | null {
+  const n = Number(value);
+
+  return TASK_PRIORITY_CONFIG.some((c) => c.level === n) ? (n as TaskPriorityLevel) : null;
+}
 
 /** Sprint status levels mapped to badge variants. */
 export const StatusVariantMap = {
@@ -50,12 +63,12 @@ export const MemberStatusVariantMap = {
 } as const;
 
 /** Priority dot indicator colors for sprint views (semantic tokens, ascending severity). */
-export const PriorityDotColorMap = {
-  LOW: 'bg-primary/40',
-  MEDIUM: 'bg-primary/70',
-  HIGH: 'bg-destructive/70',
-  CRITICAL: 'bg-destructive',
-} as const;
+export const PriorityDotColorMap: Record<TaskPriorityLevel, string> = {
+  0: 'bg-primary/40',
+  1: 'bg-primary/70',
+  2: 'bg-destructive/70',
+  3: 'bg-destructive',
+};
 
 /** Tenant status mapped to badge variants. */
 export const TenantStatusVariantMap = {
@@ -93,20 +106,18 @@ export const NeutralDotColor = 'bg-muted-foreground';
  */
 const StatusBadgeVariantMap: Record<string, BadgeVariant> = { ...StatusVariantMap, ...TenantStatusVariantMap };
 
-/** Resolve the badge variant for a task priority. Unknown values fall back to {@link NeutralVariant}. */
-export function priorityBadgeVariant(priority: string): BadgeVariant {
-  return (PriorityVariantMap as Record<string, BadgeVariant>)[priority] ?? NeutralVariant;
+/** Resolve the badge variant for a task priority level. */
+export function priorityBadgeVariant(priorityLevel: TaskPriorityLevel): BadgeVariant {
+  return PriorityVariantMap[priorityLevel] ?? NeutralVariant;
 }
 
 /**
- * Resolve the i18n key for a task priority's display label (R3-P5 → P11).
- * The key resolves to the `priority.*` section in `assets/i18n/*.json`.
- * Returns '' for unknown values so callers can fall back to the raw value.
+ * Resolve the i18n key for a priority level's display label (from
+ * TASK_PRIORITY_CONFIG). The key resolves to the `priority.*` section in
+ * `assets/i18n/*.json`. Returns '' for unknown levels so callers can fall back.
  */
-export function priorityLabelKey(priority: string): string {
-  const value = priority?.toUpperCase();
-
-  return value && PriorityValues.includes(value) ? `priority.${value.toLowerCase()}` : '';
+export function priorityLabelKey(priorityLevel: TaskPriorityLevel): string {
+  return TASK_PRIORITY_CONFIG.find((c) => c.level === priorityLevel)?.i18nKey ?? '';
 }
 
 /** Resolve the badge variant for a sprint/tenant/project status. Unknown values fall back to {@link NeutralVariant}. */

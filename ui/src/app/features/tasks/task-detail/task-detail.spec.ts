@@ -38,7 +38,7 @@ const mockTask: Task = {
   title: 'Test Task',
   description: 'Task description',
   statusId: 's1',
-  priority: 'HIGH',
+  priorityLevel: 2,
   reporterId: 'u1',
   reporterSnapshot: { displayName: 'Reporter User' },
   assigneeId: 'u2',

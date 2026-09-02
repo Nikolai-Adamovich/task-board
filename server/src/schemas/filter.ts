@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { TaskPriorityValues } from '@task-board/shared';
+import { taskPriorityLevelSchema } from './task.js';
 import { nonEmptyString, uuid } from '../validators/common.js';
 
 /**
@@ -13,7 +13,7 @@ const isoDate = () => z.iso.date();
 const FilterCriteriaSchema = z.object({
   search: z.string().optional(),
   statusIds: z.array(uuid()).optional(),
-  priority: z.array(z.enum(TaskPriorityValues)).optional(),
+  priorityLevel: z.array(taskPriorityLevelSchema).optional(),
   typeIds: z.array(uuid()).optional(),
   assigneeIds: z.array(uuid()).optional(),
   reporterIds: z.array(uuid()).optional(),

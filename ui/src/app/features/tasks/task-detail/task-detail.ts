@@ -14,7 +14,7 @@ import { PreferencesStore } from '@stores/preferences-store';
 import { ProjectRefStore, type SelectOption } from '@stores/project-ref-store';
 import { priorityBadgeVariant, priorityLabelKey } from '@app/constants/priority';
 import { TranslocoService } from '@jsverse/transloco';
-import { TaskPriorityValues } from '@task-board/shared';
+import { TASK_PRIORITY_LEVELS, type TaskPriorityLevel } from '@task-board/shared';
 import type { Task, UpdateTask } from '@task-board/shared';
 import { canManageProject, canWrite } from '@app/shared/utils/role-utils';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -69,12 +69,12 @@ import { ConfirmDialog } from '@app/shared/confirm-dialog/confirm-dialog';
 export class TaskDetail implements OnInit {
   /** Shared badge/label helpers (see constants/priority.ts) */
   protected readonly priorityBadgeVariant = priorityBadgeVariant;
-  protected readonly TaskPriorityValues = TaskPriorityValues;
+  protected readonly priorityLevels = TASK_PRIORITY_LEVELS;
   private readonly i18n = inject(TranslocoService);
 
   /** Translated priority label (P11); unknown values render verbatim. */
-  protected priorityLabel(priority: string): string {
-    const key = priorityLabelKey(priority);
+  protected priorityLabel(priorityLevel: TaskPriorityLevel): string {
+    const key = priorityLabelKey(priorityLevel);
 
     return key ? this.i18n.translate(key) : priority;
   }
@@ -149,7 +149,7 @@ export class TaskDetail implements OnInit {
   protected readonly typeItemToString = (id: string) => this.typeOptions().find((o) => o.id === id)?.name ?? id;
   protected readonly assigneeItemToString = (id: string) => this.memberOptions().find((o) => o.id === id)?.name ?? id;
   protected readonly sprintItemToString = (id: string) => this.sprintOptions().find((o) => o.id === id)?.name ?? id;
-  protected readonly priorityItemToString = (value: string) => this.priorityLabel(value);
+  protected readonly priorityItemToString = (value: TaskPriorityLevel) => this.priorityLabel(value);
   // ─── Labels: case-insensitive autocomplete + create-new (BR-019, R3-P5) ─────
   /** Free-text search buffer for the label autocomplete */
   protected readonly labelSearch = signal('');
@@ -328,6 +328,11 @@ export class TaskDetail implements OnInit {
   /** P14 (item 32): typed single-field update — `field` is constrained to the
    * updatable `UpdateTask` keys. Template selects may emit null/undefined while
    * settling; the value is forwarded verbatim (server validates the body). */
+  /** Select values arrive as strings — coerce to the numeric priority level. */
+  protected updatePriorityLevel(value: unknown): void {
+    this.updateField('priorityLevel', Number(value) as UpdateTask['priorityLevel']);
+  }
+
   protected updateField<K extends keyof UpdateTask>(field: K, value: UpdateTask[K] | null | undefined): void {
     const t = this.task();
 

@@ -266,7 +266,7 @@ const CORE_INDEXES: IndexDefinition[] = [
   // Contract note: for ASC the order WITHIN groups of equal field values
   // changes (number ASC instead of number DESC); `number` stays unique per
   // project, so overall ordering remains deterministic. See §4.20.
-  { collection: 'tasks', spec: { projectId: 1, priority: 1, number: 1 } },
+  { collection: 'tasks', spec: { projectId: 1, priorityLevel: 1, number: 1 } },
   { collection: 'tasks', spec: { projectId: 1, assigneeId: 1, number: 1 } },
   { collection: 'tasks', spec: { projectId: 1, reporterId: 1, number: 1 } },
   { collection: 'tasks', spec: { projectId: 1, typeId: 1, number: 1 } },
@@ -499,4 +499,142 @@ export async function runMigrations(db: Db): Promise<void> {
   await migrateToSingleBoardPerProject(db); // 102 — dedupe boards, strip dead fields (before the unique index)
   await backfillTaskSortNames(db); // TOP-2 — denormalized statusName/sprintName on legacy tasks
   await ensureCoreIndexes(db); // create every repository-documented index (idempotent)
+
+  const priorityStats = await migrateTaskPriorityToLevel(db); // priority string → numeric priorityLevel (replaces the old index)
+
+  if (priorityStats.tasksMigrated > 0 || priorityStats.filtersMigrated > 0) {
+    log.info(
+      `migrateTaskPriorityToLevel: legacy priority values migrated to priorityLevel — ${JSON.stringify(priorityStats)}`,
+    );
+  }
+}
+
+/** String → numeric level mapping for the 2026-09 priority model migration. */
+const PRIORITY_LEVEL_BY_LEGACY: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3 };
+
+export interface TaskPriorityMigrationStats {
+  tasksTotal: number;
+  legacyCounts: Record<string, number>;
+  missing: number;
+  unexpected: number;
+  conflicts: number;
+  tasksMigrated: number;
+  filtersMigrated: number;
+  oldFieldRemoved: number;
+  oldIndexDropped: boolean;
+}
+
+/**
+ * Priority model migration (2026-09): `priority: string` → `priorityLevel: number`
+ * (position in TASK_PRIORITY_CONFIG; see shared/src/constants/priority.ts).
+ *
+ * Order of operations per the migration design:
+ *   1. count + validate (missing / unexpected / both-fields conflicts STOP the run);
+ *   2. backfill `priorityLevel` from the legacy string;
+ *   3. verify nothing is left un-migrated;
+ *   4. migrate saved-filter `criteria.priority` arrays the same way;
+ *   5. `$unset` the legacy `priority` field only after a successful verify;
+ *   6. drop the legacy `{projectId, priority, number}` index (replacement).
+ *
+ * Idempotent: on a migrated database every counter is 0 and the run is a no-op.
+ * audit_events are deliberately NOT migrated (historical records).
+ */
+export async function migrateTaskPriorityToLevel(db: Db): Promise<TaskPriorityMigrationStats> {
+  const tasks = db.collection('tasks');
+  const tasksTotal = await tasks.countDocuments({});
+  const legacyCounts: Record<string, number> = {};
+
+  for (const legacy of Object.keys(PRIORITY_LEVEL_BY_LEGACY)) {
+    legacyCounts[legacy] = await tasks.countDocuments({ priority: legacy });
+  }
+
+  const missing = await tasks.countDocuments({ priority: { $exists: false }, priorityLevel: { $exists: false } });
+  const knownValues = Object.keys(PRIORITY_LEVEL_BY_LEGACY);
+  const unexpected = await tasks.countDocuments({
+    priority: { $exists: true, $nin: knownValues },
+  });
+  const conflicts = await tasks.countDocuments({ priority: { $exists: true }, priorityLevel: { $exists: true } });
+
+  if (missing > 0 || unexpected > 0) {
+    throw new Error(
+      `migrateTaskPriorityToLevel: refusing to migrate — missing priority on ${missing} task(s), ` +
+        `unexpected (non LOW/MEDIUM/HIGH/CRITICAL) priority on ${unexpected} task(s). ` +
+        'Fix the data before running this migration.',
+    );
+  }
+
+  // 2. Backfill (only where priorityLevel is not present yet — idempotent re-runs).
+  let tasksMigrated = 0;
+
+  for (const [legacy, level] of Object.entries(PRIORITY_LEVEL_BY_LEGACY)) {
+    const res = await tasks.updateMany(
+      { priority: legacy, priorityLevel: { $exists: false } },
+      { $set: { priorityLevel: level } },
+    );
+
+    tasksMigrated += res.modifiedCount;
+  }
+
+  // 3. Verify — every document must carry priorityLevel at this point.
+  const unmigrated = await tasks.countDocuments({ priorityLevel: { $exists: false } });
+
+  if (unmigrated > 0) {
+    throw new Error(
+      `migrateTaskPriorityToLevel: verification failed — ${unmigrated} task(s) still without priorityLevel.`,
+    );
+  }
+
+  // 4. Saved filters: criteria.priority: ["HIGH", ...] → criteria.priorityLevel: [2, ...].
+  const filters = db.collection('filters');
+  let filtersMigrated = 0;
+  const staleFilters = await filters.find({ 'criteria.priority': { $exists: true, $ne: null } }).toArray();
+
+  for (const filter of staleFilters) {
+    const legacyArray = (filter.criteria as { priority?: unknown[] }).priority ?? [];
+    const unexpectedValues = legacyArray.filter((v) => typeof v !== 'string' || !(v in PRIORITY_LEVEL_BY_LEGACY));
+
+    if (unexpectedValues.length > 0) {
+      throw new Error(
+        `migrateTaskPriorityToLevel: saved filter ${filter.id ?? String(filter._id)} contains unexpected ` +
+          `priority value(s): ${JSON.stringify(unexpectedValues)}. Fix the filter before migrating.`,
+      );
+    }
+
+    const levels = legacyArray.map((v) => PRIORITY_LEVEL_BY_LEGACY[v as string]);
+
+    await filters.updateOne(
+      { _id: filter._id },
+      {
+        $set: { 'criteria.priorityLevel': levels },
+        $unset: { 'criteria.priority': '' },
+      },
+    );
+    filtersMigrated += 1;
+  }
+
+  // 5. Remove the legacy field only after successful backfill + verification.
+  const oldFieldRemoved = (await tasks.updateMany({ priority: { $exists: true } }, { $unset: { priority: '' } }))
+    .modifiedCount;
+  // 6. Drop the replaced legacy index (the priorityLevel index is created by
+  // ensureCoreIndexes, which runs immediately before this migration).
+  let oldIndexDropped = false;
+
+  try {
+    await tasks.dropIndex('projectId_1_priority_1_number_1');
+    oldIndexDropped = true;
+  } catch {
+    // Idempotent re-run (or index never existed) — nothing to drop.
+  }
+
+  return {
+    tasksTotal,
+    legacyCounts,
+    missing,
+    unexpected,
+    conflicts,
+    tasksMigrated,
+    filtersMigrated,
+    oldFieldRemoved,
+    oldIndexDropped,
+  };
 }

@@ -112,17 +112,17 @@ export class SprintDetail implements OnInit {
     return canManageProject(this.projectStore.projectRole(), this.authStore.tenantRole());
   });
 
-  protected getPriorityDot(priority: string): string {
-    return (PriorityDotColorMap as Record<string, string>)[priority] ?? NeutralDotColor;
+  protected getPriorityDot(priorityLevel: TaskPriorityLevel): string {
+    return PriorityDotColorMap[priorityLevel] ?? NeutralDotColor;
   }
 
-  protected getPriorityBadge(priority: string): BadgeVariant {
-    return priorityBadgeVariant(priority);
+  protected getPriorityBadge(priorityLevel: TaskPriorityLevel): BadgeVariant {
+    return priorityBadgeVariant(priorityLevel);
   }
 
   /** P11: translated display label instead of the raw enum value; unknown values render verbatim. */
-  protected getPriorityLabel(priority: string): string {
-    const key = priorityLabelKey(priority);
+  protected getPriorityLabel(priorityLevel: TaskPriorityLevel): string {
+    const key = priorityLabelKey(priorityLevel);
 
     return key ? this.i18n.translate(key) : priority;
   }

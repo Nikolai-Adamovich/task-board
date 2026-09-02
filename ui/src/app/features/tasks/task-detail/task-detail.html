@@ -66,8 +66,8 @@
 
       <!-- Priority badge on its own row under the title -->
       <div class="mt-2">
-        <span hlmBadge class="text-xs font-semibold uppercase" [variant]="priorityBadgeVariant(t.priority)">
-          {{ priorityLabel(t.priority) }}
+        <span hlmBadge class="text-xs font-semibold uppercase" [variant]="priorityBadgeVariant(t.priorityLevel)">
+          {{ priorityLabel(t.priorityLevel) }}
         </span>
       </div>
 
@@ -192,8 +192,8 @@
               @if (canEdit()) {
                 <hlm-select
                   class="mt-1"
-                  [value]="t.priority"
-                  (valueChange)="updateField('priority', $any($event))"
+                  [value]="t.priorityLevel"
+                  (valueChange)="updatePriorityLevel($any($event))"
                   [itemToString]="priorityItemToString"
                 >
                   <hlm-select-trigger class="w-full" size="sm">
@@ -201,14 +201,14 @@
                   </hlm-select-trigger>
                   <hlm-select-content *hlmSelectPortal>
                     <hlm-select-group>
-                      @for (p of TaskPriorityValues; track p) {
+                      @for (p of priorityLevels; track p) {
                         <hlm-select-item [value]="p">{{ priorityLabel(p) }}</hlm-select-item>
                       }
                     </hlm-select-group>
                   </hlm-select-content>
                 </hlm-select>
               } @else {
-                <p class="mt-1 text-sm font-medium text-foreground">{{ priorityLabel(t.priority) }}</p>
+                <p class="mt-1 text-sm font-medium text-foreground">{{ priorityLabel(t.priorityLevel) }}</p>
               }
             </section>
 

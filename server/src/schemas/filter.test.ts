@@ -26,11 +26,11 @@ describe('filter schemas — date-range criteria (Q12)', () => {
   it('accepts a partial date range mixed with other criteria', () => {
     const result = CreateFilterSchema.parse({
       ...base,
-      filters: { priority: ['HIGH'], createdFrom: '2026-01-01' },
+      filters: { priorityLevel: [2], createdFrom: '2026-01-01' },
     });
 
     expect(result.filters.createdFrom).toBe('2026-01-01');
-    expect(result.filters.priority).toEqual(['HIGH']);
+    expect(result.filters.priorityLevel).toEqual([2]);
   });
 
   it('accepts date fields on update', () => {

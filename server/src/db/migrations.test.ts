@@ -11,6 +11,7 @@ import {
   backfillMemberExpiresAt,
   migrateToSingleBoardPerProject,
   backfillTaskSortNames,
+  migrateTaskPriorityToLevel,
 } from './migrations.js';
 
 describe('migrateInvitedMembershipsToRevoked', () => {
@@ -362,5 +363,148 @@ describe('backfillTaskSortNames (TOP-2)', () => {
     const count = await backfillTaskSortNames(db);
 
     expect(count).toBe(0);
+  });
+});
+
+// ── migrateTaskPriorityToLevel (priority string → numeric priorityLevel) ────
+
+type MockTask = Record<string, unknown>;
+
+function createPriorityDb(taskDocs: MockTask[], filterDocs: MockTask[] = []) {
+  const tasks = [...taskDocs];
+  const filters = [...filterDocs];
+  const updateMany = vi.fn(async (filter: Record<string, unknown>, update: Record<string, unknown>) => {
+    let n = 0;
+
+    for (const doc of tasks) {
+      const match = Object.entries(filter).every(([k, v]) => {
+        if (v !== null && typeof v === 'object') {
+          if ('$exists' in v && '$nin' in v)
+            return (v.$exists ? k in doc : !(k in doc)) && !(v.$nin as unknown[]).includes(doc[k]);
+          if ('$exists' in v) return v.$exists ? k in doc : !(k in doc);
+          if ('$nin' in v) return !(v.$nin as unknown[]).includes(doc[k]);
+          return false;
+        }
+        return doc[k] === v;
+      });
+
+      if (!match) continue;
+      if (update.$set) Object.assign(doc, update.$set);
+      if (update.$unset) {
+        for (const k of Object.keys(update.$unset)) {
+          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- emulating Mongo $unset on a plain mock object
+          delete doc[k];
+        }
+      }
+      n++;
+    }
+    return { modifiedCount: n };
+  });
+  const dropIndex = vi.fn(async () => undefined);
+  const updateOne = vi.fn(async (_f: unknown, update: Record<string, unknown>) => {
+    const setCriteria = (update.$set ?? {}) as { 'criteria.priorityLevel'?: number[] };
+    const unsetKeys = Object.keys((update.$unset ?? {}) as Record<string, unknown>);
+
+    for (const fl of filters) {
+      const criteria = fl.criteria as Record<string, unknown>;
+
+      if (setCriteria['criteria.priorityLevel']) criteria.priorityLevel = setCriteria['criteria.priorityLevel'];
+      for (const k of unsetKeys) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- emulating Mongo $unset on a plain mock object
+        delete criteria[k.replace('criteria.', '')];
+      }
+    }
+    return { modifiedCount: 1 };
+  });
+  const db = {
+    collection: vi.fn((name: string) =>
+      name === 'tasks'
+        ? {
+            countDocuments: vi.fn(async (f: Record<string, unknown>) => {
+              const docs: MockTask[] = tasks;
+
+              return docs.filter((doc) =>
+                Object.entries(f).every(([k, v]) => {
+                  if (v !== null && typeof v === 'object') {
+                    if ('$exists' in v && '$nin' in v)
+                      return (v.$exists ? k in doc : !(k in doc)) && !(v.$nin as unknown[]).includes(doc[k]);
+                    if ('$exists' in v) return v.$exists ? k in doc : !(k in doc);
+                    if ('$nin' in v) return !(v.$nin as unknown[]).includes(doc[k]);
+                    return false;
+                  }
+                  return doc[k] === v;
+                }),
+              ).length;
+            }),
+            updateMany,
+            dropIndex,
+          }
+        : {
+            find: vi.fn().mockReturnValue({
+              toArray: vi.fn().mockResolvedValue(filters.filter((f) => 'priority' in (f.criteria as object))),
+            }),
+            updateOne,
+          },
+    ),
+  };
+
+  return { db: db as never, tasks, updateMany, dropIndex, updateOne };
+}
+
+describe('migrateTaskPriorityToLevel', () => {
+  it('backfills LOW/MEDIUM/HIGH/CRITICAL → 0/1/2/3, unsets the old field and drops the legacy index', async () => {
+    const docs: MockTask[] = [
+      { id: 't1', priority: 'LOW' },
+      { id: 't2', priority: 'MEDIUM' },
+      { id: 't3', priority: 'HIGH' },
+      { id: 't4', priority: 'CRITICAL' },
+    ];
+    const { db, dropIndex } = createPriorityDb(docs);
+    const stats = await migrateTaskPriorityToLevel(db);
+
+    expect(stats.tasksTotal).toBe(4);
+    expect(stats.tasksMigrated).toBe(4);
+    expect(stats.oldFieldRemoved).toBe(4);
+    expect(stats.oldIndexDropped).toBe(true);
+    expect(docs.map((d) => d.priorityLevel)).toEqual([0, 1, 2, 3]);
+    expect(docs.every((d) => !('priority' in d))).toBe(true);
+    // legacy index dropped by name
+    expect(dropIndex).toHaveBeenCalledWith('projectId_1_priority_1_number_1');
+  });
+
+  it('migrates saved-filter criteria arrays', async () => {
+    const filters: MockTask[] = [{ id: 'f1', criteria: { priority: ['HIGH', 'CRITICAL'] } }];
+    const { db } = createPriorityDb([{ id: 't1', priority: 'LOW' }], filters);
+    const stats = await migrateTaskPriorityToLevel(db);
+
+    expect(stats.filtersMigrated).toBe(1);
+    expect(filters[0]?.criteria).toEqual({ priorityLevel: [2, 3] });
+  });
+
+  it('refuses to run when a task is missing priority (and does not touch data)', async () => {
+    const docs: MockTask[] = [{ id: 't1', priority: 'LOW' }, { id: 't2' }];
+    const { db, updateMany } = createPriorityDb(docs);
+
+    await expect(migrateTaskPriorityToLevel(db)).rejects.toThrow(/missing priority/);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses to run on unexpected priority values', async () => {
+    const docs: MockTask[] = [{ id: 't1', priority: 'WHATEVER' }];
+    const { db, updateMany } = createPriorityDb(docs);
+
+    await expect(migrateTaskPriorityToLevel(db)).rejects.toThrow(/unexpected/);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent — a migrated database is a no-op', async () => {
+    const docs: MockTask[] = [{ id: 't1', priorityLevel: 2 }];
+    const { db, updateMany } = createPriorityDb(docs);
+    const stats = await migrateTaskPriorityToLevel(db);
+
+    expect(stats.tasksMigrated).toBe(0);
+    expect(stats.oldFieldRemoved).toBe(0);
+    // only the legacy-field removal pass ran (matching nothing)
+    expect(updateMany).toHaveBeenCalledTimes(5); // 4 no-op backfill passes + the removal pass
   });
 });

@@ -280,9 +280,9 @@
               </td>
             }
             @if (visibleFields().has('priority')) {
-              <td hlmTableCell class="truncate" [hlmTooltip]="priorityLabel(task.priority)">
-                <span hlmBadge class="text-xs" [variant]="priorityBadgeVariant(task.priority)">
-                  {{ priorityLabel(task.priority) }}
+              <td hlmTableCell class="truncate" [hlmTooltip]="priorityLabel(task.priorityLevel)">
+                <span hlmBadge class="text-xs" [variant]="priorityBadgeVariant(task.priorityLevel)">
+                  {{ priorityLabel(task.priorityLevel) }}
                 </span>
               </td>
             }

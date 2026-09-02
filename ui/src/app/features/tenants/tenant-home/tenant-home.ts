@@ -14,6 +14,7 @@ import {
 import { rxResource } from '@angular/core/rxjs-interop';
 import { of } from 'rxjs';
 import { form, FormField, FormRoot, schema, required, maxLength } from '@angular/forms/signals';
+import type { TaskPriorityLevel } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -103,10 +104,10 @@ export class TenantHome {
   private readonly i18n = inject(TranslocoService);
 
   /** Translated priority label (P11) for the "My Tasks" widget; unknown values render verbatim. */
-  protected priorityLabel(priority: string): string {
-    const key = priorityLabelKey(priority);
+  protected priorityLabel(priorityLevel: TaskPriorityLevel): string {
+    const key = priorityLabelKey(priorityLevel);
 
-    return key ? this.i18n.translate(key) : priority;
+    return key ? this.i18n.translate(key) : String(priorityLevel);
   }
   protected readonly TenantStatus = TenantStatus;
   protected readonly TenantRole = TenantRole;

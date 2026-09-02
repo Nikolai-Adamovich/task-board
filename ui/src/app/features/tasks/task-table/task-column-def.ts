@@ -31,7 +31,7 @@ export interface TaskColumnDef {
   setDateRange?: (from: string, to: string) => void;
   allLabelKey?: string;
   placeholder?: string;
-  staticOptions?: { value: string; labelKey: string }[];
+  staticOptions?: { value: string | number; labelKey: string }[];
   itemToString?: (value: string) => string;
 }
 
