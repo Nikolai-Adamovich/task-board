@@ -62,8 +62,6 @@ export interface Task {
 export interface BoardTask {
   /** Unique task identifier (UUID v4) */
   id: string;
-  /** Parent project ID */
-  projectId: string;
   /** Sequential task number within the project */
   number: number;
   /** Task title */

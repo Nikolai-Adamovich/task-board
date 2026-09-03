@@ -4,6 +4,12 @@
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 export { valuesOf } from './utils/values-of.js';
+export {
+  encodeBoardCursor,
+  decodeBoardCursor,
+  InvalidBoardCursorError,
+  type BoardPageCursor,
+} from './utils/board-cursor.js';
 export { TENANT_SLUG_MAX_LENGTH, TENANT_SLUG_PATTERN, generateSlugFromName, isValidTenantSlug } from './utils/slug.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -37,6 +43,7 @@ export {
   DEFAULT_TASK_PRIORITY_LEVEL,
   type TaskPriorityLevel,
 } from './constants/priority.js';
+export { BOARD_PAGE_SIZE } from './constants/board.js';
 export { ExpandState } from './constants/expand-state.js';
 export {
   TASK_TABLE_COLUMN_KEYS,
@@ -89,7 +96,7 @@ export type {
 
 export type { Project, CreateProject, UpdateProject, ProjectMember } from './types/project.js';
 
-export type { BoardConfig, BoardColumn, UpdateBoardColumns } from './types/board.js';
+export type { BoardConfig, BoardColumn, UpdateBoardColumns, BoardColumnPage, BoardPage } from './types/board.js';
 
 export type {
   Task,
