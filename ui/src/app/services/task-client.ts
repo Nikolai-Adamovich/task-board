@@ -5,12 +5,12 @@ import { API_BASE_URL } from '@app/api-url.token';
 import type {
   Task,
   BoardTask,
+  BoardPage,
   CreateTask,
   UpdateTask,
   BulkUpdateTasks,
   BulkUpdateTasksResult,
 } from '@task-board/shared';
-import type { MoveTask } from '@app/types/frontend';
 
 /** Query params for filtering tasks */
 export interface TaskQuery {
@@ -53,6 +53,33 @@ export interface PaginatedResponse<T> {
   };
 }
 
+/** Board column pages request — opaque resume cursors by column id plus board filters */
+export interface BoardPageQuery {
+  cursors?: Record<string, string>;
+  sprintId?: string | null;
+  assigneeId?: string;
+  priorityLevel?: number;
+}
+
+/**
+ * Map a full task to the lightweight board card DTO — the same 10-field
+ * shape the server board projection returns (used after DnD mutations, which
+ * return the full task).
+ */
+export function toBoardTask(task: Task): BoardTask {
+  return {
+    id: task.id,
+    number: task.number,
+    title: task.title,
+    typeId: task.typeId,
+    statusId: task.statusId,
+    priorityLevel: task.priorityLevel,
+    assigneeId: task.assigneeId,
+    assigneeSnapshot: task.assigneeSnapshot,
+    version: task.version,
+  };
+}
+
 @Service()
 export class TaskClient {
   private readonly http = inject(HttpClient);
@@ -63,9 +90,26 @@ export class TaskClient {
     return this.fetchList<Task>(projectId, query);
   }
 
-  /** Board view: lightweight BoardTask projection (no description/metadata) */
-  listForBoard(projectId: string, query: TaskQuery = {}): Observable<PaginatedResponse<BoardTask>> {
-    return this.fetchList<BoardTask>(projectId, { ...query, view: 'board' });
+  /**
+   * Board column pages: one request serves every requested column (fixed
+   * `BOARD_PAGE_SIZE` cards per column, cursor/keyset pagination).
+   * `cursors` carries opaque `nextCursor` strings by column id — absent
+   * entries load the first page, so `{}` is the initial load of all columns.
+   */
+  listBoardPages(projectId: string, query: BoardPageQuery = {}): Observable<BoardPage> {
+    let params = new HttpParams();
+
+    for (const [columnId, cursor] of Object.entries(query.cursors ?? {})) {
+      params = params.set(`cursor.${columnId}`, cursor);
+    }
+
+    if (query.sprintId) params = params.set('sprintId', query.sprintId);
+    if (query.assigneeId) params = params.set('assigneeId', query.assigneeId);
+    if (query.priorityLevel !== undefined) params = params.set('priorityLevel', String(query.priorityLevel));
+
+    return this.http
+      .get<{ data: BoardPage }>(`${this.baseUrl}/projects/${projectId}/tasks/board`, { params })
+      .pipe(map((res) => res.data));
   }
 
   private fetchList<T>(projectId: string, query: TaskQuery): Observable<PaginatedResponse<T>> {
@@ -127,17 +171,6 @@ export class TaskClient {
   /** Delete a task */
   delete(id: string): Observable<{ success: boolean }> {
     return this.http.delete<{ data: { success: boolean } }>(`${this.baseUrl}/tasks/${id}`).pipe(map((res) => res.data));
-  }
-
-  /** Move a task to a different status (requires version for optimistic concurrency) */
-  move(data: MoveTask): Observable<Task> {
-    return this.http
-      .patch<{ data: Task }>(`${this.baseUrl}/tasks/${data.taskId}`, {
-        statusId: data.statusId,
-        position: data.position,
-        version: data.version,
-      })
-      .pipe(map((res) => res.data));
   }
 
   // ─── Cross-Tenant "My Tasks" ──────────────────────────────────────────────

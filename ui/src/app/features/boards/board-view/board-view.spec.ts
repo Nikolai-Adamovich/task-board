@@ -1,18 +1,20 @@
 /**
- * Tests for the BoardView component.
+ * Tests for the BoardView component (cursor pagination + infinite scroll + DnD).
  *
  * Covers:
  * - Initial loading state
- * - Board / tasks data fetching on init
- * - tasksByColumnId filtering (S-08 computed map)
- * - goToTask navigation
- * - goToNewTask navigation (U1 — create dialog replaced by tasks/new page)
+ * - Board / initial column pages fetching on init (one HTTP request, no cursors)
+ * - Per-column pagination: append, dedupe, batching, guards, stale generations
+ * - Drag-and-drop optimistic reconciliation (no refetch, cursor/hasMore stable)
+ * - goToTask / goToNewTask navigation, sprint selector, F-08 filters,
+ *   status display names, loaded-count headers, empty columns
  */
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router, ActivatedRoute } from '@angular/router';
-import { firstValueFrom, of, throwError } from 'rxjs';
+import { firstValueFrom, of, Subject, throwError } from 'rxjs';
 import { TranslocoService, TranslocoTestingModule } from '@jsverse/transloco';
 import { BoardView } from './board-view';
 import { BoardClient } from '@services/board-client';
@@ -23,7 +25,8 @@ import { ProjectClient } from '@services/project-client';
 import { ProjectStore } from '@stores/project-store';
 import { AuthStore } from '@stores/auth-store';
 import { API_BASE_URL } from '@app/api-url.token';
-import type { BoardConfig, Task } from '@task-board/shared';
+import type { BoardColumn, BoardConfig, BoardPage, BoardTask } from '@task-board/shared';
+import { encodeBoardCursor } from '@task-board/shared';
 import { settle } from '@app/shared/testing/zoneless';
 
 // ── Test fixtures ───────────────────────────────────────────
@@ -40,36 +43,40 @@ const mockBoard: BoardConfig = {
   updatedAt: NOW,
 };
 
-function makeTask(overrides: Partial<Task> = {}): Task {
+function makeCard(overrides: Partial<BoardTask> = {}): BoardTask {
   return {
     id: 'tk000000-0000-0000-0000-000000000001',
-    projectId: mockBoard.projectId,
     number: 1,
     typeId: 'type1',
     title: 'Test Task',
-    description: null,
     statusId: 's1',
     priorityLevel: 1,
-    reporterId: null,
-    reporterSnapshot: null,
     assigneeId: null,
     assigneeSnapshot: null,
-    sprintId: null,
-    labelIds: [],
-    createdById: 'u1',
-    createdBySnapshot: { displayName: 'Test User' },
     version: 1,
-    createdAt: NOW,
-    updatedAt: NOW,
     ...overrides,
   };
 }
 
-const mockTasks: Task[] = [
-  makeTask({ id: 'tk000000-0000-0000-0000-000000000001', statusId: 's1', title: 'Task A', number: 1 }),
-  makeTask({ id: 'tk000000-0000-0000-0000-000000000002', statusId: 's1', title: 'Task B', number: 2 }),
-  makeTask({ id: 'tk000000-0000-0000-0000-000000000003', statusId: 's3', title: 'Task C', number: 3 }),
-];
+function defaultPages(): BoardPage {
+  return {
+    col1: {
+      tasks: [
+        makeCard({ id: 'tk000000-0000-0000-0000-000000000001', statusId: 's1', title: 'Task A', number: 1 }),
+        makeCard({ id: 'tk000000-0000-0000-0000-000000000002', statusId: 's1', title: 'Task B', number: 2 }),
+      ],
+      nextCursor: null,
+      hasMore: false,
+    },
+    col2: {
+      tasks: [makeCard({ id: 'tk000000-0000-0000-0000-000000000003', statusId: 's3', title: 'Task C', number: 3 })],
+      nextCursor: null,
+      hasMore: false,
+    },
+    col3: { tasks: [], nextCursor: null, hasMore: false },
+  };
+}
+
 const mockSprints = [
   {
     id: 'sp1',
@@ -101,12 +108,16 @@ function createBoardClientMock(board: BoardConfig = mockBoard) {
   };
 }
 
-function createTaskClientMock(tasks: Task[] = mockTasks) {
+function createTaskClientMock(pages: BoardPage = defaultPages()) {
   return {
-    listForBoard: vi
+    listBoardPages: vi.fn().mockReturnValue(of(pages)),
+    update: vi
       .fn()
-      .mockReturnValue(of({ data: tasks, pagination: { total: tasks.length, page: 1, limit: 200, totalPages: 1 } })),
-    create: vi.fn().mockReturnValue(of(makeTask({ id: 'tk000000-0000-0000-0000-000000000099', title: 'New Task' }))),
+      .mockImplementation((id: string, data: { statusId: string; version: number }) =>
+        of(makeCard({ id, statusId: data.statusId, version: data.version + 1 })),
+      ),
+    getById: vi.fn(),
+    create: vi.fn().mockReturnValue(of(makeCard({ id: 'tk000000-0000-0000-0000-000000000099', title: 'New Task' }))),
   };
 }
 
@@ -130,11 +141,11 @@ describe('BoardView', () => {
     inputOverrides: Record<string, unknown> = {},
     statuses: { id: string; name: string }[] = [],
     board: BoardConfig = mockBoard,
-    tasks: Task[] = mockTasks,
+    pages: BoardPage = defaultPages(),
     authUser: { id: string } | null = null,
   ) {
     boardClientMock = createBoardClientMock(board);
-    taskClientMock = createTaskClientMock(tasks);
+    taskClientMock = createTaskClientMock(pages);
     sprintClientMock = createSprintClientMock();
     routerMock = { navigate: vi.fn().mockResolvedValue(true) };
 
@@ -194,12 +205,23 @@ describe('BoardView', () => {
     return fixture;
   }
 
-  /** Poll until `cond()` is true (reference data resolves asynchronously via ProjectRefStore) */
+  /** Poll until `cond()` is true (pages resolve asynchronously via rxResource) */
   async function until(fx: ComponentFixture<unknown>, cond: () => boolean): Promise<void> {
     for (let i = 0; i < 200 && !cond(); i++) {
       await new Promise((resolve) => setTimeout(resolve, 10));
       await settle(fx);
     }
+  }
+
+  /** Drive a cross-column drop without CDK (the component only reads item/container/column) */
+  function drop(task: BoardTask, column: BoardColumn) {
+    component.onTaskDrop({ item: { data: task }, previousContainer: { id: 'src' }, container: { id: 'dst' } }, column);
+  }
+
+  function columnIds(): string[] {
+    return Object.values(component.columnStates())
+      .flatMap((state) => (state as { tasks: BoardTask[] }).tasks.map((task) => task.id))
+      .sort();
   }
 
   // ── Loading state ───────────────────────────────────────
@@ -324,73 +346,516 @@ describe('BoardView', () => {
 
   // ── Data fetching on init ──────────────────────────────────────
 
-  describe('ngOnInit', () => {
-    beforeEach(() => setup());
+  describe('initial column pages', () => {
+    it('should call boardClient.getForProject with the active project id', async () => {
+      await setup();
 
-    it('should call boardClient.getForProject with the active project id', () => {
       expect(boardClientMock.getForProject).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001');
     });
 
-    it('should populate the board signal', () => {
+    it('should populate the board signal', async () => {
+      await setup();
+
       expect(component.board()).toEqual(mockBoard);
     });
 
-    it('should call taskClient.listForBoard with projectId and limit 200', () => {
-      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', { limit: 200 });
+    it('should fetch the first page of every column in one request without cursors', async () => {
+      const fx = await setup();
+
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      expect(taskClientMock.listBoardPages).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {});
     });
 
-    it('should populate tasks signal', () => {
-      expect(component.tasks()).toHaveLength(3);
+    it('should populate per-column states from the response', async () => {
+      const fx = await setup();
+
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      expect(component.columnStates()['col1'].tasks).toHaveLength(2);
+      expect(component.columnStates()['col2'].tasks).toHaveLength(1);
+      expect(component.columnStates()['col3'].tasks).toHaveLength(0);
+      expect(component.columnStates()['col1'].hasMore).toBe(false);
     });
   });
 
-  // ── tasksByColumnId (S-08 computed map, V4-12 ownership) ───────
+  // ── Pagination ────────────────────────────────────────────
 
-  describe('tasksByColumnId', () => {
-    beforeEach(() => setup());
+  describe('column pagination', () => {
+    const cursor184 = encodeBoardCursor({ priorityLevel: 2, number: 184 });
 
-    it('should return tasks filtered by column statusIds', () => {
-      const col = mockBoard.columns[0]; // statusIds: ['s1', 's2']
-      const tasks = component.tasksByColumnId().get(col?.id) ?? [];
+    async function setupPaged() {
+      const pages: BoardPage = {
+        col1: {
+          tasks: [makeCard({ id: 't1', statusId: 's1', number: 1, priorityLevel: 2 })],
+          nextCursor: cursor184,
+          hasMore: true,
+        },
+        col2: { tasks: [], nextCursor: null, hasMore: false },
+        col3: { tasks: [], nextCursor: null, hasMore: false },
+      };
 
-      expect(tasks.every((t: Task) => col?.statusIds.includes(t.statusId))).toBe(true);
+      return setup({}, [], mockBoard, pages);
+    }
+
+    async function flushTimers(fx: ComponentFixture<unknown>): Promise<void> {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await settle(fx);
+    }
+
+    it('should append the next page with the column cursor in a single request', async () => {
+      const fx = await setupPaged();
+
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      taskClientMock.listBoardPages.mockReturnValue(
+        of({
+          col1: {
+            tasks: [makeCard({ id: 't2', statusId: 's1', number: 200, priorityLevel: 2 })],
+            nextCursor: null,
+            hasMore: false,
+          },
+        }),
+      );
+
+      component.requestNextPage('col1');
+      await flushTimers(fx);
+
+      expect(taskClientMock.listBoardPages).toHaveBeenCalledTimes(2);
+      expect(taskClientMock.listBoardPages).toHaveBeenLastCalledWith('p0000000-0000-0000-0000-000000000001', {
+        cursors: { col1: cursor184 },
+      });
+
+      const state = component.columnStates()['col1'];
+
+      expect(state.tasks.map((t: BoardTask) => t.id)).toEqual(['t1', 't2']);
+      expect(state.hasMore).toBe(false);
+      expect(state.nextCursor).toBeNull();
+      expect(state.loading).toBe(false);
     });
 
-    it('should return tasks sorted by number ascending', () => {
-      const col = mockBoard.columns[0];
-      const tasks = (component.tasksByColumnId().get(col?.id) ?? []) as Task[];
+    it('should batch simultaneously hungry sentinels into one HTTP request', async () => {
+      const fx = await setupPaged();
 
-      expect(tasks[0]?.number).toBeLessThanOrEqual(tasks[1]?.number ?? Number.NaN);
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      component.columnStates()['col2'] = { tasks: [], nextCursor: cursor184, hasMore: true, loading: false };
+      taskClientMock.listBoardPages.mockReturnValue(of({}));
+
+      component.requestNextPage('col1');
+      component.requestNextPage('col2');
+      await flushTimers(fx);
+
+      expect(taskClientMock.listBoardPages).toHaveBeenCalledTimes(2);
+      expect(taskClientMock.listBoardPages).toHaveBeenLastCalledWith('p0000000-0000-0000-0000-000000000001', {
+        cursors: { col1: cursor184, col2: cursor184 },
+      });
     });
 
-    it('should return empty array when no tasks match the column', () => {
-      const col = mockBoard.columns[2]; // statusIds: ['s4']
-      const tasks = component.tasksByColumnId().get(col?.id) ?? [];
+    it('should never refetch an exhausted column', async () => {
+      const fx = await setup();
 
-      expect(tasks).toHaveLength(0);
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      const calls = taskClientMock.listBoardPages.mock.calls.length;
+
+      component.requestNextPage('col3');
+      await flushTimers(fx);
+
+      expect(taskClientMock.listBoardPages.mock.calls.length).toBe(calls);
+      expect(component.sentinelActive('col3')).toBe(false);
+    });
+
+    it('should guard against concurrent loads of the same column', async () => {
+      const fx = await setupPaged();
+
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      const pending = new Subject<BoardPage>();
+
+      taskClientMock.listBoardPages.mockReturnValue(pending);
+
+      component.requestNextPage('col1');
+      await flushTimers(fx);
+
+      const calls = taskClientMock.listBoardPages.mock.calls.length;
+
+      component.requestNextPage('col1');
+      await flushTimers(fx);
+
+      expect(taskClientMock.listBoardPages.mock.calls.length).toBe(calls);
+
+      pending.next({ col1: { tasks: [], nextCursor: null, hasMore: false } });
+      pending.complete();
+      await settle(fx);
+
+      expect(component.columnStates()['col1'].loading).toBe(false);
+    });
+
+    it('should dedupe cards that arrive both locally and via pagination', async () => {
+      const fx = await setupPaged();
+
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      taskClientMock.listBoardPages.mockReturnValue(
+        of({
+          col1: {
+            tasks: [makeCard({ id: 't1', statusId: 's1', number: 1, priorityLevel: 2 })],
+            nextCursor: null,
+            hasMore: false,
+          },
+        }),
+      );
+
+      component.requestNextPage('col1');
+      await flushTimers(fx);
+
+      expect(component.columnStates()['col1'].tasks.map((t: BoardTask) => t.id)).toEqual(['t1']);
+    });
+
+    it('should ignore a stale generation response after a filter change', async () => {
+      const fx = await setupPaged();
+
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      const stale = new Subject<BoardPage>();
+
+      taskClientMock.listBoardPages.mockReturnValue(stale);
+
+      component.requestNextPage('col1');
+      await flushTimers(fx);
+
+      // Filter change bumps the generation and reloads from scratch.
+      taskClientMock.listBoardPages.mockReturnValue(of(defaultPages()));
+      fx.componentRef.setInput('priorityLevel', 2);
+      await until(fx, () => component.columnStates()['col1']?.tasks.length === 2);
+
+      // The stale page resolves afterwards and must not overwrite fresh state.
+      stale.next({
+        col1: { tasks: [makeCard({ id: 'stale', statusId: 's1', number: 999 })], nextCursor: null, hasMore: false },
+      });
+      stale.complete();
+      await settle(fx);
+
+      expect(columnIds()).not.toContain('stale');
+      expect(component.columnStates()['col1'].tasks).toHaveLength(2);
+    });
+  });
+
+  // ── Drag-and-drop reconciliation ──────────────────────────
+
+  describe('drag-and-drop', () => {
+    const cursor184 = encodeBoardCursor({ priorityLevel: 2, number: 184 });
+    const col2 = mockBoard.columns[1] as BoardColumn;
+
+    async function setupDnd() {
+      const pages: BoardPage = {
+        col1: {
+          tasks: [
+            makeCard({ id: 'm1', statusId: 's1', number: 100, priorityLevel: 2, title: 'Mover' }),
+            makeCard({ id: 'keep', statusId: 's1', number: 50, priorityLevel: 3, title: 'Keeper' }),
+          ],
+          nextCursor: null,
+          hasMore: false,
+        },
+        col2: {
+          tasks: [makeCard({ id: 'b1', statusId: 's3', number: 10, priorityLevel: 3, title: 'Top' })],
+          nextCursor: cursor184,
+          hasMore: true,
+        },
+        col3: { tasks: [], nextCursor: null, hasMore: false },
+      };
+      const fx = await setup({}, [], mockBoard, pages);
+
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      // Mirror server semantics: a status move preserves sort keys and bumps the version.
+      // Snapshot up front — the optimistic removal runs before the mock is called.
+      const byId = new Map<string, BoardTask>();
+
+      for (const state of Object.values(component.columnStates())) {
+        for (const task of (state as { tasks: BoardTask[] }).tasks) byId.set(task.id, task);
+      }
+
+      taskClientMock.update.mockImplementation((id: string, data: { statusId: string; version: number }) => {
+        const current = byId.get(id) ?? makeCard({ id });
+        const fresh = { ...current, statusId: data.statusId, version: data.version + 1 };
+
+        byId.set(id, fresh);
+
+        return of(fresh);
+      });
+
+      return fx;
+    }
+
+    function mover(): BoardTask {
+      return component.columnStates()['col1'].tasks.find((t: BoardTask) => t.id === 'm1');
+    }
+
+    it('should insert a card inside the loaded target range without touching cursor/hasMore', async () => {
+      await setupDnd();
+
+      const before = { ...component.columnStates()['col2'], tasks: 'stripped' };
+
+      drop(mover(), col2);
+
+      const target = component.columnStates()['col2'];
+
+      // (2,100) sorts before the (2,184) cursor — inside the loaded prefix.
+      expect(target.tasks.map((t: BoardTask) => t.id)).toEqual(['b1', 'm1']);
+      expect(component.columnStates()['col1'].tasks.map((t: BoardTask) => t.id)).toEqual(['keep']);
+      expect(target.nextCursor).toBe(before.nextCursor);
+      expect(target.hasMore).toBe(before.hasMore);
+      // Server-returned card (fresh version) replaces the local object.
+      expect(target.tasks.find((t: BoardTask) => t.id === 'm1')?.version).toBe(2);
+      expect('projectId' in (target.tasks.find((t: BoardTask) => t.id === 'm1') ?? {})).toBe(false);
+      expect(target.tasks.find((t: BoardTask) => t.id === 'm1')?.statusId).toBe('s3');
+    });
+
+    it('should leave a card behind the target cursor for load-more', async () => {
+      await setupDnd();
+
+      // (1,5) sorts after the (2,184) cursor — beyond the loaded prefix.
+      component.columnStates()['col1'].tasks.find((t: BoardTask) => t.id === 'm1').priorityLevel = 1;
+      component.columnStates()['col1'].tasks.find((t: BoardTask) => t.id === 'm1').number = 5;
+
+      drop(mover(), col2);
+
+      expect(component.columnStates()['col2'].tasks.map((t: BoardTask) => t.id)).toEqual(['b1']);
+      expect(component.columnStates()['col1'].tasks.map((t: BoardTask) => t.id)).toEqual(['keep']);
+    });
+
+    it('should always insert into an exhausted target column', async () => {
+      await setupDnd();
+
+      component.columnStates()['col2'] = { ...component.columnStates()['col2'], hasMore: false };
+
+      // Beyond-cursor card, but the server set is terminal — insert anyway.
+      component.columnStates()['col1'].tasks.find((t: BoardTask) => t.id === 'm1').priorityLevel = 1;
+      component.columnStates()['col1'].tasks.find((t: BoardTask) => t.id === 'm1').number = 5;
+
+      drop(mover(), col2);
+
+      expect(component.columnStates()['col2'].tasks.map((t: BoardTask) => t.id)).toContain('m1');
+      expect(component.columnStates()['col2'].hasMore).toBe(false);
+    });
+
+    it('should shrink the source without an automatic refill fetch', async () => {
+      await setupDnd();
+
+      const calls = taskClientMock.listBoardPages.mock.calls.length;
+
+      drop(mover(), col2);
+
+      expect(component.columnStates()['col1'].tasks).toHaveLength(1);
+      expect(taskClientMock.listBoardPages.mock.calls.length).toBe(calls);
+    });
+
+    it('should grow the target past the page size without tail truncation', async () => {
+      await setupDnd();
+
+      component.columnStates()['col2'] = {
+        tasks: Array.from({ length: 50 }, (_, i) =>
+          makeCard({ id: `b-${i}`, statusId: 's3', number: 200 + i, priorityLevel: 1 }),
+        ),
+        nextCursor: cursor184,
+        hasMore: true,
+        loading: false,
+      };
+
+      drop(mover(), col2);
+
+      // (2,100) sorts before every (1,N) card — inserted, nothing evicted.
+      expect(component.columnStates()['col2'].tasks).toHaveLength(51);
+      expect(component.columnStates()['col2'].tasks[0]?.id).toBe('m1');
+    });
+
+    it('should dedupe when a moved card also arrives via an in-flight page', async () => {
+      await setupDnd();
+
+      const pending = new Subject<BoardPage>();
+
+      taskClientMock.listBoardPages.mockReturnValue(pending);
+
+      component.requestNextPage('col2');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      drop(mover(), col2);
+
+      pending.next({
+        col2: {
+          tasks: [makeCard({ id: 'm1', statusId: 's3', number: 100, priorityLevel: 2, version: 2 })],
+          nextCursor: null,
+          hasMore: false,
+        },
+      });
+      pending.complete();
+
+      expect(columnIds().filter((id) => id === 'm1')).toHaveLength(1);
+    });
+
+    it('should roll back on mutation failure without touching cursor/hasMore', async () => {
+      await setupDnd();
+
+      taskClientMock.update.mockReturnValue(throwError(() => new Error('Network error')));
+
+      const cursorBefore = component.columnStates()['col2'].nextCursor;
+
+      drop(mover(), col2);
+
+      expect(
+        component
+          .columnStates()
+          ['col1'].tasks.map((t: BoardTask) => t.id)
+          .sort(),
+      ).toEqual(['keep', 'm1']);
+      expect(component.columnStates()['col2'].tasks.map((t: BoardTask) => t.id)).toEqual(['b1']);
+      expect(component.columnStates()['col2'].nextCursor).toBe(cursorBefore);
+      expect(component.columnStates()['col2'].hasMore).toBe(true);
+    });
+
+    it('should refresh the single card on version conflict instead of blind rollback', async () => {
+      await setupDnd();
+
+      taskClientMock.update.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 409, statusText: 'Conflict' })),
+      );
+      taskClientMock.getById.mockReturnValue(
+        of(makeCard({ id: 'm1', statusId: 's3', number: 100, priorityLevel: 2, version: 7 })),
+      );
+
+      drop(mover(), col2);
+
+      expect(taskClientMock.getById).toHaveBeenCalledWith('m1');
+
+      const target = component.columnStates()['col2'];
+
+      expect(target.tasks.find((t: BoardTask) => t.id === 'm1')?.version).toBe(7);
+      expect(component.columnStates()['col1'].tasks.map((t: BoardTask) => t.id)).toEqual(['keep']);
+    });
+
+    it('should drop a server-deleted card on 404 without rollback', async () => {
+      await setupDnd();
+
+      taskClientMock.update.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 404, statusText: 'Not Found' })),
+      );
+
+      drop(mover(), col2);
+
+      expect(columnIds()).not.toContain('m1');
+    });
+
+    it('should ignore a second drag of a card with an in-flight mutation', async () => {
+      await setupDnd();
+
+      const pending = new Subject<BoardTask>();
+
+      taskClientMock.update.mockReturnValue(pending);
+
+      drop(mover(), col2);
+      drop(mover(), col2);
+
+      expect(taskClientMock.update).toHaveBeenCalledTimes(1);
+
+      pending.next(makeCard({ id: 'm1', statusId: 's3', number: 100, priorityLevel: 2, version: 2 }));
+      pending.complete();
+    });
+
+    it('should upsert into fresh state when a filter changes mid-mutation', async () => {
+      const fx = await setupDnd();
+      const pending = new Subject<BoardTask>();
+
+      taskClientMock.update.mockReturnValue(pending);
+
+      drop(mover(), col2);
+
+      taskClientMock.listBoardPages.mockReturnValue(of(defaultPages()));
+      fx.componentRef.setInput('priorityLevel', 2);
+      await until(fx, () => component.columnStates()['col1']?.tasks.length === 2);
+
+      pending.next(makeCard({ id: 'm1', statusId: 's3', number: 100, priorityLevel: 2, version: 2 }));
+      pending.complete();
+      await settle(fx);
+
+      // Fresh col2 holds Task C; the moved card upserts alongside it, no duplicates.
+      expect(
+        component
+          .columnStates()
+          ['col2'].tasks.map((t: BoardTask) => t.id)
+          .sort(),
+      ).toEqual(['m1', 'tk000000-0000-0000-0000-000000000003']);
+      expect(columnIds().filter((id) => id === 'm1')).toHaveLength(1);
+    });
+
+    it('should keep every card in exactly one column after a move sequence', async () => {
+      await setupDnd();
+
+      drop(mover(), col2);
+
+      const moved = component.columnStates()['col2'].tasks.find((t: BoardTask) => t.id === 'm1');
+
+      // col1 groups two statuses — the move completes through the status dialog.
+      drop(moved, mockBoard.columns[0] as BoardColumn);
+      component.applyStatusSelection('s1');
+
+      const ids = columnIds();
+      const unique = new Set(ids);
+
+      expect(ids.length).toBe(unique.size);
+      expect(unique.has('m1')).toBe(true);
+    });
+
+    it('should ignore drops within the same column (order is sort-derived)', async () => {
+      await setupDnd();
+
+      const card = mover();
+
+      component.onTaskDrop(
+        { item: { data: card }, previousContainer: { id: 'same' }, container: { id: 'same' } },
+        mockBoard.columns[0] as BoardColumn,
+      );
+
+      expect(taskClientMock.update).not.toHaveBeenCalled();
+      expect(component.columnStates()['col1'].tasks.map((t: BoardTask) => t.id)).toEqual(['m1', 'keep']);
+    });
+
+    it('should prompt for a status when the target column groups several statuses', async () => {
+      await setupDnd();
+
+      drop(mover(), mockBoard.columns[0] as BoardColumn);
+
+      expect(component.pendingDrop()).not.toBeNull();
+      expect(component.showStatusSelect()).toBe(true);
+      expect(taskClientMock.update).not.toHaveBeenCalled();
+
+      component.applyStatusSelection('s2');
+
+      expect(taskClientMock.update).toHaveBeenCalledWith('m1', expect.objectContaining({ statusId: 's2' }));
     });
   });
 
   // ── goToTask ────────────────────────────────────────────
 
   describe('goToTask', () => {
-    beforeEach(() => setup());
+    it('should navigate to the task detail route using the KEY-number format', async () => {
+      await setup();
 
-    it('should navigate to the task detail route using the KEY-number format', () => {
-      const task = mockTasks[0];
+      const task = makeCard({ number: 5 });
 
       component.goToTask(task);
 
-      expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 't1', 'projects', 't1', 'tasks', `t1-${task?.number}`]);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 't1', 'projects', 't1', 'tasks', 't1-5']);
     });
   });
 
   // ── goToNewTask (U1) ────────────────────────────────────
 
   describe('goToNewTask', () => {
-    beforeEach(() => setup());
+    it('should navigate to the unified create-task page instead of opening a dialog', async () => {
+      await setup();
 
-    it('should navigate to the unified create-task page instead of opening a dialog', () => {
       component.goToNewTask();
 
       expect(routerMock.navigate).toHaveBeenCalledWith(['/w', 't1', 'projects', 't1', 'tasks', 'new']);
@@ -400,9 +865,9 @@ describe('BoardView', () => {
   // ── Sprint selector (DEC-038) ──────────────────────────
 
   describe('sprint selector', () => {
-    beforeEach(() => setup());
+    it('should fetch sprints for the board project', async () => {
+      await setup();
 
-    it('should fetch sprints for the board project', () => {
       expect(sprintClientMock.list).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001');
       expect(component.sprints()).toEqual(mockSprints);
     });
@@ -411,8 +876,7 @@ describe('BoardView', () => {
       TestBed.resetTestingModule();
       await setup({ sprintId: 'sp1' });
 
-      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
-        limit: 200,
+      expect(taskClientMock.listBoardPages).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         sprintId: 'sp1',
       });
     });
@@ -431,7 +895,9 @@ describe('BoardView', () => {
       expect(component.selectedSprintName()).toBe('unknown-id');
     });
 
-    it('should write ?sprintId= to the URL (replaceUrl) on selection', () => {
+    it('should write ?sprintId= to the URL (replaceUrl) on selection', async () => {
+      await setup();
+
       component.onSprintSelect('sp1');
 
       expect(routerMock.navigate).toHaveBeenCalledWith(
@@ -444,7 +910,9 @@ describe('BoardView', () => {
       );
     });
 
-    it('should clear the sprint param when the empty value is selected', () => {
+    it('should clear the sprint param when the empty value is selected', async () => {
+      await setup();
+
       component.onSprintSelect('');
 
       expect(routerMock.navigate).toHaveBeenCalledWith(
@@ -463,10 +931,9 @@ describe('BoardView', () => {
   describe('board filters (F-08)', () => {
     it('should resolve ?assignee=me to the current user id at query time', async () => {
       TestBed.resetTestingModule();
-      await setup({ assignee: 'me' }, [], mockBoard, mockTasks, { id: 'u1' });
+      await setup({ assignee: 'me' }, [], mockBoard, defaultPages(), { id: 'u1' });
 
-      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
-        limit: 200,
+      expect(taskClientMock.listBoardPages).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         assigneeId: 'u1',
       });
     });
@@ -475,8 +942,7 @@ describe('BoardView', () => {
       TestBed.resetTestingModule();
       await setup({ assignee: 'u2' });
 
-      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
-        limit: 200,
+      expect(taskClientMock.listBoardPages).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         assigneeId: 'u2',
       });
     });
@@ -484,23 +950,32 @@ describe('BoardView', () => {
     it('should not send assigneeId for ?assignee=unassigned and post-filter client-side', async () => {
       TestBed.resetTestingModule();
 
-      const assigned = makeTask({ id: 'tk-assigned', statusId: 's1', title: 'Assigned', number: 9, assigneeId: 'u2' });
+      const assigned = makeCard({ id: 'tk-assigned', statusId: 's1', title: 'Assigned', number: 9, assigneeId: 'u2' });
+      const pages = defaultPages();
 
-      await setup({ assignee: 'unassigned' }, [], mockBoard, [...mockTasks, assigned]);
+      pages['col1'] = { tasks: [...(pages['col1']?.tasks ?? []), assigned], nextCursor: null, hasMore: false };
 
-      const call = taskClientMock.listForBoard.mock.calls[0]?.[1] as Record<string, unknown>;
+      const fx = await setup({ assignee: 'unassigned' }, [], mockBoard, pages);
+
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+
+      const call = taskClientMock.listBoardPages.mock.calls[0]?.[1] as Record<string, unknown>;
 
       expect(call.assigneeId).toBeUndefined();
-      expect(component.filteredTasks().map((t: Task) => t.id)).not.toContain('tk-assigned');
-      expect(component.filteredTasks()).toHaveLength(mockTasks.length);
+      expect(
+        component
+          .displayedTasksByColumnId()
+          .get('col1')
+          ?.map((t: BoardTask) => t.id),
+      ).not.toContain('tk-assigned');
+      expect(component.displayedTasksByColumnId().get('col1')).toHaveLength(2);
     });
 
     it('should send the priority filter server-side', async () => {
       TestBed.resetTestingModule();
       await setup({ priorityLevel: 2 });
 
-      expect(taskClientMock.listForBoard).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
-        limit: 200,
+      expect(taskClientMock.listBoardPages).toHaveBeenCalledWith('p0000000-0000-0000-0000-000000000001', {
         priorityLevel: 2,
       });
     });
@@ -603,13 +1078,13 @@ describe('BoardView', () => {
     });
   });
 
-  // ── WIP counts in column headers (Q9 / RQ-04 ⑥) ─────────
+  // ── Loaded counts in column headers (Q9 / RQ-04 ⑥) ──────
 
-  describe('WIP counts in column headers (Q9)', () => {
-    it('should render a muted count badge with the number of tasks in each column', async () => {
+  describe('loaded counts in column headers (Q9)', () => {
+    it('should render a muted count badge with the loaded cards per column', async () => {
       const fx = await setup({});
 
-      // Wait for the board + tasks to render (mockTasks: 2×s1 → col1, 1×s3 → col2)
+      // Wait for the board + pages to render (2 in col1, 1 in col2, 0 in col3)
       await until(fx, () => !!fx.nativeElement.querySelector('.cdk-drop-list'));
 
       const counts = Array.from(fx.nativeElement.querySelectorAll('h3 span:last-child')).map((span) =>
@@ -618,73 +1093,26 @@ describe('BoardView', () => {
 
       expect(counts).toEqual(['2', '1', '0']);
     });
-  });
 
-  // ── Exclusive column assignment (V4-12) ─────────────────
+    it('should mark columns with more server-side cards with a trailing plus', async () => {
+      const pages = defaultPages();
 
-  describe('exclusive column assignment (V4-12)', () => {
-    /**
-     * Overlapping board like the one observed in V4-12: a combined
-     * "In Progress / Reopened" column sits next to a pure "In Progress" column.
-     */
-    const overlapBoard: BoardConfig = {
-      ...mockBoard,
-      columns: [
-        { id: 'col-todo', statusIds: ['s1'], position: 0 }, // To Do
-        { id: 'col-combined', statusIds: ['s3', 's4'], position: 1 }, // In Progress / Reopened
-        { id: 'col-inprogress', statusIds: ['s3'], position: 2 }, // In Progress
-        { id: 'col-done', statusIds: ['s2'], position: 3 }, // Done
-      ],
-    };
-    const overlapTasks: Task[] = [
-      makeTask({ id: 'tk-todo', statusId: 's1', title: 'Todo Task', number: 1 }),
-      makeTask({ id: 'tk-reopened', statusId: 's4', title: 'Reopened Task', number: 2 }),
-      makeTask({ id: 'tk-inprogress', statusId: 's3', title: 'In Progress Task', number: 3 }),
-      makeTask({ id: 'tk-done', statusId: 's2', title: 'Done Task', number: 4 }),
-    ];
+      pages['col1'] = {
+        tasks: pages['col1']?.tasks ?? [],
+        hasMore: true,
+        nextCursor: encodeBoardCursor({ priorityLevel: 1, number: 2 }),
+      };
 
-    async function setupOverlap() {
-      return setup({}, [], overlapBoard, overlapTasks);
-    }
+      const fx = await setup({}, [], mockBoard, pages);
 
-    it('should show a REOPENED task only in the combined column (never duplicated)', async () => {
-      await setupOverlap();
+      await until(fx, () => Object.keys(component.columnStates()).length === 3);
+      await until(fx, () => !!fx.nativeElement.querySelector('.cdk-drop-list'));
 
-      const reopened = overlapTasks[1];
-      const combined = component.board().columns.find((c: { id: string }) => c.id === 'col-combined');
-      const others = component.board().columns.filter((c: { id: string }) => c.id !== 'col-combined');
-
-      expect((component.tasksByColumnId().get(combined.id) ?? []).map((t: Task) => t.id)).toContain(reopened?.id);
-      for (const other of others) {
-        expect((component.tasksByColumnId().get(other.id) ?? []).map((t: Task) => t.id)).not.toContain(reopened?.id);
-      }
-    });
-
-    it('should show an IN_PROGRESS task only in the dedicated IN_PROGRESS column', async () => {
-      await setupOverlap();
-
-      const inProgress = overlapTasks[2];
-      const combined = component.board().columns.find((c: { id: string }) => c.id === 'col-combined');
-      const pure = component.board().columns.find((c: { id: string }) => c.id === 'col-inprogress');
-
-      // Most-specific (single-status) column wins ownership of the shared status
-      expect((component.tasksByColumnId().get(pure.id) ?? []).map((t: Task) => t.id)).toContain(inProgress?.id);
-      expect((component.tasksByColumnId().get(combined.id) ?? []).map((t: Task) => t.id)).not.toContain(inProgress?.id);
-    });
-
-    it('should render every task in exactly one column (no card duplication)', async () => {
-      await setupOverlap();
-
-      const columns = component.board().columns;
-      const assignments = overlapTasks.map((task) =>
-        columns.filter((c: { id: string }) =>
-          (component.tasksByColumnId().get(c.id) ?? []).some((t: Task) => t.id === task.id),
-        ),
+      const counts = Array.from(fx.nativeElement.querySelectorAll('h3 span:last-child')).map((span) =>
+        (span as HTMLElement).textContent?.trim(),
       );
 
-      for (const cols of assignments) {
-        expect(cols).toHaveLength(1);
-      }
+      expect(counts).toEqual(['2+', '1', '0']);
     });
   });
 

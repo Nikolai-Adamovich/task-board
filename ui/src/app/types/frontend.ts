@@ -10,11 +10,3 @@ export type TenantWithRole = Tenant & { role: TenantRole };
 
 /** Cross-tenant invitation visible to the current user (contract lives in shared) */
 export type { MyInvitation } from '@task-board/shared';
-
-/** Request body for moving a task to a different column/status */
-export interface MoveTask {
-  taskId: string;
-  statusId: string;
-  position?: number;
-  version: number;
-}

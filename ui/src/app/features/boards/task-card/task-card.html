@@ -11,12 +11,10 @@
        2 lines with ellipsis. Bottom: issue type left, assignee right. The card
        renders the lightweight BoardTask projection — no description/metadata. -->
   <div class="flex items-start justify-between gap-2">
-    <div class="flex items-center gap-2 min-w-0">
-      <span class="shrink-0 text-xs font-mono text-muted-foreground">{{ taskLabel() }}</span>
-      <span hlmBadge class="shrink-0 text-[10px] uppercase" [variant]="priorityVariant()">
-        {{ priorityLabel(task().priorityLevel) }}
-      </span>
-    </div>
+    <span class="shrink-0 text-xs font-mono text-muted-foreground">{{ taskLabel() }}</span>
+    <span hlmBadge class="ml-auto shrink-0 text-[10px] uppercase" [variant]="priorityVariant()">
+      {{ priorityLabel(task().priorityLevel) }}
+    </span>
   </div>
 
   <h4 class="mt-1 line-clamp-2 text-sm font-medium text-foreground" [title]="task().title">{{ task().title }}</h4>

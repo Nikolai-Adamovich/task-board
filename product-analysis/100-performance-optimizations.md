@@ -734,6 +734,43 @@ CRITICAL/HIGH/LOW/MEDIUM while the board sorted by severity).
   native-select string binding, `Number()` coercion moved from templates into component methods, spec fixtures). Lesson:
   UI type correctness is only fully verified by the `ng test` build, not by the repo `typecheck` script.
 
+### 4.23 Board cursor pagination + infinite scroll + DnD without refetch — DONE (2026-09-03)
+
+Replaces the flat `GET …/tasks?view=board&limit=200` + client-side grouping with per-column keyset pagination (Stage 2
+benchmark verdict: `Promise.all` over columns beats `$facet` 9–105×; `$facet` cannot push branch `$match`es into index
+scans and COLLSCANs the collection).
+
+- **Contract** ([shared/src/constants/board.ts](../shared/src/constants/board.ts),
+  [shared/src/utils/board-cursor.ts](../shared/src/utils/board-cursor.ts)): fixed `BOARD_PAGE_SIZE = 50` cards per
+  column (no client-controlled limit); Mongo probes 51 internally for `hasMore` (no `countDocuments`); opaque base64url
+  cursors carrying `(priorityLevel, number)` with versioned payload
+  (`encodeBoardCursor`/`decodeBoardCursor`/`InvalidBoardCursorError` → HTTP 400); response `BoardPage` dictionary keyed
+  by column id (`BoardColumnPage`: tasks ≤ 50, `nextCursor`, `hasMore`).
+- **Server** (`GET …/tasks/board`): one HTTP request, columns resolved from `BoardConfig` (callers pass
+  `cursor.<columnId>` only — no arbitrary `statusIds` injection), per-column queries via `Promise.all`
+  (`TaskRepository.findBoardPage`: `{projectId, statusId: $in}` + `$or` cursor predicate, sort
+  `{priorityLevel: -1, number: 1}`, board exclusion projection, `limit(51)` slice to 50). Overlapping column `statusIds`
+  resolve to a single owner column (V4-12 parity, most-specific-first). No `skip`, no counts, `findByProject()`
+  untouched.
+- **Index** (additive via `CORE_INDEXES`): `{projectId: 1, statusId: 1, priorityLevel: -1, number: 1}`. The existing
+  `{projectId, priorityLevel, number}` ASC index cannot serve the mixed DESC/ASC board sort (proven blocking SORT 64/64
+  benchmark cells). Local explain after migration:
+  `LIMIT > PROJECTION_SIMPLE > FETCH > IXSCAN(projectId_1_statusId_1_priorityLevel_-1_number_1)`, keys=docs=nReturned,
+  no SORT stage in the winning plan.
+- **UI** ([board-view.ts](../ui/src/app/features/boards/board-view/board-view.ts)): per-column state
+  (`tasks`/`nextCursor`/`hasMore`/`loading`), initial pages via `rxResource`, load-more micro-batched into one request,
+  `BoardSentinel` directive (`IntersectionObserver`, 800px prefetch margin, disabled when exhausted/loading). Filter
+  change bumps the generation — stale responses are dropped. DnD is optimistic local reconciliation only: remove from
+  source, sorted-insert into target when inside the loaded prefix (or always when `hasMore=false`), server-returned card
+  wins, cursor/`hasMore`/scroll untouched; 409 → single-card refresh via `getById`, 404 → card dropped. Column headers
+  show loaded counts with a trailing `+` while `hasMore` (never a total). Dead `TaskClient.move()` (+ `MoveTask` type)
+  removed. Task-card priority badge moved to the card's far-right corner.
+- **Verification:** typecheck PASS, server 900 / UI 908 tests PASS (incl. cursor round-trip/malformed, repo
+  predicate/projection/51→50, service ownership/subset/400s, route 400s, UI pagination guards, 13 DnD cases, sentinel
+  contract), lint clean, migration applied locally (new index present, old indexes intact). Pre-existing breakage fixed
+  on the way: `tasks.test.ts` mock used an arrow-function `mockImplementation` which current vitest cannot
+  `new`-construct (baseline failed 10/11 before the change).
+
 ## 5. Tooling
 
 Diagnostic scripts used during the investigation: [`tools/README.md`](../tools/README.md) (api-series — keep-alive

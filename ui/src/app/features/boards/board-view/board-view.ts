@@ -1,14 +1,15 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, input, signal } from '@angular/core';
 import { getTenantSlug } from '@app/shared/utils/route-utils';
 import { Router, ActivatedRoute } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideX } from '@ng-icons/lucide';
 import { CdkDragDrop, CdkDrag, CdkDropList } from '@angular/cdk/drag-drop';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { map, of } from 'rxjs';
+import { of, tap } from 'rxjs';
 import { BoardClient } from '@services/board-client';
-import { TaskClient } from '@services/task-client';
+import { TaskClient, toBoardTask, type BoardPageQuery } from '@services/task-client';
 import { AuthStore } from '@stores/auth-store';
 import { ProjectStore } from '@stores/project-store';
 import { ProjectRefStore } from '@stores/project-ref-store';
@@ -19,18 +20,31 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { NgIcon } from '@ng-icons/core';
-import type { BoardColumn, BoardConfig, BoardTask } from '@task-board/shared';
-import type { TaskQuery } from '@services/task-client';
+import type { BoardColumn, BoardConfig, BoardTask, BoardColumnPage } from '@task-board/shared';
+import { decodeBoardCursor } from '@task-board/shared';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { priorityLabelKey, priorityLevelParam } from '@app/constants/priority';
 import type { TaskPriorityLevel } from '@task-board/shared';
 import type { TaskPriorityLevel as SharedPriorityLevel } from '@task-board/shared';
 import { TaskCard } from '../task-card/task-card';
+import { BoardSentinel } from '@app/shared/board-sentinel/board-sentinel';
 import { PRIORITY_OPTIONS } from '@app/constants/priority';
 import { injectToasts } from '@app/shared/utils/toast-utils';
 import { getErrorMessage } from '@app/shared/utils/error-utils';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
+
+/**
+ * Paginated state of one board column (fixed `BOARD_PAGE_SIZE` cards per
+ * server page). `hasMore`/`nextCursor` are server state — a DnD move never
+ * mutates them, it only reconciles the local `tasks` array.
+ */
+export interface BoardColumnState {
+  tasks: BoardTask[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  loading: boolean;
+}
 
 @Component({
   selector: 'ui-board-view',
@@ -38,6 +52,7 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
     HlmAlertImports,
     TranslocoPipe,
     TaskCard,
+    BoardSentinel,
     NgIcon,
     CdkDrag,
     CdkDropList,
@@ -60,6 +75,7 @@ export class BoardView {
   private readonly refStore = inject(ProjectRefStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   readonly projectKey = input<string>('');
   /** Optional sprint filter from query params (`?sprintId=…`) */
   readonly sprintId = input<string | null>(null);
@@ -84,44 +100,68 @@ export class BoardView {
     defaultValue: null,
   });
   protected readonly board = computed(() => (this.boardResource.hasValue() ? this.boardResource.value() : null));
-  private readonly tasksResource = rxResource({
+  /**
+   * Per-column paginated card state, keyed by board column id. Replaced
+   * wholesale on initial load / filter change, appended to by load-more,
+   * reconciled in place by drag-and-drop (never refetched after a move).
+   */
+  protected readonly columnStates = signal<Record<string, BoardColumnState>>({});
+  /**
+   * Board generation — bumped for every initial-pages request. Stale
+   * pagination responses (filter changed mid-flight) are dropped instead of
+   * overwriting the fresh board state.
+   */
+  private pagesGeneration = 0;
+  /** Task ids with an in-flight DnD mutation — a second drag waits. */
+  private readonly pendingMutations = new Set<string>();
+  /** Columns whose sentinels fired — flushed as ONE request (micro-batch). */
+  private readonly pendingColumns = new Set<string>();
+  private loadMoreTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Initial column pages. Refetches automatically when the project, the board
+   * config or any filter changes (stale streams are cancelled by rxResource
+   * and additionally guarded by `pagesGeneration`).
+   */
+  private readonly pagesResource = rxResource({
     params: () => ({
       pid: this.effectiveProjectId(),
+      board: this.board(),
       sprintId: this.sprintId(),
       assignee: this.assignee(),
       priorityLevel: this.priorityLevel(),
     }),
     stream: ({ params }) => {
-      const query: TaskQuery = { limit: 200 };
+      const board = params.board;
 
-      if (params.sprintId) {
-        query.sprintId = params.sprintId;
-      }
+      if (!params.pid || !board) return of(null);
 
-      // F-08: concrete assignee/priority filters go server-side (same as sprintId).
-      // `me` resolves to the current user id at query time; `unassigned` has no
-      // server-side equivalent (exact-id match only) and is post-filtered below.
-      const resolvedAssignee =
-        params.assignee === 'me' ? (this.authStore.currentUser()?.id ?? '') : (params.assignee ?? '');
+      const generation = ++this.pagesGeneration;
 
-      if (resolvedAssignee && resolvedAssignee !== 'unassigned') {
-        query.assigneeId = resolvedAssignee;
-      }
-      if (params.priorityLevel !== null && params.priorityLevel !== undefined) {
-        query.priorityLevel = params.priorityLevel;
-      }
-      return this.taskClient.listForBoard(params.pid, query).pipe(map((res) => res.data));
+      return this.taskClient.listBoardPages(params.pid, this.buildPageQuery({})).pipe(
+        tap((page) => {
+          if (generation === this.pagesGeneration) this.setInitialStates(board, page);
+        }),
+      );
     },
-    defaultValue: [],
+    defaultValue: null,
   });
-  protected readonly tasks = computed(() => (this.tasksResource.hasValue() ? this.tasksResource.value() : []));
-  /** F-08: client-side post-filter for the `unassigned` pseudo-value */
-  protected readonly filteredTasks = computed(() => {
-    const list = this.tasks();
+  /**
+   * S-08: display cards per column — the stored (server-filtered) pages with
+   * the `unassigned` pseudo-filter applied client-side. Computed once per
+   * change instead of filter-per-column on every CD cycle.
+   */
+  protected readonly displayedTasksByColumnId = computed(() => {
+    const map = new Map<string, BoardTask[]>();
+    const states = this.columnStates();
+    const unassignedOnly = this.assignee() === 'unassigned';
 
-    if (this.assignee() !== 'unassigned') return list;
+    for (const column of this.board()?.columns ?? []) {
+      const tasks = states[column.id]?.tasks ?? [];
 
-    return list.filter((t) => !t.assigneeId);
+      map.set(column.id, unassignedOnly ? tasks.filter((task) => !task.assigneeId) : tasks);
+    }
+
+    return map;
   });
   /** Project members — powers the assignee filter options (shared ref store) */
   protected readonly memberOptions = computed(() => this.refStore.options(this.effectiveProjectId(), 'members'));
@@ -166,7 +206,8 @@ export class BoardView {
 
     return this.sprints().find((s) => s.id === id)?.name ?? id;
   });
-  protected readonly loading = computed(() => this.boardResource.isLoading());
+  /** Global spinner covers the board config and the initial column pages (not load-more). */
+  protected readonly loading = computed(() => this.boardResource.isLoading() || this.pagesResource.isLoading());
   protected readonly error = computed(() => {
     const err = this.boardResource.error();
 
@@ -188,6 +229,12 @@ export class BoardView {
       this.refStore.sprintEntities(pid);
       this.refStore.statusEntities(pid);
       this.refStore.ensure(pid, ['statuses', 'sprints', 'members', 'types']);
+    });
+    this.destroyRef.onDestroy(() => {
+      if (this.loadMoreTimer !== null) {
+        clearTimeout(this.loadMoreTimer);
+        this.loadMoreTimer = null;
+      }
     });
   }
 
@@ -217,7 +264,7 @@ export class BoardView {
 
   /**
    * Write one board filter to the URL query params (replaceUrl, merged with
-   * the other filters). Empty value clears it; the tasks resource refetches.
+   * the other filters). Empty value clears it; the pages resource refetches.
    */
   private setFilterParam(name: 'sprintId' | 'assignee' | 'priorityLevel', value: string): void {
     this.router.navigate([], {
@@ -230,7 +277,7 @@ export class BoardView {
 
   /**
    * Sprint selector change → write `?sprintId=` to the URL (replaceUrl).
-   * Empty value clears the scope; the tasks resource refetches automatically.
+   * Empty value clears the scope; the pages resource refetches automatically.
    */
   protected onSprintSelect(value: string): void {
     this.setFilterParam('sprintId', value);
@@ -290,35 +337,187 @@ export class BoardView {
 
     return owner;
   });
+
   /**
-   * S-08: tasks per owned column (V4-12 ownership semantics preserved via
-   * `columnOwnerByStatusId`) — computed once per change instead of
-   * filter+sort per column on every CD cycle.
-   *
-   * Column order: severity first (CRITICAL → LOW), ties by number ascending.
-   * `priority` is a semantic enum (alphabetical order ≠ severity), so a Mongo
-   * index sort on the raw field cannot produce severity order — this is done
-   * client-side over the ≤200 loaded cards instead (a Mongo-side sort would
-   * require a denormalized numeric priorityRank field; see board payload audit).
+   * Loaded-count label for a column header. Pagination means the column holds
+   * a prefix, not a total — a trailing `+` marks that more cards exist
+   * server-side (`hasMore`). Never a server total (no `countDocuments` on the
+   * board path by contract).
    */
-  protected readonly tasksByColumnId = computed(() => {
-    const owner = this.columnOwnerByStatusId();
-    const map = new Map<string, BoardTask[]>();
+  protected columnCountLabel(columnId: string): string {
+    const state = this.columnStates()[columnId];
 
-    for (const col of this.board()?.columns ?? []) map.set(col.id, []);
+    if (!state) return '0';
 
-    for (const task of this.filteredTasks()) {
-      const column = owner.get(task.statusId);
-      const list = column ? map.get(column.id) : undefined;
+    return state.hasMore ? `${state.tasks.length}+` : `${state.tasks.length}`;
+  }
 
-      if (list) list.push(task);
+  /** Sentinel is live only while a next page exists and none is loading. */
+  protected sentinelActive(columnId: string): boolean {
+    const state = this.columnStates()[columnId];
+
+    return !!state && state.hasMore && !state.loading;
+  }
+
+  /** Board filter values shared by initial load and load-more requests. */
+  private buildPageQuery(cursors: Record<string, string>): BoardPageQuery {
+    const query: BoardPageQuery = {};
+
+    if (Object.keys(cursors).length > 0) query.cursors = cursors;
+
+    const sprintId = this.sprintId();
+
+    if (sprintId) query.sprintId = sprintId;
+
+    // F-08: concrete assignee/priority filters go server-side (same as sprintId).
+    // `me` resolves to the current user id at query time; `unassigned` has no
+    // server-side equivalent (exact-id match only) and is post-filtered in
+    // `displayedTasksByColumnId`.
+    const assignee = this.assignee();
+    const resolvedAssignee = assignee === 'me' ? (this.authStore.currentUser()?.id ?? '') : (assignee ?? '');
+
+    if (resolvedAssignee && resolvedAssignee !== 'unassigned') {
+      query.assigneeId = resolvedAssignee;
     }
 
-    // severity order is the numeric level itself: DESC puts CRITICAL (3) first
-    for (const list of map.values()) list.sort((a, b) => b.priorityLevel - a.priorityLevel || a.number - b.number);
+    const priorityLevel = this.priorityLevel();
 
-    return map;
-  });
+    if (priorityLevel !== null && priorityLevel !== undefined) {
+      query.priorityLevel = priorityLevel;
+    }
+
+    return query;
+  }
+
+  /** Replace every column state with a fresh initial page (filter change / first load). */
+  private setInitialStates(board: BoardConfig, page: Record<string, BoardColumnPage>): void {
+    const states: Record<string, BoardColumnState> = {};
+
+    for (const column of board.columns) {
+      const columnPage = page[column.id];
+
+      states[column.id] = {
+        tasks: columnPage?.tasks ?? [],
+        nextCursor: columnPage?.nextCursor ?? null,
+        hasMore: columnPage?.hasMore ?? false,
+        loading: false,
+      };
+    }
+
+    this.columnStates.set(states);
+  }
+
+  private setColumnLoading(columnIds: readonly string[], loading: boolean): void {
+    this.columnStates.update((states) => {
+      const next = { ...states };
+      let changed = false;
+
+      for (const id of columnIds) {
+        const current = next[id];
+
+        if (current && current.loading !== loading) {
+          next[id] = { ...current, loading };
+          changed = true;
+        }
+      }
+
+      return changed ? next : states;
+    });
+  }
+
+  /** Append one page with dedupe by id (a moved card may arrive twice). */
+  private appendPage(columnId: string, page: BoardColumnPage): void {
+    this.columnStates.update((states) => {
+      const current = states[columnId];
+
+      if (!current) return states;
+
+      const seen = new Set(current.tasks.map((task) => task.id));
+      const fresh = page.tasks.filter((task) => !seen.has(task.id));
+
+      return {
+        ...states,
+        [columnId]: {
+          tasks: [...current.tasks, ...fresh],
+          nextCursor: page.nextCursor,
+          hasMore: page.hasMore,
+          loading: current.loading,
+        },
+      };
+    });
+  }
+
+  /**
+   * Sentinel fired for one column — micro-batched so simultaneously hungry
+   * sentinels share a single HTTP request with several cursor params.
+   */
+  protected requestNextPage(columnId: string): void {
+    const state = this.columnStates()[columnId];
+
+    if (!state || !state.hasMore || state.loading) return;
+
+    this.pendingColumns.add(columnId);
+
+    if (this.loadMoreTimer !== null) return;
+
+    this.loadMoreTimer = setTimeout(() => {
+      this.loadMoreTimer = null;
+      this.flushPendingPages();
+    }, 0);
+  }
+
+  /** Load the next page for every pending column in one HTTP request. */
+  protected flushPendingPages(): void {
+    const ids = [...this.pendingColumns];
+
+    this.pendingColumns.clear();
+
+    const ready = ids.filter((id) => {
+      const state = this.columnStates()[id];
+
+      return !!state && state.hasMore && !state.loading;
+    });
+
+    if (ready.length === 0) return;
+
+    const pid = this.effectiveProjectId();
+
+    if (!pid) return;
+
+    const generation = this.pagesGeneration;
+    const cursors: Record<string, string> = {};
+
+    for (const id of ready) {
+      // `hasMore` always comes with a cursor from the server; a missing one
+      // is skipped defensively instead of refetching the first page.
+      const cursor = this.columnStates()[id]?.nextCursor;
+
+      if (cursor) cursors[id] = cursor;
+    }
+
+    if (Object.keys(cursors).length === 0) return;
+
+    this.setColumnLoading(ready, true);
+    this.taskClient.listBoardPages(pid, this.buildPageQuery(cursors)).subscribe({
+      next: (page) => {
+        if (generation !== this.pagesGeneration) return;
+
+        for (const id of ready) {
+          const columnPage = page[id];
+
+          if (columnPage) this.appendPage(id, columnPage);
+        }
+
+        this.setColumnLoading(ready, false);
+      },
+      error: (err) => {
+        if (generation !== this.pagesGeneration) return;
+
+        this.setColumnLoading(ready, false);
+        this.notify.error(getErrorMessage(err));
+      },
+    });
+  }
 
   /** Get all unique statusIds from board columns */
   protected get allStatusIds(): string[] {
@@ -342,7 +541,7 @@ export class BoardView {
 
     if (!task) return;
 
-    // If dropped in the same column, do nothing
+    // Same-column drops carry no persisted position (order is sort-derived).
     if (event.previousContainer === event.container) return;
 
     // If column has multiple statuses, prompt user to select
@@ -378,22 +577,130 @@ export class BoardView {
     }
   }
 
-  /** Move a task to a new status via the API */
+  /**
+   * Move a task to a new status with optimistic local reconciliation — no
+   * column refetch, no cursor/hasMore/scroll changes. The server-returned
+   * card (fresh version) replaces the local object; single-card upserts are
+   * safe across board generations, so no generation guard is needed here.
+   */
   private moveTaskToStatus(task: BoardTask, statusId: string): void {
+    if (this.pendingMutations.has(task.id)) return;
+
+    const sourceColumnId = this.columnOwnerByStatusId().get(task.statusId)?.id ?? null;
+
+    this.removeCard(task.id);
+    this.pendingMutations.add(task.id);
     this.taskClient.update(task.id, { statusId, version: task.version }).subscribe({
       next: (updated) => {
-        if (this.tasksResource.hasValue()) {
-          this.tasksResource.value.update((list) => list.map((t) => (t.id === task.id ? updated : t)));
-        } else {
-          this.tasksResource.reload();
-        }
+        this.pendingMutations.delete(task.id);
+        this.applyMutationCard(toBoardTask(updated));
       },
       error: (err) => {
-        // Surface failures (incl. version conflicts) — silent drops confuse users
-        this.notify.error(getErrorMessage(err));
-        this.tasksResource.reload();
+        this.pendingMutations.delete(task.id);
+
+        if (err instanceof HttpErrorResponse && err.status === 409) {
+          // Someone else bumped the version — refresh the single card and
+          // route it by its fresh status instead of rolling back blindly.
+          this.taskClient.getById(task.id).subscribe({
+            next: (fresh) => this.applyMutationCard(toBoardTask(fresh)),
+            error: (refreshErr) => {
+              this.removeCard(task.id);
+              this.notify.error(getErrorMessage(refreshErr));
+            },
+          });
+        } else if (err instanceof HttpErrorResponse && err.status === 404) {
+          // Deleted elsewhere — the optimistic removal already stands.
+          this.notify.error(getErrorMessage(err));
+        } else {
+          this.restoreCard(task, sourceColumnId);
+          this.notify.error(getErrorMessage(err));
+        }
       },
     });
+  }
+
+  /**
+   * Route one fresh card into its owner column: insert sorted when it belongs
+   * to the loaded prefix, skip when it sits behind the cursor (it arrives via
+   * load-more), always insert into an exhausted column (terminal server set).
+   * Cursor and `hasMore` are never touched here.
+   */
+  private applyMutationCard(card: BoardTask): void {
+    this.removeCard(card.id);
+
+    const targetId = this.columnOwnerByStatusId().get(card.statusId)?.id;
+
+    if (!targetId) return;
+
+    const state = this.columnStates()[targetId];
+
+    if (!state) return;
+
+    if (!state.hasMore || this.sortsWithinPrefix(card, state.nextCursor)) {
+      this.insertCardSorted(targetId, card);
+    }
+  }
+
+  /**
+   * True when the card sorts at or before the loaded prefix end
+   * (`priorityLevel` DESC, `number` ASC against the decoded cursor).
+   */
+  private sortsWithinPrefix(card: BoardTask, nextCursor: string | null): boolean {
+    if (!nextCursor) return true;
+
+    try {
+      const cursor = decodeBoardCursor(nextCursor);
+
+      return (
+        card.priorityLevel > cursor.priorityLevel ||
+        (card.priorityLevel === cursor.priorityLevel && card.number <= cursor.number)
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  /** Sorted insert (no duplicates, no tail truncation — see `applyMutationCard`). */
+  private insertCardSorted(columnId: string, card: BoardTask): void {
+    this.columnStates.update((states) => {
+      const current = states[columnId];
+
+      if (!current || current.tasks.some((task) => task.id === card.id)) return states;
+
+      const tasks = [...current.tasks, card].sort((a, b) => b.priorityLevel - a.priorityLevel || a.number - b.number);
+
+      return { ...states, [columnId]: { ...current, tasks } };
+    });
+  }
+
+  /** Remove one card from every column (source side of a move, rollback aid). */
+  private removeCard(taskId: string): void {
+    this.columnStates.update((states) => {
+      let changed = false;
+      const next: Record<string, BoardColumnState> = {};
+
+      for (const [id, column] of Object.entries(states)) {
+        const tasks = column.tasks.filter((task) => task.id !== taskId);
+
+        if (tasks.length !== column.tasks.length) {
+          changed = true;
+          next[id] = { ...column, tasks };
+        } else {
+          next[id] = column;
+        }
+      }
+
+      return changed ? next : states;
+    });
+  }
+
+  /** Rollback aid: re-insert into the source column, cursor/`hasMore` untouched. */
+  private restoreCard(card: BoardTask, sourceColumnId: string | null): void {
+    if (sourceColumnId && this.columnStates()[sourceColumnId]) {
+      this.insertCardSorted(sourceColumnId, card);
+    } else {
+      this.applyMutationCard(card);
+    }
   }
 
   /** Get the CDK drop list IDs for all columns */
@@ -402,8 +709,7 @@ export class BoardView {
   }
 
   protected goToTask(task: BoardTask): void {
-    const projectKey =
-      this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? task.projectId;
+    const projectKey = this.route.snapshot.paramMap.get('projectKey') ?? this.projectStore.activeProject()?.key ?? '';
 
     // Canonical task URL uses the project key + task number (DEC-032)
     this.router.navigate([

@@ -137,20 +137,20 @@
     <div class="flex min-w-0 flex-1 gap-4 overflow-x-auto pb-4">
       @for (column of b.columns; track column.id) {
         <div class="flex min-w-70 flex-1 flex-col rounded-lg border border-border bg-muted/30">
-          <!-- Q9 (RQ-04 ⑥): WIP count next to the column title — reflects the
-               active assignee/priority filters because it derives from
-               `filteredTasks` via `tasksByColumnId` (S-08: computed map). -->
+          <!-- Q9 (RQ-04 ⑥): loaded-count next to the column title. Pagination
+               means the column holds a prefix, never a total — a trailing `+`
+               marks more cards server-side. No `countDocuments` on this path. -->
           <div class="border-b border-border px-3 py-2">
             <h3 class="flex items-center gap-1.5 text-sm font-semibold text-foreground">
               <span class="truncate">{{ columnNames().get(column.id) }}</span>
               <span class="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                {{ tasksByColumnId().get(column.id)?.length ?? 0 }}
+                {{ columnCountLabel(column.id) }}
               </span>
             </h3>
           </div>
           <div
             cdkDropList
-            [cdkDropListData]="tasksByColumnId().get(column.id) ?? []"
+            [cdkDropListData]="displayedTasksByColumnId().get(column.id) ?? []"
             [id]="getColumnDropId(column)"
             [cdkDropListConnectedTo]="b.columns.map((c) => getColumnDropId(c))"
             (cdkDropListDropped)="onTaskDrop($event, column)"
@@ -159,7 +159,7 @@
             <!-- Empty columns have no placeholder: the cdkDropList itself is the
                  drop target (it keeps flex-1 height), so drops into an empty
                  column still work and the preview lands at the top (index 0). -->
-            @for (task of tasksByColumnId().get(column.id) ?? []; track task.id) {
+            @for (task of displayedTasksByColumnId().get(column.id) ?? []; track task.id) {
               <div cdkDrag [cdkDragData]="task">
                 <ui-task-card
                   [task]="task"
@@ -169,6 +169,21 @@
                 />
               </div>
             }
+            @if (columnStates()[column.id]?.loading) {
+              <div class="flex justify-center py-3">
+                <hlm-spinner />
+              </div>
+            }
+            <!-- Infinite-scroll sentinel: live only while a next page exists.
+                 A disabled (exhausted/loading) sentinel never fires, so an
+                 empty column cannot loop requests. -->
+            <div
+              uiBoardSentinel
+              [disabled]="!sentinelActive(column.id)"
+              (nearBottom)="requestNextPage(column.id)"
+              class="h-1 shrink-0"
+              aria-hidden="true"
+            ></div>
           </div>
         </div>
       }
