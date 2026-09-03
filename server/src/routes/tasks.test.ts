@@ -41,7 +41,12 @@ function createTestApp(
 ) {
   const bulkUpdateTasks = vi.fn(bulkImpl ?? (() => Promise.resolve({ updated: 1 })));
 
-  (TaskService as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => tasksOverride ?? { bulkUpdateTasks });
+  // NOTE: plain `function` (not an arrow) — the mock is constructed with
+  // `new` below, and vitest only supports `new` on function implementations.
+  // eslint-disable-next-line prefer-arrow-callback -- the mock is constructed with `new`, which requires a function implementation.
+  (TaskService as unknown as ReturnType<typeof vi.fn>).mockImplementation(function mockTasksService() {
+    return tasksOverride ?? { bulkUpdateTasks };
+  });
 
   const app = new Hono<AppEnv>();
 
@@ -247,5 +252,69 @@ describe('GET /api/projects/:projectId/tasks/status-summary', () => {
     const json = (await res.json()) as { error: { code: string } };
 
     expect(json.error.code).toBe('NOT_FOUND');
+  });
+});
+
+// ─── GET /api/projects/:projectId/tasks/board (board column pages) ───────────
+
+describe('GET /api/projects/:projectId/tasks/board', () => {
+  const COL_A = '550e8400-e29b-41d4-a716-4466554400a1';
+
+  async function getBoard(app: Hono<AppEnv>, query: string) {
+    return app.request(`/api/projects/${PROJECT_ID}/tasks/board${query}`, { method: 'GET' }, TEST_ENV);
+  }
+
+  it('returns { data: BoardPage } and forwards decoded cursors plus filters', async () => {
+    const { encodeBoardCursor } = await import('@task-board/shared');
+    const cursor = encodeBoardCursor({ priorityLevel: 2, number: 184 });
+    const page = { [COL_A]: { tasks: [], hasMore: false, nextCursor: null } };
+    const getBoardPages = vi.fn().mockResolvedValue(page);
+    const { app } = createTestApp('MEMBER', undefined, { getBoardPages });
+    const res = await getBoard(app, `?cursor.${COL_A}=${cursor}&priorityLevel=3`);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ data: page });
+    expect(getBoardPages).toHaveBeenCalledWith(PROJECT_ID, {
+      cursors: { [COL_A]: { priorityLevel: 2, number: 184 } },
+      sprintId: undefined,
+      assigneeId: undefined,
+      priorityLevel: 3,
+    });
+  });
+
+  it('loads every column on initial load (no cursor params)', async () => {
+    const getBoardPages = vi.fn().mockResolvedValue({});
+    const { app } = createTestApp('MEMBER', undefined, { getBoardPages });
+    const res = await getBoard(app, '');
+
+    expect(res.status).toBe(200);
+    expect(getBoardPages).toHaveBeenCalledWith(PROJECT_ID, {
+      cursors: {},
+      sprintId: undefined,
+      assigneeId: undefined,
+      priorityLevel: undefined,
+    });
+  });
+
+  it('rejects a malformed cursor with 400 without calling the service', async () => {
+    const getBoardPages = vi.fn();
+    const { app } = createTestApp('MEMBER', undefined, { getBoardPages });
+    const res = await getBoard(app, `?cursor.${COL_A}=tampered!!!`);
+
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as { error: { code: string } };
+
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(getBoardPages).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-uuid column id with 400', async () => {
+    const getBoardPages = vi.fn();
+    const { app } = createTestApp('MEMBER', undefined, { getBoardPages });
+    const res = await getBoard(app, '?cursor.not-a-column=abc');
+
+    expect(res.status).toBe(400);
+    expect(getBoardPages).not.toHaveBeenCalled();
   });
 });

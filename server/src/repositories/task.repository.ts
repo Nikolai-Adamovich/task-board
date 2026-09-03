@@ -1,7 +1,8 @@
 import { BaseRepository } from './base.repository.js';
 import { randomUUID } from 'node:crypto';
 import type { Document } from 'mongodb';
-import type { Task, IdentitySnapshot } from '@task-board/shared';
+import { BOARD_PAGE_SIZE } from '@task-board/shared';
+import type { Task, IdentitySnapshot, BoardPageCursor, TaskPriorityLevel } from '@task-board/shared';
 import { escapeRegExp } from '../utils/regex.js';
 
 // Required MongoDB indexes:
@@ -127,6 +128,7 @@ export interface TaskQueryOptions {
  */
 const BOARD_VIEW_EXCLUDED_FIELDS = [
   'description',
+  'projectId',
   'reporterId',
   'reporterSnapshot',
   'statusName',
@@ -147,6 +149,24 @@ export interface PaginatedResult<T> {
     total: number;
     totalPages: number;
   };
+}
+
+/** Options for one board column page (see `findBoardPage`). */
+export interface BoardPageOptions {
+  /** Column statuses — matched with `$in` (one column may group several). */
+  statusIds: string[];
+  /** Resume key of the last loaded card; absent for the first page. */
+  cursor?: BoardPageCursor | null;
+  sprintId?: string;
+  assigneeId?: string;
+  priorityLevel?: number;
+}
+
+/** One board column page — fixed `BOARD_PAGE_SIZE`, probe-derived `hasMore`. */
+export interface BoardPageResult {
+  tasks: Task[];
+  hasMore: boolean;
+  nextCursor: BoardPageCursor | null;
 }
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
@@ -357,6 +377,56 @@ export class TaskRepository extends BaseRepository<TaskDocument, Task> {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  /**
+   * One board column page: keyset pagination over the column's statuses.
+   *
+   * Fixed contract — `BOARD_PAGE_SIZE` cards per call, no client-controlled
+   * limit, no `skip`, no `countDocuments`. The query fetches one probe
+   * document past the page (`BOARD_PAGE_SIZE + 1`): a 51st document means
+   * `hasMore`, and `nextCursor` is built from the last returned card.
+   * Sort is `{ priorityLevel: -1, number: 1 }`, served by the
+   * `{ projectId, statusId, priorityLevel: -1, number: 1 }` compound index
+   * (see migrations) — no blocking SORT stage.
+   */
+  async findBoardPage(projectId: string, options: BoardPageOptions): Promise<BoardPageResult> {
+    const { statusIds, cursor, sprintId, assigneeId, priorityLevel } = options;
+
+    // `$in: []` never matches — skip the round-trip entirely.
+    if (statusIds.length === 0) {
+      return { tasks: [], hasMore: false, nextCursor: null };
+    }
+
+    const query: Record<string, unknown> = { projectId, statusId: { $in: statusIds } };
+
+    if (cursor) {
+      query.$or = [
+        { priorityLevel: { $lt: cursor.priorityLevel } },
+        { priorityLevel: cursor.priorityLevel, number: { $gt: cursor.number } },
+      ];
+    }
+
+    if (sprintId) query.sprintId = sprintId;
+    if (assigneeId) query.assigneeId = assigneeId;
+    if (priorityLevel !== undefined) query.priorityLevel = priorityLevel;
+
+    const docs = await this.collection
+      .find(query, { projection: Object.fromEntries(BOARD_VIEW_EXCLUDED_FIELDS.map((field) => [field, 0])) })
+      .sort({ priorityLevel: -1, number: 1 })
+      .limit(BOARD_PAGE_SIZE + 1)
+      .toArray();
+    const hasMore = docs.length > BOARD_PAGE_SIZE;
+    const page = hasMore ? docs.slice(0, BOARD_PAGE_SIZE) : docs;
+    const last = page[page.length - 1];
+
+    return {
+      tasks: page.map(toDomain),
+      hasMore,
+      // Levels reach the document only through the validated write schema, so
+      // the narrow cursor level type holds at this boundary.
+      nextCursor: last ? { priorityLevel: last.priorityLevel as TaskPriorityLevel, number: last.number } : null,
     };
   }
 

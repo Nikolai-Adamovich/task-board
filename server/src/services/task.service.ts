@@ -1,8 +1,13 @@
-import { ProjectStatus } from '@task-board/shared';
+import { ProjectStatus, encodeBoardCursor } from '@task-board/shared';
 import { ensurePermission } from './rbac.service.js';
 import type {
   Task,
   BoardTask,
+  BoardPage,
+  BoardColumnPage,
+  BoardPageCursor,
+  BoardColumn,
+  BoardConfig,
   CreateTask,
   UpdateTask,
   IdentitySnapshot,
@@ -10,7 +15,7 @@ import type {
   BulkUpdateTasksResult,
   BulkUpdateTaskFailure,
 } from '@task-board/shared';
-import { AppError, ConflictError, NotFoundError } from '../errors/app-error.js';
+import { AppError, ConflictError, NotFoundError, ValidationError } from '../errors/app-error.js';
 import { assertTenantEntity } from './tenant-assert.js';
 import {
   TaskRepository,
@@ -45,6 +50,21 @@ export interface TaskServiceRelationshipRepo {
   deleteByTask(taskId: string): Promise<void>;
 }
 
+export interface TaskServiceBoardRepo {
+  findByProject(projectId: string): Promise<BoardConfig | null>;
+}
+
+export interface BoardPagesOptions {
+  /**
+   * Decoded resume cursors by board column id. Entries that are absent load
+   * the first page; an empty map is the initial load of every column.
+   */
+  cursors?: Record<string, BoardPageCursor>;
+  sprintId?: string;
+  assigneeId?: string;
+  priorityLevel?: number;
+}
+
 // ─── Task Service ────────────────────────────────────────────────────────────
 
 export class TaskService {
@@ -60,6 +80,7 @@ export class TaskService {
     private readonly commentRepo: TaskServiceCommentRepo,
     private readonly relationshipRepo: TaskServiceRelationshipRepo,
     private readonly auditService?: AuditService,
+    private readonly boardRepo?: TaskServiceBoardRepo,
   ) {}
 
   // ─── Task CRUD ────────────────────────────────────────────────────────────
@@ -81,7 +102,6 @@ export class TaskService {
       ...result,
       data: result.data.map((task) => ({
         id: task.id,
-        projectId: task.projectId,
         number: task.number,
         title: task.title,
         typeId: task.typeId,
@@ -92,6 +112,83 @@ export class TaskService {
         version: task.version,
       })),
     };
+  }
+
+  /**
+   * Board column pages: one HTTP request serves every requested column, each
+   * column running its own keyset query in parallel (`Promise.all` — no
+   * `$facet`, no `skip`, no `countDocuments` on this path).
+   *
+   * Columns resolve server-side from the project's `BoardConfig` — callers
+   * pass opaque cursors by column id and can never inject arbitrary
+   * `statusIds`. An empty cursor map is the initial load (first page of every
+   * column); a non-empty map loads only the listed columns. Overlapping
+   * `statusIds` across columns resolve to a single owner column (most
+   * specific, then lowest position) — the same V4-12 semantics the board UI
+   * applies client-side, so no card renders twice.
+   */
+  async getBoardPages(projectId: string, options: BoardPagesOptions = {}): Promise<BoardPage> {
+    if (!this.boardRepo) {
+      throw new Error('Board repository is not configured');
+    }
+
+    const board = await this.boardRepo.findByProject(projectId);
+
+    if (!board) {
+      throw new NotFoundError('Board not found');
+    }
+
+    const { cursors = {}, sprintId, assigneeId, priorityLevel } = options;
+    const cursorIds = new Set(Object.keys(cursors));
+
+    for (const columnId of cursorIds) {
+      if (!board.columns.some((column) => column.id === columnId)) {
+        throw new ValidationError(`Unknown board column: ${columnId}`);
+      }
+    }
+
+    const wanted = cursorIds.size === 0 ? board.columns : board.columns.filter((column) => cursorIds.has(column.id));
+    const ownerByStatusId = new Map<string, BoardColumn>();
+
+    for (const column of [...board.columns].sort(
+      (a, z) => a.statusIds.length - z.statusIds.length || a.position - z.position,
+    )) {
+      for (const statusId of column.statusIds) {
+        if (!ownerByStatusId.has(statusId)) ownerByStatusId.set(statusId, column);
+      }
+    }
+
+    const entries = await Promise.all(
+      wanted.map(async (column) => {
+        const exclusiveStatusIds = column.statusIds.filter((statusId) => ownerByStatusId.get(statusId) === column);
+        const result = await this.taskRepo.findBoardPage(projectId, {
+          statusIds: exclusiveStatusIds,
+          cursor: cursors[column.id] ?? null,
+          sprintId,
+          assigneeId,
+          priorityLevel,
+        });
+        const page: BoardColumnPage = {
+          tasks: result.tasks.map((task) => ({
+            id: task.id,
+            number: task.number,
+            title: task.title,
+            typeId: task.typeId,
+            statusId: task.statusId,
+            priorityLevel: task.priorityLevel,
+            assigneeId: task.assigneeId,
+            assigneeSnapshot: task.assigneeSnapshot,
+            version: task.version,
+          })),
+          hasMore: result.hasMore,
+          nextCursor: result.hasMore && result.nextCursor ? encodeBoardCursor(result.nextCursor) : null,
+        };
+
+        return [column.id, page] as const;
+      }),
+    );
+
+    return Object.fromEntries(entries);
   }
 
   /**

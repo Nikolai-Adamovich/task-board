@@ -118,3 +118,19 @@ export const TaskQuerySchema = z.object({
    */
   view: z.enum(['board']).optional(),
 });
+
+/**
+ * Board column pages (`GET …/tasks/board`): fixed `BOARD_PAGE_SIZE` cards per
+ * column — no client-controlled limit. Per-column resume cursors arrive as
+ * flat `cursor.<columnId>` query params holding opaque base64url strings;
+ * `catchall` keeps them in the parsed output and the route decodes each one
+ * (malformed → 400). Board filters mirror the flat board list so the paged
+ * board keeps feature parity with it.
+ */
+export const BoardPageQuerySchema = z
+  .object({
+    sprintId: uuid().optional(),
+    assigneeId: uuid().optional(),
+    priorityLevel: z.coerce.number().pipe(taskPriorityLevelSchema).optional(),
+  })
+  .catchall(z.string());

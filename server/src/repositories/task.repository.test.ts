@@ -127,7 +127,7 @@ describe('TaskRepository', () => {
       expect(collection.find).toHaveBeenCalledWith({ projectId: 'project-1' }, { projection: { description: 0 } });
     });
 
-    it('view=board projects out every non-card field (description, reporter, timestamps, metadata)', async () => {
+    it('view=board projects out every non-card field (description, projectId, reporter, timestamps, metadata)', async () => {
       const toArray = vi.fn().mockResolvedValue([makeDoc()]);
       const limit = vi.fn().mockReturnValue({ toArray });
       const skip = vi.fn().mockReturnValue({ limit });
@@ -143,6 +143,7 @@ describe('TaskRepository', () => {
         {
           projection: {
             description: 0,
+            projectId: 0,
             reporterId: 0,
             reporterSnapshot: 0,
             statusName: 0,
@@ -400,6 +401,127 @@ describe('TaskRepository', () => {
       await repo.clearSprintFromTasks('project-1', 'sprint-1');
 
       expect(collection.updateMany).toHaveBeenCalled();
+    });
+  });
+
+  describe('findBoardPage (board column keyset pagination)', () => {
+    function chain(docs: ReturnType<typeof makeDoc>[]) {
+      const toArray = vi.fn().mockResolvedValue(docs);
+      const limit = vi.fn().mockReturnValue({ toArray });
+      const sort = vi.fn().mockReturnValue({ limit });
+
+      collection.find.mockReturnValue({ sort });
+
+      return { toArray, limit, sort };
+    }
+
+    function makePageDocs(count: number, startNumber = 1): ReturnType<typeof makeDoc>[] {
+      return Array.from({ length: count }, (_, i) =>
+        makeDoc({ id: `task-${startNumber + i}`, number: startNumber + i, priorityLevel: 2 }),
+      );
+    }
+
+    const BOARD_PROJECTION = {
+      description: 0,
+      projectId: 0,
+      reporterId: 0,
+      reporterSnapshot: 0,
+      statusName: 0,
+      sprintName: 0,
+      sprintId: 0,
+      labelIds: 0,
+      createdById: 0,
+      createdBySnapshot: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+
+    it('queries the fixed 50-card page with a 51 probe, board sort and projection', async () => {
+      const { limit, sort } = chain(makePageDocs(51));
+      const result = await repo.findBoardPage('project-1', { statusIds: ['status-1', 'status-2'] });
+
+      expect(collection.find).toHaveBeenCalledWith(
+        { projectId: 'project-1', statusId: { $in: ['status-1', 'status-2'] } },
+        { projection: BOARD_PROJECTION },
+      );
+      expect(sort).toHaveBeenCalledWith({ priorityLevel: -1, number: 1 });
+      expect(limit).toHaveBeenCalledWith(51);
+      expect(result.tasks).toHaveLength(50);
+      expect(result.hasMore).toBe(true);
+      expect(result.nextCursor).toEqual({ priorityLevel: 2, number: 50 });
+    });
+
+    it('returns hasMore=false with the tail cursor on a short page', async () => {
+      chain(makePageDocs(37, 100));
+
+      const result = await repo.findBoardPage('project-1', { statusIds: ['status-1'] });
+
+      expect(result.tasks).toHaveLength(37);
+      expect(result.hasMore).toBe(false);
+      expect(result.nextCursor).toEqual({ priorityLevel: 2, number: 136 });
+    });
+
+    it('returns an empty page with a null cursor when nothing matches', async () => {
+      chain([]);
+
+      const result = await repo.findBoardPage('project-1', { statusIds: ['status-1'] });
+
+      expect(result).toEqual({ tasks: [], hasMore: false, nextCursor: null });
+    });
+
+    it('applies the keyset cursor predicate for follow-up pages', async () => {
+      chain(makePageDocs(10));
+
+      await repo.findBoardPage('project-1', {
+        statusIds: ['status-1'],
+        cursor: { priorityLevel: 2, number: 184 },
+      });
+
+      expect(collection.find).toHaveBeenCalledWith(
+        {
+          projectId: 'project-1',
+          statusId: { $in: ['status-1'] },
+          $or: [{ priorityLevel: { $lt: 2 } }, { priorityLevel: 2, number: { $gt: 184 } }],
+        },
+        { projection: BOARD_PROJECTION },
+      );
+    });
+
+    it('forwards board filters into the query', async () => {
+      chain([]);
+
+      await repo.findBoardPage('project-1', {
+        statusIds: ['status-1'],
+        sprintId: 'sprint-1',
+        assigneeId: 'user-2',
+        priorityLevel: 3,
+      });
+
+      expect(collection.find).toHaveBeenCalledWith(
+        {
+          projectId: 'project-1',
+          statusId: { $in: ['status-1'] },
+          sprintId: 'sprint-1',
+          assigneeId: 'user-2',
+          priorityLevel: 3,
+        },
+        { projection: BOARD_PROJECTION },
+      );
+    });
+
+    it('skips the round-trip for an empty status list', async () => {
+      const result = await repo.findBoardPage('project-1', { statusIds: [] });
+
+      expect(collection.find).not.toHaveBeenCalled();
+      expect(result).toEqual({ tasks: [], hasMore: false, nextCursor: null });
+    });
+
+    it('never counts or skips on the board path', async () => {
+      chain(makePageDocs(5));
+
+      await repo.findBoardPage('project-1', { statusIds: ['status-1'] });
+
+      expect(collection.countDocuments).not.toHaveBeenCalled();
     });
   });
 });

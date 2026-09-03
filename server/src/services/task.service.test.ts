@@ -5,7 +5,11 @@ import type {
   TaskServiceSprintRepo,
   TaskServiceCommentRepo,
   TaskServiceRelationshipRepo,
+  TaskServiceBoardRepo,
 } from './task.service.js';
+import { decodeBoardCursor } from '@task-board/shared';
+import type { BoardConfig } from '@task-board/shared';
+import { NotFoundError, ValidationError } from '../errors/app-error.js';
 import { TaskRepository } from '../repositories/task.repository.js';
 import { CounterService } from './counter.service.js';
 import { ProjectRepository } from '../repositories/project.repository.js';
@@ -160,7 +164,6 @@ describe('TaskService', () => {
       expect(taskRepo.findByProject).toHaveBeenCalledWith('project-1', { view: 'board' });
       expect(boardTask).toEqual({
         id: expect.any(String),
-        projectId: 'project-1',
         number: expect.any(Number),
         title: expect.any(String),
         typeId: expect.any(String),
@@ -177,7 +180,6 @@ describe('TaskService', () => {
         'id',
         'number',
         'priorityLevel',
-        'projectId',
         'statusId',
         'title',
         'typeId',
@@ -573,6 +575,153 @@ describe('TaskService', () => {
 
       expect(events).toHaveLength(1);
       expect(events[0]?.entityId).toBe('t1');
+    });
+  });
+
+  describe('getBoardPages (one HTTP request, parallel column queries)', () => {
+    const COL_A = '550e8400-e29b-41d4-a716-4466554400a1';
+    const COL_B = '550e8400-e29b-41d4-a716-4466554400b2';
+
+    function makeBoard(): BoardConfig {
+      return {
+        projectId: 'project-1',
+        columns: [
+          { id: COL_A, statusIds: ['status-1', 'status-2'], position: 0 },
+          { id: COL_B, statusIds: ['status-2'], position: 1 },
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      };
+    }
+
+    function boardService(board: BoardConfig | null) {
+      const boardRepo = createMock<TaskServiceBoardRepo>({
+        findByProject: vi.fn().mockResolvedValue(board),
+      });
+
+      // Default (tests that need data assign their own mock first).
+      if (!taskRepo.findBoardPage) taskRepo.findBoardPage = vi.fn();
+
+      return new TaskService(
+        taskRepo,
+        counterService,
+        projectRepo,
+        projectMemberRepo,
+        statusRepo,
+        taskTypeRepo,
+        userRepo,
+        sprintRepo,
+        commentRepo,
+        relationshipRepo,
+        auditService,
+        boardRepo,
+      );
+    }
+
+    it('loads the first page of every column on initial load with exclusive statuses', async () => {
+      taskRepo.findBoardPage = vi
+        .fn()
+        .mockResolvedValueOnce({
+          tasks: [makeTask({ id: 't1', statusId: 'status-1', number: 1 })],
+          hasMore: true,
+          nextCursor: { priorityLevel: 1, number: 1 },
+        })
+        .mockResolvedValueOnce({ tasks: [], hasMore: false, nextCursor: null });
+
+      const page = await boardService(makeBoard()).getBoardPages('project-1');
+
+      // COL_B owns status-2 (most specific column wins — V4-12 parity), so
+      // COL_A is queried with the exclusive remainder only.
+      expect(taskRepo.findBoardPage).toHaveBeenCalledTimes(2);
+      expect(taskRepo.findBoardPage).toHaveBeenCalledWith('project-1', {
+        statusIds: ['status-1'],
+        cursor: null,
+        sprintId: undefined,
+        assigneeId: undefined,
+        priorityLevel: undefined,
+      });
+      expect(taskRepo.findBoardPage).toHaveBeenCalledWith('project-1', {
+        statusIds: ['status-2'],
+        cursor: null,
+        sprintId: undefined,
+        assigneeId: undefined,
+        priorityLevel: undefined,
+      });
+      expect(Object.keys(page).sort()).toEqual([COL_A, COL_B].sort());
+      // Exact BoardTask DTO shape — no description/reporter/timestamp leakage.
+      expect(page[COL_A]?.tasks[0]).toEqual({
+        id: 't1',
+        number: 1,
+        title: 'Test Task',
+        typeId: 'type-1',
+        statusId: 'status-1',
+        priorityLevel: 1,
+        assigneeId: null,
+        assigneeSnapshot: null,
+        version: 1,
+      });
+      expect(page[COL_A]?.hasMore).toBe(true);
+      expect(decodeBoardCursor(page[COL_A]?.nextCursor)).toEqual({ priorityLevel: 1, number: 1 });
+      expect(page[COL_B]).toEqual({ tasks: [], hasMore: false, nextCursor: null });
+    });
+
+    it('loads only the requested columns on follow-up pages and forwards filters', async () => {
+      taskRepo.findBoardPage = vi.fn().mockResolvedValue({ tasks: [], hasMore: false, nextCursor: null });
+
+      await boardService(makeBoard()).getBoardPages('project-1', {
+        cursors: { [COL_B]: { priorityLevel: 2, number: 184 } },
+        sprintId: 'sprint-1',
+        assigneeId: 'user-2',
+        priorityLevel: 3,
+      });
+
+      expect(taskRepo.findBoardPage).toHaveBeenCalledTimes(1);
+      expect(taskRepo.findBoardPage).toHaveBeenCalledWith('project-1', {
+        statusIds: ['status-2'],
+        cursor: { priorityLevel: 2, number: 184 },
+        sprintId: 'sprint-1',
+        assigneeId: 'user-2',
+        priorityLevel: 3,
+      });
+    });
+
+    it('throws NOT_FOUND when the project has no board', async () => {
+      await expect(boardService(null).getBoardPages('project-1')).rejects.toThrow(NotFoundError);
+    });
+
+    it('BoardTask response does not contain projectId or description', async () => {
+      taskRepo.findBoardPage = vi.fn().mockResolvedValue({
+        tasks: [makeTask({ description: 'should never leak' })],
+        hasMore: false,
+        nextCursor: null,
+      });
+
+      const page = await boardService(makeBoard()).getBoardPages('project-1');
+      const card = page[COL_A]?.tasks[0] ?? {};
+
+      expect('projectId' in card).toBe(false);
+      expect('description' in card).toBe(false);
+      expect(Object.keys(card).sort()).toEqual([
+        'assigneeId',
+        'assigneeSnapshot',
+        'id',
+        'number',
+        'priorityLevel',
+        'statusId',
+        'title',
+        'typeId',
+        'version',
+      ]);
+    });
+
+    it('throws a 400 ValidationError for unknown column ids (no statusIds injection)', async () => {
+      await expect(
+        boardService(makeBoard()).getBoardPages('project-1', {
+          cursors: { '550e8400-e29b-41d4-a716-446655440099': { priorityLevel: 1, number: 1 } },
+        }),
+      ).rejects.toThrow(ValidationError);
+
+      expect(taskRepo.findBoardPage).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,9 +1,22 @@
 import { Hono } from 'hono';
+import { decodeBoardCursor, InvalidBoardCursorError } from '@task-board/shared';
+import type { BoardPageCursor } from '@task-board/shared';
 import type { AppEnv } from '../types/context.js';
 import { validateBody, validateQuery } from '../middleware/validation.js';
 import { requirePermission } from '../middleware/rbac.js';
+import { ValidationError } from '../errors/app-error.js';
+import { uuid } from '../validators/common.js';
 import type { TaskQueryOptions } from '../repositories/task.repository.js';
-import { BulkUpdateTasksSchema, CreateTaskSchema, TaskQuerySchema, UpdateTaskSchema } from '../schemas/task.js';
+import {
+  BoardPageQuerySchema,
+  BulkUpdateTasksSchema,
+  CreateTaskSchema,
+  TaskQuerySchema,
+  UpdateTaskSchema,
+} from '../schemas/task.js';
+
+/** Prefix for per-column resume cursors (`cursor.<columnId>=<opaque>`). */
+const BOARD_CURSOR_PREFIX = 'cursor.';
 
 // ─── Task Routes ─────────────────────────────────────────────────────────────
 
@@ -60,6 +73,52 @@ export function createTaskRoutes(): Hono<AppEnv> {
     const summary = await c.get('svc').tasks.getStatusSummary(projectId);
 
     return c.json({ data: summary });
+  });
+
+  /**
+   * GET /projects/:projectId/tasks/board — board column pages (cursor/keyset
+   * pagination, fixed `BOARD_PAGE_SIZE` cards per column).
+   *
+   * No `cursor.<columnId>` params is the initial load (first page of every
+   * column); listed cursors load only those columns. Columns resolve
+   * server-side from the project's `BoardConfig`, so callers can never inject
+   * arbitrary `statusIds`. Malformed cursors and unknown column ids → 400.
+   * Same read pattern as the list route: tenant context resolves the project
+   * role, no coarse route gate.
+   */
+  router.get('/projects/:projectId/tasks/board', validateQuery(BoardPageQuerySchema), async (c) => {
+    const projectId = c.req.param('projectId');
+    const q = c.req.valid('query');
+    const cursors: Record<string, BoardPageCursor> = {};
+
+    for (const [key, value] of Object.entries(q)) {
+      if (!key.startsWith(BOARD_CURSOR_PREFIX)) continue;
+
+      const columnId = key.slice(BOARD_CURSOR_PREFIX.length);
+
+      if (!uuid().safeParse(columnId).success) {
+        throw new ValidationError(`Unknown board column: ${columnId}`);
+      }
+
+      try {
+        cursors[columnId] = decodeBoardCursor(value);
+      } catch (err) {
+        if (err instanceof InvalidBoardCursorError) {
+          throw new ValidationError(`Invalid cursor for board column ${columnId}`);
+        }
+
+        throw err;
+      }
+    }
+
+    const page = await c.get('svc').tasks.getBoardPages(projectId, {
+      cursors,
+      sprintId: q.sprintId,
+      assigneeId: q.assigneeId,
+      priorityLevel: q.priorityLevel,
+    });
+
+    return c.json({ data: page });
   });
 
   /**

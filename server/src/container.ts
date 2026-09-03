@@ -175,6 +175,7 @@ export function buildServices(env: ContainerEnv): Services {
       commentRepo,
       relationshipRepo,
       auditService,
+      boardRepo,
     ),
     taskTypes: new TaskTypeService(taskTypeRepo, taskRepo, projectRepo, auditService, projectMemberRepo),
     tenantMembers: new TenantMemberService(tenantRepo, tenantMemberRepo, userRepo, emailService),

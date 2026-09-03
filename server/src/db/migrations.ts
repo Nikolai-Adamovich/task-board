@@ -267,6 +267,12 @@ const CORE_INDEXES: IndexDefinition[] = [
   // changes (number ASC instead of number DESC); `number` stays unique per
   // project, so overall ordering remains deterministic. See §4.20.
   { collection: 'tasks', spec: { projectId: 1, priorityLevel: 1, number: 1 } },
+  // Board column pages (Stage 4): per-column keyset pagination — equality on
+  // {projectId, statusId} ($in per column) + mixed sort {priorityLevel: -1,
+  // number: 1}. The existing {projectId, priorityLevel, number} index cannot
+  // serve the mixed DESC/ASC sort (proven blocking SORT at every scale —
+  // see product-analysis/100 §4.23). Additive: existing indexes stay.
+  { collection: 'tasks', spec: { projectId: 1, statusId: 1, priorityLevel: -1, number: 1 } },
   { collection: 'tasks', spec: { projectId: 1, assigneeId: 1, number: 1 } },
   { collection: 'tasks', spec: { projectId: 1, reporterId: 1, number: 1 } },
   { collection: 'tasks', spec: { projectId: 1, typeId: 1, number: 1 } },
